@@ -1,0 +1,1258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    PGPony Android — strings.xml
+    Created in Phase A13 for the localization pass that follows in A14.
+
+    NAMING CONVENTION
+    =================
+
+    All keys follow `<feature>_<area>_<purpose>` snake_case format. The
+    feature prefix scopes ownership so two unrelated screens can use
+    similar wording without collisions, and the purpose suffix tells
+    you what role the string plays (title, body, button, error, etc.).
+
+    Examples:
+      settings_security_title           — section header
+      settings_biometric_lock_label     — toggle label
+      settings_biometric_lock_subtitle  — toggle subtitle (helper text)
+      settings_biometric_unavailable_error — error message
+      lock_screen_tagline               — small tagline below the app name
+      common_button_cancel              — reusable button label
+
+    Reusable strings (Cancel, OK, Save, Done, Copy, Share, etc.) live
+    under the `common_` prefix.
+
+    PARAMETERIZED STRINGS
+    =====================
+
+    Use Java/printf-style positional specifiers, never named placeholders:
+      <string name="clipboard_will_clear_in">Clipboard will clear in %1$ds</string>
+      <string name="key_count_summary">%1$d keys, %2$d key pairs</string>
+
+    Read in Kotlin via:
+      stringResource(R.string.clipboard_will_clear_in, seconds)        // Composable
+      context.getString(R.string.clipboard_will_clear_in, seconds)     // non-Composable
+      PGPonyApp.instance.getString(R.string.foo, arg1, arg2)           // ViewModel / service
+
+    PLURALS
+    =======
+
+    Strings that change form by count live in plurals.xml (created in
+    A13b alongside the first plural-using extraction — encrypt
+    recipient count). For now this file holds only singular strings.
+
+    HTML / FORMATTING
+    =================
+
+    Strings containing HTML (bold, italics, inline links) wrap in
+    <![CDATA[...]]> and are rendered via androidx.compose's
+    AnnotatedString.fromHtml or via Html.fromHtml on legacy paths.
+    None in A13a yet.
+
+    NON-COMPOSABLE ACCESS (ViewModels, services)
+    ============================================
+
+    ViewModels and services that need user-facing strings go through
+    PGPonyApp.instance.getString(R.string.foo) — Application is a
+    Context and getString reaches all string resources. Threading the
+    actual Activity Context all the way down would require touching
+    every PGPonyViewModelFactory call site; using the Application
+    singleton is the lighter pattern and matches what we already do
+    for KeyExpirationService's notification text.
+
+    SCOPE NOTES (A13a)
+    ==================
+
+    This file is created with the foundational strings from the
+    following surfaces, in order of extraction:
+
+      1. Common reusable labels         (common_*)
+      2. Lock screen                    (lock_*)
+      3. Settings screen                (settings_*)
+      4. SettingsViewModel error msgs   (settings_*_error)
+      5. MainActivity                   (main_*)
+
+    Future bundles (A13b, A13c, A13d, A13e) extend this file with the
+    remaining feature areas — see the working progress file in the
+    bundle root for the live status.
+-->
+<!-- Localized for values-ja - Phase A15: +47 ShareTargetActivity strings on top of A14e baseline. Run total: 713 entries handled per language. -->
+<resources>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         App identity
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="app_name">PGPony</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Common reusable labels — used by 5+ screens
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="common_button_cancel">キャンセル</string>
+    <string name="common_button_ok">OK</string>
+    <string name="common_button_save">保存</string>
+    <string name="common_button_done">完了</string>
+    <string name="common_button_close">閉じる</string>
+    <string name="common_button_continue">続ける</string>
+    <string name="common_button_back">戻る</string>
+    <string name="common_button_copy">コピー</string>
+    <string name="common_button_copy_to_clipboard">クリップボードにコピー</string>
+    <string name="common_button_copied">コピーしました！</string>
+    <string name="common_button_share">共有</string>
+    <string name="common_button_delete">削除</string>
+    <string name="common_button_retry">再試行</string>
+    <string name="common_button_try_again">再試行</string>
+    <string name="common_button_open">開く</string>
+    <string name="common_button_select">選択</string>
+    <string name="common_button_select_all">すべて選択</string>
+    <string name="common_button_clear">クリア</string>
+    <string name="common_button_confirm">確認</string>
+    <string name="common_button_skip">スキップ</string>
+    <string name="common_loading">読み込み中…</string>
+    <string name="common_processing">処理中…</string>
+    <string name="common_authenticating">認証中…</string>
+    <string name="common_required_field">必須</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Lock screen (Phase A11)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="lock_screen_tagline">鍵は厩舎に保管されています</string>
+    <string name="lock_screen_unlock_button">ロック解除</string>
+    <string name="lock_prompt_title">PGPony のロック解除</string>
+    <string name="lock_prompt_subtitle">認証して鍵にアクセス</string>
+    <string name="lock_error_activity_unavailable">アクティビティコンテキストを利用できません。</string>
+    <string name="lock_error_biometric_unavailable">生体認証は利用できません。システム設定で指紋または画面ロックを登録してください。</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Settings — top-level navigation
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="settings_title">設定</string>
+
+    <!-- ── Section headers ───────────────────────────────────────────── -->
+    <string name="settings_section_pgpony_pro">PGPony Pro</string>
+    <string name="settings_section_security">セキュリティ</string>
+    <string name="settings_section_clipboard">クリップボード</string>
+    <string name="settings_section_appearance">外観</string>
+    <string name="settings_section_default_recipient">既定の宛先</string>
+    <string name="settings_default_recipient_label">暗号化時に宛先を事前選択</string>
+    <string name="settings_default_recipient_none">なし</string>
+    <string name="settings_default_recipient_pinned">固定</string>
+    <string name="settings_default_recipient_last">前回の宛先</string>
+    <string name="settings_default_recipient_choose">鍵を選択</string>
+    <string name="settings_section_reminders">リマインダー</string>
+    <string name="settings_section_key_management">鍵の管理</string>
+    <string name="settings_section_data">データ</string>
+    <string name="settings_section_support">サポート</string>
+    <string name="settings_section_more">NorseHorse の他のアプリ</string>
+    <string name="settings_more_agepony_title">AgePony</string>
+    <string name="settings_more_agepony_subtitle">age 形式によるファイル暗号化</string>
+    <string name="settings_more_source_title">オープンソースエンジン</string>
+    <string name="settings_more_source_subtitle">GitHub 上の PGPonyCore、監査済みの暗号コア</string>
+    <string name="settings_more_appsource_title">ソースコード</string>
+    <string name="settings_more_appsource_subtitle">GitHub 上の PGPony アプリ全体</string>
+    <string name="settings_section_about">情報</string>
+
+    <!-- ── Pro section ──────────────────────────────────────────────── -->
+    <string name="settings_pro_active_label">PGPony Pro</string>
+    <string name="settings_pro_active_subtitle">すべての機能がアンロックされています</string>
+    <string name="settings_pro_upgrade_label">Pro にアップグレード</string>
+    <string name="settings_pro_upgrade_subtitle">完全な鍵束とクラウド同期を解除</string>
+    <string name="settings_pro_unlock_price_format">すべての機能を解除 — %1$s</string>
+    <string name="settings_pro_unlock_button">Pro を解除</string>
+    <string name="settings_pro_restore_button">復元</string>
+
+    <!-- ── Security section ─────────────────────────────────────────── -->
+    <string name="settings_biometric_lock_title">生体認証ロック</string>
+    <string name="settings_biometric_lock_subtitle">アプリを開くときに認証を求める</string>
+    <string name="settings_biometric_decrypt_title">復号のたびに要求</string>
+    <string name="settings_biometric_decrypt_subtitle">復号のたびに再認証</string>
+    <string name="settings_biometric_unavailable_error">先にシステム設定で画面ロックまたは生体認証を設定してください。</string>
+
+    <!-- ── Clipboard section ────────────────────────────────────────── -->
+    <string name="settings_clipboard_autoclear_title">クリップボードを自動消去</string>
+    <string name="settings_clipboard_autoclear_subtitle">コピーした内容を自動で消去</string>
+    <string name="settings_clipboard_clear_after_label">経過後に消去</string>
+    <string name="settings_clipboard_interval_30s">30秒</string>
+    <string name="settings_clipboard_interval_1m">1分</string>
+    <string name="settings_clipboard_interval_2m">2分</string>
+    <string name="settings_clipboard_interval_5m">5分</string>
+
+    <!-- ── Appearance section (Phase A12) ───────────────────────────── -->
+    <string name="settings_appearance_theme_label">テーマ</string>
+    <string name="settings_appearance_theme_system">システム</string>
+    <string name="settings_appearance_theme_light">ライト</string>
+    <string name="settings_appearance_theme_dark">ダーク</string>
+
+    <!-- ── Reminders section (Phase A12) ────────────────────────────── -->
+    <string name="settings_reminders_key_expiration_title">キー有効期限のリマインダー</string>
+    <string name="settings_reminders_key_expiration_subtitle">鍵の有効期限の 30 日、7 日、1 日前に通知を受け取ります</string>
+    <string name="settings_reminders_permission_denied_error">通知の権限が拒否されました。許可するまでリマインダーは送信されません。</string>
+    <string name="settings_reminders_notifications_disabled_hint">システム設定で通知が無効になっています。アプリの通知設定を開いて再度有効にしてください。</string>
+
+    <!-- ── Key Management section ───────────────────────────────────── -->
+    <string name="settings_key_default_label">デフォルトの鍵</string>
+    <string name="settings_key_total_keys_label">鍵の合計</string>
+    <string name="settings_key_total_pairs_label">鍵ペア</string>
+    <string name="settings_key_default_format">%1$s (%2$s)</string>
+
+    <!-- ── Data section ─────────────────────────────────────────────── -->
+    <string name="settings_data_clear_all_button">すべてのデータを削除</string>
+    <string name="settings_data_clear_step1_title">すべてのデータを削除しますか？</string>
+    <string name="settings_data_clear_step1_body">秘密鍵を含むすべての鍵が完全に削除されます。元には戻せません。</string>
+    <string name="settings_data_clear_step2_title">本当によろしいですか？</string>
+    <string name="settings_data_clear_step2_body">これらの鍵を使用しているすべての暗号化メッセージへのアクセスを失います。復元はできません。</string>
+    <string name="settings_data_clear_step2_confirm">すべてのデータを削除</string>
+    <string name="settings_data_clear_success">すべてのデータを削除しました</string>
+    <string name="settings_data_clear_error_format">削除に失敗しました: %1$s</string>
+
+    <!-- ── Support section ──────────────────────────────────────────── -->
+    <string name="settings_support_help_title">ヘルプとよくある質問</string>
+    <string name="settings_support_help_subtitle">よくある質問への回答</string>
+    <string name="settings_support_rate_title">Google Play で PGPony を評価</string>
+    <string name="settings_support_rate_subtitle">他の人がアプリを見つけるのに役立ちます</string>
+    <string name="settings_support_rate_error">評価ダイアログを開けませんでした</string>
+    <string name="settings_support_feedback_title">フィードバックを送信</string>
+    <string name="settings_support_feedback_subtitle">開発者に直接メールを送る</string>
+    <string name="settings_support_feedback_no_email_error">メールアプリが見つかりませんでした。%1$s までご連絡ください</string>
+    <string name="settings_support_privacy_title">プライバシーポリシー</string>
+    <string name="settings_support_privacy_subtitle">データの取り扱いについて</string>
+    <string name="settings_support_browser_error">ブラウザを開けませんでした</string>
+    <string name="settings_support_security_title">セキュリティと暗号化</string>
+    <string name="settings_support_security_subtitle">PGPony がメッセージを保護する仕組み</string>
+
+    <!-- ── About section ────────────────────────────────────────────── -->
+    <string name="settings_about_version_label">バージョン</string>
+    <string name="settings_about_compat_label">互換性</string>
+    <string name="settings_about_compat_value">Android 8.0 以上</string>
+    <string name="settings_about_openpgp_label">OpenPGP 標準</string>
+    <string name="settings_about_openpgp_value">RFC 4880 + 9580</string>
+    <string name="settings_about_crypto_label">暗号ライブラリ</string>
+    <string name="settings_about_crypto_value">Bouncy Castle 1.78.1</string>
+    <string name="settings_about_replay_onboarding_title">ウェルカムツアーを再表示</string>
+    <string name="settings_about_replay_onboarding_subtitle">初回起動時の紹介を再生</string>
+    <string name="settings_about_reset_tips_title">ヒントをリセット</string>
+    <string name="settings_about_reset_tips_subtitle">各タブのコンテキストヒントを再表示</string>
+    <string name="settings_about_reset_tips_success">各画面を訪れたときにヒントが再表示されます</string>
+    <string name="settings_about_footer">PGPony for Android
+NorseHorse (Kevin Stewart) 制作
+pgpony.norsehor.se</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         MainActivity — small UI strings (tab labels, etc.)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="main_tab_keyring">鍵束</string>
+    <string name="main_tab_encrypt">暗号化</string>
+    <string name="main_tab_decrypt">復号</string>
+    <string name="main_tab_exchange">交換</string>
+    <string name="main_tab_settings">設定</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Encrypt screen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="encrypt_screen_title">暗号化</string>
+
+    <!-- ── Mode picker ──────────────────────────────────────────────── -->
+    <string name="encrypt_mode_text">テキスト</string>
+    <string name="encrypt_mode_file">ファイル</string>
+    <string name="encrypt_mode_sign">署名</string>
+    <string name="encrypt_mode_password">パスワード</string>
+    <string name="encrypt_password_section_label">パスワードで暗号化</string>
+    <string name="encrypt_password_hint">鍵は不要です。このパスフレーズを知っていれば誰でもメッセージを復号できます。別の経路で共有してください。受信側の gpg -c でも復号できます。</string>
+    <string name="encrypt_password_passphrase_label">パスフレーズ</string>
+    <string name="encrypt_password_confirm_label">パスフレーズを確認</string>
+    <string name="encrypt_password_show">パスフレーズを表示</string>
+    <string name="encrypt_password_hide">パスフレーズを非表示</string>
+
+    <!-- ── Input field labels ───────────────────────────────────────── -->
+    <string name="encrypt_input_label_message_to_sign">署名するメッセージ</string>
+    <string name="encrypt_input_label_message_to_encrypt">暗号化するメッセージ</string>
+
+    <!-- ── Encrypt action button ────────────────────────────────────── -->
+    <string name="encrypt_action_sign">署名</string>
+    <string name="encrypt_action_encrypt_file">ファイルを暗号化</string>
+    <string name="encrypt_action_encrypt">暗号化</string>
+    <string name="encrypt_action_sign_and_encrypt">署名して暗号化</string>
+
+    <!-- ── Output preview headers ───────────────────────────────────── -->
+    <string name="encrypt_output_signed_message">署名済みメッセージ</string>
+    <string name="encrypt_output_encrypted_message">暗号化されたメッセージ</string>
+
+    <!-- ── Recipients section ───────────────────────────────────────── -->
+    <string name="encrypt_recipients_label">宛先</string>
+    <string name="encrypt_recipients_choose">受信者を選択</string>
+    <string name="encrypt_recipients_selected_count">%1$d 件選択中</string>
+    <string name="encrypt_recipients_no_keys">利用できる鍵がありません。先に鍵をインポートまたは生成してください。</string>
+    <string name="encrypt_recipients_search_label">鍵を検索</string>
+    <string name="encrypt_recipients_clear_search">検索をクリア</string>
+    <string name="encrypt_recipients_select_all">すべて選択</string>
+    <string name="encrypt_recipients_clear">クリア</string>
+    <string name="encrypt_recipients_no_match_format">「%1$s」に一致する鍵はありません。</string>
+    <string name="encrypt_recipients_remove_format">%1$s を削除</string>
+
+    <!-- ── ASCII armor toggle ───────────────────────────────────────── -->
+    <string name="encrypt_armor_toggle_title">ASCII アーマー出力</string>
+    <string name="encrypt_armor_toggle_subtitle_armored">メールやチャットに貼り付けられる PGP テキスト形式で出力します。</string>
+    <string name="encrypt_armor_toggle_subtitle_binary">バイナリ .pgp ファイルとして出力 — 共有シート経由で保存されます。</string>
+
+    <!-- ── Sign-this-too toggle ─────────────────────────────────────── -->
+    <string name="encrypt_also_sign_message_title">このメッセージも署名する</string>
+    <string name="encrypt_also_sign_file_title">このファイルも署名する</string>
+    <string name="encrypt_also_sign_subtitle_format">受信者は %1$s からの送信であることを確認できます</string>
+
+    <!-- ── Sign-as picker ───────────────────────────────────────────── -->
+    <string name="encrypt_sign_as_label">署名する鍵</string>
+    <string name="encrypt_sign_as_no_key">署名鍵が選択されていません</string>
+    <string name="encrypt_sign_as_no_key_pair">利用できる鍵ペアがありません。先に秘密鍵を生成またはインポートしてください。</string>
+    <string name="encrypt_sign_as_no_identity">(IDなし)</string>
+
+    <!-- ── Sign-only mode ───────────────────────────────────────────── -->
+    <string name="encrypt_sign_only_explainer">RFC 4880 のクリア署名メッセージを生成します。あなたの公開鍵を持つ誰もが検証できます。暗号化はされない — テキストは誰でも読めます。</string>
+
+    <!-- ── File picker (encrypt) ────────────────────────────────────── -->
+    <string name="encrypt_file_choose">暗号化するファイルを選択</string>
+    <string name="encrypt_file_any_type">あらゆる形式のファイルに対応</string>
+    <string name="encrypt_file_choose_different">別のファイルを選択</string>
+    <string name="encrypt_file_remove">ファイルを削除</string>
+
+    <!-- ── Passphrase dialog (encrypt-side / sign) ──────────────────── -->
+    <string name="encrypt_passphrase_dialog_title">パスフレーズが必要</string>
+    <string name="encrypt_passphrase_label">パスフレーズ</string>
+    <string name="encrypt_passphrase_intro">この署名鍵はパスフレーズで保護されています。 </string>
+    <string name="encrypt_passphrase_intro_sign">入力してメッセージに署名してください。</string>
+    <string name="encrypt_passphrase_intro_file">入力してファイルを暗号化して署名してください。</string>
+    <string name="encrypt_passphrase_intro_text">入力してメッセージを暗号化して署名してください。</string>
+    <string name="encrypt_passphrase_skip_signing_file">署名なしでファイルを暗号化</string>
+    <string name="encrypt_passphrase_skip_signing">署名なしで暗号化</string>
+
+    <!-- ── Inline tooltip ───────────────────────────────────────────── -->
+    <string name="encrypt_tooltip_input">上部にメッセージを入力または貼り付け、下で受信者を選び、暗号化をタップすると、どこにでも送信できる暗号文が生成されます。</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Decrypt screen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="decrypt_screen_title">復号</string>
+
+    <!-- ── Mode picker ──────────────────────────────────────────────── -->
+    <string name="decrypt_mode_text">テキスト</string>
+    <string name="decrypt_mode_file">ファイル</string>
+
+    <!-- ── Input fields ─────────────────────────────────────────────── -->
+    <string name="decrypt_input_paste_label">暗号化または署名されたメッセージを貼り付け</string>
+    <string name="decrypt_passphrase_optional_label">パスフレーズ(鍵が保護されている場合)</string>
+
+    <!-- ── Key picker ───────────────────────────────────────────────── -->
+    <string name="decrypt_with_key_label">使用する鍵</string>
+    <string name="decrypt_password_message_note">パスワードで暗号化されたメッセージです。復号するにはパスフレーズを入力してください。</string>
+    <string name="decrypt_password_passphrase_label">パスフレーズ</string>
+    <string name="decrypt_key_row_format">%1$s (%2$s)</string>
+    <string name="decrypt_no_key_pairs">利用できる鍵ペアがありません。先に秘密鍵を生成またはインポートしてください。</string>
+
+    <!-- ── Decrypt action button ────────────────────────────────────── -->
+    <string name="decrypt_action_decrypt_file">ファイルを復号</string>
+    <string name="decrypt_action_decrypt">復号</string>
+    <string name="verify_file_entry_button">ファイルを検証</string>
+    <string name="sign_file_entry_button">ファイルに署名</string>
+    <string name="sign_file_sheet_title">ファイルに署名</string>
+    <string name="sign_file_sheet_subtitle">ファイルと署名鍵を選んで、ファイルと一緒に共有できる分離署名を作成します。</string>
+    <string name="sign_file_pick_label">署名するファイルを選択</string>
+    <string name="sign_file_sign_with_format">署名者: %1$s</string>
+    <string name="sign_file_sign_with_none">署名鍵を選択</string>
+    <string name="sign_file_format_armored">.asc（アーマー）</string>
+    <string name="sign_file_format_binary">.sig（バイナリ）</string>
+    <string name="sign_file_passphrase_label">パスフレーズ（鍵が保護されている場合）</string>
+    <string name="sign_file_sign_button">署名</string>
+    <string name="sign_file_share_button">署名を共有</string>
+    <string name="sign_file_error_pick_file">署名するファイルを選択してください。</string>
+    <string name="sign_file_error_pick_key">署名鍵を選択してください。</string>
+    <string name="sign_file_error_passphrase_required">この鍵はパスフレーズで保護されています。入力してください。</string>
+    <string name="sign_file_error_failed_format">署名に失敗しました: %1$s</string>
+    <string name="verify_file_sheet_title">ファイルを検証</string>
+    <string name="verify_file_sheet_subtitle">元のファイルと、その分離署名（.sig または .asc）を選んで署名者を確認します。</string>
+    <string name="verify_file_pick_signed_label">元のファイルを選択</string>
+    <string name="verify_file_pick_signature_label">署名を選択（.sig/.asc）</string>
+    <string name="verify_file_verify_button">検証</string>
+    <string name="verify_file_error_pick_both">元のファイルと署名の両方を選んでください。</string>
+
+    <!-- ── File picker (decrypt) ────────────────────────────────────── -->
+    <string name="decrypt_file_choose">暗号化されたファイルを選択</string>
+    <string name="decrypt_file_types">.pgp / .gpg / .asc ファイル</string>
+
+    <!-- ── Output preview headers ───────────────────────────────────── -->
+    <string name="decrypt_output_decrypted">復号されたメッセージ</string>
+    <string name="decrypt_output_verified">検証済みコンテンツ</string>
+    <string name="decrypt_output_signed">署名済みコンテンツ</string>
+
+    <!-- ── Passphrase dialog (decrypt-side) ─────────────────────────── -->
+    <string name="decrypt_passphrase_dialog_title">パスフレーズが必要</string>
+    <string name="decrypt_passphrase_explainer">この鍵はパスフレーズで保護されています。</string>
+
+    <!-- ── Biometric gate ───────────────────────────────────────────── -->
+    <string name="decrypt_biometric_prompt_title">認証して復号</string>
+    <string name="decrypt_biometric_prompt_subtitle">本人確認をして、このメッセージにアクセスします</string>
+
+    <!-- ── Inline tooltip ───────────────────────────────────────────── -->
+    <string name="decrypt_tooltip_paste">ここに暗号化メッセージを貼り付けます — -----BEGIN PGP MESSAGE----- で始まります。PGPony は復号できる鍵を自動的に判定します。</string>
+
+    <!-- ── Decrypted text clipboard label (passed to ClipboardService) ─ -->
+    <string name="decrypt_clipboard_label">復号されたメッセージ</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Result sheets (EncryptionResultScreen, FileDecryptionResultScreen)
+         ════════════════════════════════════════════════════════════════ -->
+
+    <!-- ── Encryption result sheet ──────────────────────────────────── -->
+    <string name="result_encrypt_header_signed">メッセージに署名しました</string>
+    <string name="result_encrypt_header_encrypted">メッセージを暗号化しました</string>
+    <string name="result_encrypt_badge_signed">署名済み</string>
+    <string name="result_encrypt_output_signed">署名された出力</string>
+    <string name="result_encrypt_output_encrypted">暗号化された出力</string>
+    <string name="result_encrypt_can_decrypt_label">復号できる相手</string>
+    <string name="result_encrypt_clipboard_label_signed">署名済みメッセージ</string>
+    <string name="result_encrypt_clipboard_label_encrypted">暗号化されたメッセージ</string>
+    <string name="result_encrypt_share_chooser_signed">署名済みメッセージを共有</string>
+    <string name="result_encrypt_share_chooser_encrypted">暗号化されたメッセージを共有</string>
+
+    <!-- ── File decryption result sheet ─────────────────────────────── -->
+    <string name="result_file_decrypt_default_filename">decrypted_output</string>
+    <string name="result_file_decrypt_header">ファイルを復号しました</string>
+    <string name="result_file_decrypt_badge_preview">プレビュー</string>
+    <string name="result_file_decrypt_save_button">「ファイル」に保存</string>
+    <string name="result_file_decrypt_save_failed_fallback">保存に失敗しました</string>
+    <string name="result_file_decrypt_share_button">復号したファイルを共有</string>
+    <string name="result_file_decrypt_share_chooser">復号されたファイルを共有</string>
+    <string name="result_file_decrypt_share_failed_fallback">共有に失敗しました</string>
+    <string name="result_file_decrypt_saved_status">正常に保存されました</string>
+
+    <!-- ── Clipboard auto-clear countdown (Phase A12) ───────────────── -->
+    <string name="clipboard_will_clear_in_format">%1$d 秒後にクリップボードが消去されます</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         EncryptDecryptViewModel — error and status messages
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="encdec_error_sign_no_input">署名するメッセージを入力してください</string>
+    <string name="encdec_error_encrypt_no_input">暗号化するメッセージを入力してください</string>
+    <string name="encdec_error_no_recipients">受信者を少なくとも 1 人選んでください</string>
+    <string name="encdec_error_password_required">パスフレーズを入力してください</string>
+    <string name="encdec_error_password_mismatch">パスフレーズが一致しません</string>
+    <string name="encdec_error_no_file_to_encrypt">暗号化するファイルを先に選択してください</string>
+    <string name="encdec_error_no_file_to_decrypt">復号する暗号化ファイルを先に選択してください</string>
+    <string name="encdec_error_no_decrypt_input">暗号化または署名されたメッセージを貼り付けてください</string>
+    <string name="encdec_error_incorrect_passphrase">パスフレーズが正しくありません</string>
+    <string name="encdec_error_incorrect_passphrase_retry">パスフレーズが正しくありません。もう一度お試しください。</string>
+    <string name="encdec_error_signing_failed_format">署名に失敗しました：%1$s</string>
+    <string name="encdec_error_encryption_failed_format">暗号化に失敗しました：%1$s</string>
+    <string name="encdec_error_decryption_failed_format">復号に失敗しました：%1$s</string>
+    <string name="encdec_error_detached_signature">これは分離された署名のようです。署名された内容を一緒に貼り付けて検証するか、ファイル検証フロー(今後のアップデートで提供)を使用してください。</string>
+    <string name="encdec_error_not_pgp_message">これを PGP メッセージとして認識できませんでした。BEGIN と END のマーカー行を含む完全なブロックを貼り付けたか確認してください。</string>
+    <string name="encdec_error_signer_not_in_keyring">署名を検証できませんでした — 署名者の鍵が鍵束に含まれていない可能性があります</string>
+    <string name="encdec_error_keyserver_network">keys.openpgp.org への接続中にネットワークエラーが発生しました</string>
+    <string name="encdec_error_keyserver_parse_format">見つかった鍵を解析できませんでした: %1$s</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Keyring screen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="keyring_title">鍵束</string>
+    <string name="keyring_add_key_cd">鍵を追加</string>
+    <string name="keyring_section_my_keys">自分の鍵</string>
+    <string name="keyring_section_contact_keys">連絡先の鍵</string>
+
+    <!-- ── Delete confirmation ──────────────────────────────────────── -->
+    <string name="keyring_delete_dialog_title">鍵を削除しますか?</string>
+    <string name="keyring_delete_dialog_body_format">%1$s (%2$s) を削除しますか?この操作は取り消せません。</string>
+    <string name="keyring_delete_dialog_confirm">削除</string>
+
+    <!-- ── First-visit tooltip ──────────────────────────────────────── -->
+    <string name="keyring_tooltip_fab">右下の + ボタンをタップして最初の鍵ペアを生成するか、既存の鍵をインポートしてください。</string>
+
+    <!-- ── Generate Key sheet ───────────────────────────────────────── -->
+    <string name="keyring_generate_title">鍵ペアを作成</string>
+    <string name="keyring_generate_name_label">名前</string>
+    <string name="keyring_generate_email_label">メールアドレス</string>
+    <string name="keyring_generate_algorithm_label">アルゴリズム</string>
+    <string name="keyring_generate_expiration_label">有効期限</string>
+    <string name="keyring_generate_passphrase_label">パスフレーズ(省略可)</string>
+    <string name="keyring_generate_passphrase_confirm_label">パスフレーズを確認</string>
+    <string name="keyring_generate_button">鍵ペアを作成</string>
+    <string name="keyring_generate_button_in_progress">作成中…</string>
+
+    <!-- ── KeyringViewModel error / success messages ────────────────── -->
+    <string name="keyring_error_refresh_failed_format">更新に失敗しました: %1$s</string>
+    <string name="keyring_error_name_required">氏名は必須です。</string>
+    <string name="keyring_error_email_required">有効なメールアドレスが必要です</string>
+    <string name="keyring_error_passphrase_mismatch">パスフレーズが一致しません。</string>
+    <string name="keyring_status_key_generated">鍵ペアを生成しました</string>
+    <string name="keyring_error_generation_failed_format">生成に失敗しました: %1$s</string>
+    <string name="keyring_error_no_key_data">鍵データがありません — 貼り付け、ファイル選択、スキャン、または検索してください</string>
+    <string name="keyring_error_couldnt_parse_key">鍵を解析できませんでした — ASCII armor ブロックが完全であることを確認してください</string>
+    <string name="keyring_error_search_no_email_or_fp">メールアドレスまたはフィンガープリントを入力してください</string>
+    <string name="keyring_error_search_no_match_format">「%1$s」に該当する鍵が見つかりません</string>
+    <string name="keyring_error_search_failed_format">検索に失敗しました: %1$s</string>
+    <string name="keyring_status_key_upgraded">秘密鍵材料で鍵をアップグレードしました</string>
+    <string name="keyring_error_import_failed_format">インポートに失敗しました：%1$s</string>
+    <string name="keyring_error_no_armored_text">ASCII armor 形式の PGP 鍵を貼り付けてください</string>
+    <string name="keyring_status_key_deleted">鍵を削除しました</string>
+    <string name="keyring_error_delete_failed_format">削除に失敗しました: %1$s</string>
+
+    <!-- ── ImportMethod enum (KeyringViewModel) ─────────────────────── -->
+    <string name="import_method_paste">貼り付け</string>
+    <string name="import_method_file">ファイル</string>
+    <string name="import_method_qr_code">QR コード</string>
+    <string name="import_method_key_server">鍵サーバー</string>
+
+    <!-- ── ExpirationOption enum (KeyringViewModel) ─────────────────── -->
+    <string name="expiration_one_year">1 年</string>
+    <string name="expiration_two_years">2 年</string>
+    <string name="expiration_five_years">5 年</string>
+    <string name="expiration_never">なし</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Import Key screen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="import_screen_title">鍵をインポート</string>
+
+    <!-- ── Paste tab ────────────────────────────────────────────────── -->
+    <string name="import_paste_label">ASCII armor 形式の PGP 鍵を貼り付け</string>
+    <string name="import_paste_placeholder">-----BEGIN PGP PUBLIC KEY BLOCK-----
+…</string>
+    <string name="import_preview_button">プレビュー</string>
+
+    <!-- ── File tab ─────────────────────────────────────────────────── -->
+    <string name="import_file_choose_title">鍵ファイルを選択</string>
+    <string name="import_file_choose_subtitle">.asc / .gpg / .pgp / .key — PGPony や GnuPG などからエクスポートされた鍵</string>
+    <string name="import_file_browse_button">参照</string>
+
+    <!-- ── QR tab ───────────────────────────────────────────────────── -->
+    <string name="import_qr_title">QR コードをスキャン</string>
+    <string name="import_qr_subtitle">別の端末の交換タブで生成された PGP 鍵の QR コードにカメラを向けてください。</string>
+    <string name="import_qr_open_camera_button">カメラを開く</string>
+
+    <!-- ── Key server tab ───────────────────────────────────────────── -->
+    <string name="import_keyserver_query_label">メールまたはフィンガープリント</string>
+    <string name="import_keyserver_query_placeholder">alice@example.com</string>
+    <string name="import_keyserver_search_button">検索</string>
+    <string name="import_keyserver_search_button_in_progress">検索中…</string>
+    <string name="import_keyserver_help">メールアドレスの場合、PGPony はまず受信者のドメインの Web Key Directory を試し、失敗すれば keys.openpgp.org にフォールバックします。フィンガープリントの場合は keys.openpgp.org を直接検索します。</string>
+
+    <!-- ── Preview card ─────────────────────────────────────────────── -->
+    <string name="import_preview_type_key_pair">鍵ペア（公開鍵 + 秘密鍵）</string>
+    <string name="import_preview_type_public_only">公開鍵のみ</string>
+    <string name="import_preview_detail_user_label">ユーザー</string>
+    <string name="import_preview_detail_user_empty">(なし)</string>
+    <string name="import_preview_detail_fingerprint_label">フィンガープリント</string>
+    <string name="import_preview_detail_algorithm_label">アルゴリズム</string>
+    <string name="import_preview_source_file_format">ファイルから: %1$s</string>
+    <string name="import_preview_source_wkd_advanced">WKD 経由で取得 (advanced)</string>
+    <string name="import_preview_source_wkd_direct">WKD 経由で取得 (direct)</string>
+    <string name="import_preview_source_hagrid">keys.openpgp.org 経由で取得</string>
+
+    <!-- ── Duplicate banner ─────────────────────────────────────────── -->
+    <string name="import_duplicate_will_upgrade">この鍵は既に鍵束にあります。インポートすると秘密鍵が追加され、鍵ペアにアップグレードされます。</string>
+    <string name="import_duplicate_no_change">この鍵は既に鍵束にあります。再インポートしても何も変わりません。</string>
+
+    <!-- ── Confirm/cancel buttons (preview card) ────────────────────── -->
+    <string name="import_button_upgrade_key">鍵をアップグレード</string>
+    <string name="import_button_import_key">鍵をインポート</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Key Detail screen + sections
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="key_detail_title">鍵の詳細</string>
+    <string name="key_detail_back_cd">戻る</string>
+    <string name="key_detail_error_key_not_found">鍵が見つかりません</string>
+
+    <!-- ── Type + DEFAULT badge ─────────────────────────────────────── -->
+    <string name="key_detail_type_key_pair">鍵ペア</string>
+    <string name="key_detail_type_public_key">公開鍵</string>
+    <string name="key_detail_badge_default">デフォルト</string>
+
+    <!-- ── Fingerprint section ──────────────────────────────────────── -->
+    <string name="key_detail_section_fingerprint">フィンガープリント</string>
+    <string name="key_detail_fingerprint_copied">コピーしました！</string>
+    <string name="key_detail_fingerprint_tap_to_copy">タップしてコピー</string>
+
+    <!-- ── Details section ──────────────────────────────────────────── -->
+    <string name="key_detail_section_details">詳細</string>
+    <string name="key_detail_detail_algorithm">アルゴリズム</string>
+    <string name="key_detail_detail_created">作成日</string>
+    <string name="key_detail_detail_drive_backup">Drive バックアップ</string>
+    <string name="key_detail_detail_drive_backup_enabled">有効</string>
+    <string name="key_detail_detail_key_server">鍵サーバー</string>
+    <string name="key_detail_detail_key_server_published">公開済み</string>
+    <string name="key_detail_detail_expires">失効</string>
+    <string name="key_detail_detail_expires_never">なし</string>
+
+    <!-- ── Trust ───────────────────────────────────────────────────── -->
+    <string name="key_detail_trust_level_label">信頼レベル</string>
+
+    <!-- ── Contact section ─────────────────────────────────────────── -->
+    <string name="key_detail_section_contact">連絡先</string>
+    <string name="key_detail_contact_linked">連絡先にリンク済み</string>
+    <string name="key_detail_contact_linked_cd">リンク済み</string>
+
+    <!-- ── Notes section ───────────────────────────────────────────── -->
+    <string name="key_detail_section_notes">メモ</string>
+
+    <!-- ── Action menu labels (display text) ───────────────────────── -->
+    <string name="key_detail_action_change_trust">信頼レベルを変更</string>
+    <string name="key_detail_action_add_notes">メモを追加…</string>
+    <string name="key_detail_action_edit_notes">メモを編集…</string>
+    <string name="key_detail_action_link_contact">連絡先にリンク</string>
+    <string name="key_detail_action_auto_match_email">メールで自動一致</string>
+    <string name="key_detail_action_unlink_contact">連絡先のリンクを解除</string>
+    <string name="key_detail_action_share_public_key">公開鍵を共有</string>
+    <string name="key_detail_action_set_as_default">デフォルトの鍵に設定</string>
+    <string name="key_detail_action_upload_to_key_server">鍵サーバーにアップロード</string>
+    <string name="key_detail_last_uploaded_label">最終アップロード</string>
+    <string name="key_detail_last_checked_label">最終確認</string>
+    <string name="key_detail_timestamp_never">なし</string>
+    <string name="key_detail_action_check_key_server">鍵サーバーを確認</string>
+    <string name="kd_vm_check_found">この鍵は鍵サーバーに公開されています。</string>
+    <string name="kd_vm_check_not_found">この鍵は鍵サーバーで見つかりませんでした。</string>
+    <string name="kd_vm_check_failed_format">鍵サーバーの確認に失敗しました: %1$s</string>
+    <string name="key_detail_action_delete_key">鍵を削除</string>
+    <string name="key_detail_action_revoke_key">鍵を失効…</string>
+    <string name="key_detail_action_export_revocation_cert">失効証明書をエクスポート</string>
+    <string name="key_detail_action_export_private_key">秘密鍵をエクスポート</string>
+    <string name="key_detail_action_show_qr_code">QR コードを表示</string>
+
+    <!-- ── Unlink Contact dialog ───────────────────────────────────── -->
+    <string name="key_detail_unlink_dialog_title">連絡先のリンクを解除</string>
+    <string name="key_detail_unlink_dialog_body_format">この鍵と %1$s のリンクを解除しますか？鍵自体は削除されません。</string>
+    <string name="key_detail_unlink_dialog_this_contact_fallback">この連絡先</string>
+    <string name="key_detail_unlink_dialog_confirm">解除</string>
+
+    <!-- ── Delete dialog ───────────────────────────────────────────── -->
+    <string name="key_detail_delete_dialog_title">鍵を削除</string>
+    <string name="key_detail_delete_dialog_intro">この操作は取り消せません。</string>
+    <string name="key_detail_delete_dialog_body_key_pair">公開鍵と秘密鍵の両方が完全に削除されます。</string>
+    <string name="key_detail_delete_dialog_body_public_only">公開鍵が鍵束から削除されます。</string>
+    <string name="key_detail_delete_dialog_confirm">削除</string>
+
+    <!-- ── Export Private Key dialog ───────────────────────────────── -->
+    <string name="key_detail_export_private_dialog_title">秘密鍵をエクスポートしますか？</string>
+    <string name="key_detail_export_private_dialog_body_format">%1$s の秘密鍵を ASCII armor 形式のテキストとしてエクスポートします。このファイルを取得した人は、あなた宛のメッセージを復号でき、あなたとしてメッセージに署名できます。一度共有すると、PGPony は取り消せません。</string>
+
+    <!-- ── Export biometric prompt ─────────────────────────────────── -->
+    <string name="key_detail_export_biometric_title">本人確認</string>
+    <string name="key_detail_export_biometric_subtitle">認証して秘密鍵をエクスポート</string>
+
+    <!-- ── Status / snackbar messages ──────────────────────────────── -->
+    <string name="key_detail_status_pub_copied">公開鍵をクリップボードにコピーしました</string>
+    <string name="key_detail_status_pub_export_failed">公開鍵をエクスポートできませんでした</string>
+    <string name="key_detail_status_pub_file_failed">公開鍵ファイルを書き込めませんでした — 共有不可</string>
+    <string name="key_detail_status_priv_copied">秘密鍵をクリップボードにコピーしました</string>
+    <string name="key_detail_status_priv_file_failed">エクスポートファイルを書き込めませんでした — 共有不可</string>
+    <string name="key_detail_status_priv_missing">秘密鍵をエクスポートできませんでした — 秘密情報が見つからないか読み取れません</string>
+    <string name="key_detail_status_rev_copied">失効証明書をクリップボードにコピーしました</string>
+    <string name="key_detail_status_rev_file_failed">失効ファイルを書き込めませんでした — 共有不可</string>
+    <string name="key_detail_status_clip_unavailable">クリップボードにアクセスできません</string>
+    <string name="key_detail_status_no_revocation_cert">この鍵には失効証明書がありません</string>
+
+    <!-- ── Revoked banner (KeyDetailSections) ──────────────────────── -->
+    <string name="key_detail_revoked_badge">失効済み</string>
+    <string name="key_detail_revoked_on_format">失効日: %1$s</string>
+    <string name="key_detail_revoked_label">失効済み</string>
+    <string name="key_detail_revoked_no_reason">理由なし</string>
+    <string name="key_detail_revoked_explainer">この鍵は新しいメッセージへの署名や受信者としての選択に使えなくなります。これまでに受信したメッセージの復号は引き続き可能です。</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         KeyDetailViewModel — status + error messages
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="kd_vm_error_export_for_qr">QR エンコード用に公開鍵をエクスポートできませんでした</string>
+    <string name="kd_vm_error_qr_failed_format">QR の生成に失敗しました: %1$s</string>
+    <string name="kd_vm_status_trust_updated">信頼レベルを更新しました</string>
+    <string name="kd_vm_status_notes_cleared">メモを消去しました</string>
+    <string name="kd_vm_status_notes_saved">メモを保存しました</string>
+    <string name="kd_vm_error_no_email_to_match">この鍵には照合用のメールアドレスがありません</string>
+    <string name="kd_vm_status_linked_to_format">%1$s にリンクしました</string>
+    <string name="kd_vm_error_contacts_permission_needed">鍵を連絡先にリンクするには連絡先の権限が必要です</string>
+    <string name="kd_vm_status_contact_unlinked">連絡先のリンクを解除しました</string>
+    <string name="kd_vm_status_set_as_default_format">%1$s をデフォルト鍵に設定しました</string>
+    <string name="kd_vm_error_export_public_failed">公開鍵をエクスポートできませんでした</string>
+    <string name="kd_vm_error_upload_failed_format">アップロードに失敗しました: %1$s</string>
+    <string name="kd_vm_error_delete_failed_format">削除に失敗しました: %1$s</string>
+    <string name="kd_vm_error_revoke_passphrase_required">この鍵にはパスフレーズが設定されています。続行するには入力してください。</string>
+    <string name="kd_vm_error_revoke_incorrect_passphrase">パスフレーズが正しくありません。</string>
+    <string name="kd_vm_error_revocation_failed_default">失効処理に失敗しました</string>
+    <string name="kd_vm_error_revocation_failed_format">失効処理に失敗しました: %1$s</string>
+
+    <!-- Upload-success messages (computed in uploadSuccessMessage()) -->
+    <string name="kd_vm_upload_success_generic">keys.openpgp.org にアップロードしました。</string>
+    <string name="kd_vm_upload_success_verify_single_format">アップロードしました。確認メールを %1$s に送信しました — リンクをクリックすると、メールアドレスで鍵を検索できるようになります。</string>
+    <string name="kd_vm_upload_success_verify_multi_format">アップロードしました。確認メールを %1$s に送信しました — 各リンクをクリックすると、メールアドレスで鍵を検索できるようになります。</string>
+    <string name="kd_vm_upload_already_published">既に公開済み — メールアドレスで鍵を検索できます。</string>
+    <string name="kd_vm_upload_verify_skipped">アップロードしましたが、確認を開始できませんでした。鍵はフィンガープリントでのみ検索可能です — 後でもう一度お試しください。</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         TrustLevel enum (PGPKeyEntity)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="trust_level_unknown_name">不明</string>
+    <string name="trust_level_unverified_name">未確認</string>
+    <string name="trust_level_verified_name">確認済み</string>
+    <string name="trust_level_ultimate_name">究極</string>
+    <string name="trust_level_unknown_description">検証は行われていません</string>
+    <string name="trust_level_unverified_description">追加されましたが未検証 — 慎重に進めてください</string>
+    <string name="trust_level_verified_description">フィンガープリントを信頼できる経路で照合済み</string>
+    <string name="trust_level_ultimate_description">自身の鍵、または完全に管理している鍵</string>
+
+    <!-- ── TrustLevelSheet ──────────────────────────────────────────── -->
+    <string name="trust_sheet_title">信頼レベル</string>
+    <string name="trust_sheet_subtitle">この鍵が本当に主張された持ち主のものであるという、あなたの確信度を示します。信頼レベルはあなた向けの目安です。PGPony が暗号化や検証できる内容を変えるものではありません。</string>
+    <string name="trust_sheet_selected_cd">選択中</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         RevocationReason enum (PGPKeyEntity) + RevokeKeySheet
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="revocation_reason_no_reason_name">理由なし</string>
+    <string name="revocation_reason_no_reason_description">理由は共有しない — 証明書は鍵の失効のみを宣言します</string>
+    <string name="revocation_reason_superseded_name">新しい鍵に置き換え</string>
+    <string name="revocation_reason_superseded_description">別の鍵に移行しました。古い鍵は引き続き信頼できます</string>
+    <string name="revocation_reason_compromised_name">鍵が漏えい</string>
+    <string name="revocation_reason_compromised_description">秘密鍵が漏洩した可能性があります — この日付以降に署名されたものは信頼しないでください</string>
+    <string name="revocation_reason_retired_name">鍵を引退</string>
+    <string name="revocation_reason_retired_description">この鍵は使われていませんが、秘密鍵は侵害されていません</string>
+    <string name="revocation_reason_user_id_invalid_name">ユーザー ID が無効</string>
+    <string name="revocation_reason_user_id_invalid_description">鍵に関連付けられたメールアドレスまたは名前が変わりました</string>
+
+    <!-- ── RevokeKeySheet ───────────────────────────────────────────── -->
+    <string name="revoke_sheet_title">鍵を失効</string>
+    <string name="revoke_sheet_explainer_format">%1$s に対する RFC 4880 失効証明書を生成して適用します。鍵は鍵束に残りますが失効済みとマークされ、過去のメッセージは引き続き復号できますが、新しいメッセージへの署名や受信者としての選択には使えなくなります。一度適用すると取り消せません。</string>
+    <string name="revoke_sheet_reason_label">理由</string>
+    <string name="revoke_sheet_comment_label">コメント（任意）</string>
+    <string name="revoke_sheet_comment_placeholder">例: 鍵 0xABCD1234 に置き換え済み</string>
+    <string name="revoke_sheet_passphrase_label">パスフレーズ</string>
+    <string name="revoke_sheet_passphrase_placeholder">鍵にパスフレーズが設定されていない場合は空欄のまま</string>
+    <string name="revoke_sheet_confirm">失効させる</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         HelpScreen + FAQ content
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="help_screen_title">ヘルプとよくある質問</string>
+    <string name="help_screen_subtitle">PGPony に関するよくある質問への回答。</string>
+    <string name="help_screen_footer">必要な情報が見つかりませんでしたか？ 設定の「フィードバックを送信」から開発者に直接メールできます。</string>
+    <string name="help_row_collapse_cd">折りたたむ</string>
+    <string name="help_row_expand_cd">展開する</string>
+
+    <!-- ── Section titles ───────────────────────────────────────────── -->
+    <string name="faq_section_getting_started">はじめに</string>
+    <string name="faq_section_encrypt_decrypt">暗号化と復号</string>
+    <string name="faq_section_security_privacy">セキュリティとプライバシー</string>
+
+    <!-- ── Getting Started Q&amp;A ─────────────────────────────────────── -->
+    <string name="faq_q_what_is_pgp">PGP 暗号化とは？</string>
+    <string name="faq_a_what_is_pgp">PGP（Pretty Good Privacy）は、メッセージやファイルを意図した宛先だけが読めるように暗号化する、長く使われてきた標準規格です。\n\n仕組みとして、利用者ごとに鍵ペア——自由に共有する公開鍵と、秘密にしておく秘密鍵——が割り当てられます。公開鍵を持つ人は誰でもあなた宛のメッセージを暗号化できますが、それを復号できるのはあなたの秘密鍵だけです。\n\nPGPony は最新の OpenPGP 規格（RFC 4880 + RFC 9580）に準拠しているため、ここで暗号化したメッセージは GnuPG、OpenKeychain、その他の OpenPGP ツールでも読み取れます。</string>
+
+    <string name="faq_q_need_key">このアプリを使うのに鍵は必要ですか？</string>
+    <string name="faq_a_need_key">はい。何かを暗号化または復号する前に、少なくとも 1 つの鍵ペアが必要です。\n\n「鍵束」タブを開いて、「+」ボタンをタップしてください。「新しい鍵ペアを作成」（新規の方におすすめ）か、既に GnuPG などのデスクトップツールで PGP を使っている場合は「既存の鍵をインポート」を選択できます。\n\n鍵を作成するときは、他の人が識別できるように名前とメールアドレスを設定してください。必要に応じてパスフレーズで保護すると、さらに安全性が高まります。</string>
+
+    <string name="faq_q_my_keys_vs_contacts">「自分の鍵」と「連絡先」の違いは？</string>
+    <string name="faq_a_my_keys_vs_contacts">「自分の鍵」はあなた自身の鍵ペアです。暗号化されたメッセージを受け取るための公開鍵と、それを復号するための秘密鍵の両方を含み、あなたのアイデンティティを表します。\n\n「連絡先」は他の人の公開鍵だけです。誰かに暗号化したメッセージを送るためにインポートします。連絡先の鍵では復号できません。相手の秘密鍵を持っていないからです。\n\n郵便にたとえると、自分の郵便受けの鍵は「自分の鍵」に保管し、他の人の宛先住所は「連絡先」に集めるイメージです。</string>
+
+    <string name="faq_q_share_public_key">公開鍵はどうやって他の人と共有しますか？</string>
+    <string name="faq_a_share_public_key">「交換」タブを開き、共有したい鍵を選んでください。次の 3 つの方法があります：\n\n・QR コード — 相手の PGPony や任意の QR スキャナーでスキャンしてもらいます。\n\n・ファイルとして共有 — メール、Signal、メッセージなど、任意の共有アプリで .asc ファイルを送ります。\n\n・クリップボードにコピー — ASCII アーマー形式の鍵テキストを自分のメッセージに貼り付けます。\n\n公開鍵を共有することは常に安全です。一方、秘密鍵の共有は安全ではありません。自分が管理する別のデバイスに移す場合を除いて、秘密鍵をエクスポートしたり送信したりしないでください。</string>
+
+    <!-- ── Encrypt & Decrypt Q&amp;A ────────────────────────────────────── -->
+    <string name="faq_q_how_to_encrypt">メッセージはどうやって暗号化しますか？</string>
+    <string name="faq_a_how_to_encrypt">「暗号化」タブを開きます。入力欄にメッセージを入力または貼り付け、「連絡先」から 1 人以上の宛先を選んでください（自分自身を含めると後で自分でも読み返せます）。\n\n「暗号化」をタップすると、PGPony が暗号化されたテキストブロックを生成します。これをコピーして、メール、SMS、Slack など好きなチャネルで送れます。\n\n選んだ宛先以外は復号できません。</string>
+
+    <string name="faq_q_how_to_decrypt">受け取ったメッセージはどうやって復号しますか？</string>
+    <string name="faq_a_how_to_decrypt">復号タブを開き、暗号化されたメッセージを貼り付けます。`-----BEGIN PGP MESSAGE-----` で始まり、`-----END PGP MESSAGE-----` で終わるはずです。
+
+復号をタップします。メッセージがあなたの鍵宛てに暗号化されていれば、PGPony が平文を表示します。秘密鍵がパスフレーズで保護されている場合は、まずパスフレーズを尋ねられます。
+
+他のアプリから .asc / .pgp / .gpg ファイルを PGPony に直接共有することもできます — Android が PGPony を共有先として表示します。</string>
+
+    <string name="faq_q_armored_toggle">「アーマー」のトグルは何をするものですか？</string>
+    <string name="faq_a_armored_toggle">ASCII armor 出力は、メールやチャットに貼り付けられるテキストを生成します。`-----BEGIN PGP MESSAGE-----` と `-----END PGP MESSAGE-----` のマーカーで囲まれた、文字と数字のブロックのように見えます。
+
+非 armor 出力はバイナリです — サイズが小さくなりますが、ファイル添付としてのみ送信できます。
+
+メッセージには有効のままにしておきます。大きなファイルを暗号化していてサイズを最小に抑えたい場合のみ無効にしてください。</string>
+
+    <string name="faq_q_encrypt_files">テキストだけでなくファイルも暗号化できますか？</string>
+    <string name="faq_a_encrypt_files">はい。PGPony は他のどのアプリからでも共有されたファイルを受け取ります — ファイルアプリ、ギャラリー、ダウンロードフォルダ、どこからでも。
+
+ソースアプリで共有をタップして PGPony を選択します。ファイルは暗号化ファイルなら復号タブに、.asc のような鍵ファイルなら鍵束タブに渡されます。
+
+逆方向 — PGPony 内からファイルを選んで暗号化する機能 — はロードマップに入っていますが、まだリリースされていません。当面は、大きな内容をテキストとして暗号化タブに貼り付けてください。</string>
+
+    <!-- ── Security & Privacy Q&amp;A ───────────────────────────────────── -->
+    <string name="faq_q_where_keys_stored">秘密鍵はどこに保存されますか？</string>
+    <string name="faq_a_where_keys_stored">あなたの端末のみに保存されます。PGPony は秘密鍵を暗号化された Room データベースに保存し、Android Keystore にあるマスターキーで保護します。
+
+最近の端末では Keystore がハードウェアセキュリティ (Pixel の Titan M チップ、Samsung 等の同等品) で支えられており、秘密鍵を抽出するにはチップ自体への物理的攻撃が必要になります。
+
+交換タブから明示的にエクスポートしない限り、鍵が端末を離れることはありません。</string>
+
+    <string name="faq_q_lost_passphrase">パスフレーズをなくしたらどうなりますか？</string>
+    <string name="faq_a_lost_passphrase">復旧の手段はありません。PGPony はパスフレーズを保存せず、「パスワードを忘れた」フローもありません — それこそが強力な暗号の意義です。
+
+秘密鍵のパスフレーズを忘れると、その鍵は永久にアクセス不可能になり、その鍵宛てに暗号化されたメッセージは決して復号できなくなります。
+
+パスフレーズは安全な場所に書き留めてください。パスワードマネージャーが理想的です。鍵付きの引き出しに入れた紙でも構いません。</string>
+
+    <string name="faq_q_server_data">PGPony はサーバーにデータを送りますか？</string>
+    <string name="faq_a_server_data">いいえ。コアの暗号化と鍵管理はすべてあなたの端末上で行われます。PGPony にはアカウントシステム、分析、テレメトリ、広告 SDK はありません。
+
+アプリは INTERNET 権限を宣言していますが、これはあなたが鍵を公開したり検索したりすることを選んだ場合にのみ OpenPGP キーサーバーに接続するためのものです — オプトインで、アプリ利用に必須ではありません。
+
+Android の設定 &gt; プライバシー &gt; データ使用量 でアプリのネットワーク活動を確認することで検証できます。</string>
+
+    <string name="faq_q_biometric_lock">生体認証ロックは実際に何を守りますか？</string>
+    <string name="faq_a_biometric_lock">生体認証ロックは、ロック解除済みの端末を手に取った誰かが、あなたの指紋や顔で認証せずに PGPony を開くのを防ぎます。
+
+鍵自体に暗号的な保護を追加するわけではありません — 秘密鍵は既に保存時に暗号化されています。生体認証ロックは UI のゲートです。
+
+「復号時に必須」を有効にすることもできます。これは、メッセージを復号するたびに生体認証を求めます。ロック解除済みの端末が他人の手に渡ることを懸念する場合に使用してください。</string>
+
+    <string name="faq_q_algorithms">PGPony はどんな暗号化アルゴリズムを使いますか？</string>
+    <string name="faq_a_algorithms">新しい鍵は既定で署名に Ed25519、暗号化に Curve25519 を使用します — Signal、SSH、TLS 1.3 と同じ楕円曲線です。
+
+メッセージは AES-256 の AEAD OCB モード (RFC 9580) で対称暗号化され、セッション鍵は各受信者の公開鍵で暗号化されます。
+
+PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA / DSA 鍵を読み込み・インポートすることもできますが、新しい ID には最新の曲線ベースの鍵のみを生成します。
+
+すべての暗号処理は Bouncy Castle 1.78.1 によって実行されます — 世界中の企業システムや政府システムで監査・使用されている業界標準のライブラリです。</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         MainActivity tabs — adds Contacts (was missing earlier)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="main_tab_contacts">連絡先</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         SecurityInfoScreen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="security_info_title">セキュリティと暗号化</string>
+    <string name="security_info_subtitle">PGPony がメッセージと鍵をどのように保護するか。</string>
+
+    <string name="security_info_block_openpgp_title">OpenPGP 標準</string>
+    <string name="security_info_block_openpgp_body">PGPony は RFC 4880（OpenPGP）と RFC 9580（crypto-refresh）を実装しています。メッセージは GnuPG、OpenKeychain など、すべての OpenPGP 準拠ツールと完全に相互運用できます。</string>
+
+    <string name="security_info_block_algorithms_title">最新のアルゴリズム</string>
+    <string name="security_info_block_algorithms_body">新しい鍵は署名に Ed25519、暗号化に Curve25519 を使用します — Signal、SSH、TLS 1.3 と同じ楕円曲線です。対称暗号には AES-256 の AEAD OCB モード (RFC 9580) を使用します。</string>
+
+    <string name="security_info_block_library_title">Bouncy Castle 上に構築</string>
+    <string name="security_info_block_library_body">すべての暗号処理は Bouncy Castle 1.78.1 を通じて行われます。これは Java 暗号の業界標準ライブラリで、世界中の企業システムと政府システムで使用されています。PGPony は独自の暗号を実装しません。</string>
+
+    <string name="security_info_block_on_device_title">すべて端末内に留まります</string>
+    <string name="security_info_block_on_device_body">鍵は明示的に共有しない限り、端末から出ることはありません。PGPony にはサーバー、アカウントシステム、分析機能がありません。コアの暗号化機能にインターネット権限は不要です。</string>
+
+    <string name="security_info_block_at_rest_title">秘密鍵は保存時にも暗号化されます</string>
+    <string name="security_info_block_at_rest_body">秘密鍵は androidx.security.crypto を使って保存され、マスターキーは Android Keystore によって生成・保護されます。最近の端末では Keystore がハードウェアセキュリティ (Titan M、Secure Enclave、または同等品) で支えられています。</string>
+
+    <string name="security_info_block_biometric_title">任意の生体認証ロック</string>
+    <string name="security_info_block_biometric_body">設定 &gt; セキュリティで生体認証ロックを有効にすると、PGPony を開くたびに指紋または顔認証が要求されます。復号操作のたびに再認証を要求することもできます。</string>
+
+    <string name="security_info_block_clipboard_title">クリップボードの自動消去</string>
+    <string name="security_info_block_clipboard_body">クリップボードにコピーされた機密情報は、設定可能な時間（既定 60 秒）が経過すると自動的に消去され、他のアプリから読まれる状態が続かないようにします。</string>
+
+    <string name="security_info_not_doing_title">PGPony が「行わない」こと</string>
+    <string name="security_info_not_doing_bullet_1">鍵やメッセージをいかなるサーバーにも送信しません</string>
+    <string name="security_info_not_doing_bullet_2">アカウント、メール、電話番号を要求しません</string>
+    <string name="security_info_not_doing_bullet_3">分析・テレメトリ・広告 SDK を組み込みません</string>
+    <string name="security_info_not_doing_bullet_4">Bouncy Castle 以外のサードパーティ暗号ライブラリの使用</string>
+    <string name="security_info_not_doing_bullet_5">パスフレーズは保存しません（メモリ内でのみ使用されます）</string>
+
+    <string name="security_info_footer">プライバシーポリシーと技術的な詳細: pgpony.norsehor.se/privacy</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Onboarding — slide carousel (OnboardingSlide.kt)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="onboarding_slide_welcome_title">PGPony へようこそ</string>
+    <string name="onboarding_slide_welcome_body">本物の PGP 暗号化を、あなたのポケットに。\n\n意図した宛先だけが読めるメッセージを送信できます。サーバーも、アカウントも、追跡もありません。</string>
+
+    <string name="onboarding_slide_key_title">まずは鍵から</string>
+    <string name="onboarding_slide_key_body">PGP は 2 つの鍵を使います。自由に共有できる公開鍵と、自分だけが知っている秘密鍵です。\n\nあなたの公開鍵を持っている人は誰でも暗号化されたメッセージを送れますが、それを復号できるのはあなたの秘密鍵だけです。</string>
+
+    <string name="onboarding_slide_encrypt_title">なんでも暗号化</string>
+    <string name="onboarding_slide_encrypt_body">相手の公開鍵を「連絡先」に保存しておけば、「暗号化」タブからその人だけに読めるメッセージを作成できます。\n\n結果はメール、SMS、公開投稿など、どんなチャネルでも安全に送れます。</string>
+
+    <string name="onboarding_slide_exchange_title">鍵を即座に交換</string>
+    <string name="onboarding_slide_exchange_body">交換タブで公開鍵を QR コードに変換できます。PGPony を使っている人に見せれば、直接スキャンしてもらえます — 入力もコピー&amp;ペーストも不要です。
+
+鍵は他のアプリ経由でファイルとして共有することもできます。</string>
+
+    <string name="onboarding_slide_privacy_title">主導権はあなたに</string>
+    <string name="onboarding_slide_privacy_body">鍵はあなたが共有しない限り、この端末から出ることはありません。PGPony にはサーバーも分析も広告もありません。
+
+さらに安心するために、アプリを指紋や顔認証でロックすることもできます。</string>
+
+    <!-- ── OnboardingPage inline CTAs ───────────────────────────────── -->
+    <string name="onboarding_page_generate_cta">最初の鍵を今すぐ作成</string>
+    <string name="onboarding_page_generate_hint">後で「鍵束」タブから行う場合は「次へ」をタップしてください。</string>
+    <string name="onboarding_page_already_have_keys_one">すでに 1 件の鍵があります</string>
+    <string name="onboarding_page_already_have_keys_other_format">すでに %1$d 件の鍵があります</string>
+    <string name="onboarding_page_keyring_hint">「鍵束」タブからいつでも管理できます。</string>
+    <string name="onboarding_page_biometric_toggle_title">生体認証ロックを有効にする</string>
+    <string name="onboarding_page_biometric_toggle_subtitle">PGPony を開くのに指紋または顔認証が必要になります</string>
+
+    <!-- ── OnboardingScreen — Skip / Next / Get Started ─────────────── -->
+    <string name="onboarding_screen_skip">スキップ</string>
+    <string name="onboarding_screen_get_started">始める</string>
+    <string name="onboarding_screen_next">次へ</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         OnboardingGenerateSheet
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="onboarding_generate_title">鍵を作成</string>
+    <string name="onboarding_generate_subtitle">デフォルトでは最新の Ed25519 + Curve25519 を使用します。鍵束タブから後でいつでも追加の鍵を生成できます。</string>
+    <string name="onboarding_generate_name_placeholder">Jane Doe</string>
+    <string name="onboarding_generate_email_placeholder">jane@example.com</string>
+    <string name="onboarding_generate_passphrase_section_label">パスフレーズ(省略可)</string>
+    <string name="onboarding_generate_passphrase_explainer">秘密鍵をパスフレーズで保護します。忘れた場合、鍵は永久にアクセス不可能になります — 復旧はできません。</string>
+    <string name="onboarding_generate_button">作成</string>
+    <string name="onboarding_generate_in_progress_title">鍵ペアを作成中…</string>
+    <string name="onboarding_generate_in_progress_subtitle">通常は数秒で完了します。</string>
+    <string name="onboarding_generate_done_title">鍵を作成しました！</string>
+    <string name="onboarding_generate_done_subtitle">新しい鍵ペアが「鍵束」タブで利用できます。続けましょう。</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         ContactsScreen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="contacts_screen_title">連絡先</string>
+    <string name="contacts_options_cd">オプション</string>
+    <string name="contacts_menu_discover_keys">鍵を探す</string>
+    <string name="contacts_menu_auto_match">鍵を自動で一致</string>
+    <string name="contacts_menu_refresh">更新</string>
+    <string name="contacts_menu_reset_cache">鍵サーバーのキャッシュをリセット</string>
+
+    <!-- ── Permission view ──────────────────────────────────────────── -->
+    <string name="contacts_permission_title">連絡先へのアクセス</string>
+    <string name="contacts_permission_explainer">PGPony は暗号化鍵を連絡先と関連付けて\n識別しやすくし、公開鍵を自動で\n見つけられるようにします。</string>
+    <string name="contacts_permission_button">連絡先へのアクセスを許可</string>
+
+    <!-- ── Empty state ──────────────────────────────────────────────── -->
+    <string name="contacts_empty_title">連絡先が見つかりません</string>
+    <string name="contacts_empty_body">メールアドレスを持つ連絡先が見つかりませんでした。</string>
+    <string name="contacts_empty_refresh_button">更新</string>
+
+    <!-- ── Search + list ────────────────────────────────────────────── -->
+    <string name="contacts_search_placeholder">連絡先を検索…</string>
+    <string name="contacts_search_clear_cd">検索をクリア</string>
+    <string name="contacts_section_encrypted">暗号化対応の連絡先</string>
+    <string name="contacts_section_other">その他の連絡先</string>
+    <string name="contacts_search_no_match_format">「%1$s」に一致する連絡先はありません</string>
+
+    <!-- ── Tooltip + scan banner ────────────────────────────────────── -->
+    <string name="contacts_tooltip_import">端末の連絡先がここに表示されます。鍵束タブで誰かの公開鍵をインポートし、メールアドレスが連絡先と一致すると自動的にリンクされます。連絡先の横にある虫眼鏡をタップすると、キーサーバーで鍵を検索できます。</string>
+    <string name="contacts_scan_in_progress_format">スキャン中 %1$d/%2$d…</string>
+    <string name="contacts_scan_complete_one_format">スキャン完了 — %1$d 件の鍵を発見</string>
+    <string name="contacts_scan_complete_many_format">スキャン完了 — %1$d 件の鍵を発見</string>
+
+    <!-- ── Trust badges (rendered in contact rows) ──────────────────── -->
+    <string name="contacts_trust_unknown_cd">信頼レベル不明</string>
+    <string name="contacts_trust_unverified_cd">未確認</string>
+    <string name="contacts_trust_verified_cd">確認済み</string>
+    <string name="contacts_trust_ultimate_cd">最高の信頼レベル</string>
+
+    <!-- ── Row icons ────────────────────────────────────────────────── -->
+    <string name="contacts_linked_cd">リンク済み</string>
+    <string name="contacts_already_checked_cd">確認済み、鍵は見つかりませんでした</string>
+    <string name="contacts_search_keyserver_cd">キーサーバーを検索</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         ContactsViewModel — status/error messages
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="contacts_vm_error_load_failed_format">連絡先の読み込みに失敗しました: %1$s</string>
+    <string name="contacts_vm_status_linked_one_format">%1$d 件の鍵を連絡先にリンクしました</string>
+    <string name="contacts_vm_status_linked_many_format">%1$d 件の鍵を連絡先にリンクしました</string>
+    <string name="contacts_vm_status_no_new_matches">新しい一致は見つかりませんでした</string>
+    <string name="contacts_vm_error_auto_match_failed_format">自動マッチングに失敗しました: %1$s</string>
+    <string name="contacts_vm_error_no_key_for_email_format">%1$s の PGP 鍵が見つかりません</string>
+    <string name="contacts_vm_error_search_failed_format">検索に失敗しました: %1$s</string>
+    <string name="contacts_vm_error_bulk_scan_failed_format">一括スキャンに失敗しました: %1$s</string>
+    <string name="contacts_vm_status_cache_cleared">キーサーバーのキャッシュをクリアしました</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         KeyCard — used as a row across Keyring, Encrypt, etc.
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="key_card_key_pair_cd">鍵ペア</string>
+    <string name="key_card_expired_badge">期限切れ</string>
+    <string name="key_card_revoked_badge">失効済み</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         ExchangeScreen + ExchangeViewModel
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="exchange_screen_title">交換</string>
+    <string name="exchange_section_show_key">鍵を表示</string>
+    <string name="exchange_section_scan_key">鍵をスキャン</string>
+    <string name="exchange_section_key_server">鍵サーバー</string>
+
+    <!-- ── Import-after-scan dialog ─────────────────────────────────── -->
+    <string name="exchange_import_dialog_title">スキャンした鍵をインポートしますか?</string>
+    <string name="exchange_import_dialog_body">スキャンした QR コードから PGP 鍵をインポートしますか?</string>
+
+    <!-- ── Empty state (no keys to show) ────────────────────────────── -->
+    <string name="exchange_no_keys">公開鍵を共有するには、まず鍵ペアを作成してください。</string>
+
+    <!-- ── QR code + buttons ────────────────────────────────────────── -->
+    <string name="exchange_qr_cd">公開鍵の QR コード</string>
+    <string name="exchange_copy_key_button">鍵をコピー</string>
+    <string name="exchange_upload_button">アップロード</string>
+    <string name="exchange_upload_button_in_progress">アップロード中…</string>
+
+    <!-- ── Scan section ─────────────────────────────────────────────── -->
+    <string name="exchange_scan_button">スキャナーを開く</string>
+
+    <!-- ── Key server lookup ────────────────────────────────────────── -->
+    <string name="exchange_keyserver_query_label">メールまたはフィンガープリント</string>
+    <string name="exchange_keyserver_search_cd">検索</string>
+    <string name="exchange_keyserver_import_button">鍵をインポート</string>
+
+    <!-- ── Tooltip ──────────────────────────────────────────────────── -->
+    <string name="exchange_tooltip_qr">ここで鍵を選ぶと、QR コードまたは共有可能なファイルを取得できます。相手はそれをスキャンまたはインポートして、あなたに暗号化メッセージを送信できます。</string>
+
+    <!-- ── ExchangeViewModel error / status messages ────────────────── -->
+    <string name="exchange_vm_error_qr_failed_format">QR の生成に失敗しました: %1$s</string>
+    <string name="exchange_vm_error_not_pgp_key">スキャンされたデータは PGP 鍵ではありません</string>
+    <string name="exchange_vm_error_import_failed_format">インポートに失敗しました：%1$s</string>
+    <string name="exchange_vm_error_no_key_found_format">「%1$s」に該当する鍵が見つかりません</string>
+    <string name="exchange_vm_error_search_failed_format">検索に失敗しました: %1$s</string>
+    <string name="exchange_vm_status_uploaded">鍵を keys.openpgp.org にアップロードしました</string>
+    <string name="exchange_vm_error_upload_failed_format">アップロードに失敗しました: %1$s</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         ProGateSheet
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="pro_feature_unlimited_keys_title">鍵ペア数無制限</string>
+    <string name="pro_feature_unlimited_keys_body">仕事、プライベート、プロジェクト用など、用途別に鍵ペアを無制限に作成できます。無料版では 1 ペアまで利用できます。</string>
+    <string name="pro_feature_modern_algos_title">Ed25519 + Cv25519 鍵</string>
+    <string name="pro_feature_modern_algos_body">コンパクトで高速、セキュリティ専門家にも推奨される最新の Ed25519 署名鍵と Cv25519 暗号化サブ鍵を作成できます。</string>
+    <string name="pro_feature_keyserver_title">鍵サーバーへのアップロード</string>
+    <string name="pro_feature_keyserver_body">公開鍵を keys.openpgp.org に公開すれば、誰でもあなたを見つけてメッセージを暗号化して送れます。</string>
+    <string name="pro_feature_multi_recipients_title">複数の受信者</string>
+    <string name="pro_feature_multi_recipients_body">一度に複数の受信者向けにメッセージを暗号化できます。無料版は 1 メッセージあたり 1 名の受信者まで。</string>
+    <string name="pro_feature_file_encryption_title">ファイル暗号化</string>
+    <string name="pro_feature_file_encryption_body">ドキュメント、写真、アーカイブなど、あらゆる形式のファイルを暗号化・復号できます。暗号化ファイルを安全に共有しましょう。</string>
+
+    <string name="pro_gate_sheet_title">PGPony Pro をアンロック</string>
+    <string name="pro_gate_everything_in_pro">Pro に含まれるすべて</string>
+    <string name="pro_gate_you_tapped_this">この機能をタップしました</string>
+    <string name="pro_gate_purchasing">購入中…</string>
+    <string name="pro_gate_one_time_purchase">買い切り。サブスクリプションではありません。</string>
+    <string name="pro_gate_welcome_dialog_title">Pro へようこそ！</string>
+    <string name="pro_gate_welcome_dialog_body">すべての Pro 機能をアンロックしました。PGPony をご支援いただきありがとうございます！</string>
+    <string name="pro_gate_welcome_dialog_confirm">始めましょう</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         SecretUnlockScreen — promo code entry
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="promo_code_title">プロモーションコードを入力</string>
+    <string name="promo_code_subtitle">コードを入力して PGPony Pro を無料でアンロックしてください。</string>
+    <string name="promo_code_placeholder">PONY-XXXX-XXXX</string>
+    <string name="promo_code_redemption_failed_default">引き換えに失敗しました</string>
+    <string name="promo_code_redeem_in_progress">引き換え中…</string>
+    <string name="promo_code_already_pro">PGPony Pro はすでに有効です</string>
+    <string name="promo_code_dialog_success">成功しました！</string>
+    <string name="promo_code_dialog_error">エラー</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         SignerLookupSheet (decrypt-side signer lookup on unknown signer)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="signer_lookup_searching_title">署名者を検索</string>
+    <string name="signer_lookup_searching_label">keys.openpgp.orgで検索中…</string>
+    <string name="signer_lookup_found_title">鍵が見つかりました</string>
+    <string name="signer_lookup_found_body">インポートすると、鍵が鍵束に追加され、署名が再検証されます。鍵の身元はまだ検証されていません — 数学的な正当性のみが確認されます。検証済みステータスに頼る前に、別途送信者を信頼できるか判断してください。</string>
+    <string name="signer_lookup_import_button">インポート</string>
+    <string name="signer_lookup_not_found_title">keys.openpgp.org で見つかりません</string>
+    <string name="signer_lookup_not_found_body_format">%1$s の鍵は見つかりませんでした。署名者が公開キーサーバーに鍵をアップロードしていない可能性があります。公開鍵を直接共有してもらってください。</string>
+    <string name="signer_lookup_failed_title">検索に失敗しました</string>
+    <string name="signer_lookup_imported_title">インポート完了</string>
+    <string name="signer_lookup_imported_body">署名は自動的に再検証されます。</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         VerificationBanner (decrypt-side signature outcome banner)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="verify_banner_verified_title">確認済み</string>
+    <string name="verify_banner_invalid_title">署名が無効です</string>
+    <string name="verify_banner_unknown_signer_title">不明な署名者</string>
+    <string name="verify_banner_unknown_signer_lookup_cd">署名者を検索</string>
+    <string name="verify_banner_no_signature_title">署名なし</string>
+    <string name="verify_banner_no_signature_subtitle">コンテンツは復号されましたが署名はありません — 送信元は未検証です</string>
+    <string name="verify_banner_signed_by_full_format">%1$s &lt;%2$s&gt; による署名</string>
+    <string name="verify_banner_signed_by_name_format">署名者: %1$s</string>
+    <string name="verify_banner_signed_by_email_format">署名者: %1$s</string>
+    <string name="verify_banner_signed_by_keyid_format">0x%1$s による署名</string>
+    <string name="verify_banner_unknown_signer_subtitle_format">%1$s · タップして keys.openpgp.org で検索</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         PromoCodeService — billing
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="promo_error_invalid_code">プロモコードが無効です</string>
+    <string name="promo_error_already_redeemed">このコードはすでに引き換え済みです</string>
+    <string name="promo_error_server_format">サーバーエラー: %1$s</string>
+    <string name="promo_error_network_format">ネットワークエラー：%1$s</string>
+    <string name="promo_error_unknown">不明なエラー。</string>
+    <string name="promo_status_unlocked_default">PGPony Pro が解除されました!</string>
+    <string name="promo_status_unlocked_offline">PGPony Pro をアンロックしました（オフラインモード — オンライン時に同期します）</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         KeyExpirationReceiver — system notification text
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="key_expiration_notif_display_name_fallback">PGP キー</string>
+    <string name="key_expiration_notif_title_format">PGP キーが%1$sに期限切れになります</string>
+    <string name="key_expiration_notif_body_format">「%1$s」が使えなくなる前にタップして更新してください。</string>
+    <string name="key_expiration_label_in_30_days">30 日後</string>
+    <string name="key_expiration_label_in_7_days">7 日後</string>
+    <string name="key_expiration_label_tomorrow">明日</string>
+    <string name="key_expiration_label_today">今日</string>
+    <string name="key_expiration_label_in_n_days_format">%1$d 日後</string>
+
+    <!-- ── KeyExpirationService — notification channel (system Settings) -->
+    <string name="key_expiration_channel_name">キー有効期限のリマインダー</string>
+    <string name="key_expiration_channel_description">PGP キーの有効期限が近づいたときに通知します。</string>
+    <string name="key_expiration_fallback_display_name_format">キー %1$s</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Result sheets — shared
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="result_sheet_fingerprint_format">フィンガープリント: %1$s</string>
+    <string name="result_sheet_armored_block_format">ASCII armor 形式の OpenPGP ブロック、%1$d 文字</string>
+    <string name="result_sheet_revocation_block_format">失効証明書、%1$d 文字</string>
+    <string name="result_sheet_copy_button">クリップボードにコピー</string>
+    <string name="result_sheet_save_button">.asc ファイルとして保存</string>
+    <string name="result_sheet_clipboard_warning">クリップボードの内容は、消去されるまでインストールされているすべてのアプリから見える状態です。</string>
+
+    <!-- ── ExportPrivateKeyResultSheet ───────────────────────────────── -->
+    <string name="export_private_sheet_title">秘密鍵の準備完了</string>
+    <string name="export_private_sheet_warning">この鍵を使うと、あなた宛のメッセージを復号でき、あなたとして署名することもできます。パスワードのように扱い、自分だけがアクセスできる場所に保管してください。</string>
+    <string name="export_public_sheet_title">公開鍵を共有</string>
+    <string name="export_public_sheet_explainer">この鍵を持つ人は、あなたの署名を検証でき、あなた宛に暗号化メッセージを送信できます。</string>
+
+    <!-- ── RevocationResultSheet ─────────────────────────────────────── -->
+    <string name="revocation_result_sheet_title">鍵を失効しました</string>
+    <string name="revocation_result_sheet_explainer">鍵が鍵束で失効済みとマークされました。あなたの公開鍵を持つ人々に失効証明書を共有して、新しいメッセージをその鍵に暗号化しないようにしてもらい、キーサーバーにアップロードして失効を広く伝播させましょう。</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         FileEncryptionResultScreen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="file_enc_result_title">ファイルを暗号化しました</string>
+    <string name="file_enc_result_badge_signed">署名済み</string>
+    <string name="file_enc_result_badge_can_decrypt">復号できる相手</string>
+    <string name="file_enc_result_save_button">「ファイル」に保存</string>
+    <string name="file_enc_result_share_button">暗号化ファイルを共有</string>
+    <string name="file_enc_result_share_chooser_title">暗号化されたファイルを共有</string>
+    <string name="file_enc_result_save_failed_default">保存に失敗しました</string>
+    <string name="file_enc_result_share_failed_default">共有に失敗しました</string>
+    <string name="file_enc_result_save_success">正常に保存されました</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         ContactLinkSheet
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="contact_link_sheet_title_link">連絡先にリンク</string>
+    <string name="contact_link_sheet_title_auto_match">自動マッチング結果</string>
+    <string name="contact_link_sheet_filter_format">メールが %1$s に一致する連絡先を表示</string>
+    <string name="contact_link_sheet_empty_generic">この端末にはメールアドレスを持つ連絡先がありません。</string>
+    <string name="contact_link_sheet_empty_filtered_format">%1$s をメールリストに持つ連絡先はありません。</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         NotesEditorSheet
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="notes_editor_title_add">メモを追加</string>
+    <string name="notes_editor_title_edit">メモを編集</string>
+    <string name="notes_editor_explainer">メモはこの端末にのみローカル保存され、このキーのエクスポートや共有には決して含まれません。</string>
+    <string name="notes_editor_placeholder">このキーに関するメモ…</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         SignAsSheet (encrypt-time signer picker)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="sign_as_sheet_title">署名する鍵</string>
+    <string name="sign_as_sheet_explainer">受信者はメッセージがこの鍵から送られたことを検証できます。その ID の公開鍵を持つ人には、署名者としてあなたの名前が表示されます。</string>
+    <string name="sign_as_sheet_selected_cd">選択中</string>
+    <string name="sign_as_sheet_default_badge">デフォルト</string>
+    <string name="sign_as_sheet_empty">利用できる鍵ペアがありません。</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         QRScannerScreen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="qr_scanner_title">QR コードをスキャン</string>
+    <string name="qr_scanner_permission_title">カメラの許可が必要です</string>
+    <string name="qr_scanner_grant_button">許可する</string>
+    <string name="qr_scanner_hint">PGP 公開鍵の QR コードにカメラを向けてください</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         MigrationProgressOverlay
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="migration_overlay_title">鍵束を更新中</string>
+    <string name="migration_overlay_body">保存された鍵からサブキー情報を読み取っています。アップグレード後に一度だけ実行されます。</string>
+    <string name="migration_overlay_starting">開始中…</string>
+    <string name="migration_overlay_progress_format">キー %1$d / %2$d を更新中</string>
+    <string name="migration_overlay_done">完了。</string>
+    <string name="migration_overlay_error">更新を完了できませんでした。アプリは引き続き動作します — 新しい鍵をインポートまたは生成するまで、一部のサブキー情報が欠落する可能性があります。</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         KeyShareIntents — Android share-sheet chooser titles + clip labels
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="share_intent_chooser_public_key">公開鍵を共有 (.asc)</string>
+    <string name="share_intent_chooser_revocation_cert">失効証明書を共有 (.asc)</string>
+    <string name="share_intent_chooser_private_key">秘密鍵を保存 (.asc、機密)</string>
+    <string name="share_intent_clip_label_private_key">PGPony – 秘密鍵</string>
+    <string name="share_intent_clip_label_public_key">PGPony – 公開鍵</string>
+    <string name="share_intent_clip_label_revocation_cert">PGPony – 失効証明書</string>
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Phase A15 — ShareTargetActivity translations
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="share_target_activity_label">PGPony — クイックアクション</string>
+    <string name="share_target_dismiss_cd">閉じる</string>
+    <string name="share_target_root_title">何をしますか?</string>
+    <string name="share_target_root_subtitle_text">共有されたテキストをどう扱うか選択してください:</string>
+    <string name="share_target_root_subtitle_file_format">%1$s をどう扱うか選択してください:</string>
+    <string name="share_target_action_encrypt">暗号化</string>
+    <string name="share_target_action_encrypt_subtitle">受信者を選んで暗号文を生成</string>
+    <string name="share_target_action_decrypt">復号 / 検証</string>
+    <string name="share_target_action_decrypt_subtitle">この PGP メッセージをあなたの鍵で読む</string>
+    <string name="share_target_open_full_app">PGPony で開く</string>
+    <string name="share_target_open_full_app_subtitle_import">これは PGP 鍵のようです — 鍵束タブからインポートしてください</string>
+    <string name="share_target_open_full_app_subtitle_setup">クイックアクションを使うには、メインアプリで最初の鍵をセットアップしてください</string>
+    <string name="share_target_input_label_text">共有テキスト</string>
+    <string name="share_target_input_label_file_format">共有ファイル: %1$s</string>
+    <string name="share_target_input_truncated_format">… 全部で %1$d 文字</string>
+    <string name="share_target_input_binary_format">バイナリコンテンツ — %1$d バイト</string>
+    <string name="share_target_encrypt_title">宛先を選んで暗号化…</string>
+    <string name="share_target_encrypt_recipients_empty">鍵束に受信者の鍵がありません。先にメインアプリで公開鍵を追加してください。</string>
+    <string name="share_target_encrypt_no_recipients_selected">受信者を少なくとも 1 人選んでください</string>
+    <string name="share_target_encrypt_button">暗号化</string>
+    <string name="share_target_encrypt_result_title">暗号化完了</string>
+    <string name="share_target_encrypt_file_result_title">暗号化されたファイル</string>
+    <string name="share_target_encrypt_file_result_subtitle">ファイルを暗号化しました。暗号化されたコピーを共有または保存してください。</string>
+    <string name="share_target_encrypt_file_result_size_format">%1$d バイト</string>
+    <string name="share_target_encrypt_file_result_share_button">暗号化ファイルを共有</string>
+    <string name="share_target_encrypt_result_subtitle_format">暗号文、%1$d 文字</string>
+    <string name="share_target_decrypt_title">使用する鍵を選択…</string>
+    <string name="share_target_decrypt_no_key_pairs">利用できる秘密鍵がありません。先にメインアプリで鍵ペアを生成またはインポートしてください。</string>
+    <string name="share_target_decrypt_auto_select_label">最も適合する鍵</string>
+    <string name="share_target_decrypt_passphrase_label">パスフレーズ</string>
+    <string name="share_target_decrypt_passphrase_optional">パスフレーズ(鍵が保護されている場合)</string>
+    <string name="share_target_decrypt_button">復号</string>
+    <string name="share_target_decrypt_result_title">復号完了</string>
+    <string name="share_target_decrypt_file_result_title">復号されたファイル</string>
+    <string name="share_target_decrypt_file_result_share_button">復号ファイルを共有</string>
+    <string name="share_target_decrypt_result_signed_format">%1$s による署名</string>
+    <string name="share_target_decrypt_result_unverified">復号しましたが署名は未検証です</string>
+    <string name="share_target_decrypt_result_unsigned">復号完了 (署名なし)</string>
+    <string name="share_target_result_copy">コピー</string>
+    <string name="share_target_result_share">共有</string>
+    <string name="share_target_result_done">完了</string>
+    <string name="share_target_result_open_in_pgpony">PGPony で開く</string>
+    <string name="share_target_clip_label_encrypted">PGPony — 暗号化されたメッセージ</string>
+    <string name="share_target_clip_label_decrypted">PGPony — 復号されたメッセージ</string>
+    <string name="share_target_share_chooser_encrypted">暗号化されたメッセージを共有</string>
+    <string name="share_target_share_chooser_decrypted">復号されたメッセージを共有</string>
+    <string name="share_target_processing">処理中…</string>
+    <string name="share_target_status_copied">クリップボードにコピーしました</string>
+    <string name="share_target_clip_unavailable">クリップボードを利用できません</string>
+    <string name="share_target_error_no_input">共有されたコンテンツがありません — 操作する対象がありません。</string>
+    <string name="share_target_error_locked">クイックアクションを使うには PGPony のロックを解除してください。</string>
+    <string name="share_target_error_not_pgp_for_decrypt">これは PGP メッセージではないようです — -----BEGIN PGP MESSAGE----- で始まる内容を貼り付けてください。</string>
+    <string name="share_target_error_generic_format">問題が発生しました: %1$s</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         A14 Picker — Language selector UI strings
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="settings_language_row_title">言語</string>
+    <string name="language_picker_title">言語</string>
+    <string name="language_picker_footer">ほとんどの画面はすぐに更新されます。テキストが前の言語のまま残っている場合は PGPony を再起動してください。</string>
+    <string name="onboarding_slide_language_title">言語</string>
+    <string name="onboarding_slide_language_body">使用したい言語を選んでください。\n\n設定からいつでも変更できます。</string>
+</resources>

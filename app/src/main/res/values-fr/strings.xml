@@ -1,0 +1,1258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    PGPony Android — strings.xml
+    Created in Phase A13 for the localization pass that follows in A14.
+
+    NAMING CONVENTION
+    =================
+
+    All keys follow `<feature>_<area>_<purpose>` snake_case format. The
+    feature prefix scopes ownership so two unrelated screens can use
+    similar wording without collisions, and the purpose suffix tells
+    you what role the string plays (title, body, button, error, etc.).
+
+    Examples:
+      settings_security_title           — section header
+      settings_biometric_lock_label     — toggle label
+      settings_biometric_lock_subtitle  — toggle subtitle (helper text)
+      settings_biometric_unavailable_error — error message
+      lock_screen_tagline               — small tagline below the app name
+      common_button_cancel              — reusable button label
+
+    Reusable strings (Cancel, OK, Save, Done, Copy, Share, etc.) live
+    under the `common_` prefix.
+
+    PARAMETERIZED STRINGS
+    =====================
+
+    Use Java/printf-style positional specifiers, never named placeholders:
+      <string name="clipboard_will_clear_in">Clipboard will clear in %1$ds</string>
+      <string name="key_count_summary">%1$d keys, %2$d key pairs</string>
+
+    Read in Kotlin via:
+      stringResource(R.string.clipboard_will_clear_in, seconds)        // Composable
+      context.getString(R.string.clipboard_will_clear_in, seconds)     // non-Composable
+      PGPonyApp.instance.getString(R.string.foo, arg1, arg2)           // ViewModel / service
+
+    PLURALS
+    =======
+
+    Strings that change form by count live in plurals.xml (created in
+    A13b alongside the first plural-using extraction — encrypt
+    recipient count). For now this file holds only singular strings.
+
+    HTML / FORMATTING
+    =================
+
+    Strings containing HTML (bold, italics, inline links) wrap in
+    <![CDATA[...]]> and are rendered via androidx.compose's
+    AnnotatedString.fromHtml or via Html.fromHtml on legacy paths.
+    None in A13a yet.
+
+    NON-COMPOSABLE ACCESS (ViewModels, services)
+    ============================================
+
+    ViewModels and services that need user-facing strings go through
+    PGPonyApp.instance.getString(R.string.foo) — Application is a
+    Context and getString reaches all string resources. Threading the
+    actual Activity Context all the way down would require touching
+    every PGPonyViewModelFactory call site; using the Application
+    singleton is the lighter pattern and matches what we already do
+    for KeyExpirationService's notification text.
+
+    SCOPE NOTES (A13a)
+    ==================
+
+    This file is created with the foundational strings from the
+    following surfaces, in order of extraction:
+
+      1. Common reusable labels         (common_*)
+      2. Lock screen                    (lock_*)
+      3. Settings screen                (settings_*)
+      4. SettingsViewModel error msgs   (settings_*_error)
+      5. MainActivity                   (main_*)
+
+    Future bundles (A13b, A13c, A13d, A13e) extend this file with the
+    remaining feature areas — see the working progress file in the
+    bundle root for the live status.
+-->
+<!-- Localized for values-fr - Phase A15: +47 ShareTargetActivity strings on top of A14e baseline. Run total: 713 entries handled per language. -->
+<resources>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         App identity
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="app_name">PGPony</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Common reusable labels — used by 5+ screens
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="common_button_cancel">Annuler</string>
+    <string name="common_button_ok">OK</string>
+    <string name="common_button_save">Enregistrer</string>
+    <string name="common_button_done">OK</string>
+    <string name="common_button_close">Fermer</string>
+    <string name="common_button_continue">Continuer</string>
+    <string name="common_button_back">Retour</string>
+    <string name="common_button_copy">Copier</string>
+    <string name="common_button_copy_to_clipboard">Copier dans le presse-papiers</string>
+    <string name="common_button_copied">Copié !</string>
+    <string name="common_button_share">Partager</string>
+    <string name="common_button_delete">Supprimer</string>
+    <string name="common_button_retry">Réessayer</string>
+    <string name="common_button_try_again">Réessayer</string>
+    <string name="common_button_open">Ouvrir</string>
+    <string name="common_button_select">Sélectionner</string>
+    <string name="common_button_select_all">Tout sélectionner</string>
+    <string name="common_button_clear">Effacer</string>
+    <string name="common_button_confirm">Confirmer</string>
+    <string name="common_button_skip">Passer</string>
+    <string name="common_loading">Chargement…</string>
+    <string name="common_processing">Traitement…</string>
+    <string name="common_authenticating">Authentification…</string>
+    <string name="common_required_field">Requis</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Lock screen (Phase A11)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="lock_screen_tagline">Vos clés sont à l\'abri</string>
+    <string name="lock_screen_unlock_button">Déverrouiller</string>
+    <string name="lock_prompt_title">Déverrouiller PGPony</string>
+    <string name="lock_prompt_subtitle">Authentifiez-vous pour accéder à vos clés</string>
+    <string name="lock_error_activity_unavailable">Contexte d\'activité indisponible.</string>
+    <string name="lock_error_biometric_unavailable">L\'authentification biométrique n\'est pas disponible. Configurez une empreinte digitale ou un verrouillage d\'écran dans les paramètres système.</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Settings — top-level navigation
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="settings_title">Réglages</string>
+
+    <!-- ── Section headers ───────────────────────────────────────────── -->
+    <string name="settings_section_pgpony_pro">PGPony Pro</string>
+    <string name="settings_section_security">Sécurité</string>
+    <string name="settings_section_clipboard">Presse-papiers</string>
+    <string name="settings_section_appearance">Apparence</string>
+    <string name="settings_section_default_recipient">Destinataire par défaut</string>
+    <string name="settings_default_recipient_label">Présélectionner un destinataire lors du chiffrement</string>
+    <string name="settings_default_recipient_none">Aucun</string>
+    <string name="settings_default_recipient_pinned">Épinglé</string>
+    <string name="settings_default_recipient_last">Dernier utilisé</string>
+    <string name="settings_default_recipient_choose">Choisir une clé</string>
+    <string name="settings_section_reminders">Rappels</string>
+    <string name="settings_section_key_management">Gestion des clés</string>
+    <string name="settings_section_data">Données</string>
+    <string name="settings_section_support">Assistance</string>
+    <string name="settings_section_more">Plus de NorseHorse</string>
+    <string name="settings_more_agepony_title">AgePony</string>
+    <string name="settings_more_agepony_subtitle">Chiffrement de fichiers au format age</string>
+    <string name="settings_more_source_title">Moteur open source</string>
+    <string name="settings_more_source_subtitle">PGPonyCore sur GitHub, le cœur cryptographique audité</string>
+    <string name="settings_more_appsource_title">Code source</string>
+    <string name="settings_more_appsource_subtitle">L\'application PGPony complète sur GitHub</string>
+    <string name="settings_section_about">À propos</string>
+
+    <!-- ── Pro section ──────────────────────────────────────────────── -->
+    <string name="settings_pro_active_label">PGPony Pro</string>
+    <string name="settings_pro_active_subtitle">Toutes les fonctions débloquées</string>
+    <string name="settings_pro_upgrade_label">Passer à Pro</string>
+    <string name="settings_pro_upgrade_subtitle">Débloquez le trousseau complet et la synchronisation cloud</string>
+    <string name="settings_pro_unlock_price_format">Débloquer toutes les fonctionnalités — %1$s</string>
+    <string name="settings_pro_unlock_button">Débloquer Pro</string>
+    <string name="settings_pro_restore_button">Restaurer</string>
+
+    <!-- ── Security section ─────────────────────────────────────────── -->
+    <string name="settings_biometric_lock_title">Verrouillage biométrique</string>
+    <string name="settings_biometric_lock_subtitle">Exiger l\'authentification pour ouvrir l\'app</string>
+    <string name="settings_biometric_decrypt_title">Exiger lors du déchiffrement</string>
+    <string name="settings_biometric_decrypt_subtitle">Réauthentifiez-vous à chaque déchiffrement</string>
+    <string name="settings_biometric_unavailable_error">Configurez d\'abord le verrouillage d\'écran ou l\'authentification biométrique dans les paramètres système.</string>
+
+    <!-- ── Clipboard section ────────────────────────────────────────── -->
+    <string name="settings_clipboard_autoclear_title">Vider automatiquement le presse-papiers</string>
+    <string name="settings_clipboard_autoclear_subtitle">Effacer automatiquement le contenu copié</string>
+    <string name="settings_clipboard_clear_after_label">Effacer après</string>
+    <string name="settings_clipboard_interval_30s">30 s</string>
+    <string name="settings_clipboard_interval_1m">1 min</string>
+    <string name="settings_clipboard_interval_2m">2 min</string>
+    <string name="settings_clipboard_interval_5m">5 min</string>
+
+    <!-- ── Appearance section (Phase A12) ───────────────────────────── -->
+    <string name="settings_appearance_theme_label">Thème</string>
+    <string name="settings_appearance_theme_system">Système</string>
+    <string name="settings_appearance_theme_light">Clair</string>
+    <string name="settings_appearance_theme_dark">Sombre</string>
+
+    <!-- ── Reminders section (Phase A12) ────────────────────────────── -->
+    <string name="settings_reminders_key_expiration_title">Rappels d\'expiration des clés</string>
+    <string name="settings_reminders_key_expiration_subtitle">Recevez une notification 30, 7 et 1 jour avant l\'expiration d\'une clé</string>
+    <string name="settings_reminders_permission_denied_error">Autorisation de notification refusée. Les rappels ne se déclencheront qu\'une fois accordée.</string>
+    <string name="settings_reminders_notifications_disabled_hint">Les notifications sont désactivées dans les paramètres système. Ouvrez les paramètres de notification de l\'application pour les réactiver.</string>
+
+    <!-- ── Key Management section ───────────────────────────────────── -->
+    <string name="settings_key_default_label">Clé par défaut</string>
+    <string name="settings_key_total_keys_label">Total des clés</string>
+    <string name="settings_key_total_pairs_label">Paires de clés</string>
+    <string name="settings_key_default_format">%1$s (%2$s)</string>
+
+    <!-- ── Data section ─────────────────────────────────────────────── -->
+    <string name="settings_data_clear_all_button">Effacer toutes les données</string>
+    <string name="settings_data_clear_step1_title">Effacer toutes les données ?</string>
+    <string name="settings_data_clear_step1_body">Cela supprimera définitivement TOUTES les clés, y compris les clés privées. Cette action est irréversible.</string>
+    <string name="settings_data_clear_step2_title">Êtes-vous absolument sûr ?</string>
+    <string name="settings_data_clear_step2_body">Vous perdrez l\'accès à tous les messages chiffrés qui utilisent ces clés. Aucune récupération possible.</string>
+    <string name="settings_data_clear_step2_confirm">EFFACER TOUTES LES DONNÉES</string>
+    <string name="settings_data_clear_success">Toutes les données effacées</string>
+    <string name="settings_data_clear_error_format">Échec de l\'effacement : %1$s</string>
+
+    <!-- ── Support section ──────────────────────────────────────────── -->
+    <string name="settings_support_help_title">Aide et FAQ</string>
+    <string name="settings_support_help_subtitle">Réponses aux questions fréquentes</string>
+    <string name="settings_support_rate_title">Évaluer PGPony sur Google Play</string>
+    <string name="settings_support_rate_subtitle">Aidez les autres à découvrir l\'application</string>
+    <string name="settings_support_rate_error">Impossible d\'ouvrir la fenêtre d\'évaluation</string>
+    <string name="settings_support_feedback_title">Envoyer un commentaire</string>
+    <string name="settings_support_feedback_subtitle">Écrivez directement au développeur</string>
+    <string name="settings_support_feedback_no_email_error">Aucune application de messagerie trouvée. Écrivez-nous à %1$s</string>
+    <string name="settings_support_privacy_title">Politique de confidentialité</string>
+    <string name="settings_support_privacy_subtitle">Comment vos données sont traitées</string>
+    <string name="settings_support_browser_error">Impossible d\'ouvrir le navigateur</string>
+    <string name="settings_support_security_title">Sécurité et chiffrement</string>
+    <string name="settings_support_security_subtitle">Comment PGPony protège vos messages</string>
+
+    <!-- ── About section ────────────────────────────────────────────── -->
+    <string name="settings_about_version_label">Version</string>
+    <string name="settings_about_compat_label">Compatibilité</string>
+    <string name="settings_about_compat_value">Android 8.0+</string>
+    <string name="settings_about_openpgp_label">Standard OpenPGP</string>
+    <string name="settings_about_openpgp_value">RFC 4880 + 9580</string>
+    <string name="settings_about_crypto_label">Bibliothèque cryptographique</string>
+    <string name="settings_about_crypto_value">Bouncy Castle 1.78.1</string>
+    <string name="settings_about_replay_onboarding_title">Réafficher la visite guidée</string>
+    <string name="settings_about_replay_onboarding_subtitle">Rejouer l\'intro de la première utilisation</string>
+    <string name="settings_about_reset_tips_title">Réinitialiser les astuces</string>
+    <string name="settings_about_reset_tips_subtitle">Réafficher les conseils contextuels sur chaque onglet</string>
+    <string name="settings_about_reset_tips_success">Les conseils réapparaîtront à chaque visite d\'écran</string>
+    <string name="settings_about_footer">PGPony pour Android
+par NorseHorse (Kevin Stewart)
+pgpony.norsehor.se</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         MainActivity — small UI strings (tab labels, etc.)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="main_tab_keyring">Trousseau</string>
+    <string name="main_tab_encrypt">Chiffrer</string>
+    <string name="main_tab_decrypt">Déchiffrer</string>
+    <string name="main_tab_exchange">Échanger</string>
+    <string name="main_tab_settings">Réglages</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Encrypt screen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="encrypt_screen_title">Chiffrer</string>
+
+    <!-- ── Mode picker ──────────────────────────────────────────────── -->
+    <string name="encrypt_mode_text">Texte</string>
+    <string name="encrypt_mode_file">Fichier</string>
+    <string name="encrypt_mode_sign">Signer</string>
+    <string name="encrypt_mode_password">Mot de passe</string>
+    <string name="encrypt_password_section_label">Chiffrer avec un mot de passe</string>
+    <string name="encrypt_password_hint">Aucune clé requise. Toute personne disposant de cette phrase secrète peut déchiffrer le message ; partagez-la via un canal distinct. Compatible avec gpg -c à l\'autre bout.</string>
+    <string name="encrypt_password_passphrase_label">Phrase secrète</string>
+    <string name="encrypt_password_confirm_label">Confirmer la phrase secrète</string>
+    <string name="encrypt_password_show">Afficher la phrase secrète</string>
+    <string name="encrypt_password_hide">Masquer la phrase secrète</string>
+
+    <!-- ── Input field labels ───────────────────────────────────────── -->
+    <string name="encrypt_input_label_message_to_sign">Message à signer</string>
+    <string name="encrypt_input_label_message_to_encrypt">Message à chiffrer</string>
+
+    <!-- ── Encrypt action button ────────────────────────────────────── -->
+    <string name="encrypt_action_sign">Signer</string>
+    <string name="encrypt_action_encrypt_file">Chiffrer le fichier</string>
+    <string name="encrypt_action_encrypt">Chiffrer</string>
+    <string name="encrypt_action_sign_and_encrypt">Signer et chiffrer</string>
+
+    <!-- ── Output preview headers ───────────────────────────────────── -->
+    <string name="encrypt_output_signed_message">Message signé</string>
+    <string name="encrypt_output_encrypted_message">Message chiffré</string>
+
+    <!-- ── Recipients section ───────────────────────────────────────── -->
+    <string name="encrypt_recipients_label">Destinataires</string>
+    <string name="encrypt_recipients_choose">Choisir les destinataires</string>
+    <string name="encrypt_recipients_selected_count">%1$d sélectionné(s)</string>
+    <string name="encrypt_recipients_no_keys">Aucune clé disponible. Importez ou générez des clés d\'abord.</string>
+    <string name="encrypt_recipients_search_label">Rechercher des clés</string>
+    <string name="encrypt_recipients_clear_search">Effacer la recherche</string>
+    <string name="encrypt_recipients_select_all">Tout sélectionner</string>
+    <string name="encrypt_recipients_clear">Effacer</string>
+    <string name="encrypt_recipients_no_match_format">Aucune clé ne correspond à « %1$s ».</string>
+    <string name="encrypt_recipients_remove_format">Supprimer %1$s</string>
+
+    <!-- ── ASCII armor toggle ───────────────────────────────────────── -->
+    <string name="encrypt_armor_toggle_title">Sortie ASCII armored</string>
+    <string name="encrypt_armor_toggle_subtitle_armored">Sortie en texte PGP à coller dans un e-mail ou un chat.</string>
+    <string name="encrypt_armor_toggle_subtitle_binary">Sortie en fichier binaire .pgp — enregistré via la feuille de partage.</string>
+
+    <!-- ── Sign-this-too toggle ─────────────────────────────────────── -->
+    <string name="encrypt_also_sign_message_title">Signer également ce message</string>
+    <string name="encrypt_also_sign_file_title">Signer également ce fichier</string>
+    <string name="encrypt_also_sign_subtitle_format">Les destinataires peuvent vérifier qu\'il provient de %1$s</string>
+
+    <!-- ── Sign-as picker ───────────────────────────────────────────── -->
+    <string name="encrypt_sign_as_label">Signer en tant que</string>
+    <string name="encrypt_sign_as_no_key">Aucune clé de signature sélectionnée</string>
+    <string name="encrypt_sign_as_no_key_pair">Aucune paire de clés disponible. Générez ou importez d\'abord une clé privée.</string>
+    <string name="encrypt_sign_as_no_identity">(sans identité)</string>
+
+    <!-- ── Sign-only mode ───────────────────────────────────────────── -->
+    <string name="encrypt_sign_only_explainer">Produit un message signé en clair conforme RFC 4880 que toute personne disposant de votre clé publique peut vérifier. Pas de chiffrement — le texte reste lisible par tous.</string>
+
+    <!-- ── File picker (encrypt) ────────────────────────────────────── -->
+    <string name="encrypt_file_choose">Choisir un fichier à chiffrer</string>
+    <string name="encrypt_file_any_type">Tout type de fichier pris en charge</string>
+    <string name="encrypt_file_choose_different">Choisir un autre fichier</string>
+    <string name="encrypt_file_remove">Supprimer le fichier</string>
+
+    <!-- ── Passphrase dialog (encrypt-side / sign) ──────────────────── -->
+    <string name="encrypt_passphrase_dialog_title">Phrase secrète requise</string>
+    <string name="encrypt_passphrase_label">Phrase secrète</string>
+    <string name="encrypt_passphrase_intro">Cette clé de signature est protégée par une phrase secrète. </string>
+    <string name="encrypt_passphrase_intro_sign">Saisissez-la pour signer le message.</string>
+    <string name="encrypt_passphrase_intro_file">Saisissez-la pour chiffrer et signer le fichier.</string>
+    <string name="encrypt_passphrase_intro_text">Saisissez-la pour chiffrer et signer le message.</string>
+    <string name="encrypt_passphrase_skip_signing_file">Chiffrer le fichier sans signer</string>
+    <string name="encrypt_passphrase_skip_signing">Chiffrer sans signer</string>
+
+    <!-- ── Inline tooltip ───────────────────────────────────────────── -->
+    <string name="encrypt_tooltip_input">Saisissez ou collez votre message en haut, choisissez un ou plusieurs destinataires en dessous, puis appuyez sur Chiffrer pour produire un texte chiffré que vous pouvez copier et envoyer partout.</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Decrypt screen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="decrypt_screen_title">Déchiffrer</string>
+
+    <!-- ── Mode picker ──────────────────────────────────────────────── -->
+    <string name="decrypt_mode_text">Texte</string>
+    <string name="decrypt_mode_file">Fichier</string>
+
+    <!-- ── Input fields ─────────────────────────────────────────────── -->
+    <string name="decrypt_input_paste_label">Coller le message chiffré ou signé</string>
+    <string name="decrypt_passphrase_optional_label">Phrase secrète (si la clé est protégée)</string>
+
+    <!-- ── Key picker ───────────────────────────────────────────────── -->
+    <string name="decrypt_with_key_label">Déchiffrer avec</string>
+    <string name="decrypt_password_message_note">Message chiffré par mot de passe. Saisissez la phrase secrète pour déchiffrer.</string>
+    <string name="decrypt_password_passphrase_label">Phrase secrète</string>
+    <string name="decrypt_key_row_format">%1$s (%2$s)</string>
+    <string name="decrypt_no_key_pairs">Aucune paire de clés disponible. Générez ou importez d\'abord une clé privée.</string>
+
+    <!-- ── Decrypt action button ────────────────────────────────────── -->
+    <string name="decrypt_action_decrypt_file">Déchiffrer le fichier</string>
+    <string name="decrypt_action_decrypt">Déchiffrer</string>
+    <string name="verify_file_entry_button">Vérifier un fichier</string>
+    <string name="sign_file_entry_button">Signer un fichier</string>
+    <string name="sign_file_sheet_title">Signer un fichier</string>
+    <string name="sign_file_sheet_subtitle">Choisissez un fichier et une clé de signature pour produire une signature détachée à partager avec le fichier.</string>
+    <string name="sign_file_pick_label">Choisir le fichier à signer</string>
+    <string name="sign_file_sign_with_format">Signer avec : %1$s</string>
+    <string name="sign_file_sign_with_none">Choisir la clé de signature</string>
+    <string name="sign_file_format_armored">.asc (ASCII)</string>
+    <string name="sign_file_format_binary">.sig (binaire)</string>
+    <string name="sign_file_passphrase_label">Phrase secrète (si la clé est protégée)</string>
+    <string name="sign_file_sign_button">Signer</string>
+    <string name="sign_file_share_button">Partager la signature</string>
+    <string name="sign_file_error_pick_file">Choisissez un fichier à signer.</string>
+    <string name="sign_file_error_pick_key">Choisissez une clé de signature.</string>
+    <string name="sign_file_error_passphrase_required">Cette clé est protégée par une phrase secrète. Saisissez-la.</string>
+    <string name="sign_file_error_failed_format">Échec de la signature : %1$s</string>
+    <string name="verify_file_sheet_title">Vérifier un fichier</string>
+    <string name="verify_file_sheet_subtitle">Choisissez le fichier original et sa signature détachée (.sig ou .asc) pour vérifier le signataire.</string>
+    <string name="verify_file_pick_signed_label">Choisir le fichier original</string>
+    <string name="verify_file_pick_signature_label">Choisir la signature (.sig/.asc)</string>
+    <string name="verify_file_verify_button">Vérifier</string>
+    <string name="verify_file_error_pick_both">Choisissez le fichier original et sa signature.</string>
+
+    <!-- ── File picker (decrypt) ────────────────────────────────────── -->
+    <string name="decrypt_file_choose">Choisir un fichier chiffré</string>
+    <string name="decrypt_file_types">Fichiers .pgp, .gpg, .asc</string>
+
+    <!-- ── Output preview headers ───────────────────────────────────── -->
+    <string name="decrypt_output_decrypted">Message déchiffré</string>
+    <string name="decrypt_output_verified">Contenu vérifié</string>
+    <string name="decrypt_output_signed">Contenu signé</string>
+
+    <!-- ── Passphrase dialog (decrypt-side) ─────────────────────────── -->
+    <string name="decrypt_passphrase_dialog_title">Phrase secrète requise</string>
+    <string name="decrypt_passphrase_explainer">Cette clé est protégée par une phrase secrète.</string>
+
+    <!-- ── Biometric gate ───────────────────────────────────────────── -->
+    <string name="decrypt_biometric_prompt_title">S\'authentifier pour déchiffrer</string>
+    <string name="decrypt_biometric_prompt_subtitle">Vérifiez votre identité pour accéder à ce message</string>
+
+    <!-- ── Inline tooltip ───────────────────────────────────────────── -->
+    <string name="decrypt_tooltip_paste">Collez ici un message chiffré — il commence par -----BEGIN PGP MESSAGE-----. PGPony détectera laquelle de vos clés peut le déchiffrer.</string>
+
+    <!-- ── Decrypted text clipboard label (passed to ClipboardService) ─ -->
+    <string name="decrypt_clipboard_label">Message déchiffré</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Result sheets (EncryptionResultScreen, FileDecryptionResultScreen)
+         ════════════════════════════════════════════════════════════════ -->
+
+    <!-- ── Encryption result sheet ──────────────────────────────────── -->
+    <string name="result_encrypt_header_signed">Message signé</string>
+    <string name="result_encrypt_header_encrypted">Message chiffré</string>
+    <string name="result_encrypt_badge_signed">Signé</string>
+    <string name="result_encrypt_output_signed">Sortie signée</string>
+    <string name="result_encrypt_output_encrypted">Sortie chiffrée</string>
+    <string name="result_encrypt_can_decrypt_label">Peut déchiffrer</string>
+    <string name="result_encrypt_clipboard_label_signed">Message signé</string>
+    <string name="result_encrypt_clipboard_label_encrypted">Message chiffré</string>
+    <string name="result_encrypt_share_chooser_signed">Partager le message signé</string>
+    <string name="result_encrypt_share_chooser_encrypted">Partager le message chiffré</string>
+
+    <!-- ── File decryption result sheet ─────────────────────────────── -->
+    <string name="result_file_decrypt_default_filename">decrypted_output</string>
+    <string name="result_file_decrypt_header">Fichier déchiffré</string>
+    <string name="result_file_decrypt_badge_preview">Aperçu</string>
+    <string name="result_file_decrypt_save_button">Enregistrer dans Fichiers</string>
+    <string name="result_file_decrypt_save_failed_fallback">Échec de l\'enregistrement</string>
+    <string name="result_file_decrypt_share_button">Partager le fichier déchiffré</string>
+    <string name="result_file_decrypt_share_chooser">Partager le fichier déchiffré</string>
+    <string name="result_file_decrypt_share_failed_fallback">Échec du partage</string>
+    <string name="result_file_decrypt_saved_status">Enregistré avec succès</string>
+
+    <!-- ── Clipboard auto-clear countdown (Phase A12) ───────────────── -->
+    <string name="clipboard_will_clear_in_format">Le presse-papiers sera vidé dans %1$d s</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         EncryptDecryptViewModel — error and status messages
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="encdec_error_sign_no_input">Saisissez un message à signer</string>
+    <string name="encdec_error_encrypt_no_input">Saisissez un message à chiffrer</string>
+    <string name="encdec_error_no_recipients">Sélectionnez au moins un destinataire</string>
+    <string name="encdec_error_password_required">Saisissez une phrase secrète</string>
+    <string name="encdec_error_password_mismatch">Les phrases secrètes ne correspondent pas</string>
+    <string name="encdec_error_no_file_to_encrypt">Sélectionnez d\'abord un fichier à chiffrer</string>
+    <string name="encdec_error_no_file_to_decrypt">Sélectionnez d\'abord un fichier chiffré à déchiffrer</string>
+    <string name="encdec_error_no_decrypt_input">Collez un message chiffré ou signé</string>
+    <string name="encdec_error_incorrect_passphrase">Phrase secrète incorrecte</string>
+    <string name="encdec_error_incorrect_passphrase_retry">Phrase secrète incorrecte. Réessayez.</string>
+    <string name="encdec_error_signing_failed_format">Échec de la signature : %1$s</string>
+    <string name="encdec_error_encryption_failed_format">Échec du chiffrement : %1$s</string>
+    <string name="encdec_error_decryption_failed_format">Échec du déchiffrement : %1$s</string>
+    <string name="encdec_error_detached_signature">Cela ressemble à une signature détachée seule. Collez le contenu signé à côté pour vérifier, ou utilisez le flux de vérification de fichier (dans une prochaine mise à jour).</string>
+    <string name="encdec_error_not_pgp_message">Impossible de reconnaître ceci comme un message PGP. Assurez-vous d\'avoir collé le bloc complet, y compris les lignes BEGIN et END.</string>
+    <string name="encdec_error_signer_not_in_keyring">Impossible de vérifier la signature — la clé du signataire n\'est peut-être pas dans votre trousseau</string>
+    <string name="encdec_error_keyserver_network">Erreur réseau lors de la connexion à keys.openpgp.org</string>
+    <string name="encdec_error_keyserver_parse_format">Impossible d\'analyser la clé découverte : %1$s</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Keyring screen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="keyring_title">Trousseau</string>
+    <string name="keyring_add_key_cd">Ajouter une clé</string>
+    <string name="keyring_section_my_keys">Mes clés</string>
+    <string name="keyring_section_contact_keys">Clés de contacts</string>
+
+    <!-- ── Delete confirmation ──────────────────────────────────────── -->
+    <string name="keyring_delete_dialog_title">Supprimer la clé ?</string>
+    <string name="keyring_delete_dialog_body_format">Supprimer %1$s (%2$s) ? Cette action est irréversible.</string>
+    <string name="keyring_delete_dialog_confirm">Supprimer</string>
+
+    <!-- ── First-visit tooltip ──────────────────────────────────────── -->
+    <string name="keyring_tooltip_fab">Appuyez sur le bouton + en bas à droite pour générer votre première paire de clés ou en importer une existante.</string>
+
+    <!-- ── Generate Key sheet ───────────────────────────────────────── -->
+    <string name="keyring_generate_title">Générer une paire de clés</string>
+    <string name="keyring_generate_name_label">Nom</string>
+    <string name="keyring_generate_email_label">E-mail</string>
+    <string name="keyring_generate_algorithm_label">Algorithme</string>
+    <string name="keyring_generate_expiration_label">Expiration</string>
+    <string name="keyring_generate_passphrase_label">Phrase secrète (facultative)</string>
+    <string name="keyring_generate_passphrase_confirm_label">Confirmer la phrase secrète</string>
+    <string name="keyring_generate_button">Générer une paire de clés</string>
+    <string name="keyring_generate_button_in_progress">Génération…</string>
+
+    <!-- ── KeyringViewModel error / success messages ────────────────── -->
+    <string name="keyring_error_refresh_failed_format">Échec de l\'actualisation : %1$s</string>
+    <string name="keyring_error_name_required">Le nom est obligatoire.</string>
+    <string name="keyring_error_email_required">Un e-mail valide est requis</string>
+    <string name="keyring_error_passphrase_mismatch">Les phrases secrètes ne correspondent pas.</string>
+    <string name="keyring_status_key_generated">Paire de clés générée avec succès</string>
+    <string name="keyring_error_generation_failed_format">Échec de la génération : %1$s</string>
+    <string name="keyring_error_no_key_data">Aucune donnée de clé — collez, choisissez un fichier, scannez ou recherchez</string>
+    <string name="keyring_error_couldnt_parse_key">Impossible d\'analyser la clé — assurez-vous que le bloc ASCII armor est complet</string>
+    <string name="keyring_error_search_no_email_or_fp">Saisissez un e-mail ou une empreinte</string>
+    <string name="keyring_error_search_no_match_format">Aucune clé trouvée pour « %1$s »</string>
+    <string name="keyring_error_search_failed_format">Échec de la recherche : %1$s</string>
+    <string name="keyring_status_key_upgraded">Clé mise à niveau avec du matériel privé</string>
+    <string name="keyring_error_import_failed_format">Échec de l\'importation : %1$s</string>
+    <string name="keyring_error_no_armored_text">Collez une clé PGP en ASCII armor</string>
+    <string name="keyring_status_key_deleted">Clé supprimée</string>
+    <string name="keyring_error_delete_failed_format">Échec de la suppression : %1$s</string>
+
+    <!-- ── ImportMethod enum (KeyringViewModel) ─────────────────────── -->
+    <string name="import_method_paste">Coller</string>
+    <string name="import_method_file">Fichier</string>
+    <string name="import_method_qr_code">Code QR</string>
+    <string name="import_method_key_server">Serveur de clés</string>
+
+    <!-- ── ExpirationOption enum (KeyringViewModel) ─────────────────── -->
+    <string name="expiration_one_year">1 an</string>
+    <string name="expiration_two_years">2 ans</string>
+    <string name="expiration_five_years">5 ans</string>
+    <string name="expiration_never">Jamais</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Import Key screen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="import_screen_title">Importer la clé</string>
+
+    <!-- ── Paste tab ────────────────────────────────────────────────── -->
+    <string name="import_paste_label">Coller la clé PGP en ASCII armor</string>
+    <string name="import_paste_placeholder">-----BEGIN PGP PUBLIC KEY BLOCK-----
+…</string>
+    <string name="import_preview_button">Aperçu</string>
+
+    <!-- ── File tab ─────────────────────────────────────────────────── -->
+    <string name="import_file_choose_title">Choisir un fichier de clé</string>
+    <string name="import_file_choose_subtitle">.asc, .gpg, .pgp, .key — exportés depuis PGPony, GnuPG, etc.</string>
+    <string name="import_file_browse_button">Parcourir</string>
+
+    <!-- ── QR tab ───────────────────────────────────────────────────── -->
+    <string name="import_qr_title">Scanner un code QR</string>
+    <string name="import_qr_subtitle">Pointez la caméra sur un QR code de clé PGP généré depuis l\'onglet Échange d\'un autre téléphone.</string>
+    <string name="import_qr_open_camera_button">Ouvrir l\'appareil photo</string>
+
+    <!-- ── Key server tab ───────────────────────────────────────────── -->
+    <string name="import_keyserver_query_label">E-mail ou empreinte</string>
+    <string name="import_keyserver_query_placeholder">alice@example.com</string>
+    <string name="import_keyserver_search_button">Rechercher</string>
+    <string name="import_keyserver_search_button_in_progress">Recherche…</string>
+    <string name="import_keyserver_help">Pour les adresses e-mail, PGPony essaie d\'abord le Web Key Directory du domaine du destinataire, puis se rabat sur keys.openpgp.org. Pour les empreintes, il recherche directement sur keys.openpgp.org.</string>
+
+    <!-- ── Preview card ─────────────────────────────────────────────── -->
+    <string name="import_preview_type_key_pair">Paire de clés (publique + privée)</string>
+    <string name="import_preview_type_public_only">Clé publique uniquement</string>
+    <string name="import_preview_detail_user_label">Utilisateur</string>
+    <string name="import_preview_detail_user_empty">(aucun)</string>
+    <string name="import_preview_detail_fingerprint_label">Empreinte</string>
+    <string name="import_preview_detail_algorithm_label">Algorithme</string>
+    <string name="import_preview_source_file_format">Depuis le fichier : %1$s</string>
+    <string name="import_preview_source_wkd_advanced">Trouvée via WKD (avancé)</string>
+    <string name="import_preview_source_wkd_direct">Trouvée via WKD (direct)</string>
+    <string name="import_preview_source_hagrid">Trouvée via keys.openpgp.org</string>
+
+    <!-- ── Duplicate banner ─────────────────────────────────────────── -->
+    <string name="import_duplicate_will_upgrade">Cette clé est déjà dans votre trousseau. L\'importation ajoutera le matériel privé et la transformera en paire de clés.</string>
+    <string name="import_duplicate_no_change">Cette clé est déjà dans votre trousseau. L\'importer de nouveau ne changera rien.</string>
+
+    <!-- ── Confirm/cancel buttons (preview card) ────────────────────── -->
+    <string name="import_button_upgrade_key">Mettre à niveau la clé</string>
+    <string name="import_button_import_key">Importer la clé</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Key Detail screen + sections
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="key_detail_title">Détails de la clé</string>
+    <string name="key_detail_back_cd">Retour</string>
+    <string name="key_detail_error_key_not_found">Clé introuvable</string>
+
+    <!-- ── Type + DEFAULT badge ─────────────────────────────────────── -->
+    <string name="key_detail_type_key_pair">Paire de clés</string>
+    <string name="key_detail_type_public_key">Clé publique</string>
+    <string name="key_detail_badge_default">PAR DÉFAUT</string>
+
+    <!-- ── Fingerprint section ──────────────────────────────────────── -->
+    <string name="key_detail_section_fingerprint">Empreinte</string>
+    <string name="key_detail_fingerprint_copied">Copié !</string>
+    <string name="key_detail_fingerprint_tap_to_copy">Touchez pour copier</string>
+
+    <!-- ── Details section ──────────────────────────────────────────── -->
+    <string name="key_detail_section_details">Détails</string>
+    <string name="key_detail_detail_algorithm">Algorithme</string>
+    <string name="key_detail_detail_created">Créée</string>
+    <string name="key_detail_detail_drive_backup">Sauvegarde Drive</string>
+    <string name="key_detail_detail_drive_backup_enabled">Activée</string>
+    <string name="key_detail_detail_key_server">Serveur de clés</string>
+    <string name="key_detail_detail_key_server_published">Publiée</string>
+    <string name="key_detail_detail_expires">Expire</string>
+    <string name="key_detail_detail_expires_never">Jamais</string>
+
+    <!-- ── Trust ───────────────────────────────────────────────────── -->
+    <string name="key_detail_trust_level_label">Niveau de confiance</string>
+
+    <!-- ── Contact section ─────────────────────────────────────────── -->
+    <string name="key_detail_section_contact">Contact</string>
+    <string name="key_detail_contact_linked">Lié aux Contacts</string>
+    <string name="key_detail_contact_linked_cd">Lié</string>
+
+    <!-- ── Notes section ───────────────────────────────────────────── -->
+    <string name="key_detail_section_notes">Notes</string>
+
+    <!-- ── Action menu labels (display text) ───────────────────────── -->
+    <string name="key_detail_action_change_trust">Changer le niveau de confiance</string>
+    <string name="key_detail_action_add_notes">Ajouter des notes…</string>
+    <string name="key_detail_action_edit_notes">Modifier les notes…</string>
+    <string name="key_detail_action_link_contact">Lier à un contact</string>
+    <string name="key_detail_action_auto_match_email">Associer automatiquement par e-mail</string>
+    <string name="key_detail_action_unlink_contact">Délier le contact</string>
+    <string name="key_detail_action_share_public_key">Partager la clé publique</string>
+    <string name="key_detail_action_set_as_default">Définir comme clé par défaut</string>
+    <string name="key_detail_action_upload_to_key_server">Envoyer vers le serveur de clés</string>
+    <string name="key_detail_last_uploaded_label">Dernier envoi</string>
+    <string name="key_detail_last_checked_label">Dernière vérification</string>
+    <string name="key_detail_timestamp_never">Jamais</string>
+    <string name="key_detail_action_check_key_server">Vérifier le serveur de clés</string>
+    <string name="kd_vm_check_found">Cette clé est publiée sur le serveur de clés.</string>
+    <string name="kd_vm_check_not_found">Cette clé est introuvable sur le serveur de clés.</string>
+    <string name="kd_vm_check_failed_format">Échec de la vérification du serveur de clés : %1$s</string>
+    <string name="key_detail_action_delete_key">Supprimer la clé</string>
+    <string name="key_detail_action_revoke_key">Révoquer la clé…</string>
+    <string name="key_detail_action_export_revocation_cert">Exporter le certificat de révocation</string>
+    <string name="key_detail_action_export_private_key">Exporter la clé privée</string>
+    <string name="key_detail_action_show_qr_code">Afficher le code QR</string>
+
+    <!-- ── Unlink Contact dialog ───────────────────────────────────── -->
+    <string name="key_detail_unlink_dialog_title">Délier le contact</string>
+    <string name="key_detail_unlink_dialog_body_format">Supprimer le lien entre cette clé et %1$s ? La clé elle-même ne sera pas supprimée.</string>
+    <string name="key_detail_unlink_dialog_this_contact_fallback">ce contact</string>
+    <string name="key_detail_unlink_dialog_confirm">Délier</string>
+
+    <!-- ── Delete dialog ───────────────────────────────────────────── -->
+    <string name="key_detail_delete_dialog_title">Supprimer la clé</string>
+    <string name="key_detail_delete_dialog_intro">Cette action est irréversible. </string>
+    <string name="key_detail_delete_dialog_body_key_pair">Vos clés publique et privée seront supprimées définitivement.</string>
+    <string name="key_detail_delete_dialog_body_public_only">La clé publique sera retirée de votre trousseau.</string>
+    <string name="key_detail_delete_dialog_confirm">Supprimer</string>
+
+    <!-- ── Export Private Key dialog ───────────────────────────────── -->
+    <string name="key_detail_export_private_dialog_title">Exporter la clé privée ?</string>
+    <string name="key_detail_export_private_dialog_body_format">Ceci exporte votre clé PRIVÉE pour %1$s sous forme de texte ASCII armor. Toute personne obtenant ce fichier peut déchiffrer les messages qui vous sont destinés ET signer des messages en votre nom. Une fois partagée, PGPony ne peut pas l\'annuler.</string>
+
+    <!-- ── Export biometric prompt ─────────────────────────────────── -->
+    <string name="key_detail_export_biometric_title">Vérifier l\'identité</string>
+    <string name="key_detail_export_biometric_subtitle">Authentifiez-vous pour exporter votre clé privée</string>
+
+    <!-- ── Status / snackbar messages ──────────────────────────────── -->
+    <string name="key_detail_status_pub_copied">Clé publique copiée dans le presse-papiers</string>
+    <string name="key_detail_status_pub_export_failed">Impossible d\'exporter la clé publique</string>
+    <string name="key_detail_status_pub_file_failed">Impossible d\'écrire le fichier de clé publique — partage indisponible</string>
+    <string name="key_detail_status_priv_copied">Clé privée copiée dans le presse-papiers</string>
+    <string name="key_detail_status_priv_file_failed">Impossible d\'écrire le fichier d\'export — partage indisponible</string>
+    <string name="key_detail_status_priv_missing">Impossible d\'exporter la clé privée — matériel secret manquant ou illisible</string>
+    <string name="key_detail_status_rev_copied">Certificat de révocation copié dans le presse-papiers</string>
+    <string name="key_detail_status_rev_file_failed">Impossible d\'écrire le fichier de révocation — partage indisponible</string>
+    <string name="key_detail_status_clip_unavailable">Impossible d\'accéder au presse-papiers</string>
+    <string name="key_detail_status_no_revocation_cert">Aucun certificat de révocation disponible pour cette clé</string>
+
+    <!-- ── Revoked banner (KeyDetailSections) ──────────────────────── -->
+    <string name="key_detail_revoked_badge">RÉVOQUÉE</string>
+    <string name="key_detail_revoked_on_format">Révoquée le %1$s</string>
+    <string name="key_detail_revoked_label">Révoquée</string>
+    <string name="key_detail_revoked_no_reason">Aucun motif spécifié</string>
+    <string name="key_detail_revoked_explainer">Cette clé ne peut plus être utilisée pour signer de nouveaux messages ou comme destinataire. Elle peut toujours déchiffrer les messages reçus précédemment.</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         KeyDetailViewModel — status + error messages
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="kd_vm_error_export_for_qr">Impossible d\'exporter la clé publique pour l\'encodage QR</string>
+    <string name="kd_vm_error_qr_failed_format">Échec de la génération du QR : %1$s</string>
+    <string name="kd_vm_status_trust_updated">Niveau de confiance mis à jour</string>
+    <string name="kd_vm_status_notes_cleared">Notes effacées</string>
+    <string name="kd_vm_status_notes_saved">Notes enregistrées</string>
+    <string name="kd_vm_error_no_email_to_match">Cette clé n\'a pas d\'e-mail à associer</string>
+    <string name="kd_vm_status_linked_to_format">Lié à %1$s</string>
+    <string name="kd_vm_error_contacts_permission_needed">L\'autorisation Contacts est requise pour lier une clé à un contact</string>
+    <string name="kd_vm_status_contact_unlinked">Contact dissocié</string>
+    <string name="kd_vm_status_set_as_default_format">%1$s est maintenant votre clé par défaut</string>
+    <string name="kd_vm_error_export_public_failed">Impossible d\'exporter la clé publique</string>
+    <string name="kd_vm_error_upload_failed_format">Échec du téléversement : %1$s</string>
+    <string name="kd_vm_error_delete_failed_format">Échec de la suppression : %1$s</string>
+    <string name="kd_vm_error_revoke_passphrase_required">Cette clé a une phrase secrète. Saisissez-la pour continuer.</string>
+    <string name="kd_vm_error_revoke_incorrect_passphrase">Phrase secrète incorrecte.</string>
+    <string name="kd_vm_error_revocation_failed_default">Échec de la révocation</string>
+    <string name="kd_vm_error_revocation_failed_format">Échec de la révocation : %1$s</string>
+
+    <!-- Upload-success messages (computed in uploadSuccessMessage()) -->
+    <string name="kd_vm_upload_success_generic">Téléversée sur keys.openpgp.org.</string>
+    <string name="kd_vm_upload_success_verify_single_format">Téléversée. E-mail de vérification envoyé à %1$s — cliquez sur le lien pour que votre clé soit consultable par e-mail.</string>
+    <string name="kd_vm_upload_success_verify_multi_format">Téléversée. E-mails de vérification envoyés à %1$s — cliquez sur chaque lien pour que votre clé soit consultable par e-mail.</string>
+    <string name="kd_vm_upload_already_published">Déjà publiée — la clé est consultable par e-mail.</string>
+    <string name="kd_vm_upload_verify_skipped">Téléversée, mais la vérification n\'a pas pu être déclenchée. La clé n\'est consultable que par empreinte — réessayez plus tard.</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         TrustLevel enum (PGPKeyEntity)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="trust_level_unknown_name">Inconnu</string>
+    <string name="trust_level_unverified_name">Non vérifiée</string>
+    <string name="trust_level_verified_name">Vérifiée</string>
+    <string name="trust_level_ultimate_name">Ultime</string>
+    <string name="trust_level_unknown_description">Aucune validation effectuée</string>
+    <string name="trust_level_unverified_description">Ajoutée mais non vérifiée — à utiliser avec prudence</string>
+    <string name="trust_level_verified_description">Empreinte comparée via un canal de confiance</string>
+    <string name="trust_level_ultimate_description">Votre propre clé, ou une que vous contrôlez entièrement</string>
+
+    <!-- ── TrustLevelSheet ──────────────────────────────────────────── -->
+    <string name="trust_sheet_title">Niveau de confiance</string>
+    <string name="trust_sheet_subtitle">Indiquez votre niveau de confiance dans le fait que cette clé appartient bien à son propriétaire revendiqué. La confiance est un indice pour vous — elle ne modifie pas ce que PGPony peut chiffrer ou vérifier.</string>
+    <string name="trust_sheet_selected_cd">Sélectionné</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         RevocationReason enum (PGPKeyEntity) + RevokeKeySheet
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="revocation_reason_no_reason_name">Aucun motif spécifié</string>
+    <string name="revocation_reason_no_reason_description">Ne dites pas pourquoi — le certificat déclare simplement la clé révoquée</string>
+    <string name="revocation_reason_superseded_name">Remplacée par une nouvelle clé</string>
+    <string name="revocation_reason_superseded_description">Vous êtes passé à une autre clé ; l\'ancienne reste digne de confiance</string>
+    <string name="revocation_reason_compromised_name">Clé compromise</string>
+    <string name="revocation_reason_compromised_description">La clé privée a pu être exposée — NE faites confiance à rien de signé après cette date</string>
+    <string name="revocation_reason_retired_name">Clé retirée</string>
+    <string name="revocation_reason_retired_description">La clé n\'est plus utilisée mais la clé privée n\'est pas compromise</string>
+    <string name="revocation_reason_user_id_invalid_name">Identifiant utilisateur n\'est plus valide</string>
+    <string name="revocation_reason_user_id_invalid_description">L\'e-mail ou le nom associé à la clé a changé</string>
+
+    <!-- ── RevokeKeySheet ───────────────────────────────────────────── -->
+    <string name="revoke_sheet_title">Révoquer la clé</string>
+    <string name="revoke_sheet_explainer_format">Génère et applique un certificat de révocation RFC 4880 pour %1$s. La clé reste dans votre trousseau mais est marquée révoquée — elle peut toujours déchiffrer les messages passés, mais ne peut plus être utilisée pour signer de nouveaux messages ou être sélectionnée comme destinataire. Une fois appliquée, cette action est irréversible.</string>
+    <string name="revoke_sheet_reason_label">Motif</string>
+    <string name="revoke_sheet_comment_label">Commentaire (facultatif)</string>
+    <string name="revoke_sheet_comment_placeholder">p. ex. Remplacée par la clé 0xABCD1234</string>
+    <string name="revoke_sheet_passphrase_label">Phrase secrète</string>
+    <string name="revoke_sheet_passphrase_placeholder">Laissez vide si votre clé n\'a pas de phrase secrète</string>
+    <string name="revoke_sheet_confirm">Révoquer</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         HelpScreen + FAQ content
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="help_screen_title">Aide et FAQ</string>
+    <string name="help_screen_subtitle">Réponses aux questions fréquentes sur PGPony.</string>
+    <string name="help_screen_footer">Vous n\'avez pas trouvé ce dont vous avez besoin ? Touchez Envoyer un commentaire dans les Réglages pour écrire directement au développeur.</string>
+    <string name="help_row_collapse_cd">Réduire</string>
+    <string name="help_row_expand_cd">Développer</string>
+
+    <!-- ── Section titles ───────────────────────────────────────────── -->
+    <string name="faq_section_getting_started">Premiers pas</string>
+    <string name="faq_section_encrypt_decrypt">Chiffrer et déchiffrer</string>
+    <string name="faq_section_security_privacy">Sécurité et confidentialité</string>
+
+    <!-- ── Getting Started Q&amp;A ─────────────────────────────────────── -->
+    <string name="faq_q_what_is_pgp">Qu\'est-ce que le chiffrement PGP ?</string>
+    <string name="faq_a_what_is_pgp">PGP (Pretty Good Privacy) est une norme bien établie pour chiffrer messages et fichiers afin que seul le destinataire prévu puisse les lire.\n\nChaque personne dispose d\'une paire de clés : une clé publique (que vous partagez librement) et une clé privée (que vous gardez secrète). Quiconque possède votre clé publique peut chiffrer un message pour vous, mais seule votre clé privée peut le déchiffrer.\n\nPGPony met en œuvre le standard OpenPGP moderne (RFC 4880 + RFC 9580). Les messages chiffrés ici peuvent donc être lus par quiconque utilise GnuPG, OpenKeychain ou tout autre outil OpenPGP.</string>
+
+    <string name="faq_q_need_key">Ai-je besoin d\'une clé pour utiliser cette app ?</string>
+    <string name="faq_a_need_key">Oui — il vous faut au moins une paire de clés avant de pouvoir chiffrer ou déchiffrer quoi que ce soit.\n\nOuvrez l\'onglet Trousseau et touchez le bouton +. Vous pouvez Générer une nouvelle paire de clés (recommandé pour les nouveaux utilisateurs) ou Importer une clé existante si vous utilisez déjà PGP sur un outil de bureau comme GnuPG.\n\nLorsque vous générez une clé, donnez-lui un nom et une adresse e-mail pour que les autres puissent l\'identifier, et protégez-la éventuellement par une phrase secrète pour plus de sécurité.</string>
+
+    <string name="faq_q_my_keys_vs_contacts">Quelle est la différence entre Mes clés et Contacts ?</string>
+    <string name="faq_a_my_keys_vs_contacts">Mes clés contiennent vos propres paires de clés — la clé publique (pour recevoir des messages chiffrés) et la clé privée (pour les déchiffrer). Elles représentent vos identités.\n\nContacts contient les clés publiques d\'autres personnes — uniquement la moitié publique. Vous les importez pour leur envoyer un message chiffré. Vous ne pouvez jamais déchiffrer avec la clé d\'un contact, car vous n\'avez pas sa clé privée.\n\nC\'est comme un système postal : votre propre clé de boîte aux lettres se trouve dans Mes clés, et les adresses postales des autres se trouvent dans Contacts.</string>
+
+    <string name="faq_q_share_public_key">Comment partager ma clé publique avec quelqu\'un ?</string>
+    <string name="faq_a_share_public_key">Ouvrez l\'onglet Échanger et sélectionnez la clé à partager. Trois options s\'offrent à vous :\n\n• Code QR — laissez l\'autre personne le scanner avec PGPony ou n\'importe quel scanner de QR.\n\n• Partager en tant que fichier — envoie un fichier .asc via n\'importe quelle application de partage (e-mail, Signal, Messages, etc.).\n\n• Copier dans le presse-papiers — collez le texte de la clé en armure dans un message à vous.\n\nPartager votre clé publique est toujours sans risque. Partager votre clé privée NE l\'est PAS — n\'exportez et n\'envoyez jamais votre clé privée, sauf pour la déplacer vers un autre appareil que vous contrôlez.</string>
+
+    <!-- ── Encrypt & Decrypt Q&amp;A ────────────────────────────────────── -->
+    <string name="faq_q_how_to_encrypt">Comment chiffrer un message ?</string>
+    <string name="faq_a_how_to_encrypt">Ouvrez l\'onglet Chiffrer. Tapez ou collez votre message dans la zone de saisie, puis choisissez un ou plusieurs destinataires dans vos contacts (vous pouvez vous inclure pour pouvoir le relire plus tard).\n\nAppuyez sur Chiffrer. PGPony produira un bloc de texte chiffré que vous pouvez copier et envoyer par n\'importe quel canal — e-mail, SMS, Slack, peu importe.\n\nSeuls les destinataires choisis pourront le déchiffrer.</string>
+
+    <string name="faq_q_how_to_decrypt">Comment déchiffrer un message qu\'on m\'a envoyé ?</string>
+    <string name="faq_a_how_to_decrypt">Ouvrez l\'onglet Déchiffrer et collez le message chiffré. Il doit commencer par `-----BEGIN PGP MESSAGE-----` et se terminer par `-----END PGP MESSAGE-----`.
+
+Appuyez sur Déchiffrer. Si le message a été chiffré pour l\'une de vos clés, PGPony affichera le texte en clair. Si votre clé privée est protégée par une phrase secrète, celle-ci vous sera demandée d\'abord.
+
+Vous pouvez aussi partager un fichier .asc/.pgp/.gpg directement vers PGPony depuis une autre application — Android proposera PGPony comme cible de partage.</string>
+
+    <string name="faq_q_armored_toggle">À quoi sert l\'option d\'armure ASCII ?</string>
+    <string name="faq_a_armored_toggle">La sortie ASCII armor produit du texte que vous pouvez coller dans un e-mail ou un chat. Elle ressemble à un bloc de lettres et de chiffres entouré des marqueurs `-----BEGIN PGP MESSAGE-----` et `-----END PGP MESSAGE-----`.
+
+La sortie non-armor est binaire — plus petite, mais ne peut être envoyée qu\'en pièce jointe.
+
+Laissez l\'option activée pour les messages. Désactivez-la uniquement si vous chiffrez un fichier volumineux et voulez réduire la taille au minimum.</string>
+
+    <string name="faq_q_encrypt_files">Puis-je chiffrer des fichiers, pas seulement du texte ?</string>
+    <string name="faq_a_encrypt_files">Oui. PGPony accepte les fichiers partagés depuis n\'importe quelle autre application — l\'app Fichiers, votre galerie, un dossier Téléchargements, n\'importe où.
+
+Depuis l\'application source, appuyez sur Partager et choisissez PGPony. Le fichier arrivera dans l\'onglet Déchiffrer (si c\'est un fichier chiffré) ou dans l\'onglet Trousseau (si c\'est un fichier de clé comme .asc).
+
+Chiffrer un fichier dans l\'autre sens — en choisissant un fichier depuis PGPony — est sur la feuille de route mais pas encore livré. Pour le moment, collez le contenu volumineux en tant que texte dans l\'onglet Chiffrer.</string>
+
+    <!-- ── Security & Privacy Q&amp;A ───────────────────────────────────── -->
+    <string name="faq_q_where_keys_stored">Où sont stockées mes clés privées ?</string>
+    <string name="faq_a_where_keys_stored">Sur votre appareil uniquement. PGPony stocke les clés privées dans une base de données Room chiffrée, protégée par une clé maître qui réside dans le Keystore Android.
+
+Sur les appareils modernes, le Keystore est soutenu par une sécurité matérielle (puce Titan M sur Pixel, équivalent chez Samsung et d\'autres constructeurs), ce qui signifie qu\'extraire vos clés privées nécessiterait une attaque physique sur la puce elle-même.
+
+Vos clés ne quittent jamais l\'appareil sauf si vous les exportez explicitement depuis l\'onglet Échange.</string>
+
+    <string name="faq_q_lost_passphrase">Que se passe-t-il si je perds ma phrase secrète ?</string>
+    <string name="faq_a_lost_passphrase">Il n\'y a pas de récupération. PGPony ne stocke pas votre phrase secrète et il n\'y a pas de procédure « mot de passe oublié » — c\'est tout l\'intérêt d\'un chiffrement fort.
+
+Si vous oubliez la phrase secrète d\'une clé privée, cette clé est définitivement inaccessible, et aucun message chiffré pour elle ne pourra jamais être déchiffré.
+
+Notez votre phrase secrète dans un endroit sûr. Un gestionnaire de mots de passe est idéal. Un papier dans un tiroir fermé à clé fait aussi l\'affaire.</string>
+
+    <string name="faq_q_server_data">PGPony envoie-t-il des données à un serveur ?</string>
+    <string name="faq_a_server_data">Non. Le chiffrement principal et la gestion des clés se font entièrement sur votre appareil. PGPony n\'a pas de système de comptes, pas d\'analyse, pas de télémétrie et pas de SDK publicitaire.
+
+L\'application déclare la permission INTERNET pour pouvoir, en option, contacter des serveurs de clés OpenPGP si vous choisissez de publier ou rechercher une clé — mais c\'est facultatif et pas nécessaire pour utiliser l\'application.
+
+Vous pouvez le vérifier en contrôlant l\'activité réseau de l\'application dans Paramètres Android &gt; Confidentialité &gt; Utilisation des données.</string>
+
+    <string name="faq_q_biometric_lock">Que protège réellement le verrouillage biométrique ?</string>
+    <string name="faq_a_biometric_lock">Le verrouillage biométrique empêche quiconque récupérant votre téléphone déverrouillé d\'ouvrir PGPony sans s\'authentifier avec votre empreinte digitale ou votre visage.
+
+Il N\'AJOUTE PAS de protection cryptographique à vos clés — vos clés privées sont déjà chiffrées au repos. Le verrouillage biométrique est une barrière d\'interface.
+
+Vous pouvez aussi activer Requérir pour le déchiffrement, qui demande une authentification biométrique à chaque fois que vous déchiffrez un message. Utilisez-le si vous craignez qu\'un téléphone déverrouillé tombe entre d\'autres mains.</string>
+
+    <string name="faq_q_algorithms">Quels algorithmes de chiffrement PGPony utilise-t-il ?</string>
+    <string name="faq_a_algorithms">Les nouvelles clés utilisent par défaut Ed25519 pour les signatures et Curve25519 pour le chiffrement — les mêmes courbes elliptiques utilisées par Signal, SSH et TLS 1.3.
+
+Les messages sont chiffrés symétriquement avec AES-256 en mode AEAD OCB (RFC 9580), la clé de session étant chiffrée pour la clé publique de chaque destinataire.
+
+PGPony peut aussi lire et importer des clés RSA et DSA héritées pour l\'interopérabilité avec d\'anciennes installations OpenPGP, mais ne génère que des clés modernes basées sur des courbes pour les nouvelles identités.
+
+Toute la cryptographie est réalisée par Bouncy Castle 1.78.1, une bibliothèque standard de l\'industrie auditée et utilisée dans les systèmes d\'entreprise et gouvernementaux dans le monde entier.</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         MainActivity tabs — adds Contacts (was missing earlier)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="main_tab_contacts">Contacts</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         SecurityInfoScreen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="security_info_title">Sécurité et chiffrement</string>
+    <string name="security_info_subtitle">Comment PGPony protège vos messages et vos clés.</string>
+
+    <string name="security_info_block_openpgp_title">Standards OpenPGP</string>
+    <string name="security_info_block_openpgp_body">PGPony met en œuvre RFC 4880 (OpenPGP) et RFC 9580 (crypto-refresh). Les messages sont entièrement interopérables avec GnuPG, OpenKeychain et tout autre outil compatible OpenPGP.</string>
+
+    <string name="security_info_block_algorithms_title">Algorithmes modernes</string>
+    <string name="security_info_block_algorithms_body">Les nouvelles clés utilisent Ed25519 pour la signature et Curve25519 pour le chiffrement — les mêmes courbes elliptiques que Signal, SSH et TLS 1.3. Le chiffrement symétrique utilise AES-256 en mode AEAD OCB (RFC 9580).</string>
+
+    <string name="security_info_block_library_title">Bâti sur Bouncy Castle</string>
+    <string name="security_info_block_library_body">Toute la cryptographie passe par Bouncy Castle 1.78.1, la bibliothèque standard de cryptographie Java, utilisée dans les systèmes d\'entreprise et gouvernementaux dans le monde entier. PGPony ne fait pas sa propre crypto.</string>
+
+    <string name="security_info_block_on_device_title">Tout reste sur votre appareil</string>
+    <string name="security_info_block_on_device_body">Vos clés ne quittent pas votre téléphone sauf si vous les partagez explicitement. PGPony n\'a pas de serveur, pas de système de comptes, pas d\'analyse. L\'application n\'a pas besoin de l\'autorisation Internet pour aucune fonction de chiffrement principale.</string>
+
+    <string name="security_info_block_at_rest_title">Les clés privées sont chiffrées au repos</string>
+    <string name="security_info_block_at_rest_body">Les clés privées sont stockées avec androidx.security.crypto, avec une clé maître générée et protégée par le Keystore Android. Sur les appareils modernes, le Keystore est soutenu par une sécurité matérielle (Titan M, Secure Enclave ou équivalents).</string>
+
+    <string name="security_info_block_biometric_title">Verrouillage biométrique facultatif</string>
+    <string name="security_info_block_biometric_body">Activez le verrouillage biométrique dans Paramètres &gt; Sécurité pour exiger une empreinte digitale ou un déverrouillage facial à chaque ouverture de PGPony. Vous pouvez aussi exiger une ré-authentification pour chaque opération de déchiffrement.</string>
+
+    <string name="security_info_block_clipboard_title">Effacement automatique du presse-papiers</string>
+    <string name="security_info_block_clipboard_body">Le contenu sensible copié dans le presse-papiers est automatiquement effacé après un délai configurable (60 secondes par défaut), afin qu\'il ne reste pas accessible à d\'autres applications.</string>
+
+    <string name="security_info_not_doing_title">Ce que PGPony NE fait PAS</string>
+    <string name="security_info_not_doing_bullet_1">Envoyer vos clés ou messages à un serveur</string>
+    <string name="security_info_not_doing_bullet_2">Exiger un compte, un e-mail ou un numéro de téléphone</string>
+    <string name="security_info_not_doing_bullet_3">Inclure des SDK d\'analyse, de télémétrie ou de publicité</string>
+    <string name="security_info_not_doing_bullet_4">Utiliser des bibliothèques de cryptographie tierces autres que Bouncy Castle</string>
+    <string name="security_info_not_doing_bullet_5">Stocker des phrases secrètes — elles ne sont utilisées qu\'en mémoire</string>
+
+    <string name="security_info_footer">Politique de confidentialité complète et détails techniques : pgpony.norsehor.se/privacy</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Onboarding — slide carousel (OnboardingSlide.kt)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="onboarding_slide_welcome_title">Bienvenue dans PGPony</string>
+    <string name="onboarding_slide_welcome_body">Le chiffrement PGP, dans votre poche.\n\nEnvoyez des messages que seul le destinataire prévu peut lire — sans serveur, sans compte, sans pistage.</string>
+
+    <string name="onboarding_slide_key_title">Commencez par une clé</string>
+    <string name="onboarding_slide_key_body">PGP fonctionne avec deux clés : une clé publique que vous partagez librement et une clé privée que vous gardez secrète.\n\nQuiconque possède votre clé publique peut vous envoyer des messages chiffrés, mais seule votre clé privée peut les déchiffrer.</string>
+
+    <string name="onboarding_slide_encrypt_title">Chiffrez tout</string>
+    <string name="onboarding_slide_encrypt_body">Une fois la clé publique d\'une personne enregistrée dans Contacts, allez dans l\'onglet Chiffrer pour brouiller un message rien que pour elle.\n\nLe résultat peut être envoyé sans risque par n\'importe quel canal — e-mail, SMS ou même publication publique.</string>
+
+    <string name="onboarding_slide_exchange_title">Échangez des clés instantanément</string>
+    <string name="onboarding_slide_exchange_body">L\'onglet Échange transforme votre clé publique en QR code. Montrez-le à un ami qui utilise PGPony et il pourra le scanner directement — sans saisie ni copier-coller.
+
+Vous pouvez aussi partager des clés sous forme de fichiers via n\'importe quelle autre application.</string>
+
+    <string name="onboarding_slide_privacy_title">Vous gardez le contrôle</string>
+    <string name="onboarding_slide_privacy_body">Vos clés ne quittent jamais cet appareil sauf si vous choisissez de les partager. PGPony n\'a ni serveur, ni analyse, ni publicité.
+
+Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale ou votre visage pour plus de tranquillité.</string>
+
+    <!-- ── OnboardingPage inline CTAs ───────────────────────────────── -->
+    <string name="onboarding_page_generate_cta">Générer ma première clé maintenant</string>
+    <string name="onboarding_page_generate_hint">Ou appuyez sur Suivant pour le faire plus tard depuis l\'onglet Trousseau.</string>
+    <string name="onboarding_page_already_have_keys_one">Vous avez déjà 1 clé</string>
+    <string name="onboarding_page_already_have_keys_other_format">Vous avez déjà %1$d clés</string>
+    <string name="onboarding_page_keyring_hint">Vous pouvez les gérer à tout moment depuis l\'onglet Trousseau.</string>
+    <string name="onboarding_page_biometric_toggle_title">Activer le verrouillage biométrique</string>
+    <string name="onboarding_page_biometric_toggle_subtitle">Demande l\'empreinte digitale ou le visage pour ouvrir PGPony</string>
+
+    <!-- ── OnboardingScreen — Skip / Next / Get Started ─────────────── -->
+    <string name="onboarding_screen_skip">Passer</string>
+    <string name="onboarding_screen_get_started">Commencer</string>
+    <string name="onboarding_screen_next">Suivant</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         OnboardingGenerateSheet
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="onboarding_generate_title">Générer votre clé</string>
+    <string name="onboarding_generate_subtitle">Nous utilisons par défaut Ed25519 + Curve25519, modernes. Vous pouvez toujours générer d\'autres clés plus tard depuis l\'onglet Trousseau.</string>
+    <string name="onboarding_generate_name_placeholder">Jane Doe</string>
+    <string name="onboarding_generate_email_placeholder">jane@example.com</string>
+    <string name="onboarding_generate_passphrase_section_label">Phrase secrète (facultative)</string>
+    <string name="onboarding_generate_passphrase_explainer">Protégez votre clé privée avec une phrase secrète. Si vous l\'oubliez, la clé est définitivement inaccessible — aucune récupération possible.</string>
+    <string name="onboarding_generate_button">Générer</string>
+    <string name="onboarding_generate_in_progress_title">Génération de votre paire de clés…</string>
+    <string name="onboarding_generate_in_progress_subtitle">Cela prend généralement quelques secondes.</string>
+    <string name="onboarding_generate_done_title">Clé créée !</string>
+    <string name="onboarding_generate_done_subtitle">Votre nouvelle paire de clés est prête dans l\'onglet Trousseau. Continuons.</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         ContactsScreen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="contacts_screen_title">Contacts</string>
+    <string name="contacts_options_cd">Options</string>
+    <string name="contacts_menu_discover_keys">Découvrir des clés</string>
+    <string name="contacts_menu_auto_match">Associer les clés automatiquement</string>
+    <string name="contacts_menu_refresh">Actualiser</string>
+    <string name="contacts_menu_reset_cache">Réinitialiser le cache du serveur de clés</string>
+
+    <!-- ── Permission view ──────────────────────────────────────────── -->
+    <string name="contacts_permission_title">Accès aux contacts</string>
+    <string name="contacts_permission_explainer">PGPony peut lier vos clés de chiffrement à vos\ncontacts pour faciliter l\'identification et\nla découverte automatique de clés publiques.</string>
+    <string name="contacts_permission_button">Autoriser l\'accès aux contacts</string>
+
+    <!-- ── Empty state ──────────────────────────────────────────────── -->
+    <string name="contacts_empty_title">Aucun contact trouvé</string>
+    <string name="contacts_empty_body">Aucun contact avec une adresse e-mail trouvé.</string>
+    <string name="contacts_empty_refresh_button">Actualiser</string>
+
+    <!-- ── Search + list ────────────────────────────────────────────── -->
+    <string name="contacts_search_placeholder">Rechercher des contacts…</string>
+    <string name="contacts_search_clear_cd">Effacer la recherche</string>
+    <string name="contacts_section_encrypted">Contacts chiffrés</string>
+    <string name="contacts_section_other">Autres contacts</string>
+    <string name="contacts_search_no_match_format">Aucun contact ne correspond à « %1$s »</string>
+
+    <!-- ── Tooltip + scan banner ────────────────────────────────────── -->
+    <string name="contacts_tooltip_import">Les contacts de votre appareil apparaissent ici. Lorsque vous importez la clé publique de quelqu\'un depuis l\'onglet Trousseau et que son e-mail correspond à un contact, ils apparaîtront liés automatiquement. Appuyez sur la loupe à côté d\'un contact pour rechercher sa clé sur un serveur de clés.</string>
+    <string name="contacts_scan_in_progress_format">Analyse %1$d/%2$d…</string>
+    <string name="contacts_scan_complete_one_format">Analyse terminée — %1$d clé trouvée</string>
+    <string name="contacts_scan_complete_many_format">Analyse terminée — %1$d clés trouvées</string>
+
+    <!-- ── Trust badges (rendered in contact rows) ──────────────────── -->
+    <string name="contacts_trust_unknown_cd">Confiance inconnue</string>
+    <string name="contacts_trust_unverified_cd">Non vérifiée</string>
+    <string name="contacts_trust_verified_cd">Vérifiée</string>
+    <string name="contacts_trust_ultimate_cd">Confiance ultime</string>
+
+    <!-- ── Row icons ────────────────────────────────────────────────── -->
+    <string name="contacts_linked_cd">Lié</string>
+    <string name="contacts_already_checked_cd">Déjà vérifié, aucune clé trouvée</string>
+    <string name="contacts_search_keyserver_cd">Rechercher sur le serveur de clés</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         ContactsViewModel — status/error messages
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="contacts_vm_error_load_failed_format">Échec du chargement des contacts : %1$s</string>
+    <string name="contacts_vm_status_linked_one_format">%1$d clé liée aux contacts</string>
+    <string name="contacts_vm_status_linked_many_format">%1$d clés liées aux contacts</string>
+    <string name="contacts_vm_status_no_new_matches">Aucune nouvelle correspondance trouvée</string>
+    <string name="contacts_vm_error_auto_match_failed_format">Échec de l\'auto-correspondance : %1$s</string>
+    <string name="contacts_vm_error_no_key_for_email_format">Aucune clé PGP trouvée pour %1$s</string>
+    <string name="contacts_vm_error_search_failed_format">Échec de la recherche : %1$s</string>
+    <string name="contacts_vm_error_bulk_scan_failed_format">Échec de l\'analyse en lot : %1$s</string>
+    <string name="contacts_vm_status_cache_cleared">Cache du serveur de clés vidé</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         KeyCard — used as a row across Keyring, Encrypt, etc.
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="key_card_key_pair_cd">Paire de clés</string>
+    <string name="key_card_expired_badge">Expirée</string>
+    <string name="key_card_revoked_badge">RÉVOQUÉE</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         ExchangeScreen + ExchangeViewModel
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="exchange_screen_title">Échanger</string>
+    <string name="exchange_section_show_key">Afficher la clé</string>
+    <string name="exchange_section_scan_key">Scanner une clé</string>
+    <string name="exchange_section_key_server">Serveur de clés</string>
+
+    <!-- ── Import-after-scan dialog ─────────────────────────────────── -->
+    <string name="exchange_import_dialog_title">Importer la clé scannée ?</string>
+    <string name="exchange_import_dialog_body">Importer la clé PGP depuis le QR code scanné ?</string>
+
+    <!-- ── Empty state (no keys to show) ────────────────────────────── -->
+    <string name="exchange_no_keys">Générez d\'abord une paire de clés pour partager votre clé publique.</string>
+
+    <!-- ── QR code + buttons ────────────────────────────────────────── -->
+    <string name="exchange_qr_cd">QR code de clé publique</string>
+    <string name="exchange_copy_key_button">Copier la clé</string>
+    <string name="exchange_upload_button">Envoyer</string>
+    <string name="exchange_upload_button_in_progress">Téléversement…</string>
+
+    <!-- ── Scan section ─────────────────────────────────────────────── -->
+    <string name="exchange_scan_button">Ouvrir le scanner</string>
+
+    <!-- ── Key server lookup ────────────────────────────────────────── -->
+    <string name="exchange_keyserver_query_label">E-mail ou empreinte</string>
+    <string name="exchange_keyserver_search_cd">Rechercher</string>
+    <string name="exchange_keyserver_import_button">Importer la clé</string>
+
+    <!-- ── Tooltip ──────────────────────────────────────────────────── -->
+    <string name="exchange_tooltip_qr">Choisissez une clé ici pour obtenir un QR code ou un fichier partageable. L\'autre personne le scanne ou l\'importe pour vous envoyer des messages chiffrés.</string>
+
+    <!-- ── ExchangeViewModel error / status messages ────────────────── -->
+    <string name="exchange_vm_error_qr_failed_format">Échec de la génération du QR : %1$s</string>
+    <string name="exchange_vm_error_not_pgp_key">Les données scannées ne sont pas une clé PGP</string>
+    <string name="exchange_vm_error_import_failed_format">Échec de l\'importation : %1$s</string>
+    <string name="exchange_vm_error_no_key_found_format">Aucune clé trouvée pour « %1$s »</string>
+    <string name="exchange_vm_error_search_failed_format">Échec de la recherche : %1$s</string>
+    <string name="exchange_vm_status_uploaded">Clé téléversée sur keys.openpgp.org</string>
+    <string name="exchange_vm_error_upload_failed_format">Échec du téléversement : %1$s</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         ProGateSheet
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="pro_feature_unlimited_keys_title">Paires de clés illimitées</string>
+    <string name="pro_feature_unlimited_keys_body">Créez un nombre illimité de paires de clés pour différentes identités — travail, personnel, projets. La version gratuite inclut 1 paire de clés.</string>
+    <string name="pro_feature_modern_algos_title">Clés Ed25519 + Cv25519</string>
+    <string name="pro_feature_modern_algos_body">Générez des clés de signature modernes Ed25519 avec des sous-clés de chiffrement Cv25519. Compactes, rapides et recommandées par les experts en sécurité.</string>
+    <string name="pro_feature_keyserver_title">Envoi vers le serveur de clés</string>
+    <string name="pro_feature_keyserver_body">Publiez votre clé publique sur keys.openpgp.org pour que chacun puisse vous trouver et vous envoyer des messages chiffrés.</string>
+    <string name="pro_feature_multi_recipients_title">Plusieurs destinataires</string>
+    <string name="pro_feature_multi_recipients_body">Chiffrez des messages pour plusieurs destinataires à la fois. La version gratuite autorise un seul destinataire par message.</string>
+    <string name="pro_feature_file_encryption_title">Chiffrement de fichiers</string>
+    <string name="pro_feature_file_encryption_body">Chiffrez et déchiffrez tout type de fichier — documents, photos, archives. Partagez vos fichiers chiffrés en toute sécurité.</string>
+
+    <string name="pro_gate_sheet_title">Débloquer PGPony Pro</string>
+    <string name="pro_gate_everything_in_pro">Tout ce que Pro contient</string>
+    <string name="pro_gate_you_tapped_this">Vous avez touché cette fonction</string>
+    <string name="pro_gate_purchasing">Achat en cours…</string>
+    <string name="pro_gate_one_time_purchase">Achat unique. Sans abonnement.</string>
+    <string name="pro_gate_welcome_dialog_title">Bienvenue dans Pro !</string>
+    <string name="pro_gate_welcome_dialog_body">Vous avez débloqué toutes les fonctions Pro. Merci de soutenir PGPony !</string>
+    <string name="pro_gate_welcome_dialog_confirm">C\'est parti</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         SecretUnlockScreen — promo code entry
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="promo_code_title">Saisir un code promo</string>
+    <string name="promo_code_subtitle">Saisissez un code pour débloquer PGPony Pro gratuitement.</string>
+    <string name="promo_code_placeholder">PONY-XXXX-XXXX</string>
+    <string name="promo_code_redemption_failed_default">Échec de l\'utilisation</string>
+    <string name="promo_code_redeem_in_progress">Utilisation…</string>
+    <string name="promo_code_already_pro">PGPony Pro est déjà actif</string>
+    <string name="promo_code_dialog_success">Réussi !</string>
+    <string name="promo_code_dialog_error">Erreur</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         SignerLookupSheet (decrypt-side signer lookup on unknown signer)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="signer_lookup_searching_title">Rechercher le signataire</string>
+    <string name="signer_lookup_searching_label">Recherche sur keys.openpgp.org…</string>
+    <string name="signer_lookup_found_title">Clé trouvée</string>
+    <string name="signer_lookup_found_body">L\'importation ajoute cette clé à votre trousseau et revérifie la signature. L\'identité de la clé n\'est pas encore validée — seules les mathématiques sont vérifiées. Faites confiance à l\'expéditeur de manière indépendante avant de vous fier au statut vérifié.</string>
+    <string name="signer_lookup_import_button">Importer</string>
+    <string name="signer_lookup_not_found_title">Introuvable sur keys.openpgp.org</string>
+    <string name="signer_lookup_not_found_body_format">Aucune clé trouvée pour %1$s. Le signataire n\'a peut-être pas téléversé sa clé sur un serveur public. Demandez-lui de partager sa clé publique directement.</string>
+    <string name="signer_lookup_failed_title">Échec de la recherche</string>
+    <string name="signer_lookup_imported_title">Importée</string>
+    <string name="signer_lookup_imported_body">La signature sera revérifiée automatiquement.</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         VerificationBanner (decrypt-side signature outcome banner)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="verify_banner_verified_title">Vérifiée</string>
+    <string name="verify_banner_invalid_title">Signature invalide</string>
+    <string name="verify_banner_unknown_signer_title">Signataire inconnu</string>
+    <string name="verify_banner_unknown_signer_lookup_cd">Rechercher le signataire</string>
+    <string name="verify_banner_no_signature_title">Pas de signature</string>
+    <string name="verify_banner_no_signature_subtitle">Contenu déchiffré mais non signé — origine non vérifiée</string>
+    <string name="verify_banner_signed_by_full_format">Signé par %1$s &lt;%2$s&gt;</string>
+    <string name="verify_banner_signed_by_name_format">Signé par %1$s</string>
+    <string name="verify_banner_signed_by_email_format">Signé par %1$s</string>
+    <string name="verify_banner_signed_by_keyid_format">Signé par 0x%1$s</string>
+    <string name="verify_banner_unknown_signer_subtitle_format">%1$s · Appuyez pour rechercher sur keys.openpgp.org</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         PromoCodeService — billing
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="promo_error_invalid_code">Code promo non valide</string>
+    <string name="promo_error_already_redeemed">Ce code a déjà été utilisé</string>
+    <string name="promo_error_server_format">Erreur serveur : %1$s</string>
+    <string name="promo_error_network_format">Erreur réseau : %1$s</string>
+    <string name="promo_error_unknown">Erreur inconnue.</string>
+    <string name="promo_status_unlocked_default">PGPony Pro débloqué !</string>
+    <string name="promo_status_unlocked_offline">PGPony Pro débloqué ! (mode hors ligne — sera synchronisé une fois en ligne)</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         KeyExpirationReceiver — system notification text
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="key_expiration_notif_display_name_fallback">Clé PGP</string>
+    <string name="key_expiration_notif_title_format">Votre clé PGP expire %1$s</string>
+    <string name="key_expiration_notif_body_format">Appuyez pour renouveler « %1$s » avant qu\'elle ne cesse de fonctionner.</string>
+    <string name="key_expiration_label_in_30_days">dans 30 jours</string>
+    <string name="key_expiration_label_in_7_days">dans 7 jours</string>
+    <string name="key_expiration_label_tomorrow">demain</string>
+    <string name="key_expiration_label_today">aujourd\'hui</string>
+    <string name="key_expiration_label_in_n_days_format">dans %1$d jours</string>
+
+    <!-- ── KeyExpirationService — notification channel (system Settings) -->
+    <string name="key_expiration_channel_name">Rappels d\'expiration des clés</string>
+    <string name="key_expiration_channel_description">Rappels lorsqu\'une de vos clés PGP arrive à expiration.</string>
+    <string name="key_expiration_fallback_display_name_format">Clé %1$s</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Result sheets — shared
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="result_sheet_fingerprint_format">Empreinte : %1$s</string>
+    <string name="result_sheet_armored_block_format">Bloc OpenPGP en ASCII armor, %1$d caractères</string>
+    <string name="result_sheet_revocation_block_format">Certificat de révocation, %1$d caractères</string>
+    <string name="result_sheet_copy_button">Copier dans le presse-papiers</string>
+    <string name="result_sheet_save_button">Enregistrer en fichier .asc</string>
+    <string name="result_sheet_clipboard_warning">Le contenu du presse-papiers est visible par toutes les applications installées jusqu\'à ce qu\'il soit effacé.</string>
+
+    <!-- ── ExportPrivateKeyResultSheet ───────────────────────────────── -->
+    <string name="export_private_sheet_title">Clé privée prête</string>
+    <string name="export_private_sheet_warning">Cette clé permet de déchiffrer les messages qui vous sont envoyés ET de signer en votre nom. Traitez-la comme un mot de passe — conservez-la dans un endroit accessible à vous seul.</string>
+    <string name="export_public_sheet_title">Partager la clé publique</string>
+    <string name="export_public_sheet_explainer">Toute personne disposant de cette clé peut vérifier vos signatures et vous envoyer des messages chiffrés.</string>
+
+    <!-- ── RevocationResultSheet ─────────────────────────────────────── -->
+    <string name="revocation_result_sheet_title">Clé révoquée</string>
+    <string name="revocation_result_sheet_explainer">Votre clé est maintenant marquée révoquée dans votre trousseau. Partagez le certificat de révocation avec toute personne qui possède votre clé publique pour qu\'elle cesse de chiffrer de nouveaux messages pour elle, et téléversez-le sur un serveur de clés pour propager la révocation largement.</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         FileEncryptionResultScreen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="file_enc_result_title">Fichier chiffré</string>
+    <string name="file_enc_result_badge_signed">Signé</string>
+    <string name="file_enc_result_badge_can_decrypt">Peut déchiffrer</string>
+    <string name="file_enc_result_save_button">Enregistrer dans Fichiers</string>
+    <string name="file_enc_result_share_button">Partager le fichier chiffré</string>
+    <string name="file_enc_result_share_chooser_title">Partager le fichier chiffré</string>
+    <string name="file_enc_result_save_failed_default">Échec de l\'enregistrement</string>
+    <string name="file_enc_result_share_failed_default">Échec du partage</string>
+    <string name="file_enc_result_save_success">Enregistré avec succès</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         ContactLinkSheet
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="contact_link_sheet_title_link">Lier à un contact</string>
+    <string name="contact_link_sheet_title_auto_match">Résultats de l\'auto-correspondance</string>
+    <string name="contact_link_sheet_filter_format">Affichage des contacts dont l\'e-mail correspond à %1$s</string>
+    <string name="contact_link_sheet_empty_generic">Aucun contact avec une adresse e-mail trouvé sur cet appareil.</string>
+    <string name="contact_link_sheet_empty_filtered_format">Aucun contact n\'a %1$s dans sa liste d\'e-mails.</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         NotesEditorSheet
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="notes_editor_title_add">Ajouter des notes</string>
+    <string name="notes_editor_title_edit">Modifier les notes</string>
+    <string name="notes_editor_explainer">Les notes sont stockées uniquement localement sur cet appareil et ne sont jamais incluses dans les exportations ou partages de cette clé.</string>
+    <string name="notes_editor_placeholder">Notes sur cette clé…</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         SignAsSheet (encrypt-time signer picker)
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="sign_as_sheet_title">Signer en tant que</string>
+    <string name="sign_as_sheet_explainer">Les destinataires peuvent vérifier que le message provient de cette clé. Toute personne disposant de votre clé publique pour cette identité verra votre nom comme signataire.</string>
+    <string name="sign_as_sheet_selected_cd">Sélectionné</string>
+    <string name="sign_as_sheet_default_badge">PAR DÉFAUT</string>
+    <string name="sign_as_sheet_empty">Aucune paire de clés disponible.</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         QRScannerScreen
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="qr_scanner_title">Scanner un code QR</string>
+    <string name="qr_scanner_permission_title">Autorisation caméra requise</string>
+    <string name="qr_scanner_grant_button">Autoriser</string>
+    <string name="qr_scanner_hint">Pointez la caméra sur un QR code de clé publique PGP</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         MigrationProgressOverlay
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="migration_overlay_title">Mise à jour de votre trousseau</string>
+    <string name="migration_overlay_body">Lecture des informations de sous-clés de vos clés stockées. Cela ne se produit qu\'une seule fois après la mise à niveau.</string>
+    <string name="migration_overlay_starting">Démarrage…</string>
+    <string name="migration_overlay_progress_format">Mise à jour de la clé %1$d sur %2$d</string>
+    <string name="migration_overlay_done">Terminé.</string>
+    <string name="migration_overlay_error">Impossible de terminer la mise à jour. L\'application va continuer — certains détails de sous-clés peuvent manquer jusqu\'à l\'importation ou la génération d\'une nouvelle clé.</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         KeyShareIntents — Android share-sheet chooser titles + clip labels
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="share_intent_chooser_public_key">Partager la clé publique (.asc)</string>
+    <string name="share_intent_chooser_revocation_cert">Partager le certificat de révocation (.asc)</string>
+    <string name="share_intent_chooser_private_key">Enregistrer la clé PRIVÉE (.asc, sensible)</string>
+    <string name="share_intent_clip_label_private_key">PGPony – Clé privée</string>
+    <string name="share_intent_clip_label_public_key">PGPony – Clé publique</string>
+    <string name="share_intent_clip_label_revocation_cert">PGPony – Certificat de révocation</string>
+
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Phase A15 — ShareTargetActivity translations
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="share_target_activity_label">PGPony — Action rapide</string>
+    <string name="share_target_dismiss_cd">Fermer</string>
+    <string name="share_target_root_title">Que voulez-vous faire ?</string>
+    <string name="share_target_root_subtitle_text">Choisissez comment traiter le texte partagé :</string>
+    <string name="share_target_root_subtitle_file_format">Choisissez comment traiter %1$s :</string>
+    <string name="share_target_action_encrypt">Chiffrer</string>
+    <string name="share_target_action_encrypt_subtitle">Choisir les destinataires et produire un texte chiffré</string>
+    <string name="share_target_action_decrypt">Déchiffrer / Vérifier</string>
+    <string name="share_target_action_decrypt_subtitle">Lire ce message PGP avec l\'une de vos clés</string>
+    <string name="share_target_open_full_app">Ouvrir dans PGPony</string>
+    <string name="share_target_open_full_app_subtitle_import">Cela ressemble à une clé PGP — importez-la depuis l\'onglet Trousseau</string>
+    <string name="share_target_open_full_app_subtitle_setup">Configurez votre première clé dans l\'application principale pour utiliser Action rapide</string>
+    <string name="share_target_input_label_text">Texte partagé</string>
+    <string name="share_target_input_label_file_format">Fichier partagé : %1$s</string>
+    <string name="share_target_input_truncated_format">… %1$d caractères au total</string>
+    <string name="share_target_input_binary_format">Contenu binaire — %1$d octets</string>
+    <string name="share_target_encrypt_title">Chiffrer pour…</string>
+    <string name="share_target_encrypt_recipients_empty">Aucune clé de destinataire dans votre trousseau. Ajoutez d\'abord une clé publique depuis l\'application principale.</string>
+    <string name="share_target_encrypt_no_recipients_selected">Sélectionnez au moins un destinataire</string>
+    <string name="share_target_encrypt_button">Chiffrer</string>
+    <string name="share_target_encrypt_result_title">Chiffré</string>
+    <string name="share_target_encrypt_file_result_title">Fichier chiffré</string>
+    <string name="share_target_encrypt_file_result_subtitle">Votre fichier a été chiffré. Partagez ou enregistrez la copie chiffrée.</string>
+    <string name="share_target_encrypt_file_result_size_format">%1$d octets</string>
+    <string name="share_target_encrypt_file_result_share_button">Partager le fichier chiffré</string>
+    <string name="share_target_encrypt_result_subtitle_format">Texte chiffré, %1$d caractères</string>
+    <string name="share_target_decrypt_title">Déchiffrer avec…</string>
+    <string name="share_target_decrypt_no_key_pairs">Aucune clé privée disponible. Générez ou importez d\'abord une paire de clés dans l\'application principale.</string>
+    <string name="share_target_decrypt_auto_select_label">Meilleure clé correspondante</string>
+    <string name="share_target_decrypt_passphrase_label">Phrase secrète</string>
+    <string name="share_target_decrypt_passphrase_optional">Phrase secrète (si la clé est protégée)</string>
+    <string name="share_target_decrypt_button">Déchiffrer</string>
+    <string name="share_target_decrypt_result_title">Déchiffré</string>
+    <string name="share_target_decrypt_file_result_title">Fichier déchiffré</string>
+    <string name="share_target_decrypt_file_result_share_button">Partager le fichier déchiffré</string>
+    <string name="share_target_decrypt_result_signed_format">Signé par %1$s</string>
+    <string name="share_target_decrypt_result_unverified">Déchiffré mais la signature n\'est pas vérifiée</string>
+    <string name="share_target_decrypt_result_unsigned">Déchiffré (pas de signature)</string>
+    <string name="share_target_result_copy">Copier</string>
+    <string name="share_target_result_share">Partager</string>
+    <string name="share_target_result_done">OK</string>
+    <string name="share_target_result_open_in_pgpony">Ouvrir dans PGPony</string>
+    <string name="share_target_clip_label_encrypted">PGPony — Message chiffré</string>
+    <string name="share_target_clip_label_decrypted">PGPony — Message déchiffré</string>
+    <string name="share_target_share_chooser_encrypted">Partager le message chiffré</string>
+    <string name="share_target_share_chooser_decrypted">Partager le message déchiffré</string>
+    <string name="share_target_processing">Traitement…</string>
+    <string name="share_target_status_copied">Copié dans le presse-papiers</string>
+    <string name="share_target_clip_unavailable">Presse-papiers indisponible</string>
+    <string name="share_target_error_no_input">Aucun contenu partagé — rien à traiter.</string>
+    <string name="share_target_error_locked">Déverrouillez PGPony pour utiliser Action rapide.</string>
+    <string name="share_target_error_not_pgp_for_decrypt">Cela ne ressemble pas à un message PGP — collez du contenu commençant par -----BEGIN PGP MESSAGE-----.</string>
+    <string name="share_target_error_generic_format">Un problème est survenu : %1$s</string>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         A14 Picker — Language selector UI strings
+         ════════════════════════════════════════════════════════════════ -->
+    <string name="settings_language_row_title">Langue</string>
+    <string name="language_picker_title">Langue</string>
+    <string name="language_picker_footer">La plupart des écrans sont mis à jour immédiatement. Redémarrez PGPony si du texte reste dans la langue précédente.</string>
+    <string name="onboarding_slide_language_title">Langue</string>
+    <string name="onboarding_slide_language_body">Choisissez la langue que vous souhaitez utiliser.\n\nVous pouvez la modifier à tout moment dans les Paramètres.</string>
+</resources>

@@ -1,0 +1,16 @@
+PGPony is an OpenPGP app for Android. Encrypt, decrypt, sign, and verify messages and files, manage your keyring, and use a hardware security key over NFC, all on device.
+
+Features:
+
+- Encrypt, decrypt, sign, and verify text and files
+- Generate modern keys, including RFC 9580 (OpenPGP v6) Ed25519 and X25519, with Argon2id passphrase protection
+- Hardware security keys over NFC, including YubiKey 5 NFC and Token2, with on-card key generation, decrypt, sign, PIN management, and factory reset
+- Read your password-store (pass) entries, including those protected by a hardware key
+- Key discovery through WKD and the keys.openpgp.org verifying keyserver
+- Optional contact integration for choosing recipients
+- QR import and scanning for keys
+- Biometric lock and secure-screen protection
+
+PGPony does not use accounts, ads, analytics, or tracking. The F-Droid build contains no Google services and runs fully on de-Googled devices.
+
+The cryptographic core is published separately as open source (PGPonyCore-Kotlin), and the full app source is available under the Apache-2.0 license.

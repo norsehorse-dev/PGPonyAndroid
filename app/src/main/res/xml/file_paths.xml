@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Phase A7 Fix3 — FileProvider paths.
+
+  Declares which directories under the app's private storage are
+  exposed to other apps via content:// URIs.
+
+  Currently only:
+    • cache-path "exports" → cacheDir/exports/
+      Used by KeyShareIntents.shareArmoredPrivateKey to write a .asc
+      file that other apps can read via FileProvider when the user
+      picks a share target (Drive, Files, mail).
+
+  Android cleans cacheDir automatically when storage is low, so we
+  don't need explicit cleanup. The grant of read permission on the
+  URI ends when the receiving Activity finishes, so even if a stale
+  file sticks around, it's not addressable from outside without a
+  fresh share-Intent grant.
+
+  If future phases need to share larger files or media, add new
+  <cache-path>, <files-path>, <external-cache-path>, or
+  <external-files-path> entries here. Each name becomes the URI
+  prefix (e.g. /exports/foo.asc maps to content://AUTHORITY/exports/foo.asc).
+-->
+<paths>
+    <cache-path
+        name="exports"
+        path="exports/" />
+</paths>

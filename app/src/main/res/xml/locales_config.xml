@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  locales_config.xml — A14 Picker phase.
+
+  Declares which locales PGPony supports so Android 13+ surfaces a per-app
+  language picker in System Settings → System → Languages → App languages
+  → PGPony. Listing matches the six values-XX folders we ship: English (en),
+  German (de), Spanish (es), French (fr), Japanese (ja), Portuguese-Brazil
+  (pt-BR).
+
+  android:defaultLocale="en" tells the system to fall back to English when
+  the user's preferred language isn't supported — same fallback Android
+  would do anyway from the resource loader, made explicit here so the
+  system Settings UI lists "English" as the default.
+
+  Referenced from AndroidManifest.xml via
+    <application android:localeConfig="@xml/locales_config" ...>
+-->
+<locale-config
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:defaultLocale="en">
+    <locale android:name="en" />
+    <locale android:name="de" />
+    <locale android:name="es" />
+    <locale android:name="fr" />
+    <locale android:name="ja" />
+    <locale android:name="pt-BR" />
+</locale-config>

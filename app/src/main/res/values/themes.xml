@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      A14 Picker — parent changed from android:Theme.Material.NoActionBar
+      (framework-native Material from 2014) to Theme.AppCompat.DayNight.NoActionBar.
+
+      AppCompatActivity (which MainActivity + ShareTargetActivity now extend
+      so AppCompat can manage per-app locale state) throws
+      IllegalStateException at onCreate unless its theme descends from a
+      Theme.AppCompat parent. Switching parent to DayNight.NoActionBar:
+
+        • NoActionBar — matches the previous behaviour. Compose draws the
+          top bar; we don't want the framework one.
+        • DayNight — light/dark variant chosen by Android's
+          UI_MODE_NIGHT setting. Our Compose layer overrides the actual
+          color scheme via ThemeState.current anyway, so this only
+          affects the brief window background flash at activity start.
+
+      The pre-A14-Picker parent stays here as a comment for reference:
+        parent="android:Theme.Material.NoActionBar"
+
+      All four item overrides are preserved verbatim — they styled the
+      window chrome before AppCompat was in the picture and continue
+      to do so afterward.
+    -->
+    <style name="Theme.PGPony" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:colorPrimary">#FF8B5CF6</item>
+        <item name="android:colorAccent">#FF6366F1</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>

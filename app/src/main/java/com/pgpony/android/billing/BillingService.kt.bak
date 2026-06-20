@@ -1,0 +1,233 @@
+// BillingService.kt
+// PGPony Android
+//
+// Google Play Billing wrapper — Android equivalent of iOS StoreManager.swift.
+// Product: com.pgpony.pro — $2.99 one-time (non-consumable) unlock.
+// Caches isPro in SharedPreferences for instant UI, verifies async on launch.
+
+package com.pgpony.android.billing
+
+import android.app.Activity
+import android.content.SharedPreferences
+import com.android.billingclient.api.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+
+data class BillingState(
+    val isPro: Boolean = false,
+    val isLoading: Boolean = false,
+    val proPrice: String = "$2.99",
+    val errorMessage: String? = null
+)
+
+class BillingService(
+    private val activity: Activity,
+    private val prefs: SharedPreferences
+) {
+    companion object {
+        const val PRO_PRODUCT_ID = "com.pgpony.pro"
+        private const val IS_PRO_KEY = "pgpony_is_pro"
+        private const val PROMO_UNLOCKED_KEY = "pgpony_promo_unlocked"
+    }
+
+    private val _state = MutableStateFlow(BillingState())
+    val state: StateFlow<BillingState> = _state.asStateFlow()
+
+    private var billingClient: BillingClient? = null
+    private var productDetails: ProductDetails? = null
+
+    init {
+        // Load cached Pro status for instant UI
+        val cached = prefs.getBoolean(IS_PRO_KEY, false)
+            || prefs.getBoolean(PROMO_UNLOCKED_KEY, false)
+        _state.value = _state.value.copy(isPro = cached)
+    }
+
+    // ── Connect ────────────────────────────────────────────────────────
+
+    fun connect() {
+        val purchasesUpdatedListener = PurchasesUpdatedListener { billingResult, purchases ->
+            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
+                for (purchase in purchases) {
+                    handlePurchase(purchase)
+                }
+            } else if (billingResult.responseCode == BillingClient.BillingResponseCode.USER_CANCELED) {
+                _state.value = _state.value.copy(isLoading = false)
+            } else {
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    errorMessage = "Purchase failed: ${billingResult.debugMessage}"
+                )
+            }
+        }
+
+        billingClient = BillingClient.newBuilder(activity)
+            .setListener(purchasesUpdatedListener)
+            .enablePendingPurchases()
+            .build()
+
+        billingClient?.startConnection(object : BillingClientStateListener {
+            override fun onBillingSetupFinished(billingResult: BillingResult) {
+                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                    queryProductDetails()
+                    queryExistingPurchases()
+                }
+            }
+
+            override fun onBillingServiceDisconnected() {
+                // Retry on next user action
+            }
+        })
+    }
+
+    fun disconnect() {
+        billingClient?.endConnection()
+        billingClient = null
+    }
+
+    // ── Query Product Details ──────────────────────────────────────────
+
+    private fun queryProductDetails() {
+        val productList = listOf(
+            QueryProductDetailsParams.Product.newBuilder()
+                .setProductId(PRO_PRODUCT_ID)
+                .setProductType(BillingClient.ProductType.INAPP)
+                .build()
+        )
+        val params = QueryProductDetailsParams.newBuilder()
+            .setProductList(productList)
+            .build()
+
+        billingClient?.queryProductDetailsAsync(params) { billingResult, detailsList ->
+            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                productDetails = detailsList.firstOrNull()
+                productDetails?.let { details ->
+                    val price = details.oneTimePurchaseOfferDetails?.formattedPrice ?: "$2.99"
+                    _state.value = _state.value.copy(proPrice = price)
+                }
+            }
+        }
+    }
+
+    // ── Query Existing Purchases (verify entitlement) ──────────────────
+
+    private fun queryExistingPurchases() {
+        val params = QueryPurchasesParams.newBuilder()
+            .setProductType(BillingClient.ProductType.INAPP)
+            .build()
+
+        billingClient?.queryPurchasesAsync(params) { billingResult, purchases ->
+            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                val hasPro = purchases.any { purchase ->
+                    purchase.products.contains(PRO_PRODUCT_ID) &&
+                    purchase.purchaseState == Purchase.PurchaseState.PURCHASED
+                }
+                if (hasPro) {
+                    setProStatus(true)
+                    // Acknowledge any unacknowledged purchases
+                    for (purchase in purchases) {
+                        if (!purchase.isAcknowledged && purchase.products.contains(PRO_PRODUCT_ID)) {
+                            acknowledgePurchase(purchase)
+                        }
+                    }
+                } else if (!prefs.getBoolean(PROMO_UNLOCKED_KEY, false)) {
+                    // No Play Store entitlement and no promo — not Pro
+                    setProStatus(false)
+                }
+            }
+        }
+    }
+
+    // ── Purchase ───────────────────────────────────────────────────────
+
+    fun purchasePro() {
+        val details = productDetails
+        if (details == null) {
+            _state.value = _state.value.copy(errorMessage = "Product not available. Please try again.")
+            return
+        }
+
+        _state.value = _state.value.copy(isLoading = true, errorMessage = null)
+
+        val productDetailsParamsList = listOf(
+            BillingFlowParams.ProductDetailsParams.newBuilder()
+                .setProductDetails(details)
+                .build()
+        )
+        val billingFlowParams = BillingFlowParams.newBuilder()
+            .setProductDetailsParamsList(productDetailsParamsList)
+            .build()
+
+        billingClient?.launchBillingFlow(activity, billingFlowParams)
+    }
+
+    // ── Restore Purchases ──────────────────────────────────────────────
+
+    fun restorePurchases() {
+        _state.value = _state.value.copy(isLoading = true, errorMessage = null)
+        queryExistingPurchases()
+
+        // Give it a moment to query, then check
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            _state.value = _state.value.copy(isLoading = false)
+            if (!_state.value.isPro) {
+                _state.value = _state.value.copy(errorMessage = "No previous purchase found.")
+            }
+        }, 2000)
+    }
+
+    // ── Handle Purchase ────────────────────────────────────────────────
+
+    private fun handlePurchase(purchase: Purchase) {
+        if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
+            if (purchase.products.contains(PRO_PRODUCT_ID)) {
+                setProStatus(true)
+                _state.value = _state.value.copy(isLoading = false)
+
+                if (!purchase.isAcknowledged) {
+                    acknowledgePurchase(purchase)
+                }
+            }
+        } else if (purchase.purchaseState == Purchase.PurchaseState.PENDING) {
+            _state.value = _state.value.copy(
+                isLoading = false,
+                errorMessage = "Purchase is pending approval."
+            )
+        }
+    }
+
+    private fun acknowledgePurchase(purchase: Purchase) {
+        val params = AcknowledgePurchaseParams.newBuilder()
+            .setPurchaseToken(purchase.purchaseToken)
+            .build()
+
+        billingClient?.acknowledgePurchase(params) { billingResult ->
+            if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
+                // Acknowledgement failed — will retry on next launch
+            }
+        }
+    }
+
+    // ── Pro Status ─────────────────────────────────────────────────────
+
+    private fun setProStatus(value: Boolean) {
+        prefs.edit().putBoolean(IS_PRO_KEY, value).apply()
+        _state.value = _state.value.copy(isPro = value)
+    }
+
+    val isPro: Boolean get() = _state.value.isPro
+
+    // ── Promo Unlock ───────────────────────────────────────────────────
+
+    fun applyPromoUnlock() {
+        prefs.edit().putBoolean(PROMO_UNLOCKED_KEY, true).apply()
+        setProStatus(true)
+    }
+
+    fun clearError() {
+        _state.value = _state.value.copy(errorMessage = null)
+    }
+}

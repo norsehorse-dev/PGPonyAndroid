@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!--
+      Phase A12 — Key-expiration reminders.
+      • POST_NOTIFICATIONS is the runtime permission required on
+        API 33+ to display notifications. On older APIs notifications
+        post freely (subject to the per-app toggle in System Settings).
+      • RECEIVE_BOOT_COMPLETED lets BootReceiver re-schedule alarms
+        after device reboot — Android wipes alarms during boot, so
+        without this declaration the reminders silently stop working
+        after the user's first restart.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!--
+      HW Phase 1 — NFC hardware-key (OpenPGP card) support.
+      NFC lets PGPony talk to YubiKey 5 / Token2 PIN+ / Nitrokey 3 over
+      the air via ISO 7816-4 APDUs (IsoDep). required="false" so the app
+      still installs on NFC-less devices — the hardware-key UI is simply
+      hidden / shows an "NFC unavailable" message there.
+    -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <application
+        android:name=".PGPonyApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="PGPony"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.PGPony"
+        android:localeConfig="@xml/locales_config"
+        tools:targetApi="35">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.PGPony">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Receive text for encryption -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <!-- Receive .asc/.pgp/.gpg files for decrypt/import -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pgp-encrypted" />
+                <data android:mimeType="application/pgp-keys" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.asc" />
+                <data android:pathPattern=".*\\.pgp" />
+                <data android:pathPattern=".*\\.gpg" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:pathPattern=".*\\.asc" />
+                <data android:pathPattern=".*\\.pgp" />
+                <data android:pathPattern=".*\\.gpg" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          Phase A15 — Rich share-target / Quick Action activity.
+
+          ShareTargetActivity is the iOS PGPonyAction extension equivalent
+          on Android: a standalone activity that lets the user encrypt or
+          decrypt a shared blob without having to launch the full app.
+
+          Why a separate activity (not just routing through MainActivity):
+
+            * Independent task affinity (android:taskAffinity="") means
+              dismissing it returns the user to the source app — not into
+              PGPony's main task stack. iOS Action Extensions behave the
+              same way: dismissing returns to Mail/Notes/etc., not to
+              the host app.
+
+            * launchMode="singleTop" so a second share while one Quick
+              Action is open reuses the existing activity instance via
+              onNewIntent — the user does not stack multiple share UIs.
+
+            * exported="true" because the intent filters below need to
+              be reachable from any source app on the device. Required
+              by Android 12+ (API 31) when the activity declares any
+              intent filter.
+
+          About the duplicate intent filters with MainActivity:
+
+            The MainActivity declaration above intentionally keeps its
+            pre-A15 SEND / VIEW filters verbatim per the additive-edit
+            convention. Android will therefore present a chooser the
+            first time the user shares text or a PGP file into PGPony
+            ("Use PGPony — Quick Action" vs "Use PGPony"). After the
+            user picks once (with the "Always" checkbox), the chooser
+            does not reappear. A future cleanup phase may remove the
+            duplicate filters from MainActivity once we are confident
+            no existing install relies on them.
+
+          On the share targets we register:
+
+            * ACTION_SEND text/plain — typical "share to PGPony" from
+              a notes app, email body, browser, etc.
+            * ACTION_SEND with any MIME — file shares (encrypted files,
+              key files). We let the activity classify what the user
+              actually sent.
+            * ACTION_VIEW application/pgp-encrypted | pgp-keys — the
+              canonical PGP MIME types when a file manager opens an
+              .asc / .pgp / .gpg directly.
+            * ACTION_VIEW file:// + path patterns — fallback for file
+              managers that don't bother setting the MIME type and
+              just hand us a file URI with a recognizable extension.
+            * ACTION_VIEW content:// application/octet-stream + path
+              patterns — DocumentsUI / Drive / OneDrive on Android
+              hand a content URI with octet-stream MIME, and the
+              path-pattern is the only signal we have.
+        -->
+        <activity
+            android:name=".ui.share.ShareTargetActivity"
+            android:exported="true"
+            android:label="@string/share_target_activity_label"
+            android:theme="@style/Theme.PGPony"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:excludeFromRecents="false">
+            <!-- Receive plain text for encrypt / decrypt -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <!-- Receive any file via Share -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pgp-encrypted" />
+                <data android:mimeType="application/pgp-keys" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+            <!-- Phase A2 — accept ANY file type shared for encryption (PDF,
+                 image, zip, etc.). Additive: the specific filters above keep
+                 their priority for PGP types; this broadens ingestion so a
+                 user can Share → PGPony from any app to encrypt a file. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <!-- Receive .asc/.pgp/.gpg via Open / View -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pgp-encrypted" />
+                <data android:mimeType="application/pgp-keys" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.asc" />
+                <data android:pathPattern=".*\\.pgp" />
+                <data android:pathPattern=".*\\.gpg" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:pathPattern=".*\\.asc" />
+                <data android:pathPattern=".*\\.pgp" />
+                <data android:pathPattern=".*\\.gpg" />
+            </intent-filter>
+        </activity>
+        <!--
+          Phase A7 Fix3 — FileProvider for sharing exported .asc files.
+
+          Authority is namespaced with applicationId so it's globally
+          unique even if a future fork of this app installs alongside.
+          android:exported="false" means external apps can't enumerate
+          our files; they can only access URIs we explicitly grant
+          via FLAG_GRANT_READ_URI_PERMISSION in the share Intent.
+          grantUriPermissions="true" enables those Intent-level grants.
+          Path configuration in res/xml/file_paths.xml.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!--
+          Phase A12 — Key-expiration reminders.
+
+          KeyExpirationReceiver is the alarm trigger that posts the
+          notification when an AlarmManager wake-up fires for a
+          (key, daysBefore) pair scheduled by KeyExpirationService.
+          android:exported="false" because only AlarmManager (via our
+          own PendingIntent) ever invokes it; external apps have no
+          business poking at our reminder schedule.
+
+          BootReceiver listens for BOOT_COMPLETED and re-schedules
+          alarms (Android wipes alarms during boot). android:exported
+          is true because BOOT_COMPLETED is a protected system
+          broadcast that only ships from the OS itself — and the
+          system requires exported=true to deliver to us. The
+          intent-filter scopes which broadcasts we accept; without
+          it the receiver is unreachable.
+        -->
+        <receiver
+            android:name=".notifications.KeyExpirationReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".notifications.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+
+        <!--
+          A14 Picker — AppLocalesMetadataHolderService.
+
+          Required service declaration for AppCompat's per-app language
+          preferences to persist correctly on API 26–32. On API 33+ the
+          system handles persistence via LocaleManager (and ignores this
+          service), but we declare it unconditionally because the
+          androidx.appcompat library expects it to be present and warns
+          at startup otherwise.
+
+          The service is implemented entirely inside the AppCompat
+          library — we don't subclass or override anything. android:enabled
+          is false because the service has no work to do at runtime;
+          AppCompat reads only the manifest declaration as metadata.
+          android:exported is false because nothing outside our process
+          should be invoking it.
+        -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="true" />
+        </service>
+    </application>
+</manifest>
