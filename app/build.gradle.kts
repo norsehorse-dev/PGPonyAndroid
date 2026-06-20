@@ -53,8 +53,8 @@ android {
         // and the Phase E polish (version display, More from NorseHorse,
         // Encrypt recipient dropdown). versionCode jumps to 200 to leave the
         // 1xx band for the 2.x dev line.
-        versionCode = 201
-        versionName = "3.0.1"
+        versionCode = 202
+        versionName = "3.0.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -79,6 +79,12 @@ android {
                 signingConfigs.getByName("debug")
             }
             isMinifyEnabled = true
+            // Disable AGP VCS info embedding so the release APK is byte-identical
+            // regardless of which working tree it is built from. Without this, the
+            // APK contains META-INF/version-control-info.textproto with a git commit
+            // reference, which breaks F-Droid reproducible builds when the developer
+            // build tree and the F-Droid clone resolve VCS state differently.
+            vcsInfo.include = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
