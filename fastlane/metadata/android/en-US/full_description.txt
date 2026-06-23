@@ -1,16 +1,74 @@
-PGPony is an OpenPGP app for Android. Encrypt, decrypt, sign, and verify messages and files, manage your keyring, and use a hardware security key over NFC, all on device.
+PGPony brings real OpenPGP encryption to Android, now with hardware security key support. Generate PGP keys, encrypt messages, sign, and decrypt with your private key, 100% offline. No account, no server, no tracking. Fully compatible with GnuPG, OpenKeychain, and other OpenPGP tools.
 
-Features:
+NEW: Tap a YubiKey, Token2, or other NFC OpenPGP smartcard to sign and decrypt. Your private key never leaves the card.
 
-- Encrypt, decrypt, sign, and verify text and files
-- Generate modern keys, including RFC 9580 (OpenPGP v6) Ed25519 and X25519, with Argon2id passphrase protection
-- Hardware security keys over NFC, including YubiKey 5 NFC and Token2, with on-card key generation, decrypt, sign, PIN management, and factory reset
-- Read your password-store (pass) entries, including those protected by a hardware key
-- Key discovery through WKD and the keys.openpgp.org verifying keyserver
-- Optional contact integration for choosing recipients
-- QR import and scanning for keys
-- Biometric lock and secure-screen protection
+Need PGP for journalism, code signing, or secure messaging? PGPony is a clean, modern PGP client that fits in your pocket.
 
-PGPony does not use accounts, ads, analytics, or tracking. The F-Droid build contains no Google services and runs fully on de-Googled devices.
+▌HARDWARE SECURITY KEYS (NEW)
+- Tap an NFC OpenPGP smartcard to sign and decrypt. Your private key never leaves the hardware
+- Confirmed with YubiKey and Token2; works with other NFC OpenPGP cards
+- Encrypt-and-sign, decrypt, and sign using on-card keys
+- Authorize every operation with your card PIN
+- Verified-signer badge on card-decrypted signed messages
+- Change your card PIN and edit key expiration in the app
 
-The cryptographic core is published separately as open source (PGPonyCore-Kotlin), and the full app source is available under the Apache-2.0 license.
+▌PGP KEY MANAGEMENT
+- Generate Ed25519 + Curve25519 PGP key pairs: modern, fast, secure
+- Import and export keys in standard ASCII-armored OpenPGP format
+- Edit key expiration: extend, change, or set keys to never expire
+- Manage multiple PGP identities; optional passphrase protection
+
+▌ENCRYPT AND DECRYPT MESSAGES
+- Encrypt text for one or many recipients
+- Decrypt PGP messages with your private key or hardware key
+- Sign messages with Ed25519 for authenticity
+- One-tap copy of ciphertext with auto-clearing clipboard
+- Clear button to instantly reset the Encrypt and Decrypt tabs
+
+▌OPENPGP V4 + V6 COMPATIBILITY
+- Full OpenPGP v4 (RFC 4880): generate, encrypt, decrypt, sign, verify
+- OpenPGP v6 (RFC 9580): import v6 keys, decrypt v6 messages, verify v6 signatures
+- Byte-exact GnuPG 2.4.x interoperability, tested on every release
+- AEAD-OCB authenticated encryption and Argon2id support
+- v6 key generation and encrypting to v6 recipients coming in a future update
+
+▌EASY KEY EXCHANGE
+- Share your public PGP key as a QR code, file, or text
+- Scan a friend's QR code to import their key instantly
+- Look up keys via keyserver or Web Key Directory (WKD)
+- Save contacts so you don't have to re-import next time
+
+▌PRIVACY BY DESIGN
+- 100% offline encryption: no server, no account, no telemetry
+- Private keys stored in encrypted storage backed by Android Keystore
+- Optional biometric lock (fingerprint or face unlock)
+- Separate biometric-to-sign toggle for signing control
+- Open standards: RFC 4880 + RFC 9580 (OpenPGP)
+
+▌BUILT ON BOUNCY CASTLE
+- Industry-standard Java cryptography library (v1.84)
+- Fully interoperable with GnuPG: gpg --import works both ways
+- Ed25519 signatures, Curve25519 encryption, AEAD-OCB mode
+
+▌WHO PGPONY IS FOR
+- Journalists, researchers, and activists handling sensitive information
+- Developers and sysadmins who need PGP for code signing or releases
+- Hardware-key users with a YubiKey or Token2
+- GnuPG users who want a mobile companion for their desktop
+- Anyone curious about end-to-end encryption and OpenPGP
+
+▌WHY PGPONY
+Most "secure messaging" apps ask you to trust their servers. PGPony doesn't have any. Your PGP keys are generated and stored on your device, and never leave unless you explicitly share them. No account, no email to verify, no analytics SDK watching you.
+
+If you use GnuPG on the desktop, you already know PGPony. New to PGP? It's built to be the easiest place to start.
+
+▌COMPATIBILITY
+- Android 8.0 (API 26) and newer
+- NFC hardware key support on NFC-capable devices
+- Optimized for phones and tablets, dark theme throughout
+- No Internet permission required for core encryption
+
+▌PRIVACY COMMITMENT
+PGPony does not collect, store, or transmit any personal data. We run no key server, have no account system, and bundle no analytics or tracking SDKs. Full privacy policy: pgpony.app/privacy.
+
+Made by an indie developer in Alabama. Questions, bugs, or requests? Tap Send Feedback in the app, or write norsehorse@norsehor.se.

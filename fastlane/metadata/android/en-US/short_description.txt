@@ -1,1 +1,1 @@
-OpenPGP encryption with hardware security keys and password-store support
+Offline OpenPGP encryption with YubiKey & NFC hardware keys. GnuPG-compatible.
