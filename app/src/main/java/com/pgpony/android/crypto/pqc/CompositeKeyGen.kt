@@ -91,11 +91,12 @@ object CompositeKeyGen {
         scheme: Scheme,
         passphrase: String? = null,
         random: SecureRandom = SecureRandom(),
-        creationTime: Date = Date()
+        creationTime: Date = Date(),
+        expirationSeconds: Long? = null
     ): PGPSecretKeyRing = addCompositeSubkey(
         secretRing,
         if (scheme == Scheme.IETF_V6) CompositeSuite.IETF_768 else CompositeSuite.LIBREPGP_768,
-        passphrase, random, creationTime
+        passphrase, random, creationTime, expirationSeconds
     )
 
     fun addCompositeSubkey(
@@ -103,7 +104,8 @@ object CompositeKeyGen {
         suite: CompositeSuite,
         passphrase: String? = null,
         random: SecureRandom = SecureRandom(),
-        creationTime: Date = Date()
+        creationTime: Date = Date(),
+        expirationSeconds: Long? = null
     ): PGPSecretKeyRing {
         // 1. Fresh composite material for the suite's curve and ML-KEM level.
         val (xSec, xPub) = if (suite.curve.weierstrass) {
@@ -180,6 +182,11 @@ object CompositeKeyGen {
             sub.setKeyFlags(true, org.bouncycastle.bcpg.sig.KeyFlags.ENCRYPT_COMMS or
                 org.bouncycastle.bcpg.sig.KeyFlags.ENCRYPT_STORAGE)
             sub.setIssuerFingerprint(false, primaryPub)
+            // issue #4 (SecTec): carry the key's expiration onto the composite
+            // subkey binding signature too, so a PQ v6 key expires as one.
+            if (expirationSeconds != null && expirationSeconds > 0L) {
+                sub.setKeyExpirationTime(false, expirationSeconds)
+            }
             sigGen.setHashedSubpackets(sub.generate())
             sigGen.generateCertification(primaryPub, subPub).encoded
         }

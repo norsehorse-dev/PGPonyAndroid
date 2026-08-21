@@ -297,7 +297,7 @@ class PGPCryptoService private constructor() {
                 val base = buildV6Ed25519X25519KeyRings(userID, passphrase, creationDate, expirationSeconds)
                 val ring = com.pgpony.android.crypto.pqc.CompositeKeyGen.addCompositeSubkey(
                     base.first, com.pgpony.android.crypto.pqc.CompositeKeyGen.Scheme.IETF_V6,
-                    passphrase, creationTime = creationDate
+                    passphrase, creationTime = creationDate, expirationSeconds = expirationSeconds
                 )
                 ring to com.pgpony.android.crypto.pqc.CompositeKeyGen.publicRingOf(ring)
             }
@@ -318,7 +318,7 @@ class PGPCryptoService private constructor() {
                 val base = buildV6Ed25519X25519KeyRings(userID, passphrase, creationDate, expirationSeconds)
                 val ring = com.pgpony.android.crypto.pqc.CompositeKeyGen.addCompositeSubkey(
                     base.first, com.pgpony.android.crypto.pqc.CompositeSuite.IETF_1024,
-                    passphrase, creationTime = creationDate
+                    passphrase, creationTime = creationDate, expirationSeconds = expirationSeconds
                 )
                 ring to com.pgpony.android.crypto.pqc.CompositeKeyGen.publicRingOf(ring)
             }
@@ -561,11 +561,20 @@ class PGPCryptoService private constructor() {
             org.bouncycastle.openpgp.api.KeyPairGeneratorCallback { gen -> gen.generateEd25519KeyPair() },
             expirationCallback
         )
+            // issue #4 (SecTec): the expiry must be written onto the subkey
+            // binding signatures too. BC sets no Key Expiration Time on subkeys
+            // by default, so without these callbacks the signing and encryption
+            // subkeys carry no expiry of their own. addSigningSubkey takes a
+            // binding-signature callback plus a back-signature callback (null =
+            // BC default); addEncryptionSubkey takes the binding callback.
             .addSigningSubkey(
-                org.bouncycastle.openpgp.api.KeyPairGeneratorCallback { gen -> gen.generateEd25519KeyPair() }
+                org.bouncycastle.openpgp.api.KeyPairGeneratorCallback { gen -> gen.generateEd25519KeyPair() },
+                expirationCallback,
+                null
             )
             .addEncryptionSubkey(
-                org.bouncycastle.openpgp.api.KeyPairGeneratorCallback { gen -> gen.generateX25519KeyPair() }
+                org.bouncycastle.openpgp.api.KeyPairGeneratorCallback { gen -> gen.generateX25519KeyPair() },
+                expirationCallback
             )
             // getValidSeconds() reads the key expiration from the primary
             // User ID certification (the same place the v4 paths set it), so
