@@ -24,10 +24,11 @@
 //   • Existing capability subpackets (key flags, preferred algorithms,
 //     features, primary-UID) are copied forward so renewing doesn't strip
 //     capabilities; only the expiry subpacket is overridden.
-//   • Sign-capable SUBKEYS are skipped: their bindings require an embedded
-//     primary-key back-signature (0x19) made BY the subkey, which the card
-//     can't produce and which is out of scope here. PGPony-generated keys
-//     have no signing subkey, so this path is not normally hit.
+//   • Sign-capable SUBKEYS (v6 keys have one): the software path rebuilds
+//     their binding with the required embedded primary-key back-signature
+//     (0x19) made BY the subkey, so the new expiry lands on the signing subkey
+//     too (issue #4). The card path still skips them, since the card cannot
+//     sign as the subkey.
 
 package com.pgpony.android.crypto
 
@@ -87,7 +88,7 @@ class KeyExpirationService private constructor() {
             HashAlgorithmTags.SHA256
         )
         val newPublic = try {
-            rebuildExpiration(publicRing, expiresAtEpochSeconds) { type ->
+            rebuildExpiration(publicRing, expiresAtEpochSeconds, secretRing, passphrase) { type ->
                 PGPSignatureGenerator(signerBuilder, primarySecret.publicKey).apply { init(type, privateKey) }
             }
         } catch (e: ExpirationError) {
@@ -112,7 +113,7 @@ class KeyExpirationService private constructor() {
     ): UpdatedRings {
         val primaryPublic = publicRing.publicKey
         val newPublic = try {
-            rebuildExpiration(publicRing, expiresAtEpochSeconds) { type ->
+            rebuildExpiration(publicRing, expiresAtEpochSeconds, null, null) { type ->
                 PGPSignatureGenerator(CardPGPContentSignerBuilder(session, pin, primaryPublic), primaryPublic).apply {
                     init(type, PGPPrivateKey(primaryPublic.keyID, primaryPublic.publicKeyPacket, null))
                 }
@@ -132,6 +133,8 @@ class KeyExpirationService private constructor() {
     private fun rebuildExpiration(
         publicRing: PGPPublicKeyRing,
         expiresAtEpochSeconds: Long?,
+        secretRing: PGPSecretKeyRing?,
+        passphrase: String?,
         makeGenerator: (Int) -> PGPSignatureGenerator
     ): PGPPublicKeyRing {
         var primary = publicRing.publicKey
@@ -161,15 +164,23 @@ class KeyExpirationService private constructor() {
         for (id in subkeyIds) {
             var subkey = newRing.getPublicKey(id) ?: continue
             val oldBinding = subkeyBindingFor(subkey)
-            // Skip sign-capable subkeys (would need a 0x19 back-signature).
-            if (oldBinding != null && hasSignFlag(oldBinding.hashedSubPackets)) continue
-
             val subExpiry = relativeExpirySeconds(expiresAtEpochSeconds, subkey)
-            val gen = makeGenerator(PGPSignature.SUBKEY_BINDING)
-            val sub = PGPSignatureSubpacketGenerator()
-            copySubkeySubpackets(oldBinding?.hashedSubPackets, subExpiry, sub)
-            gen.setHashedSubpackets(sub.generate())
-            val newBinding = gen.generateCertification(primary, subkey)
+            val signCapable = oldBinding != null && hasSignFlag(oldBinding.hashedSubPackets)
+
+            val newBinding = if (signCapable) {
+                // issue #4 (SecTec): a signing subkey's binding needs an embedded
+                // 0x19 primary-key back-signature made BY the subkey. Only the
+                // software path holds the subkey's secret to make it; the card
+                // path cannot, so it leaves the signing subkey untouched.
+                if (secretRing == null) continue
+                buildSigningSubkeyBinding(primary, subkey, oldBinding, subExpiry, secretRing, passphrase, makeGenerator)
+            } else {
+                val gen = makeGenerator(PGPSignature.SUBKEY_BINDING)
+                val sub = PGPSignatureSubpacketGenerator()
+                copySubkeySubpackets(oldBinding?.hashedSubPackets, subExpiry, sub)
+                gen.setHashedSubpackets(sub.generate())
+                gen.generateCertification(primary, subkey)
+            }
             if (oldBinding != null) {
                 subkey = PGPPublicKey.removeCertification(subkey, oldBinding)
             }
@@ -249,6 +260,39 @@ class KeyExpirationService private constructor() {
     ) {
         if (old != null && old.keyFlags != 0) gen.setKeyFlags(false, old.keyFlags)
         if (expirySeconds != null) gen.setKeyExpirationTime(false, expirySeconds)
+    }
+
+    /**
+     * issue #4: rebuild a signing subkey's binding signature carrying the new
+     * expiry, with the required embedded 0x19 primary-key back-signature made
+     * BY the subkey (RFC 9580 5.2.3.34). Binding is signed by the primary via
+     * [makeBindingGenerator]; the back-signature is signed by the subkey's own
+     * secret from [secretRing].
+     */
+    private fun buildSigningSubkeyBinding(
+        primary: PGPPublicKey,
+        subkey: PGPPublicKey,
+        oldBinding: PGPSignature?,
+        expirySeconds: Long?,
+        secretRing: PGPSecretKeyRing,
+        passphrase: String?,
+        makeBindingGenerator: (Int) -> PGPSignatureGenerator
+    ): PGPSignature {
+        val subSecret = secretRing.getSecretKey(subkey.keyID)
+            ?: throw ExpirationError.UnsupportedKey("Missing secret material for the signing subkey")
+        val subPrivate = extractPrivate(subSecret, passphrase)
+        val backGen = PGPSignatureGenerator(
+            BcPGPContentSignerBuilder(subkey.algorithm, HashAlgorithmTags.SHA256), subkey
+        )
+        backGen.init(PGPSignature.PRIMARYKEY_BINDING, subPrivate)
+        val backSig = backGen.generateCertification(primary, subkey)
+
+        val bindGen = makeBindingGenerator(PGPSignature.SUBKEY_BINDING)
+        val hashed = PGPSignatureSubpacketGenerator()
+        copySubkeySubpackets(oldBinding?.hashedSubPackets, expirySeconds, hashed)
+        hashed.setEmbeddedSignature(false, backSig)
+        bindGen.setHashedSubpackets(hashed.generate())
+        return bindGen.generateCertification(primary, subkey)
     }
 
     private fun extractPrivate(
