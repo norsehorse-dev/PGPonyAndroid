@@ -1941,4 +1941,5 @@
     <string name="key_detail_detail_storage_card">Аппаратная карта безопасности</string>
     <string name="export_private_gpg_compat_label">Формат, совместимый с GnuPG</string>
     <string name="export_private_gpg_compat_caption">Выводит составной ключ в том виде, который ожидает GnuPG (GPG4WIN), чтобы его можно было импортировать там. Для других приложений оставьте выключенным.</string>
+    <string name="keyring_more_cd">Ещё</string>
 </resources>

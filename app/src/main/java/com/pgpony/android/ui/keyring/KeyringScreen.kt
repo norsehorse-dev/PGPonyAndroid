@@ -63,7 +63,8 @@ fun KeyringScreen(
     // HW Phase 1: parent supplies the navigation handler to the hardware-
     // key NFC scan screen. Defaulted so existing call sites / previews
     // that don't pass it still compile.
-    onScanCard: () -> Unit = {}
+    onScanCard: () -> Unit = {},
+    onOpenRecycleBin: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
 
@@ -138,6 +139,19 @@ fun KeyringScreen(
                             label = stringResource(R.string.keyring_sort_manual),
                             selected = state.sortMode == SortMode.MANUAL,
                             onClick = { viewModel.setSortMode(SortMode.MANUAL); sortMenuOpen = false }
+                        )
+                    }
+                    var moreMenuOpen by remember { mutableStateOf(false) }
+                    IconButton(onClick = { moreMenuOpen = true }) {
+                        Icon(Icons.Filled.MoreVert, stringResource(R.string.keyring_more_cd))
+                    }
+                    DropdownMenu(
+                        expanded = moreMenuOpen,
+                        onDismissRequest = { moreMenuOpen = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.settings_recycle_bin_title)) },
+                            onClick = { moreMenuOpen = false; onOpenRecycleBin() }
                         )
                     }
                 }

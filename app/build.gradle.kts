@@ -235,8 +235,10 @@ android {
         // even though the same key imported fine from a file. The fetched
         // bytes now go through BC's ArmoredOutputStream (the export path),
         // with an already-armored passthrough. versionCode moves to 430.
-        versionCode = 430
-        versionName = "4.3.0"
+        // 4.3.1 (#44): trust-sheet full expansion + Recently Deleted entry on
+        // the Keyring. versionCode 431 so it installs over 4.3.0.
+        versionCode = 431
+        versionName = "4.3.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

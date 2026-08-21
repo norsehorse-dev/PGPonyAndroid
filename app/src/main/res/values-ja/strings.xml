@@ -1868,4 +1868,5 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="key_detail_detail_storage_card">ハードウェアセキュリティカード</string>
     <string name="export_private_gpg_compat_label">GnuPG互換フォーマット</string>
     <string name="export_private_gpg_compat_caption">GnuPG (GPG4WIN) が期待する形式で複合鍵を出力し、そちらでインポートできるようにします。他のアプリではオフのままにしてください。</string>
+    <string name="keyring_more_cd">その他</string>
 </resources>

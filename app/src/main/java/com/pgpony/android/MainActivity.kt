@@ -1128,7 +1128,8 @@ fun PGPonyMainScreen(
                         onKeyClick = { fingerprint ->
                             navController.navigate("keyring/$fingerprint")
                         },
-                        onScanCard = { navController.navigate("card_scan") }
+                        onScanCard = { navController.navigate("card_scan") },
+                        onOpenRecycleBin = { navController.navigate("recently_deleted") }
                     )
                 }
                 // Phase A4a: KeyDetailScreen route.

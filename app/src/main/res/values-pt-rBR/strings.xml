@@ -1869,4 +1869,5 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="key_detail_detail_storage_card">Cartão de segurança de hardware</string>
     <string name="export_private_gpg_compat_label">Formato compatível com GnuPG</string>
     <string name="export_private_gpg_compat_caption">Gera a chave composta no formato que o GnuPG (GPG4WIN) espera, para que possa ser importada lá. Deixe desativado para outros apps.</string>
+    <string name="keyring_more_cd">Mais</string>
 </resources>

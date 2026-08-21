@@ -1869,4 +1869,5 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="key_detail_detail_storage_card">Tarjeta de seguridad de hardware</string>
     <string name="export_private_gpg_compat_label">Formato compatible con GnuPG</string>
     <string name="export_private_gpg_compat_caption">Emite la clave compuesta tal como la espera GnuPG (GPG4WIN), para que pueda importarse allí. Déjalo desactivado para otras apps.</string>
+    <string name="keyring_more_cd">Más</string>
 </resources>

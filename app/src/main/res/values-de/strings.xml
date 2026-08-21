@@ -1869,4 +1869,5 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="key_detail_detail_storage_card">Hardware-Sicherheitskarte</string>
     <string name="export_private_gpg_compat_label">GnuPG-kompatibles Format</string>
     <string name="export_private_gpg_compat_caption">Gibt den zusammengesetzten Schlüssel so aus, wie GnuPG (GPG4WIN) es erwartet, damit er dort importiert werden kann. Für andere Apps ausgeschaltet lassen.</string>
+    <string name="keyring_more_cd">Mehr</string>
 </resources>

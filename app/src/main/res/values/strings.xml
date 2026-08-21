@@ -539,6 +539,7 @@
     <!-- ════════════════════════════════════════════════════════════════
          Keyring screen
          ════════════════════════════════════════════════════════════════ -->
+    <string name="keyring_more_cd">More</string>
     <string name="keyring_title">Keyring</string>
     <string name="keyring_add_key_cd">Add Key</string>
     <string name="keyring_section_my_keys">My Keys</string>
