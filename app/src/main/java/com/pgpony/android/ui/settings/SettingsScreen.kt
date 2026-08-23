@@ -305,6 +305,16 @@ fun SettingsScreen(
                 checked = state.clearInputsAfterEncrypt,
                 onCheckedChange = { viewModel.setClearInputsAfterEncrypt(it) }
             )
+            // darkvegas interop: passphrase encryption uses gpg-compatible S2K
+            // by default; this opts into Argon2id (needs GnuPG 2.4+).
+            SettingsToggle(
+                title = stringResource(R.string.settings_argon2_title),
+                subtitle = stringResource(R.string.settings_argon2_subtitle),
+                icon = Icons.Filled.Lock,
+                iconTint = Color(0xFF8B5CF6),
+                checked = state.useArgon2,
+                onCheckedChange = { viewModel.setUseArgon2(it) }
+            )
             Spacer(modifier = Modifier.height(16.dp))
             SectionHeader(stringResource(R.string.settings_section_pass_store))
             SettingsToggle(

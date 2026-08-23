@@ -237,8 +237,8 @@ android {
         // with an already-armored passthrough. versionCode moves to 430.
         // 4.3.1 (#44): trust-sheet full expansion + Recently Deleted entry on
         // the Keyring. versionCode 431 so it installs over 4.3.0.
-        versionCode = 431
-        versionName = "4.3.1"
+        versionCode = 432
+        versionName = "4.3.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

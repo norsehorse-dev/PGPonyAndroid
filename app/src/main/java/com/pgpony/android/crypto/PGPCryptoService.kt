@@ -1180,7 +1180,7 @@ class PGPCryptoService private constructor() {
         // large file instead of buffering it (issue #6); encryptSymmetric
         // takes and returns whole ByteArrays and cannot.
         messagePassword: String? = null,
-        useArgon2: Boolean = true,
+        useArgon2: Boolean = false,
         // §4.5 (#22): user-chosen signing subkey; null = automatic pick.
         signingKeyId: Long? = null
     ) {
@@ -1408,7 +1408,7 @@ class PGPCryptoService private constructor() {
         filename: String? = null,
         armor: Boolean = true,
         useAead: Boolean = false,
-        useArgon2: Boolean = true
+        useArgon2: Boolean = false
     ): ByteArray {
         if (passphrase.isEmpty()) {
             throw PGPCryptoError.EncryptionFailed("Passphrase must not be empty")
@@ -1495,7 +1495,7 @@ class PGPCryptoService private constructor() {
         message: String,
         passphrase: String,
         useAead: Boolean = false,
-        useArgon2: Boolean = true
+        useArgon2: Boolean = false
     ): String {
         val encrypted = encryptSymmetric(
             data = message.toByteArray(Charsets.UTF_8),

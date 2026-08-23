@@ -545,6 +545,10 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             "pgpony_prefs", android.content.Context.MODE_PRIVATE
         )
     }
+    // darkvegas interop: passphrase encryption defaults to iterated-salted
+    // SHA-256 (S2K type 3) so any gpg on Linux can read it. Argon2id (type 4,
+    // needs GnuPG 2.4+ / libgcrypt 1.10+) is opt-in via Settings.
+    private val useArgon2Pref: Boolean get() = appPrefs.getBoolean("use_argon2", false)
     // Phase A3: verification service for clear-signed input. Encrypted-
     // and-signed messages still go through PGPCryptoService.decryptArmored
     // (which parses one-pass-signature packets inline); the VerifyService
@@ -1459,6 +1463,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     // 105 MB archive costs minutes and saves nothing.
                     enableCompression = totalBytes in 0..COMPRESSION_LIMIT,
                     messagePassword = messagePassword,
+                    useArgon2 = useArgon2Pref,
                     signingKeyId = signingKeyId
                 )
             }
@@ -1694,7 +1699,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             try {
                 val encrypted = crypto.encryptSymmetricMessage(
                     message = s.inputText,
-                    passphrase = s.passwordPassphrase
+                    passphrase = s.passwordPassphrase,
+                    useArgon2 = useArgon2Pref
                 )
                 _encryptState.value = _encryptState.value.copy(
                     outputText = encrypted,
@@ -1793,7 +1799,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             data = bytes,
                             passphrase = s.passwordPassphrase,
                             filename = s.selectedFileName,
-                            armor = false
+                            armor = false,
+                            useArgon2 = useArgon2Pref
                         )
                     }
                 } else null

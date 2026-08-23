@@ -1758,6 +1758,8 @@
     <!-- 4.0.0 Phase 9b: settings parity (clear inputs, pubkey comment, licenses) -->
     <string name="settings_clear_inputs_title">Clear inputs after encrypting</string>
     <string name="settings_clear_inputs_subtitle">Wipe the message, files, and passwords when you close an encryption result</string>
+    <string name="settings_argon2_title">Stronger passphrase protection (Argon2)</string>
+    <string name="settings_argon2_subtitle">Use Argon2id for password-encrypted files and messages. Harder to brute force, but the recipient needs GnuPG 2.4 or newer to open them. Off by default for the widest compatibility.</string>
     <string name="settings_armor_comment_pubkey_title">Include comment in exported public keys</string>
     <string name="settings_armor_comment_pubkey_subtitle">Add the Comment header when you copy, share, or save a public key. Keyserver uploads and QR codes stay comment free.</string>
     <string name="settings_about_licenses_title">Licenses</string>

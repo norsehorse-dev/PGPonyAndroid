@@ -106,6 +106,9 @@ data class SettingsUiState(
     // Persisted to SharedPreferences key "clear_inputs_after_encrypt";
     // EncryptDecryptViewModel reads it live at each result dismissal.
     val clearInputsAfterEncrypt: Boolean = true,
+    // darkvegas interop: passphrase encryption uses gpg-friendly S2K type 3 by
+    // default; this opts back into Argon2id (needs GnuPG 2.4+). Default off.
+    val useArgon2: Boolean = false,
     // ── Phase A4: default / remembered recipient ────────────────────────
     val defaultRecipientMode: DefaultRecipientMode = DefaultRecipientMode.NONE,
     /** Fingerprint of the pinned recipient (PINNED mode). */
@@ -185,6 +188,13 @@ class SettingsViewModel(
         _state.value = _state.value.copy(clearInputsAfterEncrypt = enabled)
     }
 
+    /** darkvegas interop: opt into Argon2id passphrase protection. Off by
+     *  default so PGPony files open in stock gpg on Linux. */
+    fun setUseArgon2(enabled: Boolean) {
+        prefs.edit().putBoolean("use_argon2", enabled).apply()
+        _state.value = _state.value.copy(useArgon2 = enabled)
+    }
+
     /** RC5 P3 (#23): public so SettingsScreen can re-read persisted
      *  preferences on entry. The onboarding biometric toggle (slide 5)
      *  writes `biometric_lock` directly to prefs, and this ViewModel is
@@ -204,6 +214,7 @@ class SettingsViewModel(
             // 4.0.0 Phase 9b — auto-wipe toggle; default ON preserves the
             // 3.1.0 always-on behavior.
             clearInputsAfterEncrypt = prefs.getBoolean("clear_inputs_after_encrypt", true),
+            useArgon2 = prefs.getBoolean("use_argon2", false),
             // ── Phase A12: theme + reminders persisted prefs ────
             selectedTheme = AppTheme.fromStorage(prefs.getString("selected_theme", null)),
             keyExpirationRemindersEnabled = prefs.getBoolean("key_expiration_reminders", false),
