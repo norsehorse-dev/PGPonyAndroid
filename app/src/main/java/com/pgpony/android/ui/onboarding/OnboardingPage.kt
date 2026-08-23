@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.foundation.clickable
@@ -158,6 +159,11 @@ fun OnboardingPage(
         if (slide.showBiometricToggle) {
             Spacer(modifier = Modifier.height(32.dp))
             BiometricToggleRow(prefs = prefs)
+        }
+        // RC1 offline switch: offered on the privacy slide, below biometric.
+        if (slide.showOfflineToggle) {
+            Spacer(modifier = Modifier.height(16.dp))
+            OfflineToggleRow(prefs = prefs)
         }
         // §5.6.9 (Piotr): sideload update-check opt-in.
         if (slide.showUpdateToggle) {
@@ -386,6 +392,53 @@ private fun UpdateToggleRow(prefs: SharedPreferences) {
                 onCheckedChange = { newValue ->
                     enabled = newValue
                     UpdateCheckService.setEnabled(context, newValue)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun OfflineToggleRow(prefs: SharedPreferences) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var enabled by remember {
+        mutableStateOf(com.pgpony.android.network.OfflineMode.isEnabled())
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Filled.CloudOff,
+                contentDescription = null,
+                tint = Color(0xFF22C55E),
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.onboarding_page_offline_toggle_title),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    stringResource(R.string.onboarding_page_offline_toggle_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = { newValue ->
+                    enabled = newValue
+                    com.pgpony.android.network.OfflineMode.set(newValue)
+                    com.pgpony.android.sync.KeyRefreshScheduler.apply(context)
                 }
             )
         }

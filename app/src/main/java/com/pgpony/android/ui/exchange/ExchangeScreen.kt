@@ -63,7 +63,10 @@ fun ExchangeScreen(viewModel: ExchangeViewModel) {
                 selectedTabIndex = state.section.ordinal,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                ExchangeSection.entries.forEach { section ->
+                ExchangeSection.entries.filterNot {
+                    it == ExchangeSection.KEY_SERVER &&
+                        com.pgpony.android.network.OfflineMode.enabled
+                }.forEach { section ->
                     Tab(
                         selected = state.section == section,
                         onClick = { viewModel.setSection(section) },
@@ -81,7 +84,13 @@ fun ExchangeScreen(viewModel: ExchangeViewModel) {
             when (state.section) {
                 ExchangeSection.SHOW_KEY -> ShowKeySection(state, viewModel, clipboard)
                 ExchangeSection.SCAN_KEY -> ScanKeySection(state, viewModel)
-                ExchangeSection.KEY_SERVER -> KeyServerSection(state, viewModel)
+                ExchangeSection.KEY_SERVER ->
+                    // RC1 offline switch: no keyserver section while offline.
+                    if (com.pgpony.android.network.OfflineMode.enabled) {
+                        ShowKeySection(state, viewModel, clipboard)
+                    } else {
+                        KeyServerSection(state, viewModel)
+                    }
             }
         }
     }

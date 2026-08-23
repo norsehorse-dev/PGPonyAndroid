@@ -22,6 +22,14 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.ProxyBuilder
 import io.ktor.client.engine.android.Android
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.api.createClientPlugin
+
+/** Thrown when a request is attempted while offline mode is on. The network
+ *  call sites already catch IOException and degrade to a null/failed result,
+ *  so no request escapes and nothing crashes. */
+class OfflineModeException : java.io.IOException(
+    "PGPony offline mode is on; no network request was made"
+)
 
 object HttpClientFactory {
 
@@ -39,6 +47,18 @@ object HttpClientFactory {
 
     @Volatile private var cached: HttpClient? = null
     @Volatile private var cachedSignature: String? = null
+
+    // RC1 offline switch: fail every request fast, before any socket, when
+    // offline mode is on. This is the single choke point the whole network
+    // layer routes through (keyserver lookup/search/publish, WKD, the update
+    // check, the background refresh worker), so one guard here covers them
+    // all. Checked per request, not per client build, so a mid-session toggle
+    // takes effect immediately even though the client is cached.
+    private val offlineGuard = createClientPlugin("PGPonyOfflineGuard") {
+        onRequest { _, _ ->
+            if (OfflineMode.isEnabled()) throw OfflineModeException()
+        }
+    }
 
     /** The shared client for the current proxy config (context-less). */
     fun client(): HttpClient = client(PGPonyApp.instance)
@@ -61,6 +81,9 @@ object HttpClientFactory {
     private fun build(cfg: ProxyPrefs.Config): HttpClient {
         val proxied = cfg.enabled && cfg.host != null
         return HttpClient(Android) {
+            // RC1 offline switch: block outright when offline mode is on,
+            // before any other plugin or the socket.
+            install(offlineGuard)
             // A hard request ceiling so a stalled lookup (common over Tor)
             // can never leave the search spinner running forever. Per-call
             // sites (WKD) tighten this with a request-scoped timeout {}.

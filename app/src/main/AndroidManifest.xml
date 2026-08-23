@@ -400,6 +400,7 @@
         -->
         <service
             android:name=".provider.PGPonyOpenPgpService"
+            android:process=":remote_api"
             android:exported="true">
             <intent-filter>
                 <action android:name="org.openintents.openpgp.IOpenPgpService2" />
@@ -419,6 +420,7 @@
         -->
         <activity
             android:name=".provider.ApiConsentActivity"
+            android:process=":remote_api"
             android:exported="false"
             android:theme="@style/Theme.PGPony"
             android:excludeFromRecents="true"
@@ -432,6 +434,7 @@
         -->
         <activity
             android:name=".provider.ProviderKeyPickerActivity"
+            android:process=":remote_api"
             android:exported="false"
             android:theme="@style/Theme.PGPony"
             android:excludeFromRecents="true"
@@ -445,6 +448,7 @@
         -->
         <activity
             android:name=".provider.ProviderPassphraseActivity"
+            android:process=":remote_api"
             android:exported="false"
             android:theme="@style/Theme.PGPony"
             android:excludeFromRecents="true"
@@ -458,6 +462,7 @@
         -->
         <activity
             android:name=".provider.ProviderCardOpActivity"
+            android:process=":remote_api"
             android:exported="false"
             android:theme="@style/Theme.PGPony"
             android:excludeFromRecents="true"

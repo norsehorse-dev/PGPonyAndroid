@@ -46,6 +46,8 @@ data class OnboardingSlide(
     // §5.6.9 (Piotr): sideload-only "stay up to date" step. Filtered out
     // of the carousel on F-Droid / Play installs (see OnboardingScreen).
     val showUpdateToggle: Boolean = false,
+    // RC1 offline switch: privacy slide offers turning the whole app offline.
+    val showOfflineToggle: Boolean = false,
 )
 
 object OnboardingSlides {
@@ -109,7 +111,8 @@ object OnboardingSlides {
             iconTint = Color(0xFF22C55E),
             titleResId = R.string.onboarding_slide_privacy_title,
             bodyResId = R.string.onboarding_slide_privacy_body,
-            showBiometricToggle = true
+            showBiometricToggle = true,
+            showOfflineToggle = true
         ),
 
         // ── Slide 6 — Stay up to date (sideload only) ────────────────────

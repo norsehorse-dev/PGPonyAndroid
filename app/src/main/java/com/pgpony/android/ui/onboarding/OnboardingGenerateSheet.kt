@@ -109,6 +109,7 @@ fun OnboardingGenerateSheet(
                     onConfirmPassphraseChange = { confirmPassphrase = it },
                     inlineError = (mode as? GenerateMode.Error)?.message,
                     onCancel = onDismiss,
+                    isGenerating = vmState.isGenerating,
                     onGenerate = {
                         keyringVm.clearError()
                         keyringVm.updateGenerateName(name.trim())
@@ -143,6 +144,7 @@ fun OnboardingGenerateSheet(
                     onConfirmPassphraseChange = { confirmPassphrase = it },
                     inlineError = m.message,
                     onCancel = onDismiss,
+                    isGenerating = vmState.isGenerating,
                     onGenerate = {
                         keyringVm.clearError()
                         keyringVm.updateGenerateName(name.trim())
@@ -176,7 +178,8 @@ private fun FormContent(
     onConfirmPassphraseChange: (String) -> Unit,
     inlineError: String?,
     onCancel: () -> Unit,
-    onGenerate: () -> Unit
+    onGenerate: () -> Unit,
+    isGenerating: Boolean
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
@@ -348,6 +351,7 @@ private fun FormContent(
         }
         Button(
             onClick = onGenerate,
+            enabled = !isGenerating,
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
             modifier = Modifier.weight(1f).height(48.dp)
         ) {

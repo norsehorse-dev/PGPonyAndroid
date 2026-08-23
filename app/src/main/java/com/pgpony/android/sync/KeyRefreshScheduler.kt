@@ -57,7 +57,8 @@ object KeyRefreshScheduler {
      */
     fun apply(context: Context) {
         val wm = WorkManager.getInstance(context.applicationContext)
-        if (!isEnabled(context)) {
+        // RC1 offline switch: offline mode cancels the periodic refresh too.
+        if (!isEnabled(context) || com.pgpony.android.network.OfflineMode.isEnabled()) {
             wm.cancelUniqueWork(WORK_NAME)
             return
         }

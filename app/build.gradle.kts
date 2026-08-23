@@ -237,8 +237,13 @@ android {
         // with an already-armored passthrough. versionCode moves to 430.
         // 4.3.1 (#44): trust-sheet full expansion + Recently Deleted entry on
         // the Keyring. versionCode 431 so it installs over 4.3.0.
-        versionCode = 432
-        versionName = "4.3.2"
+        // 4.4.0 RC1: keygen duplicate/freeze (#48), text-encrypt armor toggle
+        // (#46), contact multi-identity keys (#47), provider decrypt hang on
+        // background-kill ROMs fixed by moving the OpenPGP API service and its
+        // provider activities to a dedicated :remote_api process (#2.1), plus
+        // the offline switch. versionCode 433 so it installs over 4.3.2.
+        versionCode = 433
+        versionName = "4.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

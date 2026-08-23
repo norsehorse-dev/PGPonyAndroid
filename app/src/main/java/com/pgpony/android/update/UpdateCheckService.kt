@@ -119,6 +119,8 @@ object UpdateCheckService {
      * "Check now"); the launch check leaves it false.
      */
     suspend fun checkForUpdate(context: Context, force: Boolean = false): CheckResult {
+        // RC1 offline switch: no update check while offline.
+        if (com.pgpony.android.network.OfflineMode.isEnabled()) return CheckResult.NotEligible
         if (!isSideloaded(context) || !isEnabled(context)) return CheckResult.NotEligible
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()

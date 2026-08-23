@@ -1263,9 +1263,32 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         signingSecretKey = signingRing,
                         passphrase = passphrase,
                         filename = s.filename,
-                        armor = true,
+                        armor = s.asciiArmor,
                         signingKeyId = s.selectedSigningKeyId
                     )
+                }
+                if (!s.asciiArmor) {
+                    // #46: armor toggle off produces binary ciphertext, which
+                    // is not displayable text. Route it to the file result
+                    // sheet (the save/share surface the file-encrypt path
+                    // already uses) instead of forcing raw bytes through
+                    // String() into the inline result box, which showed
+                    // mojibake and could not round-trip. Save name follows the
+                    // C2 convention in FileEncryptionResultScreen
+                    // (selectedFileName + ".gpg").
+                    _encryptState.value = _encryptState.value.copy(
+                        encryptedFileBytes = encrypted,
+                        outputText = "",
+                        showEncryptResultSheet = false,
+                        selectedFileName = s.filename ?: "message",
+                        isProcessing = false,
+                        showSignPassphraseDialog = false,
+                        signPassphrase = "",
+                        fileEncryptedWithPassword = false,
+                        showFileEncryptResultSheet = true
+                    )
+                    _events.tryEmit(Event.EncryptSuccess)
+                    return@launch
                 }
                 _encryptState.value = _encryptState.value.copy(
                     outputText = String(encrypted, Charsets.UTF_8),
@@ -1284,6 +1307,10 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     // dedicated EncryptionResultScreen renders. Inline
                     // result block in Screens.kt keeps rendering too —
                     // both code paths show the same outputText.
+                    // #46: clear any binary file-sheet result from a prior
+                    // encrypt so the two result surfaces are never both shown.
+                    encryptedFileBytes = null,
+                    showFileEncryptResultSheet = false,
                     showEncryptResultSheet = true
                 )
                 _events.tryEmit(Event.EncryptSuccess)

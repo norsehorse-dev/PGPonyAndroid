@@ -4,6 +4,7 @@
 package com.pgpony.android
 
 import android.app.Application
+import android.os.Build
 import androidx.room.Room
 import com.pgpony.android.contacts.ContactsService
 import com.pgpony.android.data.MIGRATION_1_2
@@ -50,12 +51,6 @@ class PGPonyApp : Application() {
         Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME)
         Security.insertProviderAt(BouncyCastleProvider(), 1)
 
-        // 4.0.4 — the streaming Encrypt/Decrypt file paths write their
-        // output to cacheDir/scratch. Anything still there at app start
-        // is debris from a crash or a kill, and for a decrypt it is
-        // plaintext, so drop it before doing anything else.
-        ScratchFiles.clearAll(applicationContext)
-
         // Initialize Room database
         // Phase A6: schema bumped to v2 to add revocation columns.
         // HW Phase 0/1: schema bumped to v3 to add card-backed columns.
@@ -69,6 +64,11 @@ class PGPonyApp : Application() {
             "pgpony.db"
         )
             .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+            // #2.1: the :remote_api provider process opens this same DB, so
+            // invalidations must cross processes to keep both views coherent
+            // (e.g. a consent revocation in the main app reaching a running
+            // provider process).
+            .enableMultiInstanceInvalidation()
             .build()
 
         // Initialize secure key storage
@@ -90,6 +90,44 @@ class PGPonyApp : Application() {
         contactsService = ContactsService.getInstance(applicationContext)
 
         instance = this
+
+        // #2.1: the OpenPGP API service and its provider activities run in a
+        // dedicated :remote_api process (see AndroidManifest) so a
+        // background-kill ROM that freezes the main app process cannot freeze
+        // a bound decrypt. That process needs the crypto + storage wired
+        // above, but MUST NOT run the main-process-only startup below: it
+        // would re-clear the shared scratch dir (wiping an in-progress
+        // main-process encrypt/decrypt), open DataStore from a second process
+        // (not multi-process safe), and double-register receivers and
+        // re-schedule alarms.
+        if (isRemoteApiProcess()) {
+            // This process holds API passphrases (ProviderPassphraseCache) and
+            // card PINs. Clear them the way the main process does: on an
+            // explicit clear/invalidation broadcast, and on device lock.
+            // Registered here so the provider self-clears even when the main
+            // process has been killed by an aggressive ROM (the #2.1 case).
+            androidx.core.content.ContextCompat.registerReceiver(
+                this,
+                com.pgpony.android.provider.ProviderCacheClearReceiver(),
+                android.content.IntentFilter(
+                    com.pgpony.android.provider.ProviderCacheClearReceiver.ACTION_CLEAR
+                ),
+                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            androidx.core.content.ContextCompat.registerReceiver(
+                this,
+                com.pgpony.android.session.SessionLockReceiver(),
+                android.content.IntentFilter(android.content.Intent.ACTION_SCREEN_OFF),
+                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            return
+        }
+
+        // 4.0.4: the streaming Encrypt/Decrypt file paths write their output
+        // to cacheDir/scratch. Anything still there at app start is debris
+        // from a crash or a kill, and for a decrypt it is plaintext, so drop
+        // it before the first screen opens. Main process only (see above).
+        ScratchFiles.clearAll(applicationContext)
 
         // ── Armor comment header: seed + keep the crypto cache fresh ───
         //
@@ -156,6 +194,9 @@ class PGPonyApp : Application() {
         // the right hook since Application.onCreate fires before any
         // Activity.onCreate. Idempotent; safe to call again.
         ThemeState.initFromPrefs(applicationContext)
+        // RC1 offline switch: seed the observable so the network UI hides
+        // correctly on the first composition.
+        com.pgpony.android.network.OfflineMode.initFromPrefs()
         // A14 Picker — seed LanguageState from AppCompat's persisted locale
         // list (or detect from device on first install). Done here so any
         // Composable that reads LanguageState.current during the first
@@ -211,6 +252,31 @@ class PGPonyApp : Application() {
             // WorkManager unavailable (very rare) — non-fatal.
         }
     }
+
+    /**
+     * True when this is the dedicated :remote_api process that hosts the
+     * OpenPGP API service and its provider activities (#2.1). Used to skip
+     * the main-process-only startup in onCreate. The suffix must match the
+     * android:process value in AndroidManifest.
+     */
+    private fun isRemoteApiProcess(): Boolean =
+        currentProcessName() == "$packageName:remote_api"
+
+    /**
+     * Current process name, across API 26+. Application.getProcessName() is
+     * API 28; below that /proc/self/cmdline carries the name (null-padded).
+     */
+    private fun currentProcessName(): String? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            Application.getProcessName()
+        } else {
+            try {
+                java.io.File("/proc/self/cmdline").readText()
+                    .substringBefore('\u0000').trim().ifEmpty { null }
+            } catch (_: Exception) {
+                null
+            }
+        }
 
     /**
      * Process-scoped CoroutineScope for fire-and-forget background work

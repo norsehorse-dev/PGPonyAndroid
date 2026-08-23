@@ -127,7 +127,10 @@ fun ImportKeyScreen(state: KeyringUiState, viewModel: KeyringViewModel) {
                     FileSection(state, viewModel)
                 }
                 ImportMethod.QR_CODE    -> QrSection(state, viewModel)
-                ImportMethod.KEY_SERVER -> KeyServerSection(state, viewModel)
+                ImportMethod.KEY_SERVER ->
+                    if (!com.pgpony.android.network.OfflineMode.enabled) {
+                        KeyServerSection(state, viewModel)
+                    }
             }
 
             // ── Error banner ──────────────────────────────────────────
@@ -212,7 +215,10 @@ private fun ImportMethodPicker(
     selected: ImportMethod,
     onSelect: (ImportMethod) -> Unit
 ) {
-    val methods = ImportMethod.entries
+    val methods = ImportMethod.entries.filterNot {
+        // RC1 offline switch: no keyserver import method while offline.
+        it == ImportMethod.KEY_SERVER && com.pgpony.android.network.OfflineMode.enabled
+    }
     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
         methods.forEachIndexed { index, method ->
             SegmentedButton(

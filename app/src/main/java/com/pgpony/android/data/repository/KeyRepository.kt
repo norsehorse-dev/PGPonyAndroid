@@ -147,7 +147,7 @@ class KeyRepository(
         algorithm: KeyAlgorithm,
         passphrase: String?,
         expirationSeconds: Long? = null
-    ): PGPKeyEntity {
+    ): PGPKeyEntity = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val result = crypto.generateKeyPair(name, email, algorithm, passphrase, expirationSeconds)
 
         // Store key material in encrypted storage
@@ -226,7 +226,7 @@ class KeyRepository(
         )
 
         dao.insert(entity)
-        return entity
+        entity
     }
 
     // ── Import ─────────────────────────────────────────────────────────
@@ -1421,6 +1421,8 @@ class KeyRepository(
         val it = ring.publicKeys
         while (it.hasNext()) ids.add(it.next().keyID)
         com.pgpony.android.provider.ProviderPassphraseCache.clearKeys(ids)
+        // #2.1: also reach the provider process, where the real cache lives.
+        com.pgpony.android.provider.ProviderCacheClearReceiver.requestClearKeys(ids)
     }
 
     /**

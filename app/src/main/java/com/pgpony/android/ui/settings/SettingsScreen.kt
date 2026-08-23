@@ -315,6 +315,18 @@ fun SettingsScreen(
                 checked = state.useArgon2,
                 onCheckedChange = { viewModel.setUseArgon2(it) }
             )
+            // RC1 offline switch: privacy hardening, grouped with Security.
+            SettingsToggle(
+                title = stringResource(R.string.settings_offline_toggle_title),
+                subtitle = stringResource(R.string.settings_offline_toggle_subtitle),
+                icon = Icons.Filled.CloudOff,
+                iconTint = Color(0xFF8B5CF6),
+                checked = com.pgpony.android.network.OfflineMode.enabled,
+                onCheckedChange = {
+                    com.pgpony.android.network.OfflineMode.set(it)
+                    com.pgpony.android.sync.KeyRefreshScheduler.apply(context)
+                }
+            )
             Spacer(modifier = Modifier.height(16.dp))
             SectionHeader(stringResource(R.string.settings_section_pass_store))
             SettingsToggle(
@@ -657,6 +669,10 @@ fun SettingsScreen(
                 onClick = { showApiClients = true }
             )
             Spacer(modifier = Modifier.height(16.dp))
+            // RC1 offline switch (hard gate): the network surfaces below are
+            // hidden while offline mode is on. The toggle itself lives in the
+            // Security & Privacy category.
+            if (!com.pgpony.android.network.OfflineMode.enabled) {
             // ── Key Servers Section (4.0.0 Phase 5a) ───────────────────
             SectionHeader(stringResource(R.string.settings_section_keyservers))
             SettingsAction(
@@ -675,6 +691,7 @@ fun SettingsScreen(
             SectionHeader(stringResource(R.string.settings_section_proxy))
             ProxySection()
             Spacer(modifier = Modifier.height(16.dp))
+            }
             // ── §5.6.1 (#36 part 1): recycle bin ───────────────────────
             SettingsAction(
                 title = stringResource(R.string.settings_recycle_bin_title),
@@ -953,7 +970,8 @@ fun SettingsScreen(
                 }
             )
             // ── §5.6.9 (Piotr): update check, offered only on sideloads ──
-            if (UpdateCheckService.isEligible(context)) {
+            if (UpdateCheckService.isEligible(context) &&
+                !com.pgpony.android.network.OfflineMode.enabled) {
                 Spacer(modifier = Modifier.height(16.dp))
                 SectionHeader(stringResource(R.string.settings_section_updates))
                 UpdateCheckSection()
@@ -1694,6 +1712,7 @@ private fun PassphraseCacheSection() {
                     )
                     TextButton(onClick = {
                         com.pgpony.android.provider.ProviderPassphraseCache.clearAll()
+                        com.pgpony.android.provider.ProviderCacheClearReceiver.requestClearAll()
                         remainingMs = 0
                     }) {
                         Text(stringResource(R.string.settings_card_pin_cache_clear))
@@ -1718,6 +1737,7 @@ private fun PassphraseCacheSection() {
                     )
                     TextButton(onClick = {
                         com.pgpony.android.provider.ProviderPassphraseCache.clearAll()
+                        com.pgpony.android.provider.ProviderCacheClearReceiver.requestClearAll()
                         remainingMs = 0
                     }) {
                         Text(stringResource(R.string.settings_card_pin_cache_clear))

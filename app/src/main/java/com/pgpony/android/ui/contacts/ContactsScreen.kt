@@ -48,6 +48,7 @@ import com.pgpony.android.R
 import com.pgpony.android.MainActivity
 import com.pgpony.android.contacts.ContactWithKeys
 import com.pgpony.android.data.TrustLevel
+import com.pgpony.android.data.PGPKeyEntity
 import com.pgpony.android.ui.components.AlgorithmBadge
 import com.pgpony.android.ui.components.TrustMark
 import com.pgpony.android.ui.components.ScreenTooltip
@@ -461,15 +462,9 @@ private fun LinkedContactRow(contact: ContactWithKeys) {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    contact.emails.firstOrNull()?.let { email ->
-                        Text(
-                            email,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    // #47: the single emails.first() line moved out of the
+                    // header. Addresses render per identity below, each above
+                    // its own key(s).
                 }
                 Icon(
                     Icons.Filled.VerifiedUser,
@@ -483,31 +478,65 @@ private fun LinkedContactRow(contact: ContactWithKeys) {
             // matching the iOS trustColor mapping. Indent (56dp left)
             // mirrors the iOS layout where keys hang under the
             // header content, not the avatar.
-            contact.linkedKeys.forEach { key ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(start = 56.dp, top = 4.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.VpnKey,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = if (key.isKeyPair) Color(0xFF8B5CF6)
-                               else MaterialTheme.colorScheme.onSurfaceVariant
-                                   .copy(alpha = 0.6f)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    AlgorithmBadge(key.algorithm.shortName)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        key.shortFingerprint,
-                        style = MaterialTheme.typography.bodySmall
-                            .copy(fontFamily = FontFamily.Monospace),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                            .copy(alpha = 0.7f)
-                    )
-                    Spacer(modifier = Modifier.weight(1f))
-                    TrustBadge(trust = key.trustLevel)
+            // #47: a contact can hold several identities, one key per
+            // address. The row used to show only emails.first() with every
+            // key stacked under it, so the other addresses and their keys
+            // were hidden. Group the linked keys by the address they belong
+            // to (userEmail), the contact's own addresses first in their
+            // stored order, then any extra address a linked key introduces.
+            val keysByAddress: List<Pair<String, List<PGPKeyEntity>>> = run {
+                fun norm(v: String) = v.lowercase().trim()
+                val remaining = contact.linkedKeys.toMutableList()
+                val groups = mutableListOf<Pair<String, List<PGPKeyEntity>>>()
+                for (email in contact.emails) {
+                    val matched = remaining.filter {
+                        it.userEmail.isNotBlank() && norm(it.userEmail) == norm(email)
+                    }
+                    if (matched.isNotEmpty()) {
+                        groups.add(email to matched)
+                        remaining.removeAll(matched)
+                    }
+                }
+                remaining.groupBy { it.userEmail.ifBlank { contact.displayName } }
+                    .forEach { (addr, keys) -> groups.add(addr to keys) }
+                groups
+            }
+
+            keysByAddress.forEach { (address, keys) ->
+                Text(
+                    address,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 56.dp, top = 6.dp)
+                )
+                keys.forEach { key ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(start = 56.dp, top = 4.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.VpnKey,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = if (key.isKeyPair) Color(0xFF8B5CF6)
+                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                                       .copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        AlgorithmBadge(key.algorithm.shortName)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            key.shortFingerprint,
+                            style = MaterialTheme.typography.bodySmall
+                                .copy(fontFamily = FontFamily.Monospace),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                .copy(alpha = 0.7f)
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        TrustBadge(trust = key.trustLevel)
+                    }
                 }
             }
         }
@@ -574,7 +603,10 @@ private fun UnlinkedContactRow(
         //                      prior bulk-scan or single lookup)
         //   • Default       → magnifier IconButton to trigger lookup
         // Matches iOS unlinkedContactRow trailing logic.
-        contact.emails.firstOrNull()?.let { email ->
+        // RC1 offline switch: no keyserver discovery affordance while offline.
+        contact.emails.firstOrNull()
+            ?.takeIf { !com.pgpony.android.network.OfflineMode.enabled }
+            ?.let { email ->
             when {
                 isDiscovering -> {
                     CircularProgressIndicator(

@@ -84,8 +84,11 @@ fun VerificationBanner(
             )
         }
         is VerificationResult.UnknownSigner -> {
+            // RC1 offline switch: no online lookup, so drop the clickable
+            // affordance and the chevron; the subtitle also loses its hint.
+            val offline = com.pgpony.android.network.OfflineMode.enabled
             BannerRow(
-                modifier = modifier
+                modifier = if (offline) modifier else modifier
                     .clip(RoundedCornerShape(12.dp))
                     .clickable(onClick = onTapUnknownSigner),
                 icon = Icons.AutoMirrored.Filled.HelpOutline,
@@ -93,13 +96,13 @@ fun VerificationBanner(
                 bg = YellowBg,
                 title = stringResource(R.string.verify_banner_unknown_signer_title),
                 subtitle = buildUnknownSignerSubtitle(result),
-                trailing = {
+                trailing = if (offline) null else ({
                     Icon(
                         Icons.Filled.ChevronRight,
                         contentDescription = stringResource(R.string.verify_banner_unknown_signer_lookup_cd),
                         tint = YellowTint
                     )
-                }
+                })
             )
         }
         is VerificationResult.Unsigned -> {
@@ -192,7 +195,11 @@ private fun formatVerifiedSubtitle(v: VerificationResult.Verified): String {
 private fun buildUnknownSignerSubtitle(u: VerificationResult.UnknownSigner): String {
     val short = u.claimedFingerprint?.takeLast(16)?.let { "0x$it" }
         ?: "0x${u.signerKeyID}"
-    return stringResource(R.string.verify_banner_unknown_signer_subtitle_format, short)
+    return if (com.pgpony.android.network.OfflineMode.enabled) {
+        stringResource(R.string.verify_banner_unknown_signer_subtitle_offline_format, short)
+    } else {
+        stringResource(R.string.verify_banner_unknown_signer_subtitle_format, short)
+    }
 }
 
 // ── Color palette ──────────────────────────────────────────────────────

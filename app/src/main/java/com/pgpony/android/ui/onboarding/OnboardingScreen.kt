@@ -48,10 +48,16 @@ fun OnboardingScreen(
     // §5.6.9 (Piotr): the update-check slide is sideload-only — drop it on
     // F-Droid / Play installs, which update themselves.
     val context = androidx.compose.ui.platform.LocalContext.current
-    val slides = remember(context) {
+    // RC1 offline switch: the update step is redundant while offline (offline
+    // mode disables the update check), so drop it too. Read the observable so
+    // toggling offline on the privacy slide removes the update slide live.
+    val offline = com.pgpony.android.network.OfflineMode.enabled
+    val slides = remember(context, offline) {
         OnboardingSlides.all.filterNot {
-            it.showUpdateToggle &&
-                !com.pgpony.android.update.UpdateCheckService.isEligible(context)
+            it.showUpdateToggle && (
+                !com.pgpony.android.update.UpdateCheckService.isEligible(context) ||
+                    offline
+            )
         }
     }
     val pagerState = rememberPagerState(pageCount = { slides.size })

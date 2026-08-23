@@ -431,6 +431,8 @@ class SettingsViewModel(
                 // install (the screen consumes clearCompleted below).
                 prefs.edit().clear().apply()
                 com.pgpony.android.provider.ProviderPassphraseCache.clearAll()
+                // #2.1: clear the provider process's cache too.
+                com.pgpony.android.provider.ProviderCacheClearReceiver.requestClearAll()
                 // Fresh default state, not a patch of the old one: every
                 // pref-backed field must read as factory-new, and the
                 // dialog flags must drop so the gauntlet dismisses.

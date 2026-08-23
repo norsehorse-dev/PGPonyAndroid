@@ -47,6 +47,8 @@ class KeyRefreshWorker(
     }
 
     override suspend fun doWork(): Result {
+        // RC1 offline switch: no keyserver refresh while offline.
+        if (com.pgpony.android.network.OfflineMode.isEnabled()) return Result.success()
         val app = applicationContext as PGPonyApp
         val repo = app.keyRepository
         val refreshService = KeyRefreshService(repo)

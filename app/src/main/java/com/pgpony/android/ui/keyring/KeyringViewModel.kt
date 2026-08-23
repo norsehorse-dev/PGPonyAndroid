@@ -517,6 +517,11 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
 
     fun generateKey() {
         val s = _state.value
+        // #48: synchronous re-entry guard. isGenerating was set inside the
+        // launch below, so two fast taps both cleared this check and each
+        // spawned a generation, creating duplicate keys. Guard on the Main
+        // thread before any coroutine starts.
+        if (s.isGenerating) return
         if (s.generateName.isBlank()) {
             _state.value = s.copy(errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_name_required))
             return
@@ -530,8 +535,8 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             return
         }
 
+        _state.value = _state.value.copy(isGenerating = true, errorMessage = null)
         viewModelScope.launch {
-            _state.value = _state.value.copy(isGenerating = true, errorMessage = null)
             try {
                 val passphrase = s.generatePassphrase.ifBlank { null }
                 val generated = repo.generateKey(

@@ -767,13 +767,16 @@ fun ActionsSection(
                 onClick = { onComingSoon(KeyDetailActionIds.SET_AS_DEFAULT) }
             )
         }
-        if (key.isKeyPair && !key.keyServerUploaded) {
+        if (key.isKeyPair && !key.keyServerUploaded &&
+            !com.pgpony.android.network.OfflineMode.enabled) {
             ActionRow(
                 icon = Icons.Filled.CloudUpload,
                 label = stringResource(R.string.key_detail_action_upload_to_key_server),
                 onClick = { onComingSoon(KeyDetailActionIds.UPLOAD_TO_KEY_SERVER) }
             )
         }
+        // RC1 offline switch: keyserver check/refresh hidden while offline.
+        if (!com.pgpony.android.network.OfflineMode.enabled) {
         // 3.0.0-KS1 (Lukas request) — look this key up on a keyserver and
         // stamp "Last checked". Available for any key (read-only lookup).
         // 4.0.0 Phase 2 — gains the inline spinner the KS1 state flag
@@ -796,6 +799,7 @@ fun ActionsSection(
             trailing = if (isRefreshingFromKeyServer) ({ ActionRowSpinner() }) else null,
             onClick = { onComingSoon(KeyDetailActionIds.REFRESH_KEY_SERVER) }
         )
+        }
     }
 }
 

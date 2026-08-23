@@ -1255,6 +1255,8 @@
     <string name="verify_banner_signed_by_email_format">Signed by %1$s</string>
     <string name="verify_banner_signed_by_keyid_format">Signed by 0x%1$s</string>
     <string name="verify_banner_unknown_signer_subtitle_format">%1$s · Tap to look up on keys.openpgp.org</string>
+    <!-- RC1 offline switch: no lookup hint when offline -->
+    <string name="verify_banner_unknown_signer_subtitle_offline_format">%1$s</string>
 
     <!-- ════════════════════════════════════════════════════════════════
          PromoCodeService — billing
@@ -1947,4 +1949,10 @@
     <string name="key_detail_detail_storage">Storage</string>
     <string name="key_detail_detail_storage_software">Software keystore</string>
     <string name="key_detail_detail_storage_card">Hardware security card</string>
+    <!-- RC1 offline switch (hard gate) -->
+    <string name="settings_offline_toggle_title">Offline mode</string>
+    <string name="settings_offline_toggle_subtitle">Turn off every network feature: keyserver lookup, search, and publishing, background key refresh, and the update check. Nothing leaves your device.</string>
+    <!-- RC1 offline switch: onboarding offer -->
+    <string name="onboarding_page_offline_toggle_title">Offline mode</string>
+    <string name="onboarding_page_offline_toggle_subtitle">Keep PGPony fully offline: no keyserver lookups, no key refresh, no update checks. You can change this later in Settings.</string>
 </resources>
