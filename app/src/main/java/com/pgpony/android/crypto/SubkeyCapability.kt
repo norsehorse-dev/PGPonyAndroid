@@ -137,6 +137,13 @@ enum class SubkeyCapability(val flag: Int, val displayName: String) {
                 // only the fallback; a real key's KeyFlags self-sig is read first.
                 KeyAlgorithm.ECDSA ->
                     if (isPrimary) Certify.flag or Sign.flag else Sign.flag
+
+                // 4.4.0 RC3 (#30/#31): composite ML-DSA + EdDSA is a SIGNING key.
+                // As a primary it certifies and signs; as a subkey it signs. This
+                // fallback only runs without a self-sig; a real key's KeyFlags win.
+                KeyAlgorithm.MLDSA65_ED25519_V6,
+                KeyAlgorithm.MLDSA87_ED448_V6 ->
+                    if (isPrimary) Certify.flag or Sign.flag else Sign.flag
             }
         }
 

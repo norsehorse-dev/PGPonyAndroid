@@ -641,6 +641,7 @@ fun KeyDetailScreen(
             keyOwnerLabel = addSubkeyOwnerLabel,
             isProcessing = state.addSubkeyInFlight,
             errorMessage = state.addSubkeyError,
+            isV6 = keyForAddSubkey.isV6Key,
             onApply = { type, expiresAt, passphrase ->
                 viewModel.addSubkey(type, expiresAt, passphrase)
             },

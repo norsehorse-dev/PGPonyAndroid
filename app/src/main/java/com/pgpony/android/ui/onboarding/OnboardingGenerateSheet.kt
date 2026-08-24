@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import com.pgpony.android.R
 import com.pgpony.android.crypto.KeyAlgorithm
+import com.pgpony.android.ui.keyring.KeygenAlgorithmPicker
 import com.pgpony.android.ui.keyring.KeyringViewModel
 
 private sealed interface GenerateMode {
@@ -230,43 +231,12 @@ private fun FormContent(
     )
     Spacer(modifier = Modifier.height(16.dp))
 
-    // Key type. Mirrors the Keyring-tab generator EXACTLY: the tour offers
-    // every generatable type, the same as iOS's tour. 4.2.0-RC1 feedback
-    // (issue #1) caught that this list was still the two Ed25519 options
-    // from before the PQC types existed; the tour and the generator now
-    // share KeyAlgorithm.generatable so they cannot drift again. FlowRow,
-    // not Row: eight chips must wrap on a narrow or large-text screen.
-    Text(
-        stringResource(R.string.keyring_generate_algorithm_label),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    Spacer(modifier = Modifier.height(4.dp))
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        KeyAlgorithm.generatable.forEach { algo ->
-            FilterChip(
-                selected = algorithm == algo,
-                onClick = { onAlgorithmChange(algo) },
-                label = { Text(algo.shortName) }
-            )
-        }
-    }
-    Spacer(modifier = Modifier.height(6.dp))
-    Text(
-        text = when {
-            algorithm.isComposite && algorithm.isV6 ->
-                stringResource(R.string.keyring_generate_algorithm_caption_pqc_ietf)
-            algorithm.isComposite ->
-                stringResource(R.string.keyring_generate_algorithm_caption_pqc_librepgp)
-            algorithm.isV6 ->
-                stringResource(R.string.keyring_generate_algorithm_caption_v6)
-            algorithm == KeyAlgorithm.ED25519_CV25519 ->
-                stringResource(R.string.keyring_generate_algorithm_caption_ed25519)
-            else ->
-                stringResource(R.string.keyring_generate_algorithm_caption_rsa)
-        },
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
+    // Key type. Grouped algorithm picker (shared with the Keyring generate
+    // sheet so the two cannot drift). Classical / Post-Quantum tiers, with
+    // RSA and LibrePGP tucked behind an Advanced expander.
+    KeygenAlgorithmPicker(
+        selected = algorithm,
+        onSelect = onAlgorithmChange
     )
     Spacer(modifier = Modifier.height(16.dp))
 

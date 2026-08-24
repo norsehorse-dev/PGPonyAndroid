@@ -67,7 +67,17 @@ enum class KeyAlgorithm(
     // (algorithm 8), the pairing gpg 2.5.x / GPG4WIN 5.1 emits. Import and label
     // supported; the KEM (encrypt/decrypt) is gated on gpg round-trip
     // verification. Not offered for generation.
-    MLKEM1024_BP384_LIBREPGP("ML-KEM-1024+brainpoolP384r1 (LibrePGP)", "ML-KEM-1024 bp384 v5", 0);
+    MLKEM1024_BP384_LIBREPGP("ML-KEM-1024+brainpoolP384r1 (LibrePGP)", "ML-KEM-1024 bp384 v5", 0),
+
+    // 4.4.0 RC3 (#30/#31) - RFC 9980 composite ML-DSA + EdDSA SIGNING keys.
+    // Unlike the ML-KEM composites (encryption subkeys), these are v6 signing
+    // keys: a composite ML-DSA + EdDSA primary (algo 30/31) that self-certifies
+    // and carries an ML-KEM encryption subkey. BouncyCastle rejects the algo
+    // 30/31 signatures, so these keys live in the raw-bytes composite path
+    // (CompositeKeyFacade / CompositeDocument*), not as a PGPSecretKeyRing.
+    // Recognized on import; offered for keygen once wired.
+    MLDSA65_ED25519_V6("ML-DSA-65+Ed25519 (v6)", "ML-DSA-65 v6", 0, isV6 = true),
+    MLDSA87_ED448_V6("ML-DSA-87+Ed448 (v6)", "ML-DSA-87 v6", 0, isV6 = true);
 
     /**
      * Whether this algorithm uses native Curve25519 for encryption (ECDH subkey).
@@ -82,13 +92,26 @@ enum class KeyAlgorithm(
             this == MLKEM768_X25519_LIBREPGP || this == MLKEM1024_X448_LIBREPGP ||
             this == MLKEM1024_BP384_LIBREPGP
 
+    /** The two RFC 9980 composite ML-DSA + EdDSA signing keys (algo 30/31). */
+    val isCompositeSign: Boolean
+        get() = this == MLDSA65_ED25519_V6 || this == MLDSA87_ED448_V6
+
     companion object {
         /** Algorithms that can be selected in the key generation UI. */
-        val generatable = listOf(
-            RSA_2048, RSA_4096, ED25519_CV25519, V6_ED25519,
-            MLKEM768_X25519_V6, MLKEM768_X25519_LIBREPGP,
-            MLKEM1024_X448_V6, MLKEM1024_X448_LIBREPGP
+        // 4.4.0 RC3: keygen picker groups. Organized by security tier, with a
+        // de-emphasized Advanced/compatibility bucket (RSA + LibrePGP). The UI
+        // renders these; [generatable] stays the flat union for other callers.
+        val generatableClassical = listOf(V6_ED25519, ED25519_CV25519)
+        val generatablePostQuantum = listOf(
+            MLKEM768_X25519_V6, MLKEM1024_X448_V6, MLDSA65_ED25519_V6
         )
+        val generatableAdvanced = listOf(
+            RSA_4096, RSA_2048,
+            MLKEM768_X25519_LIBREPGP, MLKEM1024_X448_LIBREPGP
+        )
+
+        /** Every generatable algorithm (the union of the picker groups). */
+        val generatable = generatableClassical + generatablePostQuantum + generatableAdvanced
 
         /**
          * Map an OpenPGP algorithm ID + key version to a KeyAlgorithm.
@@ -105,6 +128,8 @@ enum class KeyAlgorithm(
                 when (algorithmID) {
                     35 -> MLKEM768_X25519_V6  // ML-KEM-768+X25519 composite
                     36 -> MLKEM1024_X448_V6   // ML-KEM-1024+X448 composite
+                    30 -> MLDSA65_ED25519_V6  // composite ML-DSA-65+Ed25519 signing
+                    31 -> MLDSA87_ED448_V6    // composite ML-DSA-87+Ed448 signing
                     19 -> ECDSA            // ECDSA, unlikely in v6 but valid
                     27 -> V6_ED25519       // Ed25519 signing key
                     25 -> V6_X25519        // X25519 encryption subkey

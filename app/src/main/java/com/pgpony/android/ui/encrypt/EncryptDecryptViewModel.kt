@@ -43,6 +43,8 @@ import com.pgpony.android.ui.util.ScratchFiles
 import androidx.lifecycle.viewModelScope
 import com.pgpony.android.PGPonyApp
 import com.pgpony.android.R
+import com.pgpony.android.crypto.pqc.CompositeDocumentSigner
+import com.pgpony.android.crypto.pqc.CompositeDocumentVerifier
 import com.pgpony.android.crypto.PGPCryptoService
 import com.pgpony.android.crypto.SignedInputType
 import com.pgpony.android.crypto.SigningError
@@ -1131,28 +1133,48 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             // none, so a second in-app op on the same key does not re-prompt.
             val effPass = passphrase ?: com.pgpony.android.session.InAppPassphraseCache.get(signFp)
             try {
-                val secRing = repo.loadSecretKeyRing(signFp)
-                    ?: throw SigningError.NoSigningKey()
+                // 4.4.0 RC3 (#30/#31): a composite ML-DSA + EdDSA key cannot be
+                // loaded as a PGPSecretKeyRing, so it signs through the raw-bytes
+                // composite path instead of BouncyCastle's SigningService.
+                val signed = if (effectiveSigner.algorithm.isCompositeSign) {
+                    val info = repo.loadCompositeKeyInfo(signFp)
+                        ?: throw SigningError.NoSigningKey()
+                    val secret = info.compositeSecret
+                        ?: throw SigningError.NoSigningKey()
+                    if (s.detachedSignature) {
+                        CompositeDocumentSigner.signDetachedArmored(
+                            info.suite, secret, info.fingerprint,
+                            s.inputText.toByteArray(Charsets.UTF_8)
+                        )
+                    } else {
+                        CompositeDocumentSigner.signCleartext(
+                            info.suite, secret, info.fingerprint, s.inputText
+                        )
+                    }
+                } else {
+                    val secRing = repo.loadSecretKeyRing(signFp)
+                        ?: throw SigningError.NoSigningKey()
 
-                val signed = if (s.detachedSignature) {
-                    // Detached: standalone armored signature block over the
-                    // UTF-8 bytes of the message (BINARY_DOCUMENT).
-                    String(
-                        signing.signDetached(
-                            data = s.inputText.toByteArray(Charsets.UTF_8),
+                    if (s.detachedSignature) {
+                        // Detached: standalone armored signature block over the
+                        // UTF-8 bytes of the message (BINARY_DOCUMENT).
+                        String(
+                            signing.signDetached(
+                                data = s.inputText.toByteArray(Charsets.UTF_8),
+                                secretKeyRing = secRing,
+                                passphrase = effPass,
+                                signingKeyId = s.selectedSigningKeyId
+                            ),
+                            Charsets.UTF_8
+                        )
+                    } else {
+                        signing.signClear(
+                            text = s.inputText,
                             secretKeyRing = secRing,
                             passphrase = effPass,
                             signingKeyId = s.selectedSigningKeyId
-                        ),
-                        Charsets.UTF_8
-                    )
-                } else {
-                    signing.signClear(
-                        text = s.inputText,
-                        secretKeyRing = secRing,
-                        passphrase = effPass,
-                        signingKeyId = s.selectedSigningKeyId
-                    )
+                        )
+                    }
                 }
 
                 // §3 (#15): remember the working passphrase for the session
@@ -2677,6 +2699,17 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             return
         }
 
+        // 4.4.0 RC3 (#30/#31): an inline one-pass composite signed message is
+        // a PGP MESSAGE that BouncyCastle cannot parse (algo-30/31 signature);
+        // detect and verify it through the composite path before routing.
+        val inlineBytes = if (s.inputText.contains("-----BEGIN PGP MESSAGE-----")) {
+            try { com.pgpony.android.crypto.pqc.CompositeSigPacket.dearmor(s.inputText) } catch (_: Exception) { null }
+        } else null
+        if (inlineBytes != null && CompositeDocumentVerifier.isCompositeInline(inlineBytes)) {
+            verifyCompositeInlinePath(inlineBytes)
+            return
+        }
+
         when (verify.detectInputType(s.inputText)) {
             SignedInputType.CLEAR_SIGNED       -> verifyClearSignedPath(s)
             SignedInputType.ENCRYPTED          -> decryptAndVerifyPath(s)
@@ -2704,6 +2737,184 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      *  decrypt file slot, using the same verification surface as pasted text. */
     private fun verifyClearSignedFile(armored: String) = runClearSignedVerify(armored)
 
+    /**
+     * 4.4.0 RC3 (#30/#31): verify a clear-signed message whose signature is a
+     * composite ML-DSA + EdDSA signature. BouncyCastle throws on the algo-30/31
+     * packet, so composite messages are verified through CompositeDocumentVerifier
+     * against the stored composite public keys. Returns null when the message is
+     * not composite, so the caller falls back to the BouncyCastle path.
+     */
+    private suspend fun compositeClearSignedResult(armored: String): VerificationResult? {
+        if (!CompositeDocumentVerifier.isCompositeCleartext(armored)) return null
+        val content = CompositeDocumentVerifier.cleartextContent(armored)
+        val claimedFp = CompositeDocumentVerifier.claimedSignerOfCleartext(armored)
+
+        // Load every composite cert and its signing components (primary + any
+        // composite subkeys). sequoia signs with a dedicated signing subkey,
+        // PGPony's own keys sign with the primary, so match the signature's
+        // issuer fingerprint to whichever component actually made it.
+        val certs = withContext(Dispatchers.IO) {
+            repo.getAllKeys()
+                .filter { it.algorithm.isCompositeSign }
+                .mapNotNull { e -> repo.loadCompositePublicInfo(e.fingerprint)?.let { e to it } }
+        }
+        val matched: Pair<com.pgpony.android.data.PGPKeyEntity, com.pgpony.android.crypto.pqc.CompositeKeyFacade.CompositeComponent>? =
+            run {
+                for ((entity, info) in certs) {
+                    for (component in info.compositeSigners) {
+                        if (component.fingerprintHex.equals(claimedFp, ignoreCase = true)) {
+                            return@run entity to component
+                        }
+                    }
+                }
+                null
+            }
+
+        if (matched != null) {
+            val (entity, component) = matched
+            val ok = withContext(Dispatchers.Default) {
+                CompositeDocumentVerifier.verifyCleartext(component.publicMaterial, armored).valid
+            }
+            return if (ok) {
+                VerificationResult.Verified(
+                    signerKeyID = claimedFp?.take(16) ?: entity.longKeyId,
+                    signerFingerprint = entity.fingerprint,
+                    signerName = entity.userName.ifBlank { null },
+                    signerEmail = entity.userEmail.ifBlank { null },
+                    signedContent = content
+                )
+            } else {
+                VerificationResult.Invalid(
+                    reason = "Composite signature did not verify",
+                    signerKeyID = claimedFp?.take(16),
+                    signedContent = content
+                )
+            }
+        }
+        return VerificationResult.UnknownSigner(
+            signerKeyID = claimedFp?.take(16) ?: "",
+            claimedFingerprint = claimedFp,
+            signedContent = content
+        )
+    }
+
+    /** Find the composite cert + component whose fingerprint matches [claimedFp]. */
+    private suspend fun resolveCompositeSigner(
+        claimedFp: String?
+    ): Pair<com.pgpony.android.data.PGPKeyEntity, com.pgpony.android.crypto.pqc.CompositeKeyFacade.CompositeComponent>? {
+        if (claimedFp == null) return null
+        val certs = withContext(Dispatchers.IO) {
+            repo.getAllKeys()
+                .filter { it.algorithm.isCompositeSign }
+                .mapNotNull { e -> repo.loadCompositePublicInfo(e.fingerprint)?.let { e to it } }
+        }
+        for ((entity, info) in certs) {
+            for (component in info.compositeSigners) {
+                if (component.fingerprintHex.equals(claimedFp, ignoreCase = true)) return entity to component
+            }
+        }
+        return null
+    }
+
+    /**
+     * 4.4.0 RC3 (#30/#31): verify a detached composite signature over the file
+     * at [signedUri]. Returns null when the signature is not composite, so the
+     * caller falls back to the BouncyCastle detached-verify path. The signed
+     * content is read whole (composite verify hashes the full document).
+     */
+    private suspend fun compositeDetachedFileResult(
+        sig: ByteArray,
+        signedUri: android.net.Uri
+    ): VerificationResult? {
+        val sigPacket = CompositeDocumentVerifier.rawSignaturePacket(sig)
+        if (!CompositeDocumentVerifier.isCompositeSignature(sigPacket)) return null
+        val data = withContext(Dispatchers.IO) {
+            PGPonyApp.instance.contentResolver.openInputStream(signedUri)?.use { it.readBytes() }
+        } ?: return VerificationResult.Invalid(
+            reason = PGPonyApp.instance.getString(R.string.sign_verify_error_file_unreadable),
+            signerKeyID = null,
+            signedContent = null
+        )
+        val claimedFp = CompositeDocumentVerifier.claimedSignerOfDetached(sig)
+        val matched = resolveCompositeSigner(claimedFp)
+        if (matched != null) {
+            val (entity, component) = matched
+            val ok = withContext(Dispatchers.Default) {
+                CompositeDocumentVerifier.verifyDetached(component.publicMaterial, sigPacket, data).valid
+            }
+            return if (ok) {
+                VerificationResult.Verified(
+                    signerKeyID = claimedFp?.take(16) ?: entity.longKeyId,
+                    signerFingerprint = entity.fingerprint,
+                    signerName = entity.userName.ifBlank { null },
+                    signerEmail = entity.userEmail.ifBlank { null },
+                    signedContent = null
+                )
+            } else {
+                VerificationResult.Invalid(
+                    reason = "Composite signature did not verify",
+                    signerKeyID = claimedFp?.take(16),
+                    signedContent = null
+                )
+            }
+        }
+        return VerificationResult.UnknownSigner(
+            signerKeyID = claimedFp?.take(16) ?: "",
+            claimedFingerprint = claimedFp,
+            signedContent = null
+        )
+    }
+
+    /**
+     * 4.4.0 RC3 (#30/#31): verify an inline one-pass composite signed message
+     * (One-Pass Signature + Literal Data + composite Signature) and surface its
+     * literal content.
+     */
+    private fun verifyCompositeInlinePath(message: ByteArray) {
+        viewModelScope.launch {
+            _decryptState.value = _decryptState.value.copy(isProcessing = true, errorMessage = null)
+            val content = CompositeDocumentVerifier.inlineContent(message)
+                ?.let { String(it, Charsets.UTF_8) }
+            val claimedFp = CompositeDocumentVerifier.claimedSignerOfInline(message)
+            val matched = resolveCompositeSigner(claimedFp)
+            val result: VerificationResult = if (matched != null) {
+                val (entity, component) = matched
+                val ok = withContext(Dispatchers.Default) {
+                    CompositeDocumentVerifier.verifyInline(component.publicMaterial, message).valid
+                }
+                if (ok) {
+                    VerificationResult.Verified(
+                        signerKeyID = claimedFp?.take(16) ?: entity.longKeyId,
+                        signerFingerprint = entity.fingerprint,
+                        signerName = entity.userName.ifBlank { null },
+                        signerEmail = entity.userEmail.ifBlank { null },
+                        signedContent = content
+                    )
+                } else {
+                    VerificationResult.Invalid(
+                        reason = "Composite signature did not verify",
+                        signerKeyID = claimedFp?.take(16),
+                        signedContent = content
+                    )
+                }
+            } else {
+                VerificationResult.UnknownSigner(
+                    signerKeyID = claimedFp?.take(16) ?: "",
+                    claimedFingerprint = claimedFp,
+                    signedContent = content
+                )
+            }
+            _decryptState.value = _decryptState.value.copy(
+                outputText = content.orEmpty(),
+                isProcessing = false,
+                verificationResult = result,
+                signatureVerified = result is VerificationResult.Verified,
+                pendingUnknownClaimedFingerprint =
+                    (result as? VerificationResult.UnknownSigner)?.claimedFingerprint,
+            )
+        }
+    }
+
     private fun runClearSignedVerify(armored: String) {
         viewModelScope.launch {
             _decryptState.value = _decryptState.value.copy(isProcessing = true, errorMessage = null)
@@ -2713,11 +2924,15 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             // AES-GCM per entry) plus a Bouncy Castle parse, repeated for
             // EVERY key in the keyring. verifyDetached below already wraps
             // this exact expression; these paths were missed.
-            val publicRings = withContext(Dispatchers.IO) {
-                repo.getAllKeys().mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
-            }
-            val result = withContext(Dispatchers.Default) {
-                verify.verifyClearSigned(armored, publicRings)
+            // 4.4.0 RC3 (#30/#31): composite signatures cannot go through
+            // BouncyCastle; verify them through the raw-bytes composite path.
+            val result = compositeClearSignedResult(armored) ?: run {
+                val publicRings = withContext(Dispatchers.IO) {
+                    repo.getAllKeys().mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
+                }
+                withContext(Dispatchers.Default) {
+                    verify.verifyClearSigned(armored, publicRings)
+                }
             }
 
             val outputText = when (result) {
@@ -3570,6 +3785,15 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     }
                     else -> {}
                 }
+                // 4.4.0 RC3 (#30/#31): a composite inline one-pass signed message
+                // is a PGP MESSAGE BouncyCastle cannot parse; verify it here.
+                val inlineBytes = if (asText.contains("-----BEGIN PGP MESSAGE-----")) {
+                    try { com.pgpony.android.crypto.pqc.CompositeSigPacket.dearmor(asText) } catch (_: Exception) { null }
+                } else null
+                if (inlineBytes != null && CompositeDocumentVerifier.isCompositeInline(inlineBytes)) {
+                    verifyCompositeInlinePath(inlineBytes)
+                    return
+                }
             }
         }
         if (bytes != null) {
@@ -4343,6 +4567,19 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         }
         _decryptState.value = s.copy(verifyFileProcessing = true, errorMessage = null)
         viewModelScope.launch {
+            // 4.4.0 RC3 (#30/#31): a composite detached signature cannot go
+            // through BouncyCastle; verify it through the composite path.
+            val compositeResult = compositeDetachedFileResult(sig, signedUri)
+            if (compositeResult != null) {
+                val cfp = (compositeResult as? VerificationResult.UnknownSigner)?.claimedFingerprint
+                _decryptState.value = _decryptState.value.copy(
+                    verifyFileProcessing = false,
+                    verifyFileResult = compositeResult,
+                    pendingUnknownClaimedFingerprint = cfp
+                        ?: _decryptState.value.pendingUnknownClaimedFingerprint,
+                )
+                return@launch
+            }
             val rings = withContext(Dispatchers.IO) {
                 repo.getAllKeys().mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
             }

@@ -616,37 +616,9 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
             Spacer(modifier = Modifier.height(12.dp))
 
             // Algorithm picker
-            Text(stringResource(R.string.keyring_generate_algorithm_label), style = MaterialTheme.typography.labelMedium)
-            Spacer(modifier = Modifier.height(4.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                KeyAlgorithm.generatable.forEach { algo ->
-                    FilterChip(
-                        selected = state.generateAlgorithm == algo,
-                        onClick = { viewModel.updateGenerateAlgorithm(algo) },
-                        label = { Text(algo.shortName) }
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            // V6-6: explain the selected algorithm so the v4-vs-v6 choice is
-            // legible at generation time — the v6 option produces an RFC 9580
-            // key (signing subkey + hardware-key support); v4 stays maximally
-            // compatible with older OpenPGP software.
-            Text(
-                text = when {
-                    state.generateAlgorithm.isComposite && state.generateAlgorithm.isV6 ->
-                        stringResource(R.string.keyring_generate_algorithm_caption_pqc_ietf)
-                    state.generateAlgorithm.isComposite ->
-                        stringResource(R.string.keyring_generate_algorithm_caption_pqc_librepgp)
-                    state.generateAlgorithm.isV6 ->
-                        stringResource(R.string.keyring_generate_algorithm_caption_v6)
-                    state.generateAlgorithm == KeyAlgorithm.ED25519_CV25519 ->
-                        stringResource(R.string.keyring_generate_algorithm_caption_ed25519)
-                    else ->
-                        stringResource(R.string.keyring_generate_algorithm_caption_rsa)
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            KeygenAlgorithmPicker(
+                selected = state.generateAlgorithm,
+                onSelect = { viewModel.updateGenerateAlgorithm(it) }
             )
             Spacer(modifier = Modifier.height(12.dp))
 

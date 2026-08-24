@@ -579,6 +579,10 @@
     <string name="keyring_generate_algorithm_caption_ed25519">Fast, compact elliptic-curve keys (OpenPGP v4). Widely supported. A good default.</string>
     <string name="keyring_generate_algorithm_caption_rsa">Classic RSA keys (OpenPGP v4). Maximum compatibility; larger and slower than Ed25519.</string>
     <string name="keyring_generate_algorithm_caption_pqc_ietf">Post-quantum hybrid: ML-KEM plus an elliptic curve on a modern v6 key, following RFC 9980, the OpenPGP post-quantum standard. Resists quantum attacks; readable only by up-to-date OpenPGP software. ML-KEM-1024 is the higher-strength option.</string>
+    <string name="keyring_generate_algorithm_group_classical">Classical</string>
+    <string name="keyring_generate_algorithm_group_pqc">Post-Quantum</string>
+    <string name="keyring_generate_algorithm_group_advanced">Advanced / compatibility</string>
+    <string name="keyring_generate_algorithm_caption_pqc_sign">Fully post-quantum: an ML-DSA signing identity plus an ML-KEM encryption subkey on a modern v6 key (RFC 9980). Both signing and encryption resist quantum attacks; readable only by up-to-date OpenPGP software.</string>
     <string name="keyring_generate_algorithm_caption_pqc_librepgp">Post-quantum hybrid: ML-KEM (the algorithm GnuPG still calls Kyber) plus an elliptic curve, in the LibrePGP format GnuPG 2.5.x uses. gpg shows these keys as ky768_cv25519 and ky1024_cv448. ML-KEM-1024 is the higher-strength option.</string>
     <string name="keyring_generate_expiration_label">Expiration</string>
     <string name="keyring_generate_passphrase_label">Passphrase (optional)</string>
@@ -802,6 +806,9 @@
     <string name="key_detail_add_subkey_type_rsa_4096_encrypt">RSA 4096 (Encrypt)</string>
     <string name="key_detail_add_subkey_type_ed25519_sign">Ed25519 (Sign)</string>
     <string name="key_detail_add_subkey_type_x25519_encrypt">X25519 (Encrypt)</string>
+    <string name="key_detail_add_subkey_type_rsa_2048_auth">RSA 2048 (Authenticate)</string>
+    <string name="key_detail_add_subkey_type_rsa_4096_auth">RSA 4096 (Authenticate)</string>
+    <string name="key_detail_add_subkey_type_ed25519_auth">Ed25519 (Authenticate)</string>
     <string name="key_detail_action_delete_key">Delete Key</string>
     <string name="key_detail_action_revoke_key">Revoke Key…</string>
     <string name="key_detail_action_export_revocation_cert">Export Revocation Certificate</string>

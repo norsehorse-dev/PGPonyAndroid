@@ -871,7 +871,35 @@ class KeyDetailViewModel(
      * failure handling SubkeyMigrationService used for the Room-backed
      * version of this that never got wired up.
      */
+    /**
+     * 4.4.0 RC3 (#30/#31): a composite key cannot be loaded as a
+     * PGPPublicKeyRing, so its ML-KEM encryption subkey row is built from the
+     * CompositeKeyFacade metadata rather than a BouncyCastle ring.
+     */
+    private suspend fun compositeSubkeys(entity: PGPKeyEntity): List<SubkeyDisplayInfo> {
+        val info = withContext(Dispatchers.IO) {
+            repo.loadCompositePublicInfo(entity.fingerprint)
+        } ?: return emptyList()
+        val sub = info.encryptionSubkey ?: return emptyList()
+        val fpHex = sub.fingerprint.joinToString("") { String.format("%02X", it) }
+        val algo = KeyAlgorithm.from(sub.algId, 6)
+        val expiresAtMs = info.expirationSeconds?.let { info.creationTimeMillis + it * 1000L }
+        return listOf(
+            SubkeyDisplayInfo(
+                fingerprint = fpHex,
+                keyId = fpHex.take(16),
+                algorithmLabel = algo?.displayName ?: "ML-KEM (v6)",
+                capabilities = SubkeyCapability.Encrypt.flag,
+                createdAt = info.creationTimeMillis,
+                expiresAt = expiresAtMs,
+                isRevoked = false,
+                isCardBacked = entity.isCardBacked
+            )
+        )
+    }
+
     private suspend fun deriveSubkeys(entity: PGPKeyEntity): List<SubkeyDisplayInfo> {
+        if (entity.algorithm.isCompositeSign) return compositeSubkeys(entity)
         val ring = withContext(Dispatchers.IO) { repo.loadPublicKeyRing(entity.fingerprint) }
             ?: return emptyList()
         val keys = ring.publicKeys.asSequence().toList()

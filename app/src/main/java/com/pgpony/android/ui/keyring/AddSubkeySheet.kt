@@ -36,6 +36,7 @@ fun AddSubkeySheet(
     keyOwnerLabel: String,
     isProcessing: Boolean = false,
     errorMessage: String? = null,
+    isV6: Boolean = false,
     onApply: (type: ClassicalSubkeyGen.ClassicalSubkeyType, expiresAtEpochSeconds: Long?, passphrase: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -89,6 +90,7 @@ fun AddSubkeySheet(
             )
             AddSubkeyTypeChips(
                 selected = selectedType,
+                isV6 = isV6,
                 onSelect = { selectedType = it }
             )
 
@@ -234,16 +236,26 @@ private fun AddSubkeyExpiryChips(
 @Composable
 private fun AddSubkeyTypeChips(
     selected: ClassicalSubkeyGen.ClassicalSubkeyType,
+    isV6: Boolean,
     onSelect: (ClassicalSubkeyGen.ClassicalSubkeyType) -> Unit
 ) {
+    // RC2: v6 keys take Ed25519/X25519 subkeys only; RSA is a v4 shape.
+    val types = if (isV6) listOf(
+        ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_SIGN,
+        ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_AUTH,
+        ClassicalSubkeyGen.ClassicalSubkeyType.X25519_ENCRYPT
+    ) else ClassicalSubkeyGen.ClassicalSubkeyType.entries
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ClassicalSubkeyGen.ClassicalSubkeyType.entries.forEach { type ->
+        types.forEach { type ->
             val label = when (type) {
                 ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_SIGN -> stringResource(R.string.key_detail_add_subkey_type_rsa_2048_sign)
                 ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_ENCRYPT -> stringResource(R.string.key_detail_add_subkey_type_rsa_2048_encrypt)
                 ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_SIGN -> stringResource(R.string.key_detail_add_subkey_type_rsa_4096_sign)
                 ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_ENCRYPT -> stringResource(R.string.key_detail_add_subkey_type_rsa_4096_encrypt)
+                ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_AUTH -> stringResource(R.string.key_detail_add_subkey_type_rsa_2048_auth)
+                ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_AUTH -> stringResource(R.string.key_detail_add_subkey_type_rsa_4096_auth)
                 ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_SIGN -> stringResource(R.string.key_detail_add_subkey_type_ed25519_sign)
+                ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_AUTH -> stringResource(R.string.key_detail_add_subkey_type_ed25519_auth)
                 ClassicalSubkeyGen.ClassicalSubkeyType.X25519_ENCRYPT -> stringResource(R.string.key_detail_add_subkey_type_x25519_encrypt)
             }
             FilterChip(

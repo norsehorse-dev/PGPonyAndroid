@@ -64,13 +64,18 @@ object ClassicalSubkeyGen {
      * can do either; Ed25519/X25519 are single-capability by curve, the
      * same restriction the primary-key generators already encode.
      */
-    enum class ClassicalSubkeyType(val displayName: String, val canSign: Boolean) {
-        RSA_2048_SIGN("RSA 2048 (Sign)", true),
-        RSA_2048_ENCRYPT("RSA 2048 (Encrypt)", false),
-        RSA_4096_SIGN("RSA 4096 (Sign)", true),
-        RSA_4096_ENCRYPT("RSA 4096 (Encrypt)", false),
-        ED25519_SIGN("Ed25519 (Sign)", true),
-        X25519_ENCRYPT("X25519 (Encrypt)", false)
+    enum class Capability { SIGN, ENCRYPT, AUTHENTICATE }
+
+    enum class ClassicalSubkeyType(val displayName: String, val capability: Capability) {
+        RSA_2048_SIGN("RSA 2048 (Sign)", Capability.SIGN),
+        RSA_2048_ENCRYPT("RSA 2048 (Encrypt)", Capability.ENCRYPT),
+        RSA_4096_SIGN("RSA 4096 (Sign)", Capability.SIGN),
+        RSA_4096_ENCRYPT("RSA 4096 (Encrypt)", Capability.ENCRYPT),
+        RSA_2048_AUTH("RSA 2048 (Authenticate)", Capability.AUTHENTICATE),
+        RSA_4096_AUTH("RSA 4096 (Authenticate)", Capability.AUTHENTICATE),
+        ED25519_SIGN("Ed25519 (Sign)", Capability.SIGN),
+        ED25519_AUTH("Ed25519 (Authenticate)", Capability.AUTHENTICATE),
+        X25519_ENCRYPT("X25519 (Encrypt)", Capability.ENCRYPT)
     }
 
     class SubkeyAddError(message: String, cause: Throwable? = null) : Exception(message, cause)
@@ -113,8 +118,12 @@ object ClassicalSubkeyGen {
         val hashedGen = PGPSignatureSubpacketGenerator()
         hashedGen.setKeyFlags(
             false,
-            if (type.canSign) PGPKeyFlags.SIGN_DATA
-            else PGPKeyFlags.ENCRYPT_COMMS or PGPKeyFlags.ENCRYPT_STORAGE
+            when (type.capability) {
+                Capability.SIGN -> PGPKeyFlags.SIGN_DATA
+                Capability.ENCRYPT -> PGPKeyFlags.ENCRYPT_COMMS or PGPKeyFlags.ENCRYPT_STORAGE
+                // #49: SSH-via-gpg-agent needs an authentication-capable subkey.
+                Capability.AUTHENTICATE -> PGPKeyFlags.AUTHENTICATION
+            }
         )
         hashedGen.setIssuerFingerprint(false, primarySec.publicKey)
         if (expirationSeconds != null) {
@@ -136,11 +145,13 @@ object ClassicalSubkeyGen {
         random: SecureRandom,
         creationTime: Date
     ): PGPKeyPair = when (type) {
-        ClassicalSubkeyType.RSA_2048_SIGN, ClassicalSubkeyType.RSA_2048_ENCRYPT ->
+        ClassicalSubkeyType.RSA_2048_SIGN, ClassicalSubkeyType.RSA_2048_ENCRYPT,
+        ClassicalSubkeyType.RSA_2048_AUTH ->
             rsaKeyPair(2048, random, creationTime)
-        ClassicalSubkeyType.RSA_4096_SIGN, ClassicalSubkeyType.RSA_4096_ENCRYPT ->
+        ClassicalSubkeyType.RSA_4096_SIGN, ClassicalSubkeyType.RSA_4096_ENCRYPT,
+        ClassicalSubkeyType.RSA_4096_AUTH ->
             rsaKeyPair(4096, random, creationTime)
-        ClassicalSubkeyType.ED25519_SIGN -> {
+        ClassicalSubkeyType.ED25519_SIGN, ClassicalSubkeyType.ED25519_AUTH -> {
             // Matches PGPCryptoService.buildEd25519KeyRingGenerator's
             // primary: BC lightweight Ed25519 + EDDSA_LEGACY (algo 22).
             val edGen = Ed25519KeyPairGenerator()
