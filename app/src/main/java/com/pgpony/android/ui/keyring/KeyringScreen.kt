@@ -9,6 +9,7 @@ package com.pgpony.android.ui.keyring
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
@@ -287,6 +288,29 @@ fun KeyringScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // #45: live search across name, email, key id, fingerprint.
+                    if (state.allKeys.isNotEmpty()) {
+                        item(key = "keyring_search") {
+                            OutlinedTextField(
+                                value = state.searchQuery,
+                                onValueChange = { viewModel.setSearchQuery(it) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                                trailingIcon = {
+                                    if (state.searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                            Icon(
+                                                Icons.Filled.Close,
+                                                contentDescription = stringResource(R.string.keyring_search_clear_cd)
+                                            )
+                                        }
+                                    }
+                                },
+                                placeholder = { Text(stringResource(R.string.keyring_search_placeholder)) }
+                            )
+                        }
+                    }
                     // 4.2.0 RC2 workstream F — one-time, dismissible hint for
                     // LibrePGP composite keys generated before the wire
                     // fixes. Sits above My Keys since it always concerns
@@ -310,6 +334,8 @@ fun KeyringScreen(
                         titleRes = R.string.keyring_section_my_keys,
                         titleColor = mineColor,
                         topPadding = 8.dp,
+                        collapsed = state.collapsedSections.contains("MINE") && state.searchQuery.isBlank(),
+                        onToggleCollapse = { viewModel.toggleSection("MINE") },
                         reorderableState = reorderableState,
                         manualMode = manualMode,
                         onKeyClick = onKeyClick,
@@ -319,6 +345,8 @@ fun KeyringScreen(
                         titleRes = R.string.keyring_section_contacts,
                         titleColor = contactColor,
                         topPadding = 16.dp,
+                        collapsed = state.collapsedSections.contains("CONTACT") && state.searchQuery.isBlank(),
+                        onToggleCollapse = { viewModel.toggleSection("CONTACT") },
                         reorderableState = reorderableState,
                         manualMode = manualMode,
                         onKeyClick = onKeyClick,
@@ -328,6 +356,8 @@ fun KeyringScreen(
                         titleRes = R.string.keyring_section_public_keys,
                         titleColor = publicColor,
                         topPadding = 16.dp,
+                        collapsed = state.collapsedSections.contains("PUBLIC") && state.searchQuery.isBlank(),
+                        onToggleCollapse = { viewModel.toggleSection("PUBLIC") },
                         reorderableState = reorderableState,
                         manualMode = manualMode,
                         onKeyClick = onKeyClick,
@@ -527,19 +557,39 @@ private fun LazyListScope.keySection(
     titleRes: Int,
     titleColor: Color,
     topPadding: Dp,
+    collapsed: Boolean,
+    onToggleCollapse: () -> Unit,
     reorderableState: ReorderableLazyListState,
     manualMode: Boolean,
     onKeyClick: (String) -> Unit,
 ) {
     if (keys.isEmpty()) return
+    // #45: header shows the count and toggles the section. A collapsed
+    // section renders its header only, so a user can keep private keys off
+    // screen at a glance (the state is persisted in the ViewModel).
     item {
-        Text(
-            stringResource(titleRes),
-            style = MaterialTheme.typography.titleSmall,
-            color = titleColor,
-            modifier = Modifier.padding(top = topPadding, bottom = 4.dp)
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggleCollapse)
+                .padding(top = topPadding, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (collapsed) Icons.Filled.ChevronRight else Icons.Filled.ExpandMore,
+                contentDescription = null,
+                tint = titleColor,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                stringResource(titleRes) + " (" + keys.size + ")",
+                style = MaterialTheme.typography.titleSmall,
+                color = titleColor
+            )
+        }
     }
+    if (collapsed) return
     items(keys, key = { it.id }) { key ->
         ReorderableItem(reorderableState, key = key.id) { _ ->
             KeyCard(

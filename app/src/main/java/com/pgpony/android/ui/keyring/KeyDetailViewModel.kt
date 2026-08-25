@@ -462,6 +462,10 @@ class KeyDetailViewModel(
             _state.value = _state.value.copy(showQRSheet = true, qrIndex = 0)
             return
         }
+        // #36 (AraafRoyall): open the sheet immediately so the tap feels live.
+        // With no frames yet the sheet shows its spinner while ZXing runs,
+        // instead of the tap sitting dead until the QR is fully encoded.
+        _state.value = _state.value.copy(showQRSheet = true, qrFrames = emptyList(), qrIndex = 0)
         viewModelScope.launch {
             // §5.6.5 (#37): export + QR encode off the main thread so a
             // large post-quantum key does not stall the sheet on open.
@@ -482,13 +486,15 @@ class KeyDetailViewModel(
                 withContext(Dispatchers.Default) { QrBitmap.encodeFrames(armored) }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
-                    errorMessage = PGPonyApp.instance.getString(R.string.kd_vm_error_qr_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.kd_vm_error_qr_failed_format, e.message ?: ""),
+                    showQRSheet = false
                 )
                 return@launch
             }
             if (frames.isNullOrEmpty()) {
                 _state.value = _state.value.copy(
-                    errorMessage = PGPonyApp.instance.getString(R.string.qr_too_large)
+                    errorMessage = PGPonyApp.instance.getString(R.string.qr_too_large),
+                    showQRSheet = false
                 )
                 return@launch
             }
@@ -1378,10 +1384,17 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                     return@launch
                 }
                 com.pgpony.android.session.InAppPassphraseCache.clear(key.fingerprint)
+                val wasProtected = _state.value.privateKeyIsProtected
+                val confirmation = when {
+                    newPassphrase.isEmpty() -> R.string.change_passphrase_removed
+                    wasProtected -> R.string.change_passphrase_changed
+                    else -> R.string.change_passphrase_set
+                }
                 _state.value = _state.value.copy(
                     changePassphraseInFlight = false,
                     showChangePassphraseSheet = false,
-                    privateKeyIsProtected = newPassphrase.isNotEmpty()
+                    privateKeyIsProtected = newPassphrase.isNotEmpty(),
+                    successMessage = PGPonyApp.instance.getString(confirmation)
                 )
             } catch (e: org.bouncycastle.openpgp.PGPException) {
                 _state.value = _state.value.copy(

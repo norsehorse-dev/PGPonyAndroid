@@ -278,7 +278,33 @@ private fun ActionRowSpinner() {
  * without a grouped-list surface to match the iOS .listRowBackground(.clear) feel.
  */
 @Composable
-fun KeyHeaderSection(key: PGPKeyEntity) {
+private fun CopyableEmailRow(
+    email: String,
+    style: androidx.compose.ui.text.TextStyle,
+    color: Color,
+    onCopy: ((String) -> Unit)?
+) {
+    if (onCopy == null) {
+        Text(text = email, style = style, color = color)
+        return
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.clickable { onCopy(email) }
+    ) {
+        Text(text = email, style = style, color = color)
+        Spacer(modifier = Modifier.width(4.dp))
+        Icon(
+            imageVector = Icons.Filled.ContentCopy,
+            contentDescription = stringResource(R.string.key_detail_copy_email_cd),
+            tint = color,
+            modifier = Modifier.size(14.dp)
+        )
+    }
+}
+
+@Composable
+fun KeyHeaderSection(key: PGPKeyEntity, onCopyEmail: ((String) -> Unit)? = null) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -292,17 +318,22 @@ fun KeyHeaderSection(key: PGPKeyEntity) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
+            val titleIsEmail = key.userName.isBlank() && key.userEmail.isNotBlank()
             Text(
                 text = key.userName.ifBlank { key.userEmail },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = if (titleIsEmail && onCopyEmail != null)
+                    Modifier.clickable { onCopyEmail(key.userEmail) } else Modifier
             )
             if (key.userName.isNotBlank() && key.userEmail.isNotBlank()) {
-                Text(
-                    text = key.userEmail,
+                // #45: tap the email to copy it.
+                CopyableEmailRow(
+                    email = key.userEmail,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    onCopy = onCopyEmail
                 )
             }
 
@@ -747,13 +778,16 @@ fun ActionsSection(
             ActionRow(
                 icon = Icons.Filled.VpnKey,
                 label = stringResource(R.string.key_detail_action_export_private_key),
-                tint = Color(0xFFFB923C),  // orange — sensitive action telegraph
+                tint = Color(0xFFF59E0B),  // #45: yellow warning — sensitive action
                 onClick = { onComingSoon(KeyDetailActionIds.EXPORT_PRIVATE_KEY) }
             )
         }
         // §1.1 (#26): software key pairs only. Card keys change the passphrase
-        // on the card (the CHANGE_CARD_PIN row above).
-        if (key.isKeyPair && !key.isCardBacked) {
+        // on the card (the CHANGE_CARD_PIN row above). Composite ML-DSA signing
+        // keys are stored as raw bytes (BouncyCastle cannot re-protect their
+        // algo-30/31 material), so an OpenPGP passphrase change is not available
+        // for them yet; they are protected at rest by the device key store.
+        if (key.isKeyPair && !key.isCardBacked && !key.algorithm.isCompositeSign) {
             ActionRow(
                 icon = Icons.Filled.Password,
                 label = stringResource(R.string.key_detail_action_change_passphrase),
@@ -817,7 +851,8 @@ fun UserIdsSection(
     canEdit: Boolean = false,
     onMakePrimary: ((String) -> Unit)? = null,
     onRevoke: ((String) -> Unit)? = null,
-    onAddUserId: (() -> Unit)? = null
+    onAddUserId: (() -> Unit)? = null,
+    onCopyEmail: ((String) -> Unit)? = null
 ) {
     SectionGroup(title = stringResource(R.string.key_detail_userids_title)) {
         userIds.forEach { uid ->
@@ -858,10 +893,12 @@ fun UserIdsSection(
                     }
                 }
                 if (uid.email.isNotEmpty() && uid.name.isNotEmpty()) {
-                    Text(
-                        text = uid.email,
+                    // #45: tap the email to copy it.
+                    CopyableEmailRow(
+                        email = uid.email,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        onCopy = onCopyEmail
                     )
                 }
                 if (canEdit && !uid.isRevoked) {

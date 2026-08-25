@@ -1312,58 +1312,13 @@ private fun EncryptModeBody(state: EncryptUiState, viewModel: EncryptDecryptView
     // Hidden when no signing key is available (no keypairs in the keyring)
     // — there's nothing to sign with, so showing a disabled toggle would
     // just be confusing.
+    // #36 (AraafRoyall): one selector, no separate on/off switch. The row shows
+    // "None (don't sign)" or the chosen signer; the sheet carries the None
+    // option plus every signing key.
     val signingKey = state.signingKey
     if (signingKey != null) {
         Spacer(modifier = Modifier.height(12.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Switch(
-                checked = state.signMessage,
-                onCheckedChange = { viewModel.toggleSign(it) }
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.encrypt_also_sign_message_title),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    stringResource(
-                        R.string.encrypt_also_sign_subtitle_format,
-                        signingKey.userName.ifBlank { signingKey.userEmail }
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        // ── Phase A5: Sign-as picker row ───────────────────────────────
-        //
-        // Only surfaced when:
-        //   • signing is enabled (toggle on), AND
-        //   • the user has 2+ key pairs to choose between.
-        //
-        // With a single key pair there's no meaningful choice; the toggle
-        // alone is enough and the row would just be visual noise. The
-        // sheet visibility is local to this composable — it's pure UI
-        // state with no business value to keep on the ViewModel.
-        if (state.signMessage && state.availableSigningKeys.size > 1) {
-            Spacer(modifier = Modifier.height(8.dp))
-            SignAsPicker(
-                key = state.signingKey,
-                keyPairs = state.availableSigningKeys,
-                defaultSignerFingerprint = state.defaultSignerFingerprint,
-                onSelect = { viewModel.setSigningKey(it) },
-                onSetDefault = { viewModel.setDefaultSigner(it) },
-                signingSubkeyOptions = state.signingSubkeyOptions,
-                selectedSigningKeyId = state.selectedSigningKeyId,
-                onSelectSigningSubkey = { viewModel.setSigningSubkey(it) }
-            )
-        }
+        OptionalSignAsSelector(state = state, viewModel = viewModel)
     }
 
     // ── Phase A10d: ASCII armor toggle ─────────────────────────────────
@@ -1493,6 +1448,101 @@ private fun SignAsPicker(
             selectedSigningKeyId = selectedSigningKeyId,
             onSelectSigningSubkey = onSelectSigningSubkey
         )
+    }
+}
+
+/**
+ * #36 (AraafRoyall): the encrypt flow's signing control as ONE selector with a
+ * "None (don't sign)" option, replacing the separate on/off switch plus picker.
+ * The row shows the current choice; tapping it opens SignAsSheet with None at
+ * the top followed by every signing key. Used by the text, bundle, and file
+ * encrypt bodies.
+ */
+@Composable
+private fun OptionalSignAsSelector(state: EncryptUiState, viewModel: EncryptDecryptViewModel) {
+    var showSignAsSheet by remember { mutableStateOf(false) }
+    OptionalSignAsRow(
+        signing = state.signMessage,
+        key = state.signingKey,
+        onClick = { showSignAsSheet = true }
+    )
+    if (showSignAsSheet) {
+        SignAsSheet(
+            keyPairs = state.availableSigningKeys,
+            currentSelection = if (state.signMessage) state.signingKey else null,
+            allowNone = true,
+            noneSelected = !state.signMessage,
+            onSelectNone = {
+                viewModel.toggleSign(false)
+                showSignAsSheet = false
+            },
+            onSelect = { picked ->
+                if (!state.signMessage) viewModel.toggleSign(true)
+                viewModel.setSigningKey(picked)
+                showSignAsSheet = false
+            },
+            onDismiss = { showSignAsSheet = false },
+            defaultSignerFingerprint = state.defaultSignerFingerprint,
+            onSetDefault = { viewModel.setDefaultSigner(it) },
+            signingSubkeyOptions = state.signingSubkeyOptions,
+            selectedSigningKeyId = state.selectedSigningKeyId,
+            onSelectSigningSubkey = { viewModel.setSigningSubkey(it) }
+        )
+    }
+}
+
+@Composable
+private fun OptionalSignAsRow(
+    signing: Boolean,
+    key: com.pgpony.android.data.PGPKeyEntity?,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Filled.VpnKey,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.encrypt_sign_as_label),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                val signingValue = when {
+                    !signing || key == null -> stringResource(R.string.encrypt_sign_none_option)
+                    key.userName.isNotBlank() -> key.userName
+                    else -> key.userEmail.ifBlank { stringResource(R.string.encrypt_sign_as_no_identity) }
+                }
+                Text(
+                    signingValue,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (signing && key != null) {
+                    Text(
+                        key.shortFingerprint,
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Text(
+                "›",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -1857,49 +1907,10 @@ private fun BundleModeBody(state: EncryptUiState, viewModel: EncryptDecryptViewM
     // does not need yet). What is new is that the UI now says so instead
     // of quietly disagreeing with it.
     // 4.1.0 Phase 15: no longer filtered. Card keys sign bundles now.
-    val bundleSigningKeys = state.availableSigningKeys
+    // #36: one selector with a None option, no separate switch.
     val bundleSigningKey = state.signingKey
-    if (bundleSigningKey != null && bundleSigningKeys.isNotEmpty()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Switch(
-                checked = state.signMessage,
-                onCheckedChange = { viewModel.toggleSign(it) }
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.encrypt_also_sign_file_title),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    stringResource(
-                        R.string.encrypt_also_sign_subtitle_format,
-                        bundleSigningKey.userName.ifBlank { bundleSigningKey.userEmail }
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        // Shown when there is a real choice to make.
-        if (state.signMessage && bundleSigningKeys.size > 1) {
-            Spacer(modifier = Modifier.height(8.dp))
-            SignAsPicker(
-                key = bundleSigningKey,
-                keyPairs = bundleSigningKeys,
-                defaultSignerFingerprint = state.defaultSignerFingerprint,
-                onSelect = { viewModel.setSigningKey(it) },
-                onSetDefault = { viewModel.setDefaultSigner(it) },
-                signingSubkeyOptions = state.signingSubkeyOptions,
-                selectedSigningKeyId = state.selectedSigningKeyId,
-                onSelectSigningSubkey = { viewModel.setSigningSubkey(it) }
-            )
-        }
+    if (bundleSigningKey != null && state.availableSigningKeys.isNotEmpty()) {
+        OptionalSignAsSelector(state = state, viewModel = viewModel)
     }
 
     // 4) Attachment list, LAST.
@@ -2232,46 +2243,10 @@ private fun FileSection(state: EncryptUiState, viewModel: EncryptDecryptViewMode
     // 3) Sign-message toggle + Sign-as row. Mirrors the EncryptModeBody
     // pattern exactly — same toggleSign() API, same SignAsRow/SignAsSheet
     // composition, same gating rules.
+    // #36: one selector with a None option, no separate switch.
     val signingKey = state.signingKey
     if (signingKey != null) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Switch(
-                checked = state.signMessage,
-                onCheckedChange = { viewModel.toggleSign(it) }
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.encrypt_also_sign_file_title),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    stringResource(
-                        R.string.encrypt_also_sign_subtitle_format,
-                        signingKey.userName.ifBlank { signingKey.userEmail }
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-        if (state.signMessage && state.availableSigningKeys.size > 1) {
-            Spacer(modifier = Modifier.height(8.dp))
-            SignAsPicker(
-                key = state.signingKey,
-                keyPairs = state.availableSigningKeys,
-                defaultSignerFingerprint = state.defaultSignerFingerprint,
-                onSelect = { viewModel.setSigningKey(it) },
-                onSetDefault = { viewModel.setDefaultSigner(it) },
-                signingSubkeyOptions = state.signingSubkeyOptions,
-                selectedSigningKeyId = state.selectedSigningKeyId,
-                onSelectSigningSubkey = { viewModel.setSigningSubkey(it) }
-            )
-        }
+        OptionalSignAsSelector(state = state, viewModel = viewModel)
     }
     // 3.1.0 Phase 2 (C4): end of the RECIPIENTS-only block (recipient
     // picker + sign toggle). Password mode renders neither.
@@ -3893,6 +3868,17 @@ fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
                     VerificationBanner(
                         result = result,
                         onTapUnknownSigner = { viewModel.lookupSigner() }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // #46: name the key that actually decrypted, so a passphraseless
+                // key silently matching can't masquerade as the one in the picker.
+                state.decryptedByKeyLabel?.let { label ->
+                    Text(
+                        text = stringResource(R.string.encdec_decrypted_with_format, label),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }

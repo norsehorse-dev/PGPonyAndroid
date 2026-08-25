@@ -156,7 +156,13 @@ data class KeyringUiState(
     // reload, but a NEWLY imported affected key (a fingerprint not yet
     // dismissed) still surfaces.
     val legacyCompositeFingerprints: Set<String> = emptySet(),
-    val dismissedRegenHintFingerprints: Set<String> = emptySet()
+    val dismissedRegenHintFingerprints: Set<String> = emptySet(),
+    // #45: live search over the keyring — matches name, email, key id, or
+    // fingerprint. Not persisted; a fresh keyring open starts unfiltered.
+    val searchQuery: String = "",
+    // #45: sections the user has collapsed, by KeySection name. Persisted, so
+    // a user who collapses My Keys can open the app without private keys shown.
+    val collapsedSections: Set<String> = emptySet()
 ) {
     // ── 4.1.0 Phase 12b — three sections ──────────────────────────────
     //
@@ -175,9 +181,23 @@ data class KeyringUiState(
         it.fingerprint in legacyCompositeFingerprints && it.fingerprint !in dismissedRegenHintFingerprints
     }
 
-    val myKeys: List<PGPKeyEntity> get() = sortKeys(allKeys.filter { it.section() == KeySection.MINE })
-    val contactKeys: List<PGPKeyEntity> get() = sortKeys(allKeys.filter { it.section() == KeySection.CONTACT })
-    val publicKeys: List<PGPKeyEntity> get() = sortKeys(allKeys.filter { it.section() == KeySection.PUBLIC })
+    val myKeys: List<PGPKeyEntity> get() = sortKeys(allKeys.filter { it.section() == KeySection.MINE && matchesQuery(it) })
+    val contactKeys: List<PGPKeyEntity> get() = sortKeys(allKeys.filter { it.section() == KeySection.CONTACT && matchesQuery(it) })
+    val publicKeys: List<PGPKeyEntity> get() = sortKeys(allKeys.filter { it.section() == KeySection.PUBLIC && matchesQuery(it) })
+
+    /** #45: does [key] match the current [searchQuery]? Empty query matches
+     *  everything. Fingerprint / key-id matching ignores spaces and case so a
+     *  pasted grouped fingerprint still hits. */
+    private fun matchesQuery(key: PGPKeyEntity): Boolean {
+        val needle = searchQuery.trim().lowercase()
+        if (needle.isEmpty()) return true
+        val compact = needle.replace(" ", "")
+        if (key.userName.lowercase().contains(needle)) return true
+        if (key.userEmail.lowercase().contains(needle)) return true
+        if (key.fingerprint.lowercase().replace(" ", "").contains(compact)) return true
+        if (key.longKeyId.lowercase().contains(compact)) return true
+        return false
+    }
 
     /**
      * Key PAIRS the user has generated or imported with private material.
@@ -268,10 +288,16 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             ?.filter { it.isNotBlank() }
             ?.toSet()
             ?: emptySet()
+        val collapsed = prefs.getString("keyring_collapsed_sections", null)
+            ?.split("\n")
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            ?: emptySet()
         _state.value = _state.value.copy(
             sortMode = savedMode,
             manualOrder = savedOrder,
-            dismissedRegenHintFingerprints = dismissedRegenHints
+            dismissedRegenHintFingerprints = dismissedRegenHints,
+            collapsedSections = collapsed
         )
         loadKeys()
     }
@@ -294,6 +320,21 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
         val updated = _state.value.dismissedRegenHintFingerprints + fingerprint
         prefs.edit().putString("keyring_regen_hint_dismissed", updated.joinToString("\n")).apply()
         _state.value = _state.value.copy(dismissedRegenHintFingerprints = updated)
+    }
+
+    /** #45: update the live keyring search query. */
+    fun setSearchQuery(query: String) {
+        _state.value = _state.value.copy(searchQuery = query)
+    }
+
+    /** #45: collapse or expand a keyring section, persisting the choice so it
+     *  survives an app restart (the point of "open without private keys on
+     *  screen"). [sectionKey] is a KeySection name. */
+    fun toggleSection(sectionKey: String) {
+        val current = _state.value.collapsedSections
+        val updated = if (sectionKey in current) current - sectionKey else current + sectionKey
+        prefs.edit().putString("keyring_collapsed_sections", updated.joinToString("\n")).apply()
+        _state.value = _state.value.copy(collapsedSections = updated)
     }
 
     /** Change the sort mode and persist it. */

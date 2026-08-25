@@ -300,6 +300,10 @@ data class DecryptUiState(
     val errorMessage: String? = null,
     val signatureVerified: Boolean = false,
     val signerKeyID: String? = null,
+    // #46: display label of the key that actually decrypted the message,
+    // shown by the result screens next to the signature banner. Null on the
+    // symmetric path and until a decrypt succeeds.
+    val decryptedByKeyLabel: String? = null,
     // HW Phase 3 — set when the input message is encrypted to a card-backed
     // key (a recipient key ID matches a card key's encryption subkey). The
     // Decrypt tab then hides the passphrase field and offers PIN + tap
@@ -3035,6 +3039,64 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      * card offer, error strings) is byte-for-byte what it was. With a
      * single ring the per-ring pass is skipped entirely.
      */
+    /** #46: friendly label for the explicitly selected key, or null. */
+    private fun selectedKeyLabel(s: DecryptUiState): String? =
+        s.selectedKeyFingerprint?.let { fp ->
+            s.availableKeys.firstOrNull { it.fingerprint == fp }
+                ?.let { it.userName.ifBlank { it.userEmail } }?.takeIf { it.isNotBlank() }
+        }
+
+    /** #46: which held key (by display label) owns [rawKeyId], matched against
+     *  the rings actually loaded for this decrypt. Null when unknown. */
+    private fun keyLabelForKeyId(
+        rawKeyId: Long?,
+        loaded: List<Pair<PGPKeyEntity, org.bouncycastle.openpgp.PGPSecretKeyRing>>
+    ): String? {
+        if (rawKeyId == null) return null
+        val entity = loaded.firstOrNull { (_, ring) -> ring.getSecretKey(rawKeyId) != null }?.first
+            ?: return null
+        return entity.userName.ifBlank { entity.userEmail }.takeIf { it.isNotBlank() }
+            ?: entity.shortFingerprint
+    }
+
+    private enum class DecryptFailKind { PASSPHRASE, NO_KEY }
+
+    /**
+     * #46: turn a decrypt failure into a message that separates the two cases a
+     * user with several keys actually hits: the key they picked is not a
+     * recipient of the message (choose a different key), versus the key is a
+     * recipient but the passphrase was wrong. Falls back to [fallback] when the
+     * selected key can't be ruled out (hidden recipient, unparsable input, or
+     * no key explicitly selected).
+     */
+    private suspend fun decryptFailureMessage(
+        s: DecryptUiState,
+        input: ByteArray,
+        kind: DecryptFailKind,
+        fallback: String
+    ): String {
+        val app = PGPonyApp.instance
+        val label = selectedKeyLabel(s)
+        val recipients = try { crypto.recipientKeyIDs(input) } catch (_: Exception) { emptyList<Long>() }
+        val ring = s.selectedKeyFingerprint?.let { fp ->
+            withContext(Dispatchers.IO) { repo.loadSecretKeyRing(fp) }
+        }
+        val selectedNotRecipient =
+            if (ring != null && recipients.isNotEmpty() && !recipients.contains(0L)) {
+                val ids = ring.secretKeys.asSequence().map { it.keyID }.toSet()
+                recipients.none { it in ids }
+            } else false
+        if (selectedNotRecipient && label != null) {
+            return app.getString(R.string.encdec_error_selected_key_not_recipient_format, label)
+        }
+        return when (kind) {
+            DecryptFailKind.PASSPHRASE ->
+                if (label != null) app.getString(R.string.encdec_error_incorrect_passphrase_for_format, label)
+                else app.getString(R.string.encdec_error_incorrect_passphrase)
+            DecryptFailKind.NO_KEY -> fallback
+        }
+    }
+
     private inline fun <T> decryptWithFallbackCascade(
         rings: List<org.bouncycastle.openpgp.PGPSecretKeyRing>,
         attempt: (List<org.bouncycastle.openpgp.PGPSecretKeyRing>) -> T
@@ -3055,7 +3117,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
 
     private fun decryptAndVerifyPath(s: DecryptUiState) {
         viewModelScope.launch {
-            _decryptState.value = _decryptState.value.copy(isProcessing = true, errorMessage = null)
+            _decryptState.value = _decryptState.value.copy(isProcessing = true, errorMessage = null, decryptedByKeyLabel = null)
             // §3 (#15): reuse a cached in-app passphrase for a repeat decrypt
             // on the selected key; remember a freshly entered one on success.
             val cacheFp = s.selectedKeyFingerprint
@@ -3074,9 +3136,10 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // even starts. The encrypt paths were already dispatched;
                 // decrypt was not, which is why decrypt was the side that
                 // froze.
-                val secretRings = withContext(Dispatchers.IO) {
-                    orderedKeys.mapNotNull { repo.loadSecretKeyRing(it.fingerprint) }
+                val loaded = withContext(Dispatchers.IO) {
+                    orderedKeys.mapNotNull { e -> repo.loadSecretKeyRing(e.fingerprint)?.let { e to it } }
                 }
+                val secretRings = loaded.map { it.second }
                 val verifyRings = withContext(Dispatchers.IO) {
                     repo.getAllKeys().mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
                 }
@@ -3118,6 +3181,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     decryptedFilename = result.filename,
                     showPassphraseDialog = false,
                     verificationResult = verResult,
+                    decryptedByKeyLabel = keyLabelForKeyId(result.decryptingKeyIdRaw, loaded),
                     mimeBody = mime?.body,
                     mimeAttachments = mime?.attachments ?: emptyList(),
                     showStructuredResultSheet = mime != null
@@ -3136,15 +3200,23 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 if (cacheFp != null) com.pgpony.android.session.InAppPassphraseCache.clear(cacheFp)
                 _decryptState.value = _decryptState.value.copy(
                     isProcessing = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.encdec_error_incorrect_passphrase)
+                    errorMessage = decryptFailureMessage(
+                        s, effectiveDecryptInput(s.inputText).toByteArray(Charsets.UTF_8),
+                        DecryptFailKind.PASSPHRASE,
+                        PGPonyApp.instance.getString(R.string.encdec_error_incorrect_passphrase)
+                    )
                 )
             } catch (e: com.pgpony.android.crypto.PGPCryptoError.NoMatchingKey) {
                 // 4.1.0 — the one failure worth turning into an offer.
                 if (!offerCardForHiddenRecipient()) {
                     _decryptState.value = _decryptState.value.copy(
                         isProcessing = false,
-                        errorMessage = PGPonyApp.instance.getString(
-                            R.string.encdec_error_decryption_failed_format, e.message ?: ""
+                        errorMessage = decryptFailureMessage(
+                            s, effectiveDecryptInput(s.inputText).toByteArray(Charsets.UTF_8),
+                            DecryptFailKind.NO_KEY,
+                            PGPonyApp.instance.getString(
+                                R.string.encdec_error_decryption_failed_format, e.message ?: ""
+                            )
                         )
                     )
                 }
@@ -4160,7 +4232,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      */
     private fun decryptFileAndVerifyPath(s: DecryptUiState, bytes: ByteArray) {
         viewModelScope.launch {
-            _decryptState.value = _decryptState.value.copy(isProcessing = true, errorMessage = null)
+            _decryptState.value = _decryptState.value.copy(isProcessing = true, errorMessage = null, decryptedByKeyLabel = null)
             // §3 (#15): reuse a cached in-app passphrase for a repeat decrypt
             // on the selected key; remember a freshly entered one on success.
             val cacheFp = s.selectedKeyFingerprint
@@ -4178,9 +4250,10 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // Seconds of UI-thread work is an ANR, which presents as
                 // either a freeze or a "close app" dialog depending on how
                 // aggressively the OEM's watchdog fires.
-                val secretRings = withContext(Dispatchers.IO) {
-                    orderedKeys.mapNotNull { repo.loadSecretKeyRing(it.fingerprint) }
+                val loaded = withContext(Dispatchers.IO) {
+                    orderedKeys.mapNotNull { e -> repo.loadSecretKeyRing(e.fingerprint)?.let { e to it } }
                 }
+                val secretRings = loaded.map { it.second }
                 val verifyRings = withContext(Dispatchers.IO) {
                     repo.getAllKeys().mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
                 }
@@ -4229,6 +4302,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     decryptedFilename = result.filename,
                     showPassphraseDialog = false,
                     verificationResult = verResult,
+                    decryptedByKeyLabel = keyLabelForKeyId(result.decryptingKeyIdRaw, loaded),
                     decryptedFileBytes = result.data,
                     decryptedOutputFilename = outName,
                     // 3.1.0 Phase 4 (J1): a decrypted multipart/mixed with
@@ -4252,15 +4326,23 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 if (cacheFp != null) com.pgpony.android.session.InAppPassphraseCache.clear(cacheFp)
                 _decryptState.value = _decryptState.value.copy(
                     isProcessing = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.encdec_error_incorrect_passphrase)
+                    errorMessage = decryptFailureMessage(
+                        s, effectiveDecryptFileBytes(bytes),
+                        DecryptFailKind.PASSPHRASE,
+                        PGPonyApp.instance.getString(R.string.encdec_error_incorrect_passphrase)
+                    )
                 )
             } catch (e: com.pgpony.android.crypto.PGPCryptoError.NoMatchingKey) {
                 // 4.1.0 — the one failure worth turning into an offer.
                 if (!offerCardForHiddenRecipient()) {
                     _decryptState.value = _decryptState.value.copy(
                         isProcessing = false,
-                        errorMessage = PGPonyApp.instance.getString(
-                            R.string.encdec_error_decryption_failed_format, e.message ?: ""
+                        errorMessage = decryptFailureMessage(
+                            s, effectiveDecryptFileBytes(bytes),
+                            DecryptFailKind.NO_KEY,
+                            PGPonyApp.instance.getString(
+                                R.string.encdec_error_decryption_failed_format, e.message ?: ""
+                            )
                         )
                     )
                 }

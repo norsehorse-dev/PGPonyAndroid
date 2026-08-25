@@ -95,6 +95,11 @@ fun KeyCard(
                             tint = Color(0xFF8B5CF6)
                         )
                     }
+                    // #45: mark the default key so it can be picked out at a glance.
+                    if (key.isDefault) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        DefaultPill()
+                    }
                 }
 
                 if (key.userName.isNotBlank() && key.userEmail.isNotBlank()) {
@@ -171,6 +176,23 @@ fun RevokedPill() {
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onError,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+        )
+    }
+}
+
+@Composable
+fun DefaultPill() {
+    Surface(
+        shape = RoundedCornerShape(4.dp),
+        color = Color(0xFF8B5CF6),
+        modifier = Modifier.height(18.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.key_card_default_badge),
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
         )
     }

@@ -1091,7 +1091,12 @@ fun PGPonyMainScreen(
             bottomBar = {
                 NavigationBar {
                     bottomNavScreens.forEach { screen ->
-                        val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
+                        // #45: Key Detail lives at "keyring/{fingerprint}", a sub-route of the
+                        // Keyring tab. Treat it as part of Keyring so the tab reads as the
+                        // active section and its tap (which pops back to the list) is where the
+                        // thumb expects the way back.
+                        val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true ||
+                            (screen == Screen.Keyring && currentDestination?.route?.startsWith("keyring/") == true)
                         NavigationBarItem(
                             icon = {
                                 Icon(

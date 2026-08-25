@@ -52,6 +52,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -92,7 +93,12 @@ fun SignAsSheet(
     // second-level picker shows only when there are 2+ signing keys.
     signingSubkeyOptions: List<SigningKeyOption> = emptyList(),
     selectedSigningKeyId: Long? = null,
-    onSelectSigningSubkey: ((Long?) -> Unit)? = null
+    onSelectSigningSubkey: ((Long?) -> Unit)? = null,
+    // #36: optional "None (don't sign)" entry for the encrypt flow's combined
+    // sign selector, which replaced the separate on/off switch.
+    allowNone: Boolean = false,
+    noneSelected: Boolean = false,
+    onSelectNone: (() -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -125,12 +131,21 @@ fun SignAsSheet(
 
             when {
                 keyPairs.isEmpty() -> EmptyState()
-                else -> SigningKeyList(
-                    keyPairs = keyPairs,
-                    currentSelection = currentSelection,
-                    defaultSignerFingerprint = defaultSignerFingerprint,
-                    onSelect = onSelect
-                )
+                else -> {
+                    if (allowNone && onSelectNone != null) {
+                        NoneSignerRow(isSelected = noneSelected, onClick = onSelectNone)
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 60.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    }
+                    SigningKeyList(
+                        keyPairs = keyPairs,
+                        currentSelection = currentSelection,
+                        defaultSignerFingerprint = defaultSignerFingerprint,
+                        onSelect = onSelect
+                    )
+                }
             }
 
             // "Set as default signer" — pins the current selection so it's
@@ -231,6 +246,49 @@ private fun SubkeyRow(
                 )
             }
         }
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = stringResource(R.string.sign_as_sheet_selected_cd),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun NoneSignerRow(isSelected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Block,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = stringResource(R.string.encrypt_sign_none_option),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
         if (isSelected) {
             Icon(
                 imageVector = Icons.Filled.Check,

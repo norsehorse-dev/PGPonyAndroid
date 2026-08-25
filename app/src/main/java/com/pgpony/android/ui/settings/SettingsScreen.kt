@@ -103,6 +103,27 @@ fun SettingsScreen(
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val activity = context as? android.app.Activity
+    // #50: turning a security setting on or off is itself a security action,
+    // so gate both directions behind a biometric check when the device has one.
+    // Falls through only where no biometric is enrolled (matching the clear-all
+    // path), so a user without biometrics is never locked out of their own switch.
+    val guardSecurityChange: (String, String, () -> Unit) -> Unit = { confirmTitle, confirmSubtitle, action ->
+        val fragmentActivity = context as? androidx.fragment.app.FragmentActivity
+        if (fragmentActivity != null &&
+            com.pgpony.android.ui.keyring.BiometricGate.canAuthenticate(context) ==
+            com.pgpony.android.ui.keyring.BiometricAvailability.Available
+        ) {
+            com.pgpony.android.ui.keyring.BiometricGate.authenticate(
+                activity = fragmentActivity,
+                title = confirmTitle,
+                subtitle = confirmSubtitle,
+                onSuccess = { action() },
+                onError = { _, _ -> }
+            )
+        } else {
+            action()
+        }
+    }
     val tooltipState = rememberTooltipState()
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -264,7 +285,12 @@ fun SettingsScreen(
                 icon = Icons.Filled.Fingerprint,
                 iconTint = Color(0xFF8B5CF6),
                 checked = state.biometricLockEnabled,
-                onCheckedChange = { viewModel.setBiometricLock(context, it) }
+                onCheckedChange = { target ->
+                    guardSecurityChange(
+                        context.getString(R.string.settings_security_confirm_lock_title),
+                        context.getString(if (target) R.string.settings_security_confirm_enable_subtitle else R.string.settings_security_confirm_disable_subtitle)
+                    ) { viewModel.setBiometricLock(context, target) }
+                }
             )
             if (state.biometricLockEnabled) {
                 SettingsToggle(
@@ -284,7 +310,12 @@ fun SettingsScreen(
                 icon = Icons.Filled.Fingerprint,
                 iconTint = Color(0xFF8B5CF6),
                 checked = state.requireBiometricForSign,
-                onCheckedChange = { viewModel.setRequireBiometricForSign(it) }
+                onCheckedChange = { target ->
+                    guardSecurityChange(
+                        context.getString(R.string.settings_security_confirm_sign_title),
+                        context.getString(if (target) R.string.settings_security_confirm_enable_subtitle else R.string.settings_security_confirm_disable_subtitle)
+                    ) { viewModel.setRequireBiometricForSign(target) }
+                }
             )
             // ── 3.1.0 Phase 8 (E5 F-item): sign-by-default ──────────────
             SignByDefaultToggle()

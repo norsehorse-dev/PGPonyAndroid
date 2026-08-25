@@ -253,6 +253,10 @@
     <string name="settings_data_clear_ack2_label">I am sure. Delete every key and all app data.</string>
     <string name="settings_data_clear_biometric_title">Confirm deleting all data</string>
     <string name="settings_data_clear_biometric_subtitle">Authenticate to permanently delete every key</string>
+    <string name="settings_security_confirm_lock_title">Confirm biometric lock change</string>
+    <string name="settings_security_confirm_sign_title">Confirm signing requirement change</string>
+    <string name="settings_security_confirm_enable_subtitle">Authenticate to turn this security setting on</string>
+    <string name="settings_security_confirm_disable_subtitle">Authenticate to turn this security setting off</string>
     <string name="settings_data_clear_key_list_header_format">Keys that will be permanently destroyed (%1$d):</string>
     <string name="settings_data_clear_type_word">DELETE</string>
     <string name="settings_data_clear_type_label_format">Type %1$s to confirm</string>
@@ -361,6 +365,7 @@
 
     <!-- ── Sign-as picker ───────────────────────────────────────────── -->
     <string name="encrypt_sign_as_label">Sign as</string>
+    <string name="encrypt_sign_none_option">None (don\'t sign)</string>
     <string name="encrypt_sign_as_no_key">No signing key selected</string>
     <string name="encrypt_sign_as_no_key_pair">No key pair available. Generate or import a private key first.</string>
     <string name="encrypt_sign_as_no_identity">(no identity)</string>
@@ -526,6 +531,9 @@
     <string name="encdec_error_file_too_large">This file is too large for the available memory. Try closing other apps and running it again.</string>
     <string name="encdec_error_no_decrypt_input">Paste an encrypted or signed message</string>
     <string name="encdec_error_incorrect_passphrase">Incorrect passphrase</string>
+    <string name="encdec_error_incorrect_passphrase_for_format">Incorrect passphrase for %1$s.</string>
+    <string name="encdec_error_selected_key_not_recipient_format">The selected key (%1$s) is not a recipient of this message. Choose the key it was encrypted to.</string>
+    <string name="encdec_decrypted_with_format">Decrypted with %1$s</string>
     <string name="encdec_error_incorrect_passphrase_retry">Incorrect passphrase. Try again.</string>
     <string name="encdec_error_signing_failed_format">Signing failed: %1$s</string>
     <string name="encdec_error_encryption_failed_format">Encryption failed: %1$s</string>
@@ -543,6 +551,9 @@
     <string name="keyring_title">Keyring</string>
     <string name="keyring_add_key_cd">Add Key</string>
     <string name="keyring_section_my_keys">My Keys</string>
+    <string name="keyring_search_placeholder">Search name, key ID, or fingerprint</string>
+    <string name="keyring_search_clear_cd">Clear search</string>
+    <string name="key_card_default_badge">DEFAULT</string>
     <!-- 4.1.0 Phase 12b — "Contact Keys" split in two. Contacts are the
          public keys with an Android contact linked; Public Keys are the
          rest. The old key is renamed rather than left orphaned, and the
@@ -696,6 +707,8 @@
     <string name="key_detail_section_fingerprint">Fingerprint</string>
     <string name="key_detail_fingerprint_copied">Copied!</string>
     <string name="key_detail_fingerprint_tap_to_copy">Tap to copy</string>
+    <string name="key_detail_copy_email_cd">Copy email address</string>
+    <string name="key_detail_email_copied">Email copied</string>
 
     <!-- ── Details section ──────────────────────────────────────────── -->
     <string name="key_detail_section_details">Details</string>
@@ -1942,6 +1955,9 @@
     <string name="change_passphrase_backup_note">Existing backups keep the old passphrase until you export the key again.</string>
     <string name="change_passphrase_apply">Change</string>
     <string name="change_passphrase_failed">Could not change the passphrase.</string>
+    <string name="change_passphrase_changed">Passphrase changed</string>
+    <string name="change_passphrase_set">Passphrase set</string>
+    <string name="change_passphrase_removed">Passphrase removed</string>
     <!-- 4.3.0 (#31): zip output packaging -->
     <string name="enc_result_wrap_zip_label">Wrap in .zip</string>
     <string name="enc_result_wrap_zip_note">Packaging for transport, not encryption. Useful when a channel mangles .gpg or .asc files.</string>

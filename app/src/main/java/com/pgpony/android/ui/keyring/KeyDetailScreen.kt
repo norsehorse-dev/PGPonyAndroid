@@ -305,13 +305,25 @@ fun KeyDetailScreen(
                                 )
                             }
                             if (menuKey.isKeyPair) {
+                                // #45: yellow warning signal on the sensitive export.
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.key_detail_action_export_private_key)) },
-                                    leadingIcon = { Icon(Icons.Filled.VpnKey, null) },
+                                    text = {
+                                        Text(
+                                            stringResource(R.string.key_detail_action_export_private_key),
+                                            color = androidx.compose.ui.graphics.Color(0xFFF59E0B)
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Filled.VpnKey,
+                                            null,
+                                            tint = androidx.compose.ui.graphics.Color(0xFFF59E0B)
+                                        )
+                                    },
                                     onClick = { menuOpen = false; dispatchAction(KeyDetailActionIds.EXPORT_PRIVATE_KEY) }
                                 )
                             }
-                            if (menuKey.isKeyPair && !menuKey.isCardBacked) {
+                            if (menuKey.isKeyPair && !menuKey.isCardBacked && !menuKey.algorithm.isCompositeSign) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.key_detail_action_change_passphrase)) },
                                     leadingIcon = { Icon(Icons.Filled.Password, null) },
@@ -377,6 +389,10 @@ fun KeyDetailScreen(
                 onCopyFingerprint = {
                     clipboard.setText(AnnotatedString(state.key!!.fingerprint))
                     viewModel.copyFingerprintFeedback()
+                },
+                onCopyEmail = { email ->
+                    clipboard.setText(AnnotatedString(email))
+                    scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.key_detail_email_copied)) }
                 },
                 onShowQR = { viewModel.showQR() },
                 // Phase A4b — dispatcher replaces the bare onComingSoon
@@ -1230,6 +1246,7 @@ private fun LoadedBody(
     padding: PaddingValues,
     state: KeyDetailUiState,
     onCopyFingerprint: () -> Unit,
+    onCopyEmail: (String) -> Unit,
     onShowQR: () -> Unit,
     onComingSoon: (String) -> Unit,
     onEditExpiry: () -> Unit,
@@ -1252,7 +1269,7 @@ private fun LoadedBody(
         contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item { KeyHeaderSection(key = key) }
+        item { KeyHeaderSection(key = key, onCopyEmail = onCopyEmail) }
         // Phase A6 — Revoked banner directly under the header so it's
         // the first thing the user sees on a revoked key without having
         // to scroll to Danger Zone. RevokedBanner internally no-ops when
@@ -1278,7 +1295,8 @@ private fun LoadedBody(
                     canEdit = canEditUserIds,
                     onMakePrimary = onMakePrimaryUserId,
                     onRevoke = onRevokeUserId,
-                    onAddUserId = onAddUserId
+                    onAddUserId = onAddUserId,
+                    onCopyEmail = onCopyEmail
                 )
             }
         }

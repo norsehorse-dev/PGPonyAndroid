@@ -144,6 +144,15 @@ fun FileDecryptionResultScreen(state: DecryptUiState, onDismiss: () -> Unit) {
                 )
             }
 
+            // #46: which key decrypted this file.
+            state.decryptedByKeyLabel?.let { label ->
+                Text(
+                    text = stringResource(R.string.encdec_decrypted_with_format, label),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             // ── 2. Optional plaintext preview ────────────────────────
             asTextShort?.let { text ->
                 Column(

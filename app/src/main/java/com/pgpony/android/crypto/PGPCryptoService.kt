@@ -193,7 +193,11 @@ data class DecryptResult(
     val hasSignature: Boolean = false,
     /** Raw 64-bit key id from the signature packets — populated even
      *  when the signer's key is not in the keyring. */
-    val signatureKeyIDRaw: Long? = null
+    val signatureKeyIDRaw: Long? = null,
+    /** #46: raw 64-bit key id of the secret (sub)key that actually
+     *  unwrapped the session key. Null on the symmetric path and on the
+     *  composite ML-KEM path, which do not report a recipient key id. */
+    val decryptingKeyIdRaw: Long? = null
 )
 
 /**
@@ -1552,6 +1556,9 @@ class PGPCryptoService private constructor() {
         // (BC validates SEIPDv1's MDC only on an explicit verify(); without it,
         // CFB-malleable ciphertext and legacy unprotected packets slip through).
         var integrityObj: org.bouncycastle.openpgp.PGPEncryptedData? = null
+        // #46: the id of the secret (sub)key that opened the session key, so
+        // the UI can name which of the user's keys actually decrypted.
+        var decryptingKeyId: Long? = null
         try {
             // Phase 2b: a composite (ML-KEM+X25519, algo 35) PKESK can't be
             // parsed by BouncyCastle (its PKESK reader throws on the unknown
@@ -1607,6 +1614,7 @@ class PGPCryptoService private constructor() {
                     resolvePkesk(pkesks, secretKeyRings, passphrase)?.let { match ->
                         decryptedStream = match.stream
                         integrityObj = match.data
+                        decryptingKeyId = match.decryptingKeyID
                     }
                 }
             }
@@ -1675,7 +1683,7 @@ class PGPCryptoService private constructor() {
                     )
                 }
             }
-            return result
+            return result.copy(decryptingKeyIdRaw = decryptingKeyId)
 
         } catch (e: PGPCryptoError) {
             // A symmetric decrypt with a wrong passphrase produces garbage that
@@ -2694,7 +2702,8 @@ class PGPCryptoService private constructor() {
     /** A PKESK we managed to open, with the packet it came from. */
     private class PkeskMatch(
         val stream: java.io.InputStream,
-        val data: PGPPublicKeyEncryptedData
+        val data: PGPPublicKeyEncryptedData,
+        val decryptingKeyID: Long
     )
 
     /**
@@ -2770,7 +2779,8 @@ class PGPCryptoService private constructor() {
                     obj.getDataStream(
                         org.bouncycastle.openpgp.operator.bc.BcPublicKeyDataDecryptorFactory(privateKey)
                     ),
-                    obj
+                    obj,
+                    secretKey.keyID
                 )
             } catch (e: PGPException) {
                 // Unlocked fine, wrong key for this packet. Expected during
