@@ -249,6 +249,25 @@ class PGPonyOpenPgpService : Service() {
                 )
         }
 
+        // #51: optional "ask which key to sign with on each send". When the
+        // setting is on and the user holds more than one signing key, a sign
+        // action opens PGPony's own key picker so the choice is not locked to
+        // the client's cached sign key. Skipped once the picker has resumed the
+        // op (EXTRA_SIGN_CHOICE_MADE) and for single-key users.
+        val signActions = setOf(
+            OpenPgpApi.ACTION_SIGN_AND_ENCRYPT,
+            OpenPgpApi.ACTION_CLEARTEXT_SIGN,
+            OpenPgpApi.ACTION_SIGN,
+            OpenPgpApi.ACTION_DETACHED_SIGN
+        )
+        if (data.action in signActions &&
+            askSignKeyEachSend() &&
+            !data.getBooleanExtra(ProviderKeyPickerActivity.EXTRA_SIGN_CHOICE_MADE, false) &&
+            signingCandidateCount() > 1
+        ) {
+            return perSendSignKeyInteraction(data, callingPackage)
+        }
+
         // 4) Action dispatch.
         return when (data.action) {
             OpenPgpApi.ACTION_CHECK_PERMISSION -> successResult()
@@ -1598,6 +1617,47 @@ class PGPonyOpenPgpService : Service() {
             this,
             2,
             promptIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return Intent().apply {
+            putExtra(OpenPgpApi.RESULT_CODE, OpenPgpApi.RESULT_CODE_USER_INTERACTION_REQUIRED)
+            putExtra(OpenPgpApi.RESULT_INTENT, pendingIntent)
+        }
+    }
+
+    // ── #51: per-send signing-key selection ─────────────────────────────
+
+    /** Whether the user asked to be prompted for the signing key on each send. */
+    private fun askSignKeyEachSend(): Boolean =
+        getSharedPreferences("pgpony_prefs", android.content.Context.MODE_PRIVATE)
+            .getBoolean("provider_ask_sign_key_each_send", false)
+
+    /** Count of keys that can sign (software pairs and card-backed, unrevoked). */
+    private fun signingCandidateCount(): Int =
+        runBlocking {
+            repo.getAllKeys().count { (it.isKeyPair || it.isCardBacked) && !it.isRevoked }
+        }
+
+    /**
+     * Return a USER_INTERACTION_REQUIRED response that opens PGPony's key
+     * picker in per-send mode. On pick the picker re-runs the same sign op
+     * with the chosen EXTRA_SIGN_KEY_ID and the resume marker, so the client's
+     * cached sign key is overridden for this one send.
+     */
+    private fun perSendSignKeyInteraction(data: Intent, callingPackage: String): Intent {
+        val pickerIntent = Intent(this, ProviderKeyPickerActivity::class.java).apply {
+            putExtra(ProviderKeyPickerActivity.EXTRA_API_DATA, data)
+            putExtra(ProviderKeyPickerActivity.EXTRA_FOR_OP, true)
+            putExtra(
+                ProviderKeyPickerActivity.EXTRA_PRESELECT_USER_ID,
+                data.getStringExtra(OpenPgpApi.EXTRA_USER_ID)
+            )
+            setData(android.net.Uri.parse("pgpony-api-signpick://$callingPackage/${data.action}"))
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            3,
+            pickerIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return Intent().apply {

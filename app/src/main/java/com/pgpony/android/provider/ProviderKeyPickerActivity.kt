@@ -75,6 +75,15 @@ class ProviderKeyPickerActivity : ComponentActivity() {
 
         /** The API's NO_KEY sentinel — "sign with no key" / disable signing. */
         const val KEY_ID_NONE = 0L
+
+        /** #51: per-send mode. In this mode the picker is opened by a sign
+         *  operation (not GET_SIGN_KEY_ID), so on pick it returns
+         *  EXTRA_SIGN_KEY_ID plus [EXTRA_SIGN_CHOICE_MADE] for the client to
+         *  re-run the same sign op with, and the "No key" row is hidden. */
+        const val EXTRA_FOR_OP = "com.pgpony.android.provider.FOR_OP"
+
+        /** #51: marks a resumed sign op so the service does not prompt again. */
+        const val EXTRA_SIGN_CHOICE_MADE = "com.pgpony.android.provider.SIGN_CHOICE_MADE"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,6 +95,7 @@ class ProviderKeyPickerActivity : ComponentActivity() {
         } else {
             intent.getParcelableExtra(EXTRA_API_DATA)
         }
+        val forOp = intent.getBooleanExtra(EXTRA_FOR_OP, false)
         val preselectUserId = intent.getStringExtra(EXTRA_PRESELECT_USER_ID)
         val preselectEmail = preselectUserId
             ?.substringAfterLast('<')?.substringBefore('>')?.trim()
@@ -136,7 +146,7 @@ class ProviderKeyPickerActivity : ComponentActivity() {
                                     highlighted = key.userEmail.equals(
                                         preselectEmail ?: "", ignoreCase = true
                                     ),
-                                    onClick = { pick(apiData, key) }
+                                    onClick = { pick(apiData, key, forOp) }
                                 )
                             }
                             if (keys?.isEmpty() == true) {
@@ -150,7 +160,7 @@ class ProviderKeyPickerActivity : ComponentActivity() {
                             if (!keys.isNullOrEmpty()) {
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                             }
-                            if (keys != null) {
+                            if (keys != null && !forOp) {
                                 NoKeyRow(onClick = { pickNone(apiData) })
                             }
                         }
@@ -166,22 +176,29 @@ class ProviderKeyPickerActivity : ComponentActivity() {
         }
     }
 
-    private fun pick(apiData: Intent?, key: PGPKeyEntity) {
+    private fun pick(apiData: Intent?, key: PGPKeyEntity, forOp: Boolean) {
         val keyId = try {
             java.lang.Long.parseUnsignedLong(key.longKeyId, 16)
         } catch (e: NumberFormatException) {
             cancel(); return
         }
-        finishWithKeyId(apiData, keyId)
+        finishWithKeyId(apiData, keyId, forOp)
     }
 
-    private fun pickNone(apiData: Intent?) = finishWithKeyId(apiData, KEY_ID_NONE)
+    private fun pickNone(apiData: Intent?) = finishWithKeyId(apiData, KEY_ID_NONE, forOp = false)
 
-    private fun finishWithKeyId(apiData: Intent?, keyId: Long) {
-        // The client re-executes GET_SIGN_KEY_ID with exactly this
+    private fun finishWithKeyId(apiData: Intent?, keyId: Long, forOp: Boolean) {
+        // The client re-executes the original request with exactly this
         // intent, so it must be the original request plus the selection.
         val result = Intent(apiData ?: Intent())
-        result.putExtra(OpenPgpApi.RESULT_SIGN_KEY_ID, keyId)
+        if (forOp) {
+            // #51: per-send sign pick — feed the chosen key straight back into
+            // the sign op and mark it resumed so the service does not re-prompt.
+            result.putExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, keyId)
+            result.putExtra(EXTRA_SIGN_CHOICE_MADE, true)
+        } else {
+            result.putExtra(OpenPgpApi.RESULT_SIGN_KEY_ID, keyId)
+        }
         setResult(Activity.RESULT_OK, result)
         finish()
     }

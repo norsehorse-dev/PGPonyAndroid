@@ -152,6 +152,7 @@ fun KeyringScreen(
                     ) {
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.settings_recycle_bin_title)) },
+                            leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
                             onClick = { moreMenuOpen = false; onOpenRecycleBin() }
                         )
                     }

@@ -1540,7 +1540,9 @@ class PGPCryptoService private constructor() {
         encryptedData: ByteArray,
         secretKeyRings: List<PGPSecretKeyRing>,
         passphrase: String?,
-        verificationKeys: List<PGPPublicKeyRing>? = null
+        verificationKeys: List<PGPPublicKeyRing>? = null,
+        // #26 (RC4): raw composite-primary rings tried packet-level for decrypt.
+        compositePrimaryRings: List<ByteArray> = emptyList()
     ): DecryptResult {
         // Hoisted above the try so the catch blocks can read it: true once
         // we've committed to the symmetric (SKESK) path, which changes how a
@@ -1566,7 +1568,7 @@ class PGPCryptoService private constructor() {
             // returns null when the message carries no composite PKESK, in
             // which case we fall back to BC's normal PKESK/SKESK discovery.
             val composite = com.pgpony.android.crypto.pqc.CompositeDecryptor.tryDecrypt(
-                encryptedData, secretKeyRings, passphrase
+                encryptedData, secretKeyRings, passphrase, compositePrimaryRings
             )
             // LibrePGP composite (algo 8) is a separate framing; try it when
             // the IETF (algo 35) path declined.
@@ -1685,6 +1687,10 @@ class PGPCryptoService private constructor() {
             }
             return result.copy(decryptingKeyIdRaw = decryptingKeyId)
 
+        } catch (e: com.pgpony.android.crypto.pqc.CompositeSecretKeyMaterial.ProtectedKeyException) {
+            // #26 (RC4): a locked composite key surfaces as "passphrase required"
+            // so the Decrypt screen prompts, not as a generic failure.
+            throw PGPCryptoError.PassphraseRequired()
         } catch (e: PGPCryptoError) {
             // A symmetric decrypt with a wrong passphrase produces garbage that
             // typically fails deep in content parsing — e.g. "No literal data
@@ -2094,13 +2100,16 @@ class PGPCryptoService private constructor() {
         armoredMessage: String,
         secretKeyRings: List<PGPSecretKeyRing>,
         passphrase: String?,
-        verificationKeys: List<PGPPublicKeyRing>? = null
+        verificationKeys: List<PGPPublicKeyRing>? = null,
+        // #26 (RC4): raw composite-primary rings whose ML-KEM subkey can decrypt.
+        compositePrimaryRings: List<ByteArray> = emptyList()
     ): DecryptResult {
         return decrypt(
             armoredMessage.toByteArray(Charsets.UTF_8),
             secretKeyRings,
             passphrase,
-            verificationKeys
+            verificationKeys,
+            compositePrimaryRings
         )
     }
 

@@ -323,7 +323,7 @@ fun KeyDetailScreen(
                                     onClick = { menuOpen = false; dispatchAction(KeyDetailActionIds.EXPORT_PRIVATE_KEY) }
                                 )
                             }
-                            if (menuKey.isKeyPair && !menuKey.isCardBacked && !menuKey.algorithm.isCompositeSign) {
+                            if (menuKey.isKeyPair && !menuKey.isCardBacked) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.key_detail_action_change_passphrase)) },
                                     leadingIcon = { Icon(Icons.Filled.Password, null) },

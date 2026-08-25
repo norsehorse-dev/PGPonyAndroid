@@ -60,6 +60,41 @@ object HttpClientFactory {
         }
     }
 
+    // Proxy stream isolation: SOCKS5 user/pass auth. Java exposes no per-client
+    // SOCKS credentials, so a single default Authenticator, scoped to the active
+    // proxy's port and the PROXY requestor type, hands the pair to the SOCKS
+    // handshake. It returns null for everything else, so it is inert when no
+    // proxy auth is configured. Distinct credentials put PGPony on its own Tor
+    // circuit (Orbot IsolateSOCKSAuth).
+    private val socksAuthenticator = object : java.net.Authenticator() {
+        @Volatile var port: Int = -1
+        @Volatile var auth: java.net.PasswordAuthentication? = null
+        override fun getPasswordAuthentication(): java.net.PasswordAuthentication? {
+            val a = auth ?: return null
+            if (requestorType != RequestorType.PROXY) return null
+            if (requestingPort != port) return null
+            return a
+        }
+    }
+    @Volatile private var authenticatorInstalled = false
+
+    private fun applyProxyAuth(cfg: ProxyPrefs.Config) {
+        if (cfg.enabled && cfg.host != null && cfg.hasAuth) {
+            socksAuthenticator.port = cfg.port
+            socksAuthenticator.auth =
+                java.net.PasswordAuthentication(cfg.username, cfg.password!!.toCharArray())
+            if (!authenticatorInstalled) {
+                java.net.Authenticator.setDefault(socksAuthenticator)
+                authenticatorInstalled = true
+            }
+        } else {
+            // Clear the credentials; the installed Authenticator then returns
+            // null for every request (including a proxy with no auth set).
+            socksAuthenticator.auth = null
+            socksAuthenticator.port = -1
+        }
+    }
+
     /** The shared client for the current proxy config (context-less). */
     fun client(): HttpClient = client(PGPonyApp.instance)
 
@@ -80,6 +115,9 @@ object HttpClientFactory {
 
     private fun build(cfg: ProxyPrefs.Config): HttpClient {
         val proxied = cfg.enabled && cfg.host != null
+        // Scope the SOCKS Authenticator to this config before the client makes
+        // its first connection (fail-closed: bad auth fails the SOCKS handshake).
+        applyProxyAuth(cfg)
         return HttpClient(Android) {
             // RC1 offline switch: block outright when offline mode is on,
             // before any other plugin or the socket.

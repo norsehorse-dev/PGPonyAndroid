@@ -784,10 +784,8 @@ fun ActionsSection(
         }
         // §1.1 (#26): software key pairs only. Card keys change the passphrase
         // on the card (the CHANGE_CARD_PIN row above). Composite ML-DSA signing
-        // keys are stored as raw bytes (BouncyCastle cannot re-protect their
-        // algo-30/31 material), so an OpenPGP passphrase change is not available
-        // for them yet; they are protected at rest by the device key store.
-        if (key.isKeyPair && !key.isCardBacked && !key.algorithm.isCompositeSign) {
+        // keys (RC4) re-protect their raw-bytes secret through CompositeKeyFacade.
+        if (key.isKeyPair && !key.isCardBacked) {
             ActionRow(
                 icon = Icons.Filled.Password,
                 label = stringResource(R.string.key_detail_action_change_passphrase),

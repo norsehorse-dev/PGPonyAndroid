@@ -1547,6 +1547,13 @@ private fun ProxySection() {
             ).toString()
         )
     }
+    // proxy stream isolation: SOCKS5 user/pass.
+    var proxyUser by remember {
+        mutableStateOf(com.pgpony.android.network.ProxyPrefs.username(context))
+    }
+    var proxyPass by remember {
+        mutableStateOf(com.pgpony.android.network.ProxyPrefs.password(context))
+    }
 
     Text(
         stringResource(R.string.settings_proxy_subtitle),
@@ -1621,6 +1628,43 @@ private fun ProxySection() {
                 modifier = Modifier.weight(1f)
             )
         }
+    }
+
+    if (mode != com.pgpony.android.network.ProxyPrefs.MODE_OFF) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = proxyUser,
+                onValueChange = {
+                    proxyUser = it
+                    com.pgpony.android.network.ProxyPrefs.setCredentials(context, it, proxyPass)
+                    com.pgpony.android.network.HttpClientFactory.invalidate()
+                },
+                singleLine = true,
+                label = { Text(stringResource(R.string.settings_proxy_socks_user)) },
+                modifier = Modifier.weight(1f)
+            )
+            OutlinedTextField(
+                value = proxyPass,
+                onValueChange = {
+                    proxyPass = it
+                    com.pgpony.android.network.ProxyPrefs.setCredentials(context, proxyUser, it)
+                    com.pgpony.android.network.HttpClientFactory.invalidate()
+                },
+                singleLine = true,
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                label = { Text(stringResource(R.string.settings_proxy_socks_pass)) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+        Text(
+            stringResource(R.string.settings_proxy_socks_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
+        )
     }
 
     if (mode != com.pgpony.android.network.ProxyPrefs.MODE_OFF) {

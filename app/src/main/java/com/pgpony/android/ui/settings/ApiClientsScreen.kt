@@ -36,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -112,6 +113,40 @@ fun ApiClientsScreen(onDismiss: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 20.dp)
             )
+
+            // #51: let the user be asked which key to sign with on each send,
+            // instead of being locked to the key the mail app cached first.
+            val prefs = remember {
+                context.getSharedPreferences("pgpony_prefs", android.content.Context.MODE_PRIVATE)
+            }
+            var askSignEachSend by remember {
+                mutableStateOf(prefs.getBoolean("provider_ask_sign_key_each_send", false))
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.provider_ask_sign_key_title),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        stringResource(R.string.provider_ask_sign_key_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Switch(
+                    checked = askSignEachSend,
+                    onCheckedChange = {
+                        askSignEachSend = it
+                        prefs.edit().putBoolean("provider_ask_sign_key_each_send", it).apply()
+                    }
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(bottom = 16.dp))
 
             if (loaded && clients.isEmpty()) {
                 // ── Empty state: how a client gets here ─────────────────

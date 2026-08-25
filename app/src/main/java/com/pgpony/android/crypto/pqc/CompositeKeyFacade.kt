@@ -64,7 +64,75 @@ object CompositeKeyFacade {
         return CompositeSignSuite.forAlgId(algId) != null
     }
 
-    fun parse(ring: ByteArray): Info {
+    /** #26 (RC4): unlock a secret region with [oldPassphrase] and re-emit it
+     *  under [newPassphrase] (null/empty = unprotected). */
+    private fun reprotectRegion(
+        keyPacketBody: ByteArray,
+        pubBody: ByteArray,
+        secretLen: Int,
+        oldPassphrase: CharArray?,
+        newPassphrase: CharArray?
+    ): ByteArray {
+        val material = CompositeSecretProtection.unlock(keyPacketBody, oldPassphrase, secretLen)
+        return if (newPassphrase == null || newPassphrase.isEmpty()) {
+            byteArrayOf(0) + material
+        } else {
+            CompositeSecretProtection.protect(pubBody, material, newPassphrase)
+        }
+    }
+
+    /** True if [ring] carries secret material (a tag-5 secret primary packet). */
+    fun hasSecret(ring: ByteArray): Boolean =
+        walk(ring).any { it.tag == 5 }
+
+    /** #26 (RC4): true if the composite primary's secret is passphrase-protected. */
+    fun isProtected(ring: ByteArray): Boolean {
+        val primary = walk(ring).firstOrNull { it.tag == 5 } ?: return false
+        return CompositeSecretProtection.isProtected(primary.body)
+    }
+
+    /**
+     * #26 (RC4): return [ring] with the composite primary's secret re-protected
+     * under [newPassphrase] (null/empty strips protection). [oldPassphrase]
+     * unlocks the current material first (null/empty when unprotected). Only the
+     * composite primary (tag 5) is touched; the ML-KEM subkey, which the app
+     * never loads for these keys, is passed through unchanged. A wrong
+     * [oldPassphrase] throws (BC AEAD tag mismatch).
+     */
+    fun reprotect(ring: ByteArray, oldPassphrase: CharArray?, newPassphrase: CharArray?): ByteArray {
+        val out = ByteArrayOutputStream()
+        for (pkt in walk(ring)) {
+            if (pkt.tag == 5) {
+                val pubBody = publicKeyBody(pkt.body)
+                val algId = pubBody[1 + 4].toInt() and 0xFF
+                val suite = CompositeSignSuite.forAlgId(algId)
+                if (suite != null) {
+                    out.write(packet(5, pubBody + reprotectRegion(
+                        pkt.body, pubBody, suite.compositeSecretLen, oldPassphrase, newPassphrase
+                    )))
+                    continue
+                }
+            }
+            if (pkt.tag == 7) {
+                val pubBody = publicKeyBody(pkt.body)
+                val algId = pubBody[1 + 4].toInt() and 0xFF
+                val kem = com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(algId)
+                if (kem != null) {
+                    // #26 (RC4): protect the ML-KEM subkey too, so the passphrase
+                    // gates decryption as well as signing.
+                    val len = kem.curve.keyLen + kem.mlkem.seedLen
+                    out.write(packet(7, pubBody + reprotectRegion(
+                        pkt.body, pubBody, len, oldPassphrase, newPassphrase
+                    )))
+                    continue
+                }
+            }
+            out.write(packet(pkt.tag, pkt.body))
+        }
+        return out.toByteArray()
+    }
+
+    fun parse(ring: ByteArray, passphrase: CharArray? = null): Info {
         val packets = walk(ring)
         val primary = packets.first { it.tag == 5 || it.tag == 6 }
         val primaryPublicBody = publicKeyBody(primary.body)
@@ -77,7 +145,7 @@ object CompositeKeyFacade {
         val fingerprint = v6Fingerprint(primaryPublicBody)
 
         val compositeSecret = if (primary.tag == 5) {
-            secretMaterial(primary.body, suite.compositeSecretLen)
+            secretMaterial(primary.body, suite.compositeSecretLen, passphrase)
         } else null
 
         val userIds = packets.filter { it.tag == 13 }.map { String(it.body, Charsets.UTF_8) }
@@ -104,7 +172,7 @@ object CompositeKeyFacade {
                 val subPublicBody = publicKeyBody(pkt.body)
                 val subAlgId = subPublicBody[1 + 4].toInt() and 0xFF
                 if (subAlgId != 35 && subAlgId != 36) return@mapNotNull null
-                val subSecret = if (pkt.tag == 7) trailingSecret(pkt.body) else null
+                val subSecret = if (pkt.tag == 7) subkeySecret(pkt.body, subAlgId, passphrase) else null
                 SubkeyInfo(subAlgId, v6Fingerprint(subPublicBody), publicMaterial(subPublicBody), subSecret)
             }.firstOrNull()
 
@@ -157,14 +225,33 @@ object CompositeKeyFacade {
     }
 
     /** Fixed-length composite secret material after the s2k-usage octet (unprotected). */
-    private fun secretMaterial(keyPacketBody: ByteArray, secretLen: Int): ByteArray? {
-        var q = 1 + 4 + 1
-        val matLen = beInt(keyPacketBody, q); q += 4
-        q += matLen
-        val usage = keyPacketBody[q++].toInt() and 0xFF
-        if (usage != 0) return null // protected; needs the OpenPGP passphrase path
-        return keyPacketBody.copyOfRange(q, q + secretLen)
+    /**
+     * #26 (RC4): the ML-KEM subkey secret, unlocked with [passphrase] when the
+     * subkey is protected. Returns null for a locked subkey with no passphrase.
+     */
+    private fun subkeySecret(keyPacketBody: ByteArray, subAlgId: Int, passphrase: CharArray?): ByteArray? {
+        val kem = com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(subAlgId) ?: return null
+        val len = kem.curve.keyLen + kem.mlkem.seedLen
+        return try {
+            CompositeSecretProtection.unlock(keyPacketBody, passphrase, len)
+        } catch (e: CompositeSecretProtection.ProtectedKeyException) {
+            null
+        }
     }
+
+    private fun secretMaterial(
+        keyPacketBody: ByteArray,
+        secretLen: Int,
+        passphrase: CharArray?
+    ): ByteArray? =
+        // #26 (RC4): unlock a passphrase-protected composite primary via
+        // CompositeSecretProtection; a locked key with no passphrase surfaces
+        // as null (the caller prompts), while a wrong passphrase throws.
+        try {
+            CompositeSecretProtection.unlock(keyPacketBody, passphrase, secretLen)
+        } catch (e: CompositeSecretProtection.ProtectedKeyException) {
+            null
+        }
 
     /** The remaining secret octets after the usage octet (for the ML-KEM subkey). */
     private fun trailingSecret(keyPacketBody: ByteArray): ByteArray? {

@@ -1141,10 +1141,17 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // loaded as a PGPSecretKeyRing, so it signs through the raw-bytes
                 // composite path instead of BouncyCastle's SigningService.
                 val signed = if (effectiveSigner.algorithm.isCompositeSign) {
-                    val info = repo.loadCompositeKeyInfo(signFp)
-                        ?: throw SigningError.NoSigningKey()
+                    // #26 (RC4): unlock a passphrase-protected composite signing
+                    // key. A locked key with no passphrase asks for one; a wrong
+                    // passphrase surfaces as the incorrect-passphrase retry.
+                    val info = try {
+                        repo.loadCompositeKeyInfo(signFp, effPass?.toCharArray())
+                    } catch (e: Exception) {
+                        throw SigningError.InvalidPassphrase()
+                    } ?: throw SigningError.NoSigningKey()
                     val secret = info.compositeSecret
-                        ?: throw SigningError.NoSigningKey()
+                        ?: throw SigningError.PassphraseRequired()
+                    if (effPass != null) com.pgpony.android.session.InAppPassphraseCache.put(signFp, effPass)
                     if (s.detachedSignature) {
                         CompositeDocumentSigner.signDetachedArmored(
                             info.suite, secret, info.fingerprint,
@@ -3140,6 +3147,12 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     orderedKeys.mapNotNull { e -> repo.loadSecretKeyRing(e.fingerprint)?.let { e to it } }
                 }
                 val secretRings = loaded.map { it.second }
+                // #26 (RC4): composite-primary keys are not BC rings; pass their
+                // raw bytes so the ML-KEM subkey can open composite mail.
+                val compositeRings = withContext(Dispatchers.IO) {
+                    orderedKeys.filter { it.algorithm.isCompositeSign }
+                        .mapNotNull { repo.loadCompositePrivateRing(it.fingerprint) }
+                }
                 val verifyRings = withContext(Dispatchers.IO) {
                     repo.getAllKeys().mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
                 }
@@ -3154,7 +3167,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             armoredMessage = effectiveDecryptInput(s.inputText),
                             secretKeyRings = rings,
                             passphrase = effPass,
-                            verificationKeys = verifyRings
+                            verificationKeys = verifyRings,
+                            compositePrimaryRings = compositeRings
                         )
                     }
                 }
@@ -4254,6 +4268,12 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     orderedKeys.mapNotNull { e -> repo.loadSecretKeyRing(e.fingerprint)?.let { e to it } }
                 }
                 val secretRings = loaded.map { it.second }
+                // #26 (RC4): composite-primary keys are not BC rings; pass their
+                // raw bytes so the ML-KEM subkey can open composite mail.
+                val compositeRings = withContext(Dispatchers.IO) {
+                    orderedKeys.filter { it.algorithm.isCompositeSign }
+                        .mapNotNull { repo.loadCompositePrivateRing(it.fingerprint) }
+                }
                 val verifyRings = withContext(Dispatchers.IO) {
                     repo.getAllKeys().mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
                 }
@@ -4268,7 +4288,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             encryptedData = effectiveDecryptFileBytes(bytes),
                             secretKeyRings = rings,
                             passphrase = effPass,
-                            verificationKeys = verifyRings
+                            verificationKeys = verifyRings,
+                            compositePrimaryRings = compositeRings
                         )
                     }
                 }

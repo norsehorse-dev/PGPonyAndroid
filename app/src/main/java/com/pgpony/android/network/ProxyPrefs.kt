@@ -29,6 +29,11 @@ object ProxyPrefs {
     const val KEY_CUSTOM_HOST = "proxy_custom_host"
     const val KEY_CUSTOM_PORT = "proxy_custom_port"
     const val KEY_ONION_MIRROR = "proxy_onion_mirror" // default ON under a proxy
+    // #proxy stream isolation: optional SOCKS5 user/pass. Blank = no auth.
+    // Applies to whichever proxy is active (Orbot or Custom). A distinct
+    // user/pass pair puts PGPony on its own Tor circuit (IsolateSOCKSAuth).
+    const val KEY_PROXY_USER = "proxy_socks_user"
+    const val KEY_PROXY_PASS = "proxy_socks_pass"
 
     const val MODE_OFF = "off"
     const val MODE_ORBOT = "orbot"
@@ -47,11 +52,17 @@ object ProxyPrefs {
         val mode: String,
         val host: String?,
         val port: Int,
-        val onionMirror: Boolean
+        val onionMirror: Boolean,
+        val username: String? = null,
+        val password: String? = null
     ) {
         val enabled: Boolean get() = mode != MODE_OFF
-        /** A stable signature so HttpClientFactory rebuilds only on change. */
-        val signature: String get() = "$mode|$host|$port"
+        /** True when SOCKS5 user/pass auth should be offered to the proxy. */
+        val hasAuth: Boolean get() = !username.isNullOrEmpty() && !password.isNullOrEmpty()
+        /** A stable signature so HttpClientFactory rebuilds only on change.
+         *  Credentials are folded in so a user/pass change rebuilds the client
+         *  (and re-scopes the SOCKS Authenticator). In-memory only, never logged. */
+        val signature: String get() = "$mode|$host|$port|$username|${password?.length ?: 0}"
     }
 
     private fun prefs(context: Context) =
@@ -60,13 +71,17 @@ object ProxyPrefs {
     fun config(context: Context): Config {
         val p = prefs(context)
         val mode = p.getString(KEY_MODE, MODE_OFF) ?: MODE_OFF
+        val user = p.getString(KEY_PROXY_USER, "")?.ifBlank { null }
+        val pass = p.getString(KEY_PROXY_PASS, "")?.ifBlank { null }
         return when (mode) {
-            MODE_ORBOT -> Config(mode, ORBOT_HOST, ORBOT_PORT, onionMirror(context))
+            MODE_ORBOT -> Config(mode, ORBOT_HOST, ORBOT_PORT, onionMirror(context), user, pass)
             MODE_CUSTOM -> Config(
                 mode,
                 p.getString(KEY_CUSTOM_HOST, "")?.ifBlank { null },
                 p.getInt(KEY_CUSTOM_PORT, ORBOT_PORT),
-                onionMirror(context)
+                onionMirror(context),
+                user,
+                pass
             )
             else -> Config(MODE_OFF, null, 0, false)
         }
@@ -86,6 +101,17 @@ object ProxyPrefs {
 
     fun setOnionMirror(context: Context, enabled: Boolean) =
         prefs(context).edit().putBoolean(KEY_ONION_MIRROR, enabled).apply()
+
+    /** Set the SOCKS5 user/pass (blank clears). Caller should invalidate the
+     *  shared client so the change takes effect immediately. */
+    fun setCredentials(context: Context, username: String, password: String) =
+        prefs(context).edit()
+            .putString(KEY_PROXY_USER, username)
+            .putString(KEY_PROXY_PASS, password)
+            .apply()
+
+    fun username(context: Context): String = prefs(context).getString(KEY_PROXY_USER, "") ?: ""
+    fun password(context: Context): String = prefs(context).getString(KEY_PROXY_PASS, "") ?: ""
 
     /** Convenience toggle: is Orbot installed? (drives the one-tap UI). */
     fun isOrbotInstalled(context: Context): Boolean = try {

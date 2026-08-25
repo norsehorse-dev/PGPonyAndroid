@@ -48,12 +48,15 @@ object CompositeDecryptor {
     fun tryDecrypt(
         encryptedData: ByteArray,
         secretKeyRings: List<PGPSecretKeyRing>,
-        passphrase: String? = null
+        passphrase: String? = null,
+        // #26 (RC4): raw composite-PRIMARY rings (algo 30/31 signing keys). Their
+        // ML-KEM subkey is not a BouncyCastle ring, so it is tried packet-level.
+        rawCompositeRings: List<ByteArray> = emptyList()
     ): Result? {
         val binary = toBinary(encryptedData)
         val split = split(binary) ?: return null // no composite PKESK
 
-        val sessionKey = recover(split.parsed, secretKeyRings, passphrase)
+        val sessionKey = recover(split.parsed, secretKeyRings, rawCompositeRings, passphrase)
 
         // Hand the recovered session key to BC's SEIPD decryptor. The SEIPD
         // sits alone (no ESK packet), so use the session-key entry point.
@@ -107,7 +110,7 @@ object CompositeDecryptor {
         val parsed = firstCompositePkesk(eskRegion) ?: return null
         return PGPSessionKey(
             SymmetricKeyAlgorithmTags.AES_256,
-            recover(parsed, secretKeyRings, passphrase)
+            recover(parsed, secretKeyRings, emptyList(), passphrase)
         )
     }
 
@@ -118,18 +121,64 @@ object CompositeDecryptor {
     private fun recover(
         parsed: CompositePkesk.Parsed,
         secretKeyRings: List<PGPSecretKeyRing>,
+        rawCompositeRings: List<ByteArray>,
         passphrase: String?
     ): ByteArray {
         if (parsed.recipientFingerprint.isEmpty()) {
-            return recoverAnonymous(parsed, secretKeyRings, passphrase)
+            return recoverAnonymous(parsed, secretKeyRings, rawCompositeRings, passphrase)
         }
-        val secKey = findSecretKey(parsed.recipientFingerprint, secretKeyRings)
-            ?: throw NoMatchingKey(
-                "no held composite secret key for recipient " +
-                    parsed.recipientFingerprint.toHex()
-            )
-        return open(secKey, parsed, passphrase)
+        findSecretKey(parsed.recipientFingerprint, secretKeyRings)?.let {
+            return open(it, parsed, passphrase)
+        }
+        findRawComposite(parsed.recipientFingerprint, rawCompositeRings)?.let {
+            return openRaw(it, parsed, passphrase)
+        }
+        throw NoMatchingKey(
+            "no held composite secret key for recipient " +
+                parsed.recipientFingerprint.toHex()
+        )
     }
+
+    /** Decapsulate + unwrap [parsed] with a raw composite-PRIMARY ring's ML-KEM
+     *  subkey (extracted packet-level, since the ring is not BC-parseable). */
+    private fun openRaw(
+        rawRing: ByteArray,
+        parsed: CompositePkesk.Parsed,
+        passphrase: String?
+    ): ByteArray {
+        val info = CompositeKeyFacade.parse(rawRing, passphrase?.toCharArray())
+        val sub = info.encryptionSubkey
+            ?: throw NoMatchingKey("composite key has no ML-KEM subkey")
+        val secret = sub.secretMaterial
+            ?: throw CompositeSecretKeyMaterial.ProtectedKeyException(
+                "composite ML-KEM subkey secret is unavailable"
+            )
+        val suite = parsed.suite
+        if (sub.algId != suite.ietfAlgId) {
+            throw NoMatchingKey("composite subkey suite does not match the message")
+        }
+        val xSec = secret.copyOfRange(0, suite.curve.keyLen)
+        val mlkemSeed = secret.copyOfRange(suite.curve.keyLen, secret.size)
+        val mlkemSec = MLKEMPrivateKeyParameters(suite.mlkem.params, mlkemSeed)
+        val (recipientXPub, _) = CompositeKem.splitPublic(sub.publicMaterial, suite)
+        val kek = CompositeKem.decapsulate(
+            ephemeralX25519 = parsed.ephemeralX25519,
+            mlkemCiphertext = parsed.mlkemCiphertext,
+            recipientX25519Sec = xSec,
+            recipientMlkemSec = mlkemSec,
+            recipientX25519Pub = recipientXPub,
+            suite = suite
+        )
+        return CompositeKem.unwrapSessionKey(kek, parsed.wrappedSessionKey)
+    }
+
+    /** The raw composite-PRIMARY ring whose ML-KEM subkey fingerprint is [fp]. */
+    private fun findRawComposite(fp: ByteArray, rawRings: List<ByteArray>): ByteArray? =
+        rawRings.firstOrNull { ring ->
+            runCatching {
+                CompositeKeyFacade.parse(ring).encryptionSubkey?.fingerprint?.contentEquals(fp) == true
+            }.getOrDefault(false)
+        }
 
     /** Decapsulate + unwrap [parsed] with [secKey]. Errors propagate to the
      *  caller: [CompositeSecretKeyMaterial.extract] throws
@@ -174,6 +223,7 @@ object CompositeDecryptor {
     private fun recoverAnonymous(
         parsed: CompositePkesk.Parsed,
         secretKeyRings: List<PGPSecretKeyRing>,
+        rawCompositeRings: List<ByteArray>,
         passphrase: String?
     ): ByteArray {
         for (ring in secretKeyRings) {
@@ -186,6 +236,14 @@ object CompositeDecryptor {
                 }
                 if (result != null) return result
             }
+        }
+        for (rawRing in rawCompositeRings) {
+            val result = try {
+                openRaw(rawRing, parsed, passphrase)
+            } catch (e: Exception) {
+                null
+            }
+            if (result != null) return result
         }
         throw NoMatchingKey("no held composite secret key opens this anonymous PKESK")
     }

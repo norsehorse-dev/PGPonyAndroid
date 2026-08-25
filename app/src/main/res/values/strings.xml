@@ -551,7 +551,7 @@
     <string name="keyring_title">Keyring</string>
     <string name="keyring_add_key_cd">Add Key</string>
     <string name="keyring_section_my_keys">My Keys</string>
-    <string name="keyring_search_placeholder">Search name, key ID, or fingerprint</string>
+    <string name="keyring_search_placeholder">Search name, note, key ID, or fingerprint</string>
     <string name="keyring_search_clear_cd">Clear search</string>
     <string name="key_card_default_badge">DEFAULT</string>
     <!-- 4.1.0 Phase 12b — "Contact Keys" split in two. Contacts are the
@@ -1815,6 +1815,8 @@
     <string name="settings_provider_clients_subtitle">Apps allowed to use PGPony for OpenPGP encryption, like Thunderbird or K-9 Mail</string>
     <string name="provider_clients_title">Connected apps</string>
     <string name="provider_clients_subtitle">These apps can use your PGPony keyring through the OpenPGP API. Removing an app here revokes its access immediately. It will ask for permission again on its next request.</string>
+    <string name="provider_ask_sign_key_title">Ask which key to sign with</string>
+    <string name="provider_ask_sign_key_subtitle">When a mail app asks PGPony to sign, choose the key each time instead of using the one it remembered first. Only appears when you have more than one signing key.</string>
     <string name="provider_clients_empty_title">No connected apps yet</string>
     <string name="provider_clients_empty_body">In an OpenPGP-capable app such as Thunderbird for Android, choose PGPony as the OpenPGP provider. The app will appear here after you approve its first connection.</string>
     <string name="provider_clients_granted_format">Connected %1$s</string>
@@ -1896,6 +1898,9 @@
     <string name="settings_proxy_orbot_missing">Orbot isn\'t installed. Install it from F-Droid or Google Play to route through Tor.</string>
     <string name="settings_proxy_custom_host">SOCKS5 host</string>
     <string name="settings_proxy_custom_port">Port</string>
+    <string name="settings_proxy_socks_user">SOCKS username (optional)</string>
+    <string name="settings_proxy_socks_pass">SOCKS password (optional)</string>
+    <string name="settings_proxy_socks_note">Optional. A username and password put PGPony on its own Tor circuit, separate from other apps sharing the proxy.</string>
     <string name="settings_proxy_onion_title">Use PGPony onion mirror</string>
     <string name="settings_proxy_onion_subtitle">Reach keys.pgpony.app over its .onion so keyserver traffic never leaves Tor</string>
     <string name="settings_proxy_failclosed_note">When the proxy is unreachable, requests fail rather than falling back to a direct connection.</string>

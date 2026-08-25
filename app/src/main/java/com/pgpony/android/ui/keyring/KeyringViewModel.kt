@@ -196,6 +196,9 @@ data class KeyringUiState(
         if (key.userEmail.lowercase().contains(needle)) return true
         if (key.fingerprint.lowercase().replace(" ", "").contains(compact)) return true
         if (key.longKeyId.lowercase().contains(compact)) return true
+        // #45 (CertainBot): search notes too, since a key's purpose often lives
+        // there when the name and email do not say what it is for.
+        if (key.notes?.lowercase()?.contains(needle) == true) return true
         return false
     }
 
