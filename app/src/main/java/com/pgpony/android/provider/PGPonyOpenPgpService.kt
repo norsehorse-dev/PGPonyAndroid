@@ -249,11 +249,15 @@ class PGPonyOpenPgpService : Service() {
                 )
         }
 
-        // #51: optional "ask which key to sign with on each send". When the
-        // setting is on and the user holds more than one signing key, a sign
-        // action opens PGPony's own key picker so the choice is not locked to
-        // the client's cached sign key. Skipped once the picker has resumed the
-        // op (EXTRA_SIGN_CHOICE_MADE) and for single-key users.
+        // #51: pick the signing key when the choice is real. Two of the
+        // user's own signing keys can share one address (e.g. a modern Ed25519
+        // key and a legacy RSA key on the same email); signing one of them
+        // silently, locked to the client's cached key, is the reported bug. So
+        // whenever the send address matches more than one of the user's signing
+        // keys we open PGPony's own picker, regardless of the toggle. The
+        // "ask which key to sign with" toggle stays as an override that also
+        // asks in the unambiguous case. Skipped once the picker has resumed the
+        // op (EXTRA_SIGN_CHOICE_MADE).
         val signActions = setOf(
             OpenPgpApi.ACTION_SIGN_AND_ENCRYPT,
             OpenPgpApi.ACTION_CLEARTEXT_SIGN,
@@ -261,11 +265,13 @@ class PGPonyOpenPgpService : Service() {
             OpenPgpApi.ACTION_DETACHED_SIGN
         )
         if (data.action in signActions &&
-            askSignKeyEachSend() &&
-            !data.getBooleanExtra(ProviderKeyPickerActivity.EXTRA_SIGN_CHOICE_MADE, false) &&
-            signingCandidateCount() > 1
+            !data.getBooleanExtra(ProviderKeyPickerActivity.EXTRA_SIGN_CHOICE_MADE, false)
         ) {
-            return perSendSignKeyInteraction(data, callingPackage)
+            val ambiguousForIdentity = signingKeysMatchingSend(data) > 1
+            val alwaysAsk = askSignKeyEachSend() && signingCandidateCount() > 1
+            if (ambiguousForIdentity || alwaysAsk) {
+                return perSendSignKeyInteraction(data, callingPackage)
+            }
         }
 
         // 4) Action dispatch.
@@ -1637,6 +1643,29 @@ class PGPonyOpenPgpService : Service() {
         runBlocking {
             repo.getAllKeys().count { (it.isKeyPair || it.isCardBacked) && !it.isRevoked }
         }
+
+    /**
+     * How many of the user's signing keys share this send's from-address. More
+     * than one means the address is ambiguous (e.g. a modern and a legacy key
+     * on the same email), so the user must choose rather than have one picked
+     * for them. The address comes from the client's chosen sign key
+     * (EXTRA_SIGN_KEY_ID, always present on a sign op — the whole point is that
+     * the client is locked to one of several keys on that address), falling
+     * back to EXTRA_USER_ID.
+     */
+    private fun signingKeysMatchingSend(data: Intent): Int = runBlocking {
+        val keyId = data.getLongExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, 0L)
+        val email = (if (keyId != 0L) findEntityByKeyId(keyId)?.userEmail else null)
+            ?.takeIf { it.isNotBlank() }
+            ?: data.getStringExtra(OpenPgpApi.EXTRA_USER_ID)
+                ?.substringAfterLast('<')?.substringBefore('>')?.trim()
+                ?.ifEmpty { null }
+        if (email.isNullOrBlank()) return@runBlocking 0
+        repo.getAllKeys().count {
+            (it.isKeyPair || it.isCardBacked) && !it.isRevoked &&
+                it.userEmail.equals(email, ignoreCase = true)
+        }
+    }
 
     /**
      * Return a USER_INTERACTION_REQUIRED response that opens PGPony's key

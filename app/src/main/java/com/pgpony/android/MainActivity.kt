@@ -1093,7 +1093,7 @@ fun PGPonyMainScreen(
                     bottomNavScreens.forEach { screen ->
                         // #45 (RC4, CertainBot): the Keyring tab stays UN-highlighted on
                         // Key Detail on purpose. An unlit tab reads as "tap me to go back",
-                        // the cue for returning to the list; its onClick already pops back.
+                        // the cue for returning to the list.
                         val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
                         NavigationBarItem(
                             icon = {
@@ -1105,10 +1105,21 @@ fun PGPonyMainScreen(
                             label = { NavBarLabel(stringResource(screen.titleResId)) },
                             selected = selected,
                             onClick = {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
+                                val current = currentDestination?.route
+                                if (current != null && current.startsWith(screen.route + "/")) {
+                                    // On a sub-route of this tab (e.g. Key Detail,
+                                    // "keyring/{fingerprint}", under the Keyring tab). Return
+                                    // to the tab's own root. A plain navigate() here would
+                                    // saveState the detail and then restoreState it straight
+                                    // back, leaving the view stuck on Key Detail (CertainBot,
+                                    // RC4).
+                                    navController.popBackStack(screen.route, inclusive = false)
+                                } else {
+                                    navController.navigate(screen.route) {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
                                 }
                             }
                         )

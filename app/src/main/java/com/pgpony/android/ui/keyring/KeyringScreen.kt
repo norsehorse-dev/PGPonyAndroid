@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -308,7 +309,13 @@ fun KeyringScreen(
                                         }
                                     }
                                 },
-                                placeholder = { Text(stringResource(R.string.keyring_search_placeholder)) }
+                                placeholder = {
+                                    Text(
+                                        stringResource(R.string.keyring_search_placeholder),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             )
                         }
                     }
