@@ -16,6 +16,8 @@
 package com.pgpony.android.ui.settings
 
 import android.content.pm.PackageManager
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,10 +28,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import com.pgpony.android.PGPonyApp
 import com.pgpony.android.R
 import com.pgpony.android.data.ApiClientEntity
+import com.pgpony.android.data.PGPKeyEntity
 import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
@@ -148,6 +154,10 @@ fun ApiClientsScreen(onDismiss: () -> Unit) {
             }
             HorizontalDivider(modifier = Modifier.padding(bottom = 16.dp))
 
+            // #51: change the remembered per-address signing key from inside
+            // PGPony, so it never depends on the mail client offering the choice.
+            SigningKeyPerAddressSection(prefs)
+
             if (loaded && clients.isEmpty()) {
                 // ── Empty state: how a client gets here ─────────────────
                 Text(
@@ -237,6 +247,103 @@ private fun ApiClientRow(
                 contentDescription = stringResource(R.string.provider_clients_revoke),
                 tint = MaterialTheme.colorScheme.error
             )
+        }
+    }
+}
+
+
+// ── #51: per-address signing-key selector ──────────────────────────────
+// When an address carries more than one of the user's signing keys, this lets
+// the user set which one PGPony signs with, writing the same
+// "sign_key_choice::<email>" preference the provider reads on send. Self-owned,
+// so clients that cannot offer the choice (e.g. FairEmail) are not a dead end.
+@Composable
+private fun SigningKeyPerAddressSection(prefs: android.content.SharedPreferences) {
+    var groups by remember {
+        mutableStateOf<List<Pair<String, List<PGPKeyEntity>>>>(emptyList())
+    }
+    LaunchedEffect(Unit) {
+        val signing = PGPonyApp.instance.keyRepository.getAllKeys()
+            .filter { (it.isKeyPair || it.isCardBacked) && !it.isRevoked }
+        groups = signing.groupBy { it.userEmail.lowercase() }
+            .filter { it.value.size > 1 }
+            .map { (_, keys) -> keys.first().userEmail to keys.sortedBy { it.userName.lowercase() } }
+            .sortedBy { it.first.lowercase() }
+    }
+    if (groups.isEmpty()) return
+
+    Text(
+        stringResource(R.string.provider_sign_per_address_title),
+        style = MaterialTheme.typography.bodyLarge
+    )
+    Text(
+        stringResource(R.string.provider_sign_per_address_subtitle),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 8.dp)
+    )
+    groups.forEach { (email, keys) ->
+        SigningKeyAddressRow(email = email, keys = keys, prefs = prefs)
+    }
+    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+}
+
+private fun signingKeyLabel(k: PGPKeyEntity): String =
+    (k.userName.ifEmpty { k.userEmail }) + " \u00b7 " + k.shortFingerprint
+
+private fun signingKeyIdOf(k: PGPKeyEntity): Long =
+    runCatching { java.lang.Long.parseUnsignedLong(k.longKeyId, 16) }.getOrDefault(0L)
+
+@Composable
+private fun SigningKeyAddressRow(
+    email: String,
+    keys: List<PGPKeyEntity>,
+    prefs: android.content.SharedPreferences
+) {
+    val prefKey = "sign_key_choice::" + email.lowercase()
+    var selectedId by remember {
+        mutableStateOf(
+            prefs.getLong(prefKey, 0L).takeIf { it != 0L }
+                ?: signingKeyIdOf(keys.firstOrNull { it.isDefault } ?: keys.first())
+        )
+    }
+    var expanded by remember { mutableStateOf(false) }
+    val selectedKey = keys.firstOrNull { signingKeyIdOf(it) == selectedId } ?: keys.first()
+
+    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+        Text(
+            email,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        Box {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = true }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    signingKeyLabel(selectedKey),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                keys.forEach { k ->
+                    DropdownMenuItem(
+                        text = { Text(signingKeyLabel(k)) },
+                        onClick = {
+                            val id = signingKeyIdOf(k)
+                            selectedId = id
+                            prefs.edit().putLong(prefKey, id).apply()
+                            expanded = false
+                        }
+                    )
+                }
+            }
         }
     }
 }

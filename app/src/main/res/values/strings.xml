@@ -1815,6 +1815,8 @@
     <string name="settings_provider_clients_subtitle">Apps allowed to use PGPony for OpenPGP encryption, like Thunderbird or K-9 Mail</string>
     <string name="provider_clients_title">Connected apps</string>
     <string name="provider_clients_subtitle">These apps can use your PGPony keyring through the OpenPGP API. Removing an app here revokes its access immediately. It will ask for permission again on its next request.</string>
+    <string name="provider_sign_per_address_title">Signing key by address</string>
+    <string name="provider_sign_per_address_subtitle">When an address has more than one of your signing keys, choose which one PGPony signs with. It applies right away, with no prompt on send.</string>
     <string name="provider_ask_sign_key_title">Ask which key to sign with</string>
     <string name="provider_ask_sign_key_subtitle">When more than one of your signing keys is on the same address, PGPony asks which to use and remembers your choice. Turn this on to be asked every time, so you can switch keys or change a remembered pick.</string>
     <string name="provider_clients_empty_title">No connected apps yet</string>

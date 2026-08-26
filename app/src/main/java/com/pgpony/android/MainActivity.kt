@@ -125,6 +125,7 @@ import com.pgpony.android.ui.card.CardDecryptScreen
 import com.pgpony.android.ui.components.LockScreen
 import com.pgpony.android.ui.keyring.KeyDetailScreen
 import com.pgpony.android.ui.keyring.KeyDetailViewModel
+import com.pgpony.android.ui.DecryptLockOpen
 import com.pgpony.android.ui.keyring.KeyringScreen
 import com.pgpony.android.ui.keyring.RecentlyDeletedScreen
 import com.pgpony.android.ui.keyring.KeyringViewModel
@@ -165,7 +166,7 @@ sealed class Screen(
 ) {
     data object Keyring : Screen("keyring", R.string.main_tab_keyring, Icons.Filled.VpnKey, Icons.Outlined.VpnKey)
     data object Encrypt : Screen("encrypt", R.string.main_tab_encrypt, Icons.Filled.Lock, Icons.Outlined.Lock)
-    data object Decrypt : Screen("decrypt", R.string.main_tab_decrypt, Icons.Filled.LockOpen, Icons.Outlined.LockOpen)
+    data object Decrypt : Screen("decrypt", R.string.main_tab_decrypt, DecryptLockOpen, Icons.Outlined.LockOpen)
     data object Exchange : Screen("exchange", R.string.main_tab_exchange, Icons.Filled.Share, Icons.Outlined.Share)
     data object Contacts : Screen("contacts", R.string.main_tab_contacts, Icons.Filled.Contacts, Icons.Outlined.Contacts)
     data object Settings : Screen("settings", R.string.main_tab_settings, Icons.Filled.Settings, Icons.Outlined.Settings)
@@ -173,6 +174,14 @@ sealed class Screen(
 
 val bottomNavScreens = listOf(
     Screen.Keyring, Screen.Encrypt, Screen.Decrypt, Screen.Exchange, Screen.Contacts, Screen.Settings
+)
+
+// Top-level routes that belong to the Keyring tab: the NFC/card flow and the
+// recycle bin, reached from the Keyring but registered as their own
+// destinations. Tapping the Keyring tab from any of them returns to the list.
+val keyringOwnedRoutes = setOf(
+    "card_scan", "card_pin_change", "card_keygen",
+    "card_management", "card_sign", "card_decrypt", "recently_deleted"
 )
 
 // ── Activity ───────────────────────────────────────────────────────────
@@ -1106,13 +1115,20 @@ fun PGPonyMainScreen(
                             selected = selected,
                             onClick = {
                                 val current = currentDestination?.route
-                                if (current != null && current.startsWith(screen.route + "/")) {
-                                    // On a sub-route of this tab (e.g. Key Detail,
-                                    // "keyring/{fingerprint}", under the Keyring tab). Return
-                                    // to the tab's own root. A plain navigate() here would
-                                    // saveState the detail and then restoreState it straight
-                                    // back, leaving the view stuck on Key Detail (CertainBot,
-                                    // RC4).
+                                // Sub-screens of the tapped tab return to the tab's own root
+                                // instead of the save/restore navigate, which would saveState
+                                // the sub-screen and restoreState it straight back, leaving the
+                                // view stuck where it was. This covers Key Detail
+                                // ("keyring/{fingerprint}") and the Keyring's top-level
+                                // sub-screens — the NFC/card flow and Recently Deleted — which
+                                // are registered as their own routes but belong to the Keyring
+                                // tab (CertainBot, #45).
+                                val onSubScreenOfTappedTab = current != null && (
+                                    current.startsWith(screen.route + "/") ||
+                                        (screen.route == Screen.Keyring.route &&
+                                            current in keyringOwnedRoutes)
+                                )
+                                if (onSubScreenOfTappedTab) {
                                     navController.popBackStack(screen.route, inclusive = false)
                                 } else {
                                     navController.navigate(screen.route) {
