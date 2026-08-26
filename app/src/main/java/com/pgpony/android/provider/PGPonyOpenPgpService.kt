@@ -252,25 +252,41 @@ class PGPonyOpenPgpService : Service() {
         // #51: pick the signing key when the choice is real. Two of the
         // user's own signing keys can share one address (e.g. a modern Ed25519
         // key and a legacy RSA key on the same email); signing one of them
-        // silently, locked to the client's cached key, is the reported bug. So
-        // whenever the send address matches more than one of the user's signing
-        // keys we open PGPony's own picker, regardless of the toggle. The
-        // "ask which key to sign with" toggle stays as an override that also
-        // asks in the unambiguous case. Skipped once the picker has resumed the
-        // op (EXTRA_SIGN_CHOICE_MADE).
+        // silently, locked to the client's cached key, was the reported bug.
+        // When the address is ambiguous we ask once and remember the pick for
+        // that address, so later sends from it are silent (RandomNam3). The
+        // "ask which key to sign with" toggle forces the prompt every send,
+        // which is also how the user changes a remembered pick. Skipped once
+        // the picker has resumed the op (EXTRA_SIGN_CHOICE_MADE) — that resume
+        // is where the pick is persisted.
         val signActions = setOf(
             OpenPgpApi.ACTION_SIGN_AND_ENCRYPT,
             OpenPgpApi.ACTION_CLEARTEXT_SIGN,
             OpenPgpApi.ACTION_SIGN,
             OpenPgpApi.ACTION_DETACHED_SIGN
         )
-        if (data.action in signActions &&
-            !data.getBooleanExtra(ProviderKeyPickerActivity.EXTRA_SIGN_CHOICE_MADE, false)
-        ) {
-            val ambiguousForIdentity = signingKeysMatchingSend(data) > 1
-            val alwaysAsk = askSignKeyEachSend() && signingCandidateCount() > 1
-            if (ambiguousForIdentity || alwaysAsk) {
-                return perSendSignKeyInteraction(data, callingPackage)
+        if (data.action in signActions) {
+            if (data.getBooleanExtra(ProviderKeyPickerActivity.EXTRA_SIGN_CHOICE_MADE, false)) {
+                // Resumed after a pick: remember it for this address.
+                val chosen = data.getLongExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, 0L)
+                val email = sendIdentityEmail(data)
+                if (chosen != 0L && !email.isNullOrBlank()) rememberSignKeyFor(email, chosen)
+            } else {
+                val email = sendIdentityEmail(data)
+                val ambiguous = email != null && countSigningKeysForEmail(email) > 1
+                val alwaysAsk = askSignKeyEachSend() && signingCandidateCount() > 1
+                when {
+                    alwaysAsk -> return perSendSignKeyInteraction(data, callingPackage)
+                    ambiguous && email != null -> {
+                        val remembered = validatedRememberedKey(email)
+                        if (remembered != null) {
+                            // Use the key the user chose before, silently.
+                            data.putExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, remembered)
+                        } else {
+                            return perSendSignKeyInteraction(data, callingPackage)
+                        }
+                    }
+                }
             }
         }
 
@@ -1645,26 +1661,51 @@ class PGPonyOpenPgpService : Service() {
         }
 
     /**
-     * How many of the user's signing keys share this send's from-address. More
-     * than one means the address is ambiguous (e.g. a modern and a legacy key
-     * on the same email), so the user must choose rather than have one picked
-     * for them. The address comes from the client's chosen sign key
-     * (EXTRA_SIGN_KEY_ID, always present on a sign op — the whole point is that
-     * the client is locked to one of several keys on that address), falling
-     * back to EXTRA_USER_ID.
+     * How many of the user's signing keys share an address. More than one means
+     * that address is ambiguous (e.g. a modern and a legacy key on the same
+     * email), so the user must choose rather than have one picked for them.
      */
-    private fun signingKeysMatchingSend(data: Intent): Int = runBlocking {
-        val keyId = data.getLongExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, 0L)
-        val email = (if (keyId != 0L) findEntityByKeyId(keyId)?.userEmail else null)
-            ?.takeIf { it.isNotBlank() }
-            ?: data.getStringExtra(OpenPgpApi.EXTRA_USER_ID)
-                ?.substringAfterLast('<')?.substringBefore('>')?.trim()
-                ?.ifEmpty { null }
-        if (email.isNullOrBlank()) return@runBlocking 0
+    private fun countSigningKeysForEmail(email: String): Int = runBlocking {
         repo.getAllKeys().count {
             (it.isKeyPair || it.isCardBacked) && !it.isRevoked &&
                 it.userEmail.equals(email, ignoreCase = true)
         }
+    }
+
+    private fun signChoicePrefKey(email: String) = "sign_key_choice::" + email.lowercase()
+
+    /** Persist the user's per-address signing-key pick (#51). */
+    private fun rememberSignKeyFor(email: String, keyId: Long) {
+        getSharedPreferences("pgpony_prefs", android.content.Context.MODE_PRIVATE)
+            .edit().putLong(signChoicePrefKey(email), keyId).apply()
+    }
+
+    /**
+     * The remembered per-address pick, but only if it still resolves to an
+     * unrevoked signing key on that address; otherwise null so we ask again.
+     */
+    private fun validatedRememberedKey(email: String): Long? {
+        val rid = getSharedPreferences("pgpony_prefs", android.content.Context.MODE_PRIVATE)
+            .getLong(signChoicePrefKey(email), 0L)
+        if (rid == 0L) return null
+        val entity = runBlocking { findEntityByKeyId(rid) } ?: return null
+        return if (!entity.isRevoked && (entity.isKeyPair || entity.isCardBacked) &&
+            entity.userEmail.equals(email, ignoreCase = true)
+        ) rid else null
+    }
+
+    /**
+     * The send's from-address: the email of the client's chosen sign key
+     * (EXTRA_SIGN_KEY_ID, always present on a sign op), falling back to
+     * EXTRA_USER_ID. Null when neither yields an address.
+     */
+    private fun sendIdentityEmail(data: Intent): String? = runBlocking {
+        val keyId = data.getLongExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, 0L)
+        (if (keyId != 0L) findEntityByKeyId(keyId)?.userEmail else null)
+            ?.takeIf { it.isNotBlank() }
+            ?: data.getStringExtra(OpenPgpApi.EXTRA_USER_ID)
+                ?.substringAfterLast('<')?.substringBefore('>')?.trim()
+                ?.ifEmpty { null }
     }
 
     /**
@@ -1680,6 +1721,15 @@ class PGPonyOpenPgpService : Service() {
             putExtra(
                 ProviderKeyPickerActivity.EXTRA_PRESELECT_USER_ID,
                 data.getStringExtra(OpenPgpApi.EXTRA_USER_ID)
+            )
+            val sendEmail = sendIdentityEmail(data)
+            putExtra(ProviderKeyPickerActivity.EXTRA_PRESELECT_EMAIL, sendEmail)
+            // "In use" reflects what actually signs: the remembered pick if we
+            // have one, otherwise the client's cached key.
+            putExtra(
+                ProviderKeyPickerActivity.EXTRA_CURRENT_KEY_ID,
+                (sendEmail?.let { validatedRememberedKey(it) })
+                    ?: data.getLongExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, 0L)
             )
             setData(android.net.Uri.parse("pgpony-api-signpick://$callingPackage/${data.action}"))
         }

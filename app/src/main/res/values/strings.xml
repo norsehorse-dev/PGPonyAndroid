@@ -1816,7 +1816,7 @@
     <string name="provider_clients_title">Connected apps</string>
     <string name="provider_clients_subtitle">These apps can use your PGPony keyring through the OpenPGP API. Removing an app here revokes its access immediately. It will ask for permission again on its next request.</string>
     <string name="provider_ask_sign_key_title">Ask which key to sign with</string>
-    <string name="provider_ask_sign_key_subtitle">When a mail app asks PGPony to sign, choose the key each time instead of using the one it remembered first. Only appears when you have more than one signing key.</string>
+    <string name="provider_ask_sign_key_subtitle">When more than one of your signing keys is on the same address, PGPony asks which to use and remembers your choice. Turn this on to be asked every time, so you can switch keys or change a remembered pick.</string>
     <string name="provider_clients_empty_title">No connected apps yet</string>
     <string name="provider_clients_empty_body">In an OpenPGP-capable app such as Thunderbird for Android, choose PGPony as the OpenPGP provider. The app will appear here after you approve its first connection.</string>
     <string name="provider_clients_granted_format">Connected %1$s</string>
@@ -1829,6 +1829,7 @@
     <string name="provider_keypicker_title">Choose signing key</string>
     <string name="provider_keypicker_for_format">For %1$s</string>
     <string name="provider_keypicker_none">No key. Don\'t sign</string>
+    <string name="provider_keypicker_in_use">In use</string>
     <string name="provider_keypicker_empty">No usable keys in your keyring yet. Create or import a key pair in PGPony first.</string>
     <!-- 4.0.0 Succession Phase P2a-2 — provider passphrase prompt -->
     <string name="provider_passphrase_title">Unlock signing key</string>

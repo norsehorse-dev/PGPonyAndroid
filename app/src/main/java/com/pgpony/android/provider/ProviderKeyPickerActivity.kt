@@ -73,6 +73,13 @@ class ProviderKeyPickerActivity : ComponentActivity() {
         /** The account user id (email) the client wants a key for. */
         const val EXTRA_PRESELECT_USER_ID = "com.pgpony.android.provider.PRESELECT_USER_ID"
 
+        /** #51: the resolved send address, used to scope the per-send list to
+         *  the keys on that address and to highlight the address match. */
+        const val EXTRA_PRESELECT_EMAIL = "com.pgpony.android.provider.PRESELECT_EMAIL"
+
+        /** #51: the key the client is currently locked to, marked "In use". */
+        const val EXTRA_CURRENT_KEY_ID = "com.pgpony.android.provider.CURRENT_KEY_ID"
+
         /** The API's NO_KEY sentinel — "sign with no key" / disable signing. */
         const val KEY_ID_NONE = 0L
 
@@ -96,10 +103,13 @@ class ProviderKeyPickerActivity : ComponentActivity() {
             intent.getParcelableExtra(EXTRA_API_DATA)
         }
         val forOp = intent.getBooleanExtra(EXTRA_FOR_OP, false)
+        val currentKeyId = intent.getLongExtra(EXTRA_CURRENT_KEY_ID, 0L)
         val preselectUserId = intent.getStringExtra(EXTRA_PRESELECT_USER_ID)
-        val preselectEmail = preselectUserId
-            ?.substringAfterLast('<')?.substringBefore('>')?.trim()
-            ?.ifEmpty { preselectUserId.trim() }
+        val preselectEmail = intent.getStringExtra(EXTRA_PRESELECT_EMAIL)
+            ?.takeIf { it.isNotBlank() }
+            ?: preselectUserId
+                ?.substringAfterLast('<')?.substringBefore('>')?.trim()
+                ?.ifEmpty { preselectUserId.trim() }
 
         val repo = (application as PGPonyApp).keyRepository
 
@@ -112,6 +122,14 @@ class ProviderKeyPickerActivity : ComponentActivity() {
                     // of Phase 2). Revoked keys are never offered.
                     value = repo.getAllKeys()
                         .filter { (it.isKeyPair || it.isCardBacked) && !it.isRevoked }
+                        // #51: per-send mode scopes to the sending address, so
+                        // the choice is between the keys ON that address, not
+                        // every key in the ring. Only scope when the address is
+                        // known; otherwise fall back to the full list.
+                        .filter { key ->
+                            !forOp || preselectEmail.isNullOrBlank() ||
+                                key.userEmail.equals(preselectEmail, ignoreCase = true)
+                        }
                         .sortedWith(
                             compareByDescending<PGPKeyEntity> {
                                 it.userEmail.equals(preselectEmail ?: "", ignoreCase = true)
@@ -141,11 +159,15 @@ class ProviderKeyPickerActivity : ComponentActivity() {
                                 )
                             }
                             keys?.forEach { key ->
+                                val isCurrent = currentKeyId != 0L && runCatching {
+                                    java.lang.Long.parseUnsignedLong(key.longKeyId, 16)
+                                }.getOrNull() == currentKeyId
                                 KeyRow(
                                     key = key,
-                                    highlighted = key.userEmail.equals(
+                                    highlighted = if (forOp) isCurrent else key.userEmail.equals(
                                         preselectEmail ?: "", ignoreCase = true
                                     ),
+                                    isCurrent = isCurrent,
                                     onClick = { pick(apiData, key, forOp) }
                                 )
                             }
@@ -215,6 +237,7 @@ class ProviderKeyPickerActivity : ComponentActivity() {
 private fun KeyRow(
     key: PGPKeyEntity,
     highlighted: Boolean,
+    isCurrent: Boolean = false,
     onClick: () -> Unit
 ) {
     Row(
@@ -238,6 +261,13 @@ private fun KeyRow(
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = if (highlighted) FontWeight.SemiBold else FontWeight.Normal
             )
+            if (isCurrent) {
+                Text(
+                    stringResource(R.string.provider_keypicker_in_use),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
             Text(
                 if (key.userEmail.isNotEmpty()) {
                     "${key.userEmail} · ${key.shortFingerprint}"
