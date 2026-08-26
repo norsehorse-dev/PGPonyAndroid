@@ -267,25 +267,28 @@ class PGPonyOpenPgpService : Service() {
         )
         if (data.action in signActions) {
             if (data.getBooleanExtra(ProviderKeyPickerActivity.EXTRA_SIGN_CHOICE_MADE, false)) {
-                // Resumed after a pick: remember it for this address.
-                val chosen = data.getLongExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, 0L)
-                val email = sendIdentityEmail(data)
-                if (chosen != 0L && !email.isNullOrBlank()) rememberSignKeyFor(email, chosen)
+                // Resumed after a pick. In auto-ask mode (the toggle off) the pick
+                // becomes this address's pinned key, so later sends are silent. In
+                // "ask every time" mode the pick is for this one send only and is
+                // NOT pinned — otherwise the first pick would end the asking.
+                if (!askSignKeyEachSend()) {
+                    val chosen = data.getLongExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, 0L)
+                    val email = sendIdentityEmail(data)
+                    if (chosen != 0L && !email.isNullOrBlank()) rememberSignKeyFor(email, chosen)
+                }
             } else {
                 val email = sendIdentityEmail(data)
-                val ambiguous = email != null && countSigningKeysForEmail(email) > 1
-                val alwaysAsk = askSignKeyEachSend() && signingCandidateCount() > 1
+                // An explicit per-address key — pinned in Connected apps, or
+                // remembered from an earlier auto-ask — wins, even over the "ask
+                // which key to sign with" toggle. So that toggle only prompts for
+                // addresses the user has not pinned.
+                val pinned = email?.let { validatedRememberedKey(it) }
                 when {
-                    alwaysAsk -> return perSendSignKeyInteraction(data, callingPackage)
-                    ambiguous && email != null -> {
-                        val remembered = validatedRememberedKey(email)
-                        if (remembered != null) {
-                            // Use the key the user chose before, silently.
-                            data.putExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, remembered)
-                        } else {
-                            return perSendSignKeyInteraction(data, callingPackage)
-                        }
-                    }
+                    pinned != null -> data.putExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, pinned)
+                    askSignKeyEachSend() && signingCandidateCount() > 1 ->
+                        return perSendSignKeyInteraction(data, callingPackage)
+                    email != null && countSigningKeysForEmail(email) > 1 ->
+                        return perSendSignKeyInteraction(data, callingPackage)
                 }
             }
         }

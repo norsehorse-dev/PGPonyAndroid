@@ -1818,7 +1818,7 @@
     <string name="provider_sign_per_address_title">Signing key by address</string>
     <string name="provider_sign_per_address_subtitle">When an address has more than one of your signing keys, choose which one PGPony signs with. It applies right away, with no prompt on send.</string>
     <string name="provider_ask_sign_key_title">Ask which key to sign with</string>
-    <string name="provider_ask_sign_key_subtitle">When more than one of your signing keys is on the same address, PGPony asks which to use and remembers your choice. Turn this on to be asked every time, so you can switch keys or change a remembered pick.</string>
+    <string name="provider_ask_sign_key_subtitle">When an address has more than one signing key, PGPony asks once and remembers your choice. Turn this on to be asked on every send instead, for addresses you have not set under Signing key by address below.</string>
     <string name="provider_clients_empty_title">No connected apps yet</string>
     <string name="provider_clients_empty_body">In an OpenPGP-capable app such as Thunderbird for Android, choose PGPony as the OpenPGP provider. The app will appear here after you approve its first connection.</string>
     <string name="provider_clients_granted_format">Connected %1$s</string>
