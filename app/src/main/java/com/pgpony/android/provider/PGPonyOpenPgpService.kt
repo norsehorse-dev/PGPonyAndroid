@@ -1654,7 +1654,7 @@ class PGPonyOpenPgpService : Service() {
 
     /** Whether the user asked to be prompted for the signing key on each send. */
     private fun askSignKeyEachSend(): Boolean =
-        getSharedPreferences("pgpony_prefs", android.content.Context.MODE_PRIVATE)
+        getSharedPreferences("pgpony_prefs", android.content.Context.MODE_MULTI_PROCESS)
             .getBoolean("provider_ask_sign_key_each_send", false)
 
     /** Count of keys that can sign (software pairs and card-backed, unrevoked). */
@@ -1679,7 +1679,7 @@ class PGPonyOpenPgpService : Service() {
 
     /** Persist the user's per-address signing-key pick (#51). */
     private fun rememberSignKeyFor(email: String, keyId: Long) {
-        getSharedPreferences("pgpony_prefs", android.content.Context.MODE_PRIVATE)
+        getSharedPreferences("pgpony_prefs", android.content.Context.MODE_MULTI_PROCESS)
             .edit().putLong(signChoicePrefKey(email), keyId).apply()
     }
 
@@ -1688,7 +1688,7 @@ class PGPonyOpenPgpService : Service() {
      * unrevoked signing key on that address; otherwise null so we ask again.
      */
     private fun validatedRememberedKey(email: String): Long? {
-        val rid = getSharedPreferences("pgpony_prefs", android.content.Context.MODE_PRIVATE)
+        val rid = getSharedPreferences("pgpony_prefs", android.content.Context.MODE_MULTI_PROCESS)
             .getLong(signChoicePrefKey(email), 0L)
         if (rid == 0L) return null
         val entity = runBlocking { findEntityByKeyId(rid) } ?: return null

@@ -123,7 +123,7 @@ fun ApiClientsScreen(onDismiss: () -> Unit) {
             // #51: let the user be asked which key to sign with on each send,
             // instead of being locked to the key the mail app cached first.
             val prefs = remember {
-                context.getSharedPreferences("pgpony_prefs", android.content.Context.MODE_PRIVATE)
+                context.getSharedPreferences("pgpony_prefs", android.content.Context.MODE_MULTI_PROCESS)
             }
             var askSignEachSend by remember {
                 mutableStateOf(prefs.getBoolean("provider_ask_sign_key_each_send", false))
