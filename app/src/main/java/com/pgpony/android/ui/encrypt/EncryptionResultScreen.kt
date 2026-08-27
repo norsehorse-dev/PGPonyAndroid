@@ -50,6 +50,10 @@ fun EncryptionResultScreen(state: EncryptUiState, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val signOnly = state.mode == EncryptMode.SIGN
+    // #53 (CertainBot): Password (symmetric) mode encrypts to a passphrase,
+    // not to recipient keys, so the recipient badge and "Can Decrypt" list are
+    // wrong there even when recipients were selected before the switch.
+    val passwordMode = state.mode == EncryptMode.PASSWORD
     val signed = signOnly || (state.signMessage && state.signingKey != null)
     val output = state.outputText
     val detached = signOnly && state.detachedSignature
@@ -97,7 +101,13 @@ fun EncryptionResultScreen(state: EncryptUiState, onDismiss: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (!signOnly) {
+                if (passwordMode) {
+                    StatusBadge(
+                        icon = Icons.Filled.Lock,
+                        label = stringResource(R.string.file_enc_result_badge_password),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                } else if (!signOnly) {
                     val count = state.selectedRecipients.size
                     StatusBadge(
                         icon = Icons.Filled.Person,
@@ -150,7 +160,7 @@ fun EncryptionResultScreen(state: EncryptUiState, onDismiss: () -> Unit) {
             }
 
             // ── 4. Recipients list (encrypt-only) ────────────────────
-            if (!signOnly && state.selectedRecipients.isNotEmpty()) {
+            if (!signOnly && !passwordMode && state.selectedRecipients.isNotEmpty()) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.Start
@@ -190,6 +200,28 @@ fun EncryptionResultScreen(state: EncryptUiState, onDismiss: () -> Unit) {
                             )
                         }
                     }
+                }
+            }
+
+            // #53 (CertainBot): only the passphrase decrypts a password-encrypted
+            // message. State it, rather than listing recipient keys that can't.
+            if (passwordMode) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.Start
+                ) {
+                    Text(
+                        stringResource(R.string.result_encrypt_can_decrypt_label),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.result_encrypt_password_note),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 

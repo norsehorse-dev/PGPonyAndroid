@@ -489,6 +489,7 @@
     <string name="result_encrypt_badge_signed">Signed</string>
     <string name="result_encrypt_output_signed">Signed Output</string>
     <string name="result_encrypt_output_encrypted">Encrypted Output</string>
+    <string name="result_encrypt_password_note">Only someone with the password can decrypt this message.</string>
     <string name="result_encrypt_can_decrypt_label">Can Decrypt</string>
     <string name="result_encrypt_clipboard_label_signed">Signed message</string>
     <string name="result_encrypt_clipboard_label_encrypted">Encrypted message</string>
