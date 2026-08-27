@@ -17,7 +17,9 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -32,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -72,6 +75,18 @@ class ProviderPassphraseActivity : ComponentActivity() {
 
         setContent {
             PGPonyTheme {
+                val context = LocalContext.current
+                // RandomNam3 (#51): let the user switch signing key right here.
+                // Opens the full key list (no address filtering), and relays the
+                // pick back so the client re-runs the sign with the chosen key.
+                val pickerLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.StartActivityForResult()
+                ) { result ->
+                    if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+                        setResult(Activity.RESULT_OK, result.data)
+                        finish()
+                    }
+                }
                 var passphrase by remember { mutableStateOf("") }
                 AlertDialog(
                     onDismissRequest = { cancel() },
@@ -115,6 +130,23 @@ class ProviderPassphraseActivity : ComponentActivity() {
                                     .fillMaxWidth()
                                     .autofillPassword { passphrase = it }
                             )
+                            TextButton(
+                                onClick = {
+                                    val pickerIntent = Intent(
+                                        context, ProviderKeyPickerActivity::class.java
+                                    ).apply {
+                                        putExtra(ProviderKeyPickerActivity.EXTRA_API_DATA, apiData)
+                                        putExtra(ProviderKeyPickerActivity.EXTRA_FOR_OP, true)
+                                        putExtra(
+                                            ProviderKeyPickerActivity.EXTRA_CURRENT_KEY_ID, keyId
+                                        )
+                                    }
+                                    pickerLauncher.launch(pickerIntent)
+                                },
+                                modifier = Modifier.padding(top = 4.dp)
+                            ) {
+                                Text(stringResource(R.string.provider_passphrase_change_key))
+                            }
                         }
                     },
                     confirmButton = {

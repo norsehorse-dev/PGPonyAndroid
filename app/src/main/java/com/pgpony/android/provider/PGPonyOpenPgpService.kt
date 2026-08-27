@@ -286,7 +286,10 @@ class PGPonyOpenPgpService : Service() {
                 when {
                     pinned != null -> data.putExtra(OpenPgpApi.EXTRA_SIGN_KEY_ID, pinned)
                     askSignKeyEachSend() && signingCandidateCount() > 1 ->
-                        return perSendSignKeyInteraction(data, callingPackage)
+                        // Always-ask: show ALL signing keys, unscoped, so a
+                        // single identity with several addresses (catch-all) can
+                        // still reach every key (RandomNam3, #51).
+                        return perSendSignKeyInteraction(data, callingPackage, scopeToAddress = false)
                     email != null && countSigningKeysForEmail(email) > 1 ->
                         return perSendSignKeyInteraction(data, callingPackage)
                 }
@@ -1717,16 +1720,26 @@ class PGPonyOpenPgpService : Service() {
      * with the chosen EXTRA_SIGN_KEY_ID and the resume marker, so the client's
      * cached sign key is overridden for this one send.
      */
-    private fun perSendSignKeyInteraction(data: Intent, callingPackage: String): Intent {
+    private fun perSendSignKeyInteraction(
+        data: Intent,
+        callingPackage: String,
+        scopeToAddress: Boolean = true
+    ): Intent {
         val pickerIntent = Intent(this, ProviderKeyPickerActivity::class.java).apply {
             putExtra(ProviderKeyPickerActivity.EXTRA_API_DATA, data)
             putExtra(ProviderKeyPickerActivity.EXTRA_FOR_OP, true)
-            putExtra(
-                ProviderKeyPickerActivity.EXTRA_PRESELECT_USER_ID,
-                data.getStringExtra(OpenPgpApi.EXTRA_USER_ID)
-            )
             val sendEmail = sendIdentityEmail(data)
-            putExtra(ProviderKeyPickerActivity.EXTRA_PRESELECT_EMAIL, sendEmail)
+            // Scope the list to the sending address only in the automatic
+            // ambiguity case. Always-ask (and the passphrase-prompt switch) show
+            // every key, so catch-all identities can reach keys on other
+            // addresses.
+            if (scopeToAddress) {
+                putExtra(
+                    ProviderKeyPickerActivity.EXTRA_PRESELECT_USER_ID,
+                    data.getStringExtra(OpenPgpApi.EXTRA_USER_ID)
+                )
+                putExtra(ProviderKeyPickerActivity.EXTRA_PRESELECT_EMAIL, sendEmail)
+            }
             // "In use" reflects what actually signs: the remembered pick if we
             // have one, otherwise the client's cached key.
             putExtra(

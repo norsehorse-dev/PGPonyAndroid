@@ -1838,6 +1838,7 @@
     <string name="provider_passphrase_body_format">Enter the passphrase for %1$s to sign this message. PGPony remembers it for 5 minutes on this device only.</string>
     <string name="provider_passphrase_wrong">Wrong passphrase. Try again.</string>
     <string name="provider_passphrase_hint">Passphrase</string>
+    <string name="provider_passphrase_change_key">Sign with a different key</string>
     <string name="provider_passphrase_unlock">Unlock</string>
     <!-- 4.0.0 Succession Phase P2c — provider hardware-card operations -->
     <string name="provider_cardop_title">Confirm with your %1$s key</string>

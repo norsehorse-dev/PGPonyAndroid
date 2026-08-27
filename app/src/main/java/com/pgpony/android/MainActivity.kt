@@ -1146,7 +1146,12 @@ fun PGPonyMainScreen(
             NavHost(
                 navController = navController,
                 startDestination = Screen.Keyring.route,
-                modifier = Modifier.padding(padding)
+                // consumeWindowInsets: the root Scaffold already reserves the
+                // bottom nav-bar region via `padding`. Marking it consumed stops
+                // each screen's own Scaffold from re-applying the system nav-bar
+                // inset, which otherwise doubled up as a black band above the tab
+                // bar, tall on 3-button nav, short on gesture nav (CertainBot).
+                modifier = Modifier.padding(padding).consumeWindowInsets(padding)
             ) {
                 composable(Screen.Keyring.route) {
                     // Phase A4a: tapping a key card navigates to the new
