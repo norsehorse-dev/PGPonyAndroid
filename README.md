@@ -84,3 +84,7 @@ The cryptographic core is maintained separately as open source:
 - Website: https://pgpony.app
 - Source: https://github.com/norsehorse-dev/PGPonyAndroid
 - Desktop: https://github.com/norsehorse-dev/PGPonyDesktop
+
+## A note on how this is built
+
+This app is developed solo and with heavy use of AI assistance, which I don't hide. What matters for a tool like this is the crypto, and PGPony builds on the open OpenPGP standard, with its output verified against the reference tools. The full source is here to audit, and bug reports and code review are welcome.
