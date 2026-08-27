@@ -50,10 +50,13 @@ fun EncryptionResultScreen(state: EncryptUiState, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val signOnly = state.mode == EncryptMode.SIGN
-    // #53 (CertainBot): Password (symmetric) mode encrypts to a passphrase,
+    // #53 (CertainBot): Password (symmetric) encryption seals to a passphrase,
     // not to recipient keys, so the recipient badge and "Can Decrypt" list are
-    // wrong there even when recipients were selected before the switch.
-    val passwordMode = state.mode == EncryptMode.PASSWORD
+    // wrong even when recipients were selected before the switch. In Text mode
+    // the "Encrypt with" choice lives in fileEncryptMethod, not mode (mode stays
+    // TEXT), so both have to be checked.
+    val passwordMode = state.mode == EncryptMode.PASSWORD ||
+        state.fileEncryptMethod == FileEncryptMethod.PASSWORD
     val signed = signOnly || (state.signMessage && state.signingKey != null)
     val output = state.outputText
     val detached = signOnly && state.detachedSignature

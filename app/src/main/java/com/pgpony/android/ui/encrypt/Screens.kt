@@ -40,6 +40,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -1043,14 +1045,14 @@ private fun RecipientPickerSheet(
     val anySelected = selected.isNotEmpty()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        // 4.1.0 — the scroll + insets triad, same as GenerateKeySheet. This
-        // sheet lists every key on the ring above a search field, so it is one
-        // of the likelier ones to outgrow the viewport. Verified free of any
-        // lazy list first: nesting verticalScroll around one throws.
+        // #53 (CertainBot): no outer verticalScroll. The key list below is a
+        // LazyColumn; wrapping a scroller around another same-direction scroller
+        // inside a ModalBottomSheet made downward drags leak to the sheet instead
+        // of scrolling the list. Header and footer are small and fixed; only the
+        // list scrolls, and it owns its drags now.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
                 .imePadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 20.dp)
@@ -1103,13 +1105,12 @@ private fun RecipientPickerSheet(
                     modifier = Modifier.padding(vertical = 16.dp)
                 )
             } else {
-                Column(
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 360.dp)
-                        .verticalScroll(rememberScrollState())
                 ) {
-                    filtered.forEach { key ->
+                    items(filtered, key = { it.fingerprint }) { key ->
                         val isSel = selected.any { it.fingerprint == key.fingerprint }
                         RecipientPickerRow(
                             key = key,
