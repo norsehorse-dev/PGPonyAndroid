@@ -59,8 +59,17 @@ import com.pgpony.android.crypto.VerificationResult
 fun VerificationBanner(
     result: VerificationResult,
     onTapUnknownSigner: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    suppressUnsigned: Boolean = false
 ) {
+    // #53 (CertainBot): a password (symmetric) message is sealed to a
+    // passphrase, not sent from a key, so "No signature — origin unverified"
+    // says nothing useful about it: there is no sender identity that could
+    // have signed. Callers on the symmetric-decrypt path pass suppressUnsigned,
+    // and the gray Unsigned banner is dropped entirely. Every other state
+    // (Verified / Invalid / UnknownSigner) still shows, including on password
+    // messages that DO carry a signature.
+    if (suppressUnsigned && result is VerificationResult.Unsigned) return
     when (result) {
         is VerificationResult.Verified -> {
             val subtitle = formatVerifiedSubtitle(result)

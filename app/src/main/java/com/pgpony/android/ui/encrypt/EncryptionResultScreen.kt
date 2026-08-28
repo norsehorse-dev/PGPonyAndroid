@@ -52,11 +52,12 @@ fun EncryptionResultScreen(state: EncryptUiState, onDismiss: () -> Unit) {
     val signOnly = state.mode == EncryptMode.SIGN
     // #53 (CertainBot): Password (symmetric) encryption seals to a passphrase,
     // not to recipient keys, so the recipient badge and "Can Decrypt" list are
-    // wrong even when recipients were selected before the switch. In Text mode
-    // the "Encrypt with" choice lives in fileEncryptMethod, not mode (mode stays
-    // TEXT), so both have to be checked.
-    val passwordMode = state.mode == EncryptMode.PASSWORD ||
-        state.fileEncryptMethod == FileEncryptMethod.PASSWORD
+    // wrong even when recipients were selected before the switch. mode stays TEXT
+    // for the "Encrypt with: Password" toggle, and fileEncryptMethod is a sticky
+    // preference that stayed PASSWORD after leaving the Text flow and bled into
+    // the Sign result. textEncryptedWithPassword is the honest per-operation
+    // signal: set only by the text password path, cleared by every other one.
+    val passwordMode = state.textEncryptedWithPassword
     val signed = signOnly || (state.signMessage && state.signingKey != null)
     val output = state.outputText
     val detached = signOnly && state.detachedSignature

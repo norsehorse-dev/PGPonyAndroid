@@ -140,7 +140,8 @@ fun FileDecryptionResultScreen(state: DecryptUiState, onDismiss: () -> Unit) {
             state.verificationResult?.let { result ->
                 VerificationBanner(
                     result = result,
-                    onTapUnknownSigner = { /* not actionable from sheet — handled in main screen */ }
+                    onTapUnknownSigner = { /* not actionable from sheet — handled in main screen */ },
+                    suppressUnsigned = state.isPasswordMessage
                 )
             }
 

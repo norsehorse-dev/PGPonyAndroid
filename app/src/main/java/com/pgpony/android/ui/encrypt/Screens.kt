@@ -3868,7 +3868,8 @@ fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
                 state.verificationResult?.let { result ->
                     VerificationBanner(
                         result = result,
-                        onTapUnknownSigner = { viewModel.lookupSigner() }
+                        onTapUnknownSigner = { viewModel.lookupSigner() },
+                        suppressUnsigned = state.isPasswordMessage
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }

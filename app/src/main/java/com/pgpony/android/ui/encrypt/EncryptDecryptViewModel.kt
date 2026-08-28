@@ -239,6 +239,13 @@ data class EncryptUiState(
     // of the recipient count.
     val fileEncryptMethod: FileEncryptMethod = FileEncryptMethod.RECIPIENTS,
     val fileEncryptedWithPassword: Boolean = false,
+    // #53 (CertainBot): per-operation "was the text/message result produced by
+    // password encryption" signal for EncryptionResultScreen. mode stays TEXT
+    // for the "Encrypt with: Password" toggle, and fileEncryptMethod is a sticky
+    // preference that bled into the Sign result, so neither is a truthful per-op
+    // signal. Only the text password path sets this true; every other text-result
+    // path clears it.
+    val textEncryptedWithPassword: Boolean = false,
     // ── 3.1.0 Phase 5 (J3/J4): Bundle compose ──────────────────────────
     val bundleBody: String = "",
     // 4.2.0 RC6 (#32): refs, not bytes. A picker add stores only the
@@ -925,6 +932,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         _encryptState.value = _encryptState.value.copy(
             outputText = signed,
             isProcessing = false,
+            textEncryptedWithPassword = false,
             showEncryptResultSheet = true
         )
         _events.tryEmit(Event.SignSuccess)
@@ -1196,6 +1204,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     isProcessing = false,
                     showSignPassphraseDialog = false,
                     signPassphrase = "",
+                    textEncryptedWithPassword = false,
                     // Phase A10b: same result-sheet flow as the text
                     // encrypt path. EncryptionResultScreen's title
                     // and badges adapt via the mode field passed
@@ -1344,6 +1353,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     // encrypt so the two result surfaces are never both shown.
                     encryptedFileBytes = null,
                     showFileEncryptResultSheet = false,
+                    textEncryptedWithPassword = false,
                     showEncryptResultSheet = true
                 )
                 _events.tryEmit(Event.EncryptSuccess)
@@ -1769,6 +1779,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     passwordPassphrase = "",
                     passwordConfirm = "",
                     passwordVisible = false,
+                    textEncryptedWithPassword = true,
                     showEncryptResultSheet = true
                 )
                 _events.tryEmit(Event.EncryptSuccess)
