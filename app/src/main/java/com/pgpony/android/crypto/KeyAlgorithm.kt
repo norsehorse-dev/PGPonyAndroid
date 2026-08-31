@@ -17,7 +17,12 @@ enum class KeyAlgorithm(
     val isV6: Boolean = false
 ) {
     RSA_2048("RSA 2048", "RSA-2048", 2048),
+    RSA_3072("RSA 3072", "RSA-3072", 3072),
     RSA_4096("RSA 4096", "RSA-4096", 4096),
+    // 4.4.1 (#36): import/label-only. Not offered for generation; these exist
+    // so an imported RSA-3072/8192 key is labeled by its real modulus size
+    // instead of collapsing to RSA-4096.
+    RSA_8192("RSA 8192", "RSA-8192", 8192),
     ED25519_CV25519("Ed25519+Cv25519", "Ed25519", 256),
 
     // RFC 9580 v6 algorithm variants. V6_ED25519 (Ed25519 cert primary +

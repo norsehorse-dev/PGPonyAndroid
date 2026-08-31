@@ -1284,7 +1284,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // recipient encrypt ran its ring loads AND the encryption
                 // itself on Dispatchers.Main.
                 val recipientRings = withContext(Dispatchers.IO) {
-                    s.selectedRecipients.mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
+                    s.selectedRecipients.mapNotNull { repo.loadEncryptionRecipientRing(it.fingerprint) }
                 }
                 val signingRing = withContext(Dispatchers.IO) {
                     if (s.signMessage && s.signingKey != null) {
@@ -1609,7 +1609,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // encrypt is the worse of the two, because the payload is
                 // whatever the user picked rather than a text box.
                 val recipientRings = withContext(Dispatchers.IO) {
-                    s.selectedRecipients.mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
+                    s.selectedRecipients.mapNotNull { repo.loadEncryptionRecipientRing(it.fingerprint) }
                 }
                 val signingRing = withContext(Dispatchers.IO) {
                     if (s.signMessage && s.signingKey != null) {
@@ -2092,7 +2092,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // 4.0.4 — the crypto below was already on Dispatchers.Default,
                 // but the ring loads feeding it were not.
                 val recipientRings = withContext(Dispatchers.IO) {
-                    s.selectedRecipients.mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
+                    s.selectedRecipients.mapNotNull { repo.loadEncryptionRecipientRing(it.fingerprint) }
                 }
                 val signingRing = withContext(Dispatchers.IO) {
                     if (

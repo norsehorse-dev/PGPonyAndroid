@@ -246,6 +246,16 @@ class PGPCryptoService private constructor() {
     companion object {
         val shared = PGPCryptoService()
 
+        // 4.4.1 (#36, Umotas): OCB chunk size as a RAW power of two. BC's
+        // setWithAEAD second arg is the exponent (block = 1 shl pow), minimum
+        // 6, and BC writes the RFC 9580 chunk-size octet as (pow - 6). This
+        // was 6, i.e. 64-byte chunks (RFC octet 0), so OCB appended a 16-byte
+        // authentication tag every 64 bytes: ~25% size bloat on v6 encryption.
+        // 16 = 64 KiB chunks (RFC octet 10), matching the streaming buffer and
+        // dropping tag overhead to ~0.02%. Decrypt reads the size from the
+        // packet, so older 64-byte-chunk files still open.
+        private const val AEAD_CHUNK_POW = 16
+
         init {
             // Register Bouncy Castle as a security provider
             if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
@@ -946,7 +956,7 @@ class PGPCryptoService private constructor() {
             // whole message falls back to SEIPDv1 so the v4 recipient can still
             // decrypt. v6 keys always support SEIPDv2, so the all-v6 gate never
             // produces a container a recipient can't read. This mirrors BouncyCastle's
-            // own high-level negotiation (setWithAEAD(OCB, 6) + setUseV6AEAD()), and
+            // own high-level negotiation (setWithAEAD(OCB, AEAD_CHUNK_POW) + setUseV6AEAD()), and
             // v6 PKESKs are emitted automatically for the v6 recipient keys by
             // PGPEncryptedDataGenerator under v6 AEAD.
             //
@@ -968,7 +978,7 @@ class PGPCryptoService private constructor() {
             )
             val encGen = if (allRecipientsV6) {
                 encBuilder
-                    .setWithAEAD(org.bouncycastle.bcpg.AEADAlgorithmTags.OCB, 6)
+                    .setWithAEAD(org.bouncycastle.bcpg.AEADAlgorithmTags.OCB, AEAD_CHUNK_POW)
                     .setUseV6AEAD()
                     .setSecureRandom(SecureRandom())
             } else {
@@ -1250,7 +1260,7 @@ class PGPCryptoService private constructor() {
             )
             val encGen = if (allRecipientsV6) {
                 encBuilder
-                    .setWithAEAD(org.bouncycastle.bcpg.AEADAlgorithmTags.OCB, 6)
+                    .setWithAEAD(org.bouncycastle.bcpg.AEADAlgorithmTags.OCB, AEAD_CHUNK_POW)
                     .setUseV6AEAD()
                     .setSecureRandom(SecureRandom())
             } else {
@@ -1300,7 +1310,7 @@ class PGPCryptoService private constructor() {
             }
 
             if (recipientPublicKeys.isEmpty() && messagePassword == null) {
-                throw PGPCryptoError.EncryptionFailed("No recipients and no password")
+                throw PGPCryptoError.EncryptionFailed("None of the selected recipients has an encryption key, and no password was set")
             }
 
             val encryptedOut = encryptedGen.open(targetOut, ByteArray(1 shl 16))
@@ -1430,7 +1440,7 @@ class PGPCryptoService private constructor() {
             if (useAead) {
                 // SEIPDv2 (RFC 9580) — AEAD/OCB, v6 framing. Mirrors the
                 // recipient path's all-v6 branch.
-                encBuilder.setWithAEAD(org.bouncycastle.bcpg.AEADAlgorithmTags.OCB, 6)
+                encBuilder.setWithAEAD(org.bouncycastle.bcpg.AEADAlgorithmTags.OCB, AEAD_CHUNK_POW)
                     .setUseV6AEAD()
             } else {
                 // SEIPDv1 — AES-256-CFB + MDC. Maximal interop for `gpg -c`.
@@ -2561,15 +2571,40 @@ class PGPCryptoService private constructor() {
         val algoId = publicKey.algorithm
         val version = publicKey.version
 
-        return KeyAlgorithm.from(algoId, version) ?: when (algoId) {
+        // 4.4.1 (#36): RSA and LibrePGP v5 composite (algo 8) each share one
+        // algorithm number across sizes/levels, so from() cannot tell them
+        // apart and defaults (RSA -> 4096, ML-KEM -> 768). Read the actual key
+        // material first; only then fall back to the algorithm-id mapping.
+        when (algoId) {
             PublicKeyAlgorithmTags.RSA_GENERAL,
             PublicKeyAlgorithmTags.RSA_ENCRYPT,
-            PublicKeyAlgorithmTags.RSA_SIGN -> {
-                if (publicKey.bitStrength >= 4096) KeyAlgorithm.RSA_4096
-                else KeyAlgorithm.RSA_2048
+            PublicKeyAlgorithmTags.RSA_SIGN -> return when {
+                publicKey.bitStrength >= 8192 -> KeyAlgorithm.RSA_8192
+                publicKey.bitStrength >= 4096 -> KeyAlgorithm.RSA_4096
+                publicKey.bitStrength >= 3072 -> KeyAlgorithm.RSA_3072
+                else -> KeyAlgorithm.RSA_2048
             }
-            else -> KeyAlgorithm.RSA_4096 // Fallback
+            8 -> if (version == 5) {
+                // LibrePGP composite: 768 vs 1024 is the curve, not the algo id.
+                val curve = try {
+                    com.pgpony.android.crypto.pqc.CompositeLibrePGPKeyMaterial
+                        .suiteOf(publicKey.encoded).curve
+                } catch (_: Exception) {
+                    null
+                }
+                when (curve) {
+                    com.pgpony.android.crypto.pqc.EccCurve.X448 ->
+                        return KeyAlgorithm.MLKEM1024_X448_LIBREPGP
+                    com.pgpony.android.crypto.pqc.EccCurve.BRAINPOOL_P384R1 ->
+                        return KeyAlgorithm.MLKEM1024_BP384_LIBREPGP
+                    com.pgpony.android.crypto.pqc.EccCurve.X25519 ->
+                        return KeyAlgorithm.MLKEM768_X25519_LIBREPGP
+                    else -> {}
+                }
+            }
         }
+
+        return KeyAlgorithm.from(algoId, version) ?: KeyAlgorithm.RSA_4096
     }
 
     // ── Helper Functions ───────────────────────────────────────────────

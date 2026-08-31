@@ -242,8 +242,8 @@ android {
         // background-kill ROMs fixed by moving the OpenPGP API service and its
         // provider activities to a dedicated :remote_api process (#2.1), plus
         // the offline switch. versionCode 433 so it installs over 4.3.2.
-        versionCode = 433
-        versionName = "4.4.0"
+        versionCode = 434
+        versionName = "4.4.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

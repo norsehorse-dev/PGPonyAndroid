@@ -192,6 +192,35 @@ object CompositeKeyFacade {
     }
 
     /**
+     * 4.4.1 (#36, Umotas): build a BouncyCastle public key ring for THIS
+     * composite key's ML-KEM encryption subkey, so it can be used as an
+     * encryption recipient. BC rejects the algo-30/31 composite primary, so
+     * the whole key fails to load through the normal import path; here we lift
+     * just the algo-35/36 encryption subkey out of the raw public ring and
+     * re-frame it as a bare primary public-key packet, which BC parses into an
+     * UnknownBCPGKey exactly as it does a standalone ML-KEM key (same material,
+     * same v6 fingerprint). Returns null if there is no composite encryption
+     * subkey to receive a message.
+     */
+    fun encryptionSubkeyRing(publicRing: ByteArray): org.bouncycastle.openpgp.PGPPublicKeyRing? {
+        val sub = walk(publicRing).firstOrNull { pkt ->
+            if (pkt.tag != 6 && pkt.tag != 14 && pkt.tag != 5 && pkt.tag != 7) return@firstOrNull false
+            val pb = publicKeyBody(pkt.body)
+            val alg = pb[1 + 4].toInt() and 0xFF
+            alg == 35 || alg == 36
+        } ?: return null
+        val bare = packet(6, publicKeyBody(sub.body))
+        return try {
+            org.bouncycastle.openpgp.PGPPublicKeyRing(
+                bare,
+                org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator()
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
      * Derive the public transferable key from a composite SECRET ring: convert
      * the secret key packet (tag 5) and secret subkey packets (tag 7) to their
      * public forms (tags 6 and 14) by keeping only the public key body, and pass

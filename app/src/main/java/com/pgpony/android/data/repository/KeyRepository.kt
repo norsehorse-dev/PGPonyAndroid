@@ -834,6 +834,21 @@ class KeyRepository(
         } catch (_: Exception) { null }
     }
 
+    /**
+     * 4.4.1 (#36, Umotas): the public key ring to encrypt TO for a recipient.
+     * Normal keys and standalone ML-KEM keys load through BouncyCastle as
+     * usual. A composite ML-DSA signing key cannot (BC rejects its algo-30/31
+     * primary), yet it carries an ML-KEM encryption subkey; that subkey is
+     * lifted out via CompositeKeyFacade and returned as a bare ring. Returns
+     * null only when the key truly has no encryption subkey to receive a
+     * message.
+     */
+    fun loadEncryptionRecipientRing(fingerprint: String): PGPPublicKeyRing? {
+        loadPublicKeyRing(fingerprint)?.let { return it }
+        val raw = store.loadPublicKey(fingerprint) ?: return null
+        return CompositeKeyFacade.encryptionSubkeyRing(raw)
+    }
+
     fun loadSecretKeyRing(fingerprint: String): PGPSecretKeyRing? {
         val data = store.loadPrivateKey(fingerprint) ?: return null
         return try {

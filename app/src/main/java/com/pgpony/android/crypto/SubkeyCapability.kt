@@ -101,7 +101,9 @@ enum class SubkeyCapability(val flag: Int, val displayName: String) {
         fun heuristic(algorithm: KeyAlgorithm, isPrimary: Boolean): Int {
             return when (algorithm) {
                 KeyAlgorithm.RSA_2048,
-                KeyAlgorithm.RSA_4096 ->
+                KeyAlgorithm.RSA_3072,
+                KeyAlgorithm.RSA_4096,
+                KeyAlgorithm.RSA_8192 ->
                     if (isPrimary) Certify.flag or Sign.flag or Encrypt.flag
                     else Sign.flag or Encrypt.flag
 
