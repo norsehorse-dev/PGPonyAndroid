@@ -1,7 +1,7 @@
 # PGPony 4.4.1
 
 A fixes-only release addressing four reports against 4.4.0's post-quantum
-support, raised on the #36 thread.
+support, raised on #36 (Umotas) and #55 (elnardosa).
 
 4.4.1 carries versionCode 434 and installs in place over 4.4.0.
 
@@ -28,12 +28,12 @@ genuinely has no encryption subkey is clearer. Reported by Umotas (#36).
 ML-KEM-1024 keys were shown as ML-KEM-768. In LibrePGP the two share one
 algorithm number and differ only by curve, so the label defaulted to 768. The
 key material was correct all along; only the label was wrong. Key detection now
-reads the curve and reports the right level. Reported by a tester on #36.
+reads the curve and reports the right level. Reported by elnardosa (#55).
 
 An imported RSA 8192 key was shown as RSA 4096. Key-size detection keyed off the
 algorithm number, which does not carry the modulus size, and capped the label at
 4096. It now reads the actual modulus size, so RSA 3072, 4096, and 8192 are each
-labeled correctly. Reported by a tester on #36.
+labeled correctly. Reported by elnardosa (#55).
 
 ## Verify this build
 
