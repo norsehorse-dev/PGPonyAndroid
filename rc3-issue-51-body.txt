@@ -1,0 +1,28 @@
+title:	Feature request: E-Mail Key Selection
+state:	OPEN
+author:	RandomNam3 (Rand0m_Name_)
+labels:	
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	51
+--
+Hello,
+I'm using FairEmail and have everything set up so far.
+When I sent my first email, PGPony opened and I was able to choose between my keys.
+After that, I couldn't select a different key anymore; instead, I always have to use the one I selected the first time.
+
+This is extremely annoying when you use multiple keys for a single email account.
+
+I think a small feature or toggle to switch to a different key—or simply to always be given the option to choose—would be better.
+
+
+Thanks for the project.
+Best regards

@@ -39,6 +39,11 @@ object CompositeDecryptor {
 
     class NoMatchingKey(message: String) : Exception(message)
 
+    /** item 14 (#56): a recovered session key plus the symmetric-algorithm ID
+     *  the PKESK declared — nonzero only for a v3 PKESK (SEIPDv1), where the
+     *  algorithm is not carried in the SEIPD packet; 0 for a v6 PKESK. */
+    private class Recovered(val sessionKey: ByteArray, val symAlgId: Int)
+
     /**
      * Attempt composite decryption. Returns null when the message carries
      * no composite PKESK (caller should fall back to the normal path).
@@ -56,15 +61,18 @@ object CompositeDecryptor {
         val binary = toBinary(encryptedData)
         val split = split(binary) ?: return null // no composite PKESK
 
-        val sessionKey = recover(split.parsed, secretKeyRings, rawCompositeRings, passphrase)
+        val recovered = recoverAmong(split.parsed, secretKeyRings, rawCompositeRings, passphrase)
 
         // Hand the recovered session key to BC's SEIPD decryptor. The SEIPD
-        // sits alone (no ESK packet), so use the session-key entry point.
+        // sits alone (no ESK packet), so use the session-key entry point. A v3
+        // PKESK (SEIPDv1) carries its own symmetric-algorithm octet; a v6 PKESK
+        // (SEIPDv2) leaves it 0 and the algorithm lives in the SEIPD packet
+        // (AES-256 is the pairing).
         val bcpgIn = BCPGInputStream(ByteArrayInputStream(split.remainder))
         val encList = PGPEncryptedDataList(bcpgIn)
         val sessionEnc = encList.extractSessionKeyEncryptedData()
         val factory = BcSessionKeyDataDecryptorFactory(
-            PGPSessionKey(SymmetricKeyAlgorithmTags.AES_256, sessionKey)
+            PGPSessionKey(symAlgOrDefault(recovered.symAlgId), recovered.sessionKey)
         )
         val stream = sessionEnc.getDataStream(factory)
         return Result(stream, sessionEnc)
@@ -107,31 +115,76 @@ object CompositeDecryptor {
         secretKeyRings: List<PGPSecretKeyRing>,
         passphrase: String? = null
     ): PGPSessionKey? {
-        val parsed = firstCompositePkesk(eskRegion) ?: return null
-        return PGPSessionKey(
-            SymmetricKeyAlgorithmTags.AES_256,
-            recover(parsed, secretKeyRings, emptyList(), passphrase)
+        val parsedList = allCompositePkesks(eskRegion)
+        if (parsedList.isEmpty()) return null
+        val recovered = recoverAmong(parsedList, secretKeyRings, emptyList(), passphrase)
+        return PGPSessionKey(symAlgOrDefault(recovered.symAlgId), recovered.sessionKey)
+    }
+
+    /**
+     * item 18 (#57): a multi-recipient message carries one composite PKESK
+     * per recipient. Try each against the held keys and return the first
+     * session key that opens. A PKESK addressed to a key we do not hold
+     * misses with [NoMatchingKey] and we move to the next, while a matched
+     * but locked key surfaces its ProtectedKeyException as-is. Throw only
+     * when no PKESK in the message matches any held key.
+     */
+    private fun recoverAmong(
+        parsedList: List<CompositePkesk.Parsed>,
+        secretKeyRings: List<PGPSecretKeyRing>,
+        rawCompositeRings: List<ByteArray>,
+        passphrase: String?
+    ): Recovered {
+        for (parsed in parsedList) {
+            try {
+                return recover(parsed, secretKeyRings, rawCompositeRings, passphrase)
+            } catch (e: NoMatchingKey) {
+                // this recipient slot is not ours; try the next PKESK
+            }
+        }
+        throw NoMatchingKey(
+            "no held composite secret key for any of the " +
+                "${parsedList.size} composite recipient(s) in this message"
         )
     }
 
-    /** The shared decapsulation core behind [tryDecrypt] and
-     *  [recoverSessionKey]: match the recipient key (or trial every held
-     *  composite key for an anonymous PKESK), extract its material,
-     *  decapsulate with the PKESK's suite, unwrap the session key. */
+    /** The shared decapsulation core behind [recoverAmong]: match the
+     *  recipient key (or trial every held composite key for an anonymous
+     *  PKESK), extract its material, decapsulate with the PKESK's suite,
+     *  unwrap the session key. */
     private fun recover(
         parsed: CompositePkesk.Parsed,
         secretKeyRings: List<PGPSecretKeyRing>,
         rawCompositeRings: List<ByteArray>,
         passphrase: String?
-    ): ByteArray {
+    ): Recovered {
+        // item 14 (#56): a v3 PKESK (RFC 9980 A.2.3, SEIPDv1) identifies the
+        // recipient by 8-octet key ID and carries the symmetric-algorithm octet
+        // itself. The KEM core is identical to the v6 path; only the lookup key
+        // and the trailing symAlgId differ.
+        if (parsed.recipientKeyId.isNotEmpty()) {
+            findSecretKeyByKeyId(parsed.recipientKeyId, secretKeyRings)?.let {
+                return Recovered(open(it, parsed, passphrase), parsed.symAlgId)
+            }
+            findRawCompositeByKeyId(parsed.recipientKeyId, rawCompositeRings)?.let {
+                return Recovered(openRaw(it, parsed, passphrase), parsed.symAlgId)
+            }
+            throw NoMatchingKey(
+                "no held composite secret key for v3 recipient key ID " +
+                    parsed.recipientKeyId.toHex()
+            )
+        }
         if (parsed.recipientFingerprint.isEmpty()) {
-            return recoverAnonymous(parsed, secretKeyRings, rawCompositeRings, passphrase)
+            return Recovered(
+                recoverAnonymous(parsed, secretKeyRings, rawCompositeRings, passphrase),
+                parsed.symAlgId
+            )
         }
         findSecretKey(parsed.recipientFingerprint, secretKeyRings)?.let {
-            return open(it, parsed, passphrase)
+            return Recovered(open(it, parsed, passphrase), parsed.symAlgId)
         }
         findRawComposite(parsed.recipientFingerprint, rawCompositeRings)?.let {
-            return openRaw(it, parsed, passphrase)
+            return Recovered(openRaw(it, parsed, passphrase), parsed.symAlgId)
         }
         throw NoMatchingKey(
             "no held composite secret key for recipient " +
@@ -146,6 +199,12 @@ object CompositeDecryptor {
         parsed: CompositePkesk.Parsed,
         passphrase: String?
     ): ByteArray {
+        // item 14 (#56): a v4 interop ring carries an ordinary Ed25519 primary
+        // and a v4 algo-35 subkey that CompositeKeyFacade.parse cannot model
+        // (parse expects a composite primary), so it takes its own path.
+        if (CompositeKeyFacade.hasV4Algo35Subkey(rawRing)) {
+            return openV4Algo35(rawRing, parsed, passphrase)
+        }
         val info = CompositeKeyFacade.parse(rawRing, passphrase?.toCharArray())
         val sub = info.encryptionSubkey
             ?: throw NoMatchingKey("composite key has no ML-KEM subkey")
@@ -172,11 +231,52 @@ object CompositeDecryptor {
         return CompositeKem.unwrapSessionKey(kek, parsed.wrappedSessionKey)
     }
 
-    /** The raw composite-PRIMARY ring whose ML-KEM subkey fingerprint is [fp]. */
+    /** item 14 (#56): decapsulate + unwrap [parsed] with a v4 interop ring's
+     *  algo-35 subkey. The subkey has no material-length field, so its public
+     *  and secret material are extracted by the v4-specific facade helpers; the
+     *  KEM itself is the same version-agnostic core. */
+    private fun openV4Algo35(
+        rawRing: ByteArray,
+        parsed: CompositePkesk.Parsed,
+        passphrase: String?
+    ): ByteArray {
+        val suite = parsed.suite
+        if (suite.ietfAlgId != 35) {
+            throw NoMatchingKey("v4 interop subkey is ML-KEM-768 (algo 35) only")
+        }
+        val subBody = CompositeKeyFacade.v4Algo35SubkeyBody(rawRing)
+            ?: throw NoMatchingKey("v4 algo-35 subkey not found")
+        val pubMat = CompositeKeyFacade.v4Algo35PublicMaterial(subBody)
+        val secret = CompositeKeyFacade.v4Algo35SecretMaterial(subBody, passphrase?.toCharArray())
+            ?: throw CompositeSecretKeyMaterial.ProtectedKeyException(
+                "v4 algo-35 subkey secret is unavailable"
+            )
+        val xSec = secret.copyOfRange(0, suite.curve.keyLen)
+        val mlkemSeed = secret.copyOfRange(suite.curve.keyLen, secret.size)
+        val mlkemSec = MLKEMPrivateKeyParameters(suite.mlkem.params, mlkemSeed)
+        val (recipientXPub, _) = CompositeKem.splitPublic(pubMat, suite)
+        val kek = CompositeKem.decapsulate(
+            ephemeralX25519 = parsed.ephemeralX25519,
+            mlkemCiphertext = parsed.mlkemCiphertext,
+            recipientX25519Sec = xSec,
+            recipientMlkemSec = mlkemSec,
+            recipientX25519Pub = recipientXPub,
+            suite = suite
+        )
+        return CompositeKem.unwrapSessionKey(kek, parsed.wrappedSessionKey)
+    }
+
+    /** The raw ring whose ML-KEM subkey fingerprint is [fp]: a composite-PRIMARY
+     *  ring's v6 subkey, or a v4 interop ring's v4 algo-35 subkey. */
     private fun findRawComposite(fp: ByteArray, rawRings: List<ByteArray>): ByteArray? =
         rawRings.firstOrNull { ring ->
             runCatching {
-                CompositeKeyFacade.parse(ring).encryptionSubkey?.fingerprint?.contentEquals(fp) == true
+                if (CompositeKeyFacade.hasV4Algo35Subkey(ring)) {
+                    val sub = CompositeKeyFacade.v4Algo35SubkeyBody(ring)
+                    sub != null && CompositeKeyFacade.v4Algo35SubkeyFingerprint(sub).contentEquals(fp)
+                } else {
+                    CompositeKeyFacade.parse(ring).encryptionSubkey?.fingerprint?.contentEquals(fp) == true
+                }
             }.getOrDefault(false)
         }
 
@@ -248,25 +348,27 @@ object CompositeDecryptor {
         throw NoMatchingKey("no held composite secret key opens this anonymous PKESK")
     }
 
-    /** First parseable composite PKESK in a region of ESK packets, walking
-     *  definite-length packets only; null on none. */
-    private fun firstCompositePkesk(region: ByteArray): CompositePkesk.Parsed? {
+    /** Every parseable composite PKESK in a region of ESK packets, walking
+     *  definite-length packets only; empty on none. item 18 (#57): the
+     *  streaming path must see all recipients, not just the first. */
+    private fun allCompositePkesks(region: ByteArray): List<CompositePkesk.Parsed> {
+        val out = mutableListOf<CompositePkesk.Parsed>()
         var i = 0
         while (i < region.size) {
-            val h = try { header(region, i) } catch (e: Exception) { null } ?: return null
+            val h = try { header(region, i) } catch (e: Exception) { null } ?: break
             val end = h.bodyStart + h.bodyLen
-            if (h.bodyLen < 0 || end > region.size || end <= i) return null
+            if (h.bodyLen < 0 || end > region.size || end <= i) break
             if (h.tag == TAG_PKESK) {
-                CompositePkesk.parseBody(region.copyOfRange(h.bodyStart, end))?.let { return it }
+                CompositePkesk.parseBody(region.copyOfRange(h.bodyStart, end))?.let { out.add(it) }
             }
             i = end
         }
-        return null
+        return out
     }
 
     // ── packet splitting ─────────────────────────────────────────────
 
-    private class Split(val parsed: CompositePkesk.Parsed, val remainder: ByteArray)
+    private class Split(val parsed: List<CompositePkesk.Parsed>, val remainder: ByteArray)
 
     /**
      * Walk the top-level packets, dropping every leading ESK packet
@@ -276,7 +378,7 @@ object CompositeDecryptor {
      */
     private fun split(data: ByteArray): Split? {
         var i = 0
-        var parsed: CompositePkesk.Parsed? = null
+        val parsed = mutableListOf<CompositePkesk.Parsed>()
         val n = data.size
         while (i < n) {
             // 4.1.2 (issue #33): decide ESK-vs-body from the tag octet
@@ -293,14 +395,17 @@ object CompositeDecryptor {
             if (tag != TAG_PKESK && tag != TAG_SKESK) {
                 // First non-ESK packet: the encrypted-data (SEIPD) packet,
                 // handed onward with its framing intact; BC reads partial
-                // lengths natively.
-                val p = parsed ?: return null
-                return Split(p, data.copyOfRange(i, n))
+                // lengths natively. item 18 (#57): hand back EVERY composite
+                // PKESK collected so far (one per recipient), not just the
+                // first, so a held key that is not the first recipient can
+                // still be matched downstream.
+                if (parsed.isEmpty()) return null
+                return Split(parsed, data.copyOfRange(i, n))
             }
             val h = header(data, i) ?: break
-            if (h.tag == TAG_PKESK && parsed == null) {
+            if (h.tag == TAG_PKESK) {
                 val body = data.copyOfRange(h.bodyStart, h.bodyStart + h.bodyLen)
-                CompositePkesk.parseBody(body)?.let { parsed = it }
+                CompositePkesk.parseBody(body)?.let { parsed.add(it) }
             }
             i = h.bodyStart + h.bodyLen
         }
@@ -354,6 +459,46 @@ object CompositeDecryptor {
                 CompositeSuite.ietfFor(it.publicKey.algorithm) != null &&
                     it.publicKey.fingerprint.contentEquals(fp)
             }
+
+    /** item 14 (#56): a v3 PKESK addresses its recipient by 8-octet key ID.
+     *  Match a held composite BC secret key whose key ID equals it. */
+    private fun findSecretKeyByKeyId(keyId: ByteArray, rings: List<PGPSecretKeyRing>): org.bouncycastle.openpgp.PGPSecretKey? {
+        val id = keyIdToLong(keyId)
+        return rings.asSequence()
+            .flatMap { it.secretKeys.asSequence() }
+            .firstOrNull {
+                CompositeSuite.ietfFor(it.publicKey.algorithm) != null && it.keyID == id
+            }
+    }
+
+    /** item 14 (#56): the raw ring whose ML-KEM subkey key ID (low 8 octets of
+     *  the subkey fingerprint) is [keyId] — a v4 interop ring's v4 algo-35
+     *  subkey, or a composite-PRIMARY ring's v6 subkey. */
+    private fun findRawCompositeByKeyId(keyId: ByteArray, rawRings: List<ByteArray>): ByteArray? =
+        rawRings.firstOrNull { ring ->
+            runCatching {
+                val fp = if (CompositeKeyFacade.hasV4Algo35Subkey(ring)) {
+                    CompositeKeyFacade.v4Algo35SubkeyBody(ring)
+                        ?.let { CompositeKeyFacade.v4Algo35SubkeyFingerprint(it) }
+                } else {
+                    CompositeKeyFacade.parse(ring).encryptionSubkey?.fingerprint
+                }
+                fp != null && fp.size >= 8 &&
+                    fp.copyOfRange(fp.size - 8, fp.size).contentEquals(keyId)
+            }.getOrDefault(false)
+        }
+
+    /** Big-endian 8-octet key ID to the Long BC exposes as PGPSecretKey.keyID. */
+    private fun keyIdToLong(keyId: ByteArray): Long {
+        var v = 0L
+        for (b in keyId) v = (v shl 8) or (b.toLong() and 0xFF)
+        return v
+    }
+
+    /** The PKESK's symmetric-algorithm octet, or AES-256 when it carried none
+     *  (a v6 PKESK: the algorithm lives in the paired SEIPDv2 packet). */
+    private fun symAlgOrDefault(symAlgId: Int): Int =
+        if (symAlgId != 0) symAlgId else SymmetricKeyAlgorithmTags.AES_256
 
     private fun toBinary(data: ByteArray): ByteArray {
         val looksArmored = data.isNotEmpty() && data[0].toInt() == '-'.code

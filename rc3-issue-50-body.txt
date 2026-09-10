@@ -1,0 +1,23 @@
+title:	Feature request
+state:	OPEN
+author:	CertainBot (CertainBot)
+labels:	
+comments:	0
+assignees:	
+projects:	
+milestone:	
+issue-type:	
+parent:	
+sub-issues:	
+sub-issues-completed:	
+blocked-by:	
+blocking:	
+number:	50
+--
+Hello @norsehorse-dev,
+
+I noticed 'biometric lock' and 'required fingerprint to sign', being a security measures, do not require fingerprint for disabling. I expect those controls to be fingerprint protected.
+
+As a safety measure I would also ask for fingerprint on enabling, thus ensuring the fingerprint is recognized correctly as there is the potential danger to be locked out of the app.
+
+Thanks

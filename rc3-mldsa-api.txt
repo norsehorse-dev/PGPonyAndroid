@@ -1,0 +1,85 @@
+=== org.bouncycastle.pqc.crypto.mldsa.MLDSASigner ===
+public class org.bouncycastle.pqc.crypto.mldsa.MLDSASigner implements org.bouncycastle.crypto.Signer {
+  public org.bouncycastle.pqc.crypto.mldsa.MLDSASigner();
+  public void init(boolean, org.bouncycastle.crypto.CipherParameters);
+  public void update(byte);
+  public void update(byte[], int, int);
+  public byte[] generateMu() throws org.bouncycastle.crypto.CryptoException, org.bouncycastle.crypto.DataLengthException;
+  public byte[] generateMuSignature(byte[]) throws org.bouncycastle.crypto.CryptoException, org.bouncycastle.crypto.DataLengthException;
+  public byte[] generateSignature() throws org.bouncycastle.crypto.CryptoException, org.bouncycastle.crypto.DataLengthException;
+  public boolean verifyMu(byte[]);
+  public boolean verifySignature(byte[]);
+  public boolean verifyMuSignature(byte[], byte[]);
+  public void reset();
+  protected byte[] internalGenerateSignature(byte[], byte[]);
+  protected boolean internalVerifySignature(byte[], byte[]);
+  static {};
+}
+=== org.bouncycastle.pqc.crypto.mldsa.MLDSAPublicKeyParameters ===
+public class org.bouncycastle.pqc.crypto.mldsa.MLDSAPublicKeyParameters extends org.bouncycastle.pqc.crypto.mldsa.MLDSAKeyParameters {
+  final byte[] rho;
+  final byte[] t1;
+  static byte[] getEncoded(byte[], byte[]);
+  public org.bouncycastle.pqc.crypto.mldsa.MLDSAPublicKeyParameters(org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters, byte[]);
+  public org.bouncycastle.pqc.crypto.mldsa.MLDSAPublicKeyParameters(org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters, byte[], byte[]);
+  public byte[] getEncoded();
+  public byte[] getRho();
+  public byte[] getT1();
+}
+=== org.bouncycastle.pqc.crypto.mldsa.MLDSAPrivateKeyParameters ===
+public class org.bouncycastle.pqc.crypto.mldsa.MLDSAPrivateKeyParameters extends org.bouncycastle.pqc.crypto.mldsa.MLDSAKeyParameters {
+  public static final int BOTH;
+  public static final int SEED_ONLY;
+  public static final int EXPANDED_KEY;
+  final byte[] rho;
+  final byte[] k;
+  final byte[] tr;
+  final byte[] s1;
+  final byte[] s2;
+  final byte[] t0;
+  public org.bouncycastle.pqc.crypto.mldsa.MLDSAPrivateKeyParameters(org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters, byte[]);
+  public org.bouncycastle.pqc.crypto.mldsa.MLDSAPrivateKeyParameters(org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters, byte[], byte[], byte[], byte[], byte[], byte[], byte[]);
+  public org.bouncycastle.pqc.crypto.mldsa.MLDSAPrivateKeyParameters(org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters, byte[], byte[], byte[], byte[], byte[], byte[], byte[], byte[]);
+  public org.bouncycastle.pqc.crypto.mldsa.MLDSAPrivateKeyParameters(org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters, byte[], org.bouncycastle.pqc.crypto.mldsa.MLDSAPublicKeyParameters);
+  public org.bouncycastle.pqc.crypto.mldsa.MLDSAPrivateKeyParameters getParametersWithFormat(int);
+  public int getPreferredFormat();
+  public byte[] getEncoded();
+  public byte[] getK();
+  public byte[] getPrivateKey();
+  public byte[] getPublicKey();
+  public byte[] getSeed();
+  public org.bouncycastle.pqc.crypto.mldsa.MLDSAPublicKeyParameters getPublicKeyParameters();
+  public byte[] getRho();
+  public byte[] getS1();
+  public byte[] getS2();
+  public byte[] getT0();
+  public byte[] getT1();
+  public byte[] getTr();
+}
+=== org.bouncycastle.pqc.crypto.mldsa.MLDSAKeyPairGenerator ===
+public class org.bouncycastle.pqc.crypto.mldsa.MLDSAKeyPairGenerator implements org.bouncycastle.crypto.AsymmetricCipherKeyPairGenerator {
+  public org.bouncycastle.pqc.crypto.mldsa.MLDSAKeyPairGenerator();
+  public void init(org.bouncycastle.crypto.KeyGenerationParameters);
+  public org.bouncycastle.crypto.AsymmetricCipherKeyPair generateKeyPair();
+}
+=== org.bouncycastle.pqc.crypto.mldsa.MLDSAKeyGenerationParameters ===
+public class org.bouncycastle.pqc.crypto.mldsa.MLDSAKeyGenerationParameters extends org.bouncycastle.crypto.KeyGenerationParameters {
+  public org.bouncycastle.pqc.crypto.mldsa.MLDSAKeyGenerationParameters(java.security.SecureRandom, org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters);
+  public org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters getParameters();
+}
+=== org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters ===
+public class org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters {
+  public static final int TYPE_PURE;
+  public static final int TYPE_SHA2_512;
+  public static final org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters ml_dsa_44;
+  public static final org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters ml_dsa_65;
+  public static final org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters ml_dsa_87;
+  public static final org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters ml_dsa_44_with_sha512;
+  public static final org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters ml_dsa_65_with_sha512;
+  public static final org.bouncycastle.pqc.crypto.mldsa.MLDSAParameters ml_dsa_87_with_sha512;
+  public boolean isPreHash();
+  public int getType();
+  org.bouncycastle.pqc.crypto.mldsa.MLDSAEngine getEngine(java.security.SecureRandom);
+  public java.lang.String getName();
+  static {};
+}

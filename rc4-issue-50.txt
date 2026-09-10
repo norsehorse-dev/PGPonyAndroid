@@ -1,0 +1,29 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Good call, and both directions are in RC3.
+
+Biometric lock and require fingerprint to sign now ask for a fingerprint before they change, turning them on as well as off. Enabling prompts too, so a fingerprint that will not read is caught then rather than locking you out later. On a device with no enrolled biometric the toggles still work, so no one is stranded without a way to change them.
+
+https://pgpony.app/rc/4.4.0-RC-foss/PGPony-4.4.0-RC3-foss.apk
+
+Installs over your current build, no uninstall. To retest: turn each toggle off and back on, confirm the fingerprint prompt each time, and that cancelling leaves the switch where it was.
+
+NorseHorse
+--
+author:	CertainBot
+association:	contributor
+edited:	false
+status:	none
+--
+Tested on 4.4.0-RC3:
+- Biometric lock on/off toggle asks for fingerprint ✅
+- Require fingerprint to sign on/off toggle asks for fingerprint ✅
+In each case canceling leaves the toggle where it was.
+
+Thank you @norsehorse-dev!
+
+Closing
+--

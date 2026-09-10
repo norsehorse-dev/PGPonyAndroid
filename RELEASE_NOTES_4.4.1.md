@@ -40,14 +40,14 @@ labeled correctly. Reported by elnardosa (#55).
 Whole-file SHA-256 (is this download the published file):
 
 ```
-<FILL_WHOLE_FILE_SHA256>
+55075c11f90833dae75b66162c0adcd636eec223a8fc98d2c22408209335e257
 ```
 
 Content hash (for rebuilders; excludes signature, see
 REPRODUCIBLE_BUILDS_PLAYBOOK.md):
 
 ```
-<FILL_CONTENT_HASH>
+2707269a69c39650ea99ced72077a68d5fbf18fcd6df0253f5784d581975cead
 ```
 
 The APK is signed with the NorseHorse release key

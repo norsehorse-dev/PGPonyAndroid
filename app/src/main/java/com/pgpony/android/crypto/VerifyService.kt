@@ -220,6 +220,15 @@ class VerifyService private constructor() {
         val (signerName, signerEmail, signerFingerprint) =
             resolveSignerIdentity(sig.keyID, publicKeyRings)
 
+        // item 11 (Finding C): downgrade a valid signature from a revoked,
+        // expired, or non-signing key so it never shows as Verified.
+        SignerEvaluator.evaluate(sig.keyID, sig.creationTime, publicKeyRings).let { st ->
+            if (st != SignerStatus.VERIFIED) return VerificationResult.Invalid(
+                reason = SignerEvaluator.reason(st),
+                signerKeyID = keyIdHex,
+                signedContent = components.cleartext
+            )
+        }
         return VerificationResult.Verified(
             signerKeyID = keyIdHex,
             signerFingerprint = signerFingerprint,
@@ -338,6 +347,15 @@ class VerifyService private constructor() {
         }
         val (signerName, signerEmail, signerFingerprint) =
             resolveSignerIdentity(sig.keyID, publicKeyRings)
+        // item 11 (Finding C): downgrade a valid signature from a revoked,
+        // expired, or non-signing key so it never shows as Verified.
+        SignerEvaluator.evaluate(sig.keyID, sig.creationTime, publicKeyRings).let { st ->
+            if (st != SignerStatus.VERIFIED) return VerificationResult.Invalid(
+                reason = SignerEvaluator.reason(st),
+                signerKeyID = keyIdHex,
+                signedContent = null
+            )
+        }
         return VerificationResult.Verified(
             signerKeyID = keyIdHex,
             signerFingerprint = signerFingerprint,
@@ -404,6 +422,15 @@ class VerifyService private constructor() {
         val (signerName, signerEmail, signerFingerprint) =
             resolveSignerIdentity(sig.keyID, publicKeyRings)
 
+        // item 11 (Finding C): downgrade a valid signature from a revoked,
+        // expired, or non-signing key so it never shows as Verified.
+        SignerEvaluator.evaluate(sig.keyID, sig.creationTime, publicKeyRings).let { st ->
+            if (st != SignerStatus.VERIFIED) return VerificationResult.Invalid(
+                reason = SignerEvaluator.reason(st),
+                signerKeyID = keyIdHex,
+                signedContent = null
+            )
+        }
         return VerificationResult.Verified(
             signerKeyID = keyIdHex,
             signerFingerprint = signerFingerprint,

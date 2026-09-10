@@ -109,6 +109,8 @@ data class SettingsUiState(
     // darkvegas interop: passphrase encryption uses gpg-friendly S2K type 3 by
     // default; this opts back into Argon2id (needs GnuPG 2.4+). Default off.
     val useArgon2: Boolean = false,
+    // item 8 (#request): offer the post-keygen publish prompt (default on).
+    val offerPublishAfterKeygen: Boolean = true,
     // ── Phase A4: default / remembered recipient ────────────────────────
     val defaultRecipientMode: DefaultRecipientMode = DefaultRecipientMode.NONE,
     /** Fingerprint of the pinned recipient (PINNED mode). */
@@ -195,6 +197,13 @@ class SettingsViewModel(
         _state.value = _state.value.copy(useArgon2 = enabled)
     }
 
+    /** item 8 (#request): toggle the post-keygen "offer to publish" suggestion,
+     *  which points at key servers (keys.pgpony.app included). Persisted. */
+    fun setOfferPublishAfterKeygen(enabled: Boolean) {
+        prefs.edit().putBoolean("offer_publish_after_keygen", enabled).apply()
+        _state.value = _state.value.copy(offerPublishAfterKeygen = enabled)
+    }
+
     /** RC5 P3 (#23): public so SettingsScreen can re-read persisted
      *  preferences on entry. The onboarding biometric toggle (slide 5)
      *  writes `biometric_lock` directly to prefs, and this ViewModel is
@@ -215,6 +224,7 @@ class SettingsViewModel(
             // 3.1.0 always-on behavior.
             clearInputsAfterEncrypt = prefs.getBoolean("clear_inputs_after_encrypt", true),
             useArgon2 = prefs.getBoolean("use_argon2", false),
+            offerPublishAfterKeygen = prefs.getBoolean("offer_publish_after_keygen", true),
             // ── Phase A12: theme + reminders persisted prefs ────
             selectedTheme = AppTheme.fromStorage(prefs.getString("selected_theme", null)),
             keyExpirationRemindersEnabled = prefs.getBoolean("key_expiration_reminders", false),

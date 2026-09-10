@@ -87,6 +87,23 @@ object ClassicalSubkeyGen {
      * unprotected) — it both unlocks the primary to sign the binding and
      * protects the new subkey's secret material identically.
      */
+    /**
+     * item 16 (#54): remove a subkey (local delete, no revocation) from a v4 or
+     * v6 secret ring. Strips the secret subkey and its binding; the caller
+     * derives the public ring from the result. BC's removeSecretKey handles
+     * both v4 and v6 rings, so no version split is needed. Throws SubkeyAddError
+     * if [subkeyId] is the primary or is not present on the ring.
+     */
+    fun removeSubkey(secretRing: PGPSecretKeyRing, subkeyId: Long): PGPSecretKeyRing {
+        if (subkeyId == secretRing.secretKey.keyID) {
+            throw SubkeyAddError("Cannot remove the primary key; only subkeys can be removed")
+        }
+        val target = secretRing.getSecretKey(subkeyId)
+            ?: throw SubkeyAddError("Subkey not found on this key")
+        return PGPSecretKeyRing.removeSecretKey(secretRing, target)
+            ?: throw SubkeyAddError("Removing the subkey would leave no keys on the ring")
+    }
+
     fun addSubkey(
         secretRing: PGPSecretKeyRing,
         type: ClassicalSubkeyType,

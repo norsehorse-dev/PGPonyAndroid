@@ -40,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -171,6 +172,14 @@ fun PublishSheet(fingerprint: String, onDismiss: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(stringResource(R.string.publish_action))
+            }
+            // item 8 (#request): an explicit, unambiguous skip so the online
+            // post-keygen prompt does not have to be dismissed by tapping away.
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.publish_not_now))
             }
         }
     }

@@ -70,6 +70,46 @@ fun KeygenAlgorithmPicker(
         )
         Spacer(Modifier.height(10.dp))
 
+        // item 14 (#56): interop tier — the three ML-KEM-768+X25519 wire shapes
+        // (v6 / v4 / v5), the same key for different tools. Collapsed unless the
+        // selection lives here, since it is a compatibility choice, not a
+        // recommended one.
+        var interopExpanded by remember {
+            mutableStateOf(selected in KeyAlgorithm.generatableInterop)
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { interopExpanded = !interopExpanded }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (interopExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                stringResource(R.string.keyring_generate_algorithm_group_interop),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        AnimatedVisibility(visible = interopExpanded) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                KeyAlgorithm.generatableInterop.forEach { algo ->
+                    FilterChip(
+                        selected = selected == algo,
+                        onClick = { onSelect(algo) },
+                        label = { Text(algo.shortName) }
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
         // Advanced / compatibility, collapsed unless the selection lives here.
         var advancedExpanded by remember {
             mutableStateOf(selected in KeyAlgorithm.generatableAdvanced)
@@ -143,6 +183,8 @@ private fun AlgorithmGroup(
 private fun captionFor(algorithm: KeyAlgorithm): String = when {
     algorithm.isCompositeSign ->
         stringResource(R.string.keyring_generate_algorithm_caption_pqc_sign)
+    algorithm == KeyAlgorithm.MLKEM768_X25519_V4 ->
+        stringResource(R.string.keyring_generate_algorithm_caption_pqc_v4)
     algorithm.isComposite && algorithm.isV6 ->
         stringResource(R.string.keyring_generate_algorithm_caption_pqc_ietf)
     algorithm.isComposite ->

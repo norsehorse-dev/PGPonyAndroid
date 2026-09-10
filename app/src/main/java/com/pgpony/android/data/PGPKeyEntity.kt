@@ -270,8 +270,29 @@ data class PGPKeyEntity(
                     match.groupValues[2].trim()
                 )
             }
+            val bracketOnly = Regex("""^<(.+?)>$""").find(uid)
+            if (bracketOnly != null) return Pair("", bracketOnly.groupValues[1].trim())
             if (uid.contains("@")) return Pair("", uid.trim())
             return Pair(uid.trim(), "")
+        }
+
+        /**
+         * item 3 (#request): assemble a User ID from an optional name and
+         * email. The inverse of parseUserID: "Name <email>" when both are
+         * present, just the name when the email is blank, "<email>" when only
+         * an email is given, and "" when neither is supplied (a UID-less v6
+         * certificate). Callers that hardcoded "$name <$email>" route here so
+         * a blank email no longer emits empty angle brackets.
+         */
+        fun composeUserID(name: String, email: String): String {
+            val n = name.trim()
+            val e = email.trim()
+            return when {
+                n.isNotEmpty() && e.isNotEmpty() -> "$n <$e>"
+                n.isNotEmpty() -> n
+                e.isNotEmpty() -> "<$e>"
+                else -> ""
+            }
         }
     }
 }

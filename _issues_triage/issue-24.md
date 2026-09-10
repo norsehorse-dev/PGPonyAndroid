@@ -1,0 +1,10 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+On the 4.3.0 roster: all four trust marks get decided at once so shape and color agree with rank, rather than swapping one image now. 4.2.0 is out today; I am on iOS next per my usual schedule and back on Android after.
+
+NorseHorse
+--
+

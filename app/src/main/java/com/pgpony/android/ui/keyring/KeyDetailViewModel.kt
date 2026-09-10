@@ -36,6 +36,7 @@ import com.pgpony.android.qr.QrBitmap
 import com.pgpony.android.data.RevocationReason
 import com.pgpony.android.data.TrustLevel
 import com.pgpony.android.data.repository.KeyRepository
+import com.pgpony.android.data.repository.KeyRepoError
 import com.pgpony.android.network.KeyServerRepository
 import org.bouncycastle.openpgp.PGPPublicKey
 import kotlinx.coroutines.Dispatchers
@@ -117,6 +118,16 @@ data class FallbackKeyChoice(
     val key: PGPKeyEntity,
     val enabled: Boolean
 )
+
+/** item 16 (#54): a subkey revoke/remove paused on the last-encryption-subkey
+ *  warning, carrying what it needs to retry once the user confirms. */
+data class PendingSubkeyOp(
+    val kind: Kind,
+    val subkeyFingerprint: String,
+    val reason: RevocationReason? = null,
+    val comment: String? = null,
+    val passphrase: String? = null
+) { enum class Kind { REVOKE, REMOVE } }
 
 data class KeyDetailUiState(
     /** The loaded key. Null while loading or if not found. */
@@ -251,6 +262,18 @@ data class KeyDetailUiState(
      *  PGPKeyEntity.revocationCertificate so the user can re-export
      *  later from Danger Zone. */
     val pendingRevocationCert: String? = null,
+    // ── item 16 (#54): per-subkey revoke / remove ────────────────────
+    /** Target subkey for the reused RevokeKeySheet (subkey revoke). */
+    val subkeyRevokeTarget: SubkeyDisplayInfo? = null,
+    val showSubkeyRevokeSheet: Boolean = false,
+    val subkeyRevokeInFlight: Boolean = false,
+    val subkeyRevokeError: String? = null,
+    /** Target subkey for the local-remove confirmation dialog. */
+    val subkeyRemoveTarget: SubkeyDisplayInfo? = null,
+    val subkeyRemoveInFlight: Boolean = false,
+    /** Set when an op would strip the last encryption subkey; drives the
+     *  confirm dialog that retries with allowLastEncryptionSubkey. */
+    val lastEncryptionWarning: PendingSubkeyOp? = null,
     // ── Phase A7: Export private key ──────────────────────────────────
     /** Drives the export-private-key confirmation AlertDialog. The
      *  dialog warns the user that the private key includes secret
@@ -846,6 +869,25 @@ class KeyDetailViewModel(
                 )
             }
         }
+        if (fromRing.isEmpty() && entity.algorithm.isCompositeSign) {
+            // #55 item 4: a composite ML-DSA key is not a BouncyCastle ring, so
+            // its User IDs come from CompositeKeyFacade metadata rather than from
+            // primaryPub (which is null for algo 30/31). Show every one.
+            val compositeUids = withContext(Dispatchers.IO) {
+                repo.loadCompositePublicInfo(entity.fingerprint)?.userIds
+            }
+            if (!compositeUids.isNullOrEmpty()) {
+                return compositeUids.mapIndexed { index, raw ->
+                    val parsed = PGPKeyEntity.parseUserID(raw)
+                    KeyUserIdInfo(
+                        raw = raw,
+                        name = parsed.first,
+                        email = parsed.second,
+                        isPrimary = index == 0
+                    )
+                }
+            }
+        }
         if (fromRing.isEmpty()) {
             val parsed = PGPKeyEntity.parseUserID(entity.userID)
             return listOf(
@@ -898,7 +940,7 @@ class KeyDetailViewModel(
                 capabilities = SubkeyCapability.Encrypt.flag,
                 createdAt = info.creationTimeMillis,
                 expiresAt = expiresAtMs,
-                isRevoked = false,
+                isRevoked = sub.isRevoked,
                 isCardBacked = entity.isCardBacked
             )
         )
@@ -1339,6 +1381,123 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                 )
             }
         }
+    }
+
+    // ── Subkey revoke / remove (item 16, #54) ────────────────────────────
+
+    fun showSubkeyRevokeSheet(sub: SubkeyDisplayInfo) {
+        _state.value = _state.value.copy(
+            subkeyRevokeTarget = sub, showSubkeyRevokeSheet = true, subkeyRevokeError = null
+        )
+    }
+
+    fun dismissSubkeyRevokeSheet() {
+        if (_state.value.subkeyRevokeInFlight) return
+        _state.value = _state.value.copy(
+            showSubkeyRevokeSheet = false, subkeyRevokeTarget = null, subkeyRevokeError = null
+        )
+    }
+
+    fun revokeSubkey(reason: RevocationReason, comment: String?, passphrase: String?) {
+        val sub = _state.value.subkeyRevokeTarget ?: return
+        doRevokeSubkey(sub.fingerprint, reason, comment, passphrase, allowLast = false)
+    }
+
+    private fun doRevokeSubkey(
+        subkeyFp: String, reason: RevocationReason, comment: String?, passphrase: String?, allowLast: Boolean
+    ) {
+        val key = _state.value.key ?: return
+        _state.value = _state.value.copy(subkeyRevokeInFlight = true, subkeyRevokeError = null)
+        viewModelScope.launch {
+            try {
+                repo.revokeSubkey(
+                    key.fingerprint, subkeyFp, reason,
+                    comment.takeIf { !it.isNullOrBlank() }, passphrase, allowLast
+                )
+                val reloaded = repo.getByFingerprint(key.fingerprint)
+                _state.value = _state.value.copy(
+                    key = reloaded ?: key,
+                    subkeys = reloaded?.let { deriveSubkeys(it) } ?: _state.value.subkeys,
+                    subkeyRevokeInFlight = false,
+                    showSubkeyRevokeSheet = false,
+                    subkeyRevokeTarget = null
+                )
+            } catch (e: KeyRepoError.LastEncryptionSubkey) {
+                _state.value = _state.value.copy(
+                    subkeyRevokeInFlight = false,
+                    showSubkeyRevokeSheet = false,
+                    lastEncryptionWarning = PendingSubkeyOp(
+                        PendingSubkeyOp.Kind.REVOKE, subkeyFp, reason, comment, passphrase
+                    )
+                )
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    subkeyRevokeInFlight = false,
+                    subkeyRevokeError = e.message
+                        ?: PGPonyApp.instance.getString(R.string.key_detail_subkey_action_failed)
+                )
+            }
+        }
+    }
+
+    fun requestSubkeyRemove(sub: SubkeyDisplayInfo) {
+        _state.value = _state.value.copy(subkeyRemoveTarget = sub)
+    }
+
+    fun dismissSubkeyRemove() {
+        if (_state.value.subkeyRemoveInFlight) return
+        _state.value = _state.value.copy(subkeyRemoveTarget = null)
+    }
+
+    fun confirmSubkeyRemove() {
+        val sub = _state.value.subkeyRemoveTarget ?: return
+        doRemoveSubkey(sub.fingerprint, allowLast = false)
+    }
+
+    private fun doRemoveSubkey(subkeyFp: String, allowLast: Boolean) {
+        val key = _state.value.key ?: return
+        _state.value = _state.value.copy(subkeyRemoveInFlight = true)
+        viewModelScope.launch {
+            try {
+                repo.removeSubkey(key.fingerprint, subkeyFp, allowLast)
+                val reloaded = repo.getByFingerprint(key.fingerprint)
+                _state.value = _state.value.copy(
+                    key = reloaded ?: key,
+                    subkeys = reloaded?.let { deriveSubkeys(it) } ?: _state.value.subkeys,
+                    subkeyRemoveInFlight = false,
+                    subkeyRemoveTarget = null
+                )
+            } catch (e: KeyRepoError.LastEncryptionSubkey) {
+                _state.value = _state.value.copy(
+                    subkeyRemoveInFlight = false,
+                    subkeyRemoveTarget = null,
+                    lastEncryptionWarning = PendingSubkeyOp(PendingSubkeyOp.Kind.REMOVE, subkeyFp)
+                )
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    subkeyRemoveInFlight = false,
+                    subkeyRemoveTarget = null,
+                    errorMessage = e.message
+                        ?: PGPonyApp.instance.getString(R.string.key_detail_subkey_action_failed)
+                )
+            }
+        }
+    }
+
+    fun confirmLastEncryptionSubkey() {
+        val op = _state.value.lastEncryptionWarning ?: return
+        _state.value = _state.value.copy(lastEncryptionWarning = null)
+        when (op.kind) {
+            PendingSubkeyOp.Kind.REVOKE -> doRevokeSubkey(
+                op.subkeyFingerprint, op.reason ?: RevocationReason.NO_REASON,
+                op.comment, op.passphrase, allowLast = true
+            )
+            PendingSubkeyOp.Kind.REMOVE -> doRemoveSubkey(op.subkeyFingerprint, allowLast = true)
+        }
+    }
+
+    fun dismissLastEncryptionSubkey() {
+        _state.value = _state.value.copy(lastEncryptionWarning = null)
     }
 
     // ── User ID editing (RC3 §17.2 I / #29) ──────────────────────────────

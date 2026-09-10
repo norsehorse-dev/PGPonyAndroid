@@ -570,8 +570,10 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             _state.value = s.copy(errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_name_required))
             return
         }
-        if (s.generateEmail.isBlank() || !s.generateEmail.contains("@")) {
-            _state.value = s.copy(errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_email_required))
+        // item 3 (#request): email is optional now (name-only key). Only a
+        // non-blank address must still look like an email.
+        if (s.generateEmail.isNotBlank() && !s.generateEmail.contains("@")) {
+            _state.value = s.copy(errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_email_invalid))
             return
         }
         if (s.generatePassphrase != s.generateConfirmPassphrase) {
@@ -594,7 +596,12 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                     isGenerating = false,
                     showGenerateSheet = false,
                     // 4.0.0 Phase 5a (§6 Q6) — offer to publish the new key.
-                    pendingPublishFingerprint = generated.fingerprint,
+                    // item 8 (#request): suppressed while offline and when the
+                    // "offer to publish new keys" suggestion is turned off.
+                    // A name-only (email-less) key has no address to publish, and
+                    // key servers key discovery off the email, so skip the prompt.
+                    pendingPublishFingerprint =
+                        if (shouldOfferPublish() && generated.userEmail.isNotBlank()) generated.fingerprint else null,
                     successMessage = PGPonyApp.instance.getString(R.string.keyring_status_key_generated)
                 )
                 loadKeys()
@@ -611,6 +618,17 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
      *  generation publish prompt. */
     fun dismissPublishPrompt() {
         _state.value = _state.value.copy(pendingPublishFingerprint = null)
+    }
+
+    /** item 8 (#request): whether keygen offers the post-generation publish
+     *  prompt. Off while offline mode is on (publishing contradicts the
+     *  offline guarantee) and off when the user disabled the "offer to publish
+     *  new keys" suggestion in Settings. Default on preserves prior behavior. */
+    private fun shouldOfferPublish(): Boolean {
+        if (com.pgpony.android.network.OfflineMode.isEnabled()) return false
+        return PGPonyApp.instance
+            .getSharedPreferences("pgpony_prefs", android.content.Context.MODE_PRIVATE)
+            .getBoolean("offer_publish_after_keygen", true)
     }
 
     // ── Import (Phase A10a — 4-method picker) ──────────────────────────
@@ -781,7 +799,12 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
         source: KeyLookupSource? = null,
         sourceFilename: String? = null
     ) {
-        val trimmed = armoredText.trim()
+        // item 19 (#58): a shared browser text selection wraps the key in page
+        // text; pull out the armored key block(s) and ignore the surrounding
+        // noise. A clean .asc is a single block and comes back unchanged; text
+        // with no armored block falls through to the "no key data" error below.
+        val extracted = com.pgpony.android.crypto.ArmorExtractor.extractForImport(armoredText)
+        val trimmed = (extracted ?: armoredText).trim()
         if (trimmed.isBlank()) {
             _state.value = _state.value.copy(
                 errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_no_key_data)

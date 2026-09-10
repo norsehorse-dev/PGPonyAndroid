@@ -1,0 +1,227 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Thanks for the detailed report and the exact repro steps, that saves me a lot of time.
+
+You're right that PGPony can't handle the ECC and Kyber hybrid keys yet. I dug into it and the fix is a little more involved than bumping Bouncy Castle. Newer Bouncy Castle versions do ship the ML-KEM primitive, but the OpenPGP composite layer GnuPG uses for these keys needs its own handling on top of that, and GnuPG's Kyber wire format has some history that I want to verify against real gpg output before I trust it.
+
+I'm already deep into the 4.0.0 release and this compatibility is going into it. Importing the hybrid secret key, decrypting files encrypted to it, and encrypting to these keys are all in scope. I'll post here when there's a build you can test against your setup.
+--
+author:	EmanuelLoos
+association:	none
+edited:	false
+status:	none
+--
+There is another very useful feature you might want to implement in the 4.0.0 release: OpenKeychain is no longer actively developed but integrates with other apps like the email client Thunderbird (formerly K9-Mail) and the XMPP client Conversations. If PGPony can include the same logic OpenKeychain uses to integrate with other apps, it would be a drop-in replacement for OpenKeychain.
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+That's actually the centerpiece of 4.0.0. PGPony is implementing the same OpenPGP API that OpenKeychain exposes, so apps like Thunderbird for Android and Conversations can select PGPony as their crypto provider the same way they do OpenKeychain today. That includes the permission model client apps expect, so it should behave as a drop-in replacement.
+
+The Kyber compatibility from this issue is going into the same release, so both should land together. I'll post here when there's something to test.
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+PGPony 4.0.0 is live on GitHub and should be picked up by F-Droid within the next 48 hours. It includes the ECC+Kyber support you asked for, and since you also brought up the OpenKeychain integration, that made it into the same release. Here's where things stand with both.
+
+On the post-quantum side, 4.0.0 implements ML-KEM-768 + X25519 composite encryption in both wire formats that exist today: the IETF draft format (algorithm 35, v6 keys) and the LibrePGP format that GnuPG 2.5.x produces (algorithm 8, v5 keys, the ky768_cv25519 you generated). Your exact repro case now passes end to end. I validated message interop in both directions against GnuPG 2.5.21, so files and messages encrypted by gpg decrypt in PGPony and the other way around. Public key exchange works both ways too, and keys generated in PGPony import cleanly into gpg with the PQC subkey intact. The IETF format implementation is verified against the draft's official test vectors, and everything transfers cleanly between PGPony on Android and iOS.
+
+There are a few limitations you should know about, all on the ecosystem side rather than in PGPony. PQC private keys can't be imported into GnuPG from PGPony or any other app, because gpg stores these secrets in its own internal format and its importer doesn't accept the standard wire form yet. Public keys and messages are unaffected by this. Sequoia's sq preview builds implement an older revision of the IETF draft and can't parse current draft keys, they fail on the draft's own sample key, so no sq interop for IETF format keys until they update. GnuPG itself has no support for the IETF format at all, so keys in that format are PGPony to PGPony for now. And any PQC interop with gpg needs 2.5 or later, since 2.4.x has no ML-KEM support. These are all blocked on the other tools right now, but I'll be watching gpg and sq releases and will get each of these working in later PGPony releases as it becomes possible. Classical keys, RSA and Ed25519, v4 and v6, are completely unaffected by all of this.
+
+On the OpenKeychain replacement, 4.0.0 ships a provider service implementing the same OpenPGP API interface and versions that OpenKeychain 6.0.4 exposed, so any app that could use OpenKeychain as its crypto provider can select PGPony instead. Thunderbird for Android, K-9 Mail, and Password Store are the targets I tested against. Encrypt, decrypt, sign, and verify all work through the API, along with signing key selection, passphrase prompting, streaming for large attachments, and NFC hardware key operations during provider calls. Nothing is allowed by default, each client app gets authorized on first use and pinned to its signature, and you can revoke any of them in Settings under Connected apps. The provider runs on the same crypto core as the rest of the app, so mail encrypted to someone with a post-quantum key works through Thunderbird as well, within the limitations above.
+
+Thanks again for the report and the clean repro steps. If you get a chance to test against your setup once the F-Droid build lands, I'd be glad to hear how it goes.
+--
+author:	EmanuelLoos
+association:	none
+edited:	false
+status:	none
+--
+Those are great news!
+
+Did you also implement and test the GnuPG kyber type 4 "Kyber 1024 (X448)" for completeness?
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Not yet. 4.0.0 implements the ML-KEM-768 + X25519 composite only, in both wire formats. Kyber 1024 (X448) isn't supported in this release, so a gpg key generated with type 4 won't import as a usable encryption key.
+
+The groundwork is there though. The app already uses X448 for classical v6 keys, Bouncy Castle provides the ML-KEM-1024 primitive, and both composite constructions are isolated enough that the 1024 variant is mostly parameterization plus another round of interop validation against gpg. It's on the plan for 4.1.0, assuming validation doesn't run into ecosystem limitations like the ones I hit with the 768 keys. I'll track it in this issue or a follow-up so you can see when it lands.
+--
+author:	monospacedmagic
+association:	none
+edited:	true
+status:	none
+--
+Looks like ML-KEM-1024 + X448 support needs some more work and didn't land in 4.1.0, but is queued for 4.2.0. Looking forward to it!
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+ML-KEM-1024 + X448 is in, both formats: the IETF draft (v6 keys) and the LibrePGP one GnuPG 2.5.x uses (ky1024_cv448). Keygen, import, encrypt, decrypt, and export all work.
+
+This isn't the finished 4.2.0. I'm still building the rest, but I wanted to get 1024 into your hands now rather than make you wait for it. I verified the LibrePGP format round-trips against GnuPG 2.5.21 both ways, so the interop is tested, not assumed. The iOS side gets 1024 in 8.2.0.
+
+Build, the foss APK (no Google dependencies):
+https://pgpony.app/rc/4.2.0-RC1/PGPony-4.2.0-RC1-foss.apk
+
+Signature and SHA-256:
+https://pgpony.app/rc/4.2.0-RC1/PGPony-4.2.0-RC1-foss.apk.asc
+https://pgpony.app/rc/4.2.0-RC1/PGPony-4.2.0-RC1-foss.apk.sha256
+
+This build is signed with my key, same as the pgpony.app download. If you installed from F-Droid or Google Play, their signatures differ and Android won't update over it: back up your keyring (Settings), uninstall, install this, then restore. On the pgpony.app build it updates in place.
+
+Thanks for the push on this.
+
+NorseHorse
+--
+author:	EmanuelLoos
+association:	none
+edited:	true
+status:	none
+--
+Thanks for implementing Kyber 1024 (X448)!
+
+Upon testing RC1, I noticed that the Welcome Tour only allows Ed25519 keys to be generated, is that intentional? I would have made a screenshot, but the app seems to enable `FLAG_SECURE`. Browsers enabling `FLAG_SECURE` in private mode usually allow disabling it in the app settings. It might be wise to add an option to allow screenshots to PGPony as well because screenshots could provide more context to bug reports.
+
+Also, I recommend naming the LibrePGP format keys "Kyber 768 (X25519)" and "Kyber 1024 (X448)" as GnuPG does. This will avoid confusion because there are also the GnuPG kyber types 1 and 2. Also, if ML-KEM is the post-standardization name it might be best to use it for the standardized version (or the closest-to-standard draft version) only.
+
+On another note, when using a key for email encryption and decryption, for example in Thunderbird, only one key can be selected. How will PGPony behave when a different key that is imported in PGPony is needed to decrypt an email? While it would probably be unwise to give any app that is allowed to use some key permission to decrypt anything that was encrypted with another key, old encryption keys and old emails encrypted with these do exist when switching to from an older key to a newer, more secure one. Also, even new emails encrypted with the old keys might arrive for various reasons. Encrypting emails with an older key for delivery to contacts whose software does not yet support Kyber+ECC hybrid keys would probably be difficult to implement as implementing the ability to select multiple keys and set the one used for signing per contact might require breaking changes to the API and thereby every app using it. But maybe a per-key setting in PGPony to select old keys that may be used as fallback for decryption by any app that was given access to a certain key as well as per-key options which key to use for signing based on weather the recipients public key the message is encrypted with is a Kyber+ECC hybrid key, a different key or not existent could allow backward compatibility without API changes?
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Thanks for testing RC1 this quickly.
+
+The Welcome Tour: good catch, and it's an oversight, not a decision. The tour is supposed to offer every key type the main generator offers, and the iOS version's tour does exactly that. I just never widened the Android tour's list when the generator grew, so it still shows only the Ed25519 pair. I'll fix it, the tour will carry the full set including both hybrid formats.
+
+FLAG_SECURE: fair point. The flag stays on by default, but I'll add an opt-in setting to allow screenshots, the way private-mode browsers do it. A deliberate toggle for better bug reports is a trade the user should be allowed to make.
+
+Naming: agreed, and I'll take your suggestion as is. The LibrePGP-format keys will show as "Kyber 768 (X25519)" and "Kyber 1024 (X448)", matching what GnuPG prints, and "ML-KEM" stays reserved for the IETF draft format, which is the one tracking the standardized construction. The current labels blur exactly the line you describe.
+
+On the mail-client question: you've thought this through further than the API discussion usually gets, and I think your conclusion is right. Changing the client-facing API to support multiple keys per account would break every client, but both halves of your suggestion live entirely inside PGPony: a per-key setting that marks retired keys as decryption fallbacks for any app already granted the current key, and per-key signing rules keyed on what the recipient's certificate supports. Old keys and old mail are a real situation, not an edge case, and the fallback especially matters for exactly the migration you describe, moving from a classical key to a hybrid one. I can definitely look into adding that. If you file it as its own issue it gets tracked properly and you'll see when it lands; it fits naturally with the key-management work already queued.
+
+NorseHorse
+--
+author:	monospacedmagic
+association:	none
+edited:	true
+status:	none
+--
+I have imported an ML-KEM-1024 + X448 key generated using [FreePGP-patched GnuPG](https://gitlab.com/freepg/gnupg) v2.5.21, and it was listed in the app with no corresponding indicator:
+
+<img width="1080" height="646" alt="Image" src="https://github.com/user-attachments/assets/446ffd3e-e931-4c66-9402-83fd6f5f330a" />
+
+(The way `FLAG_SECURE` is implemented for PGPony seems to be bugged, on GrapheneOS at least it doesn't prevent screenshots.)
+
+I advise against naming the keys according to the [standards-deviating](https://wiki.archlinux.org/title/GnuPG#OpenPGP_compatibility) old names that GnuPG uses. I'd rather PGPony sticks to [IETF's names](https://datatracker.ietf.org/doc/rfc9980/) and doesn't contribute to this issue.
+
+Also, please try not to rely on an LLM to respond to issues, as it will not only lead you down the wrong path (confirming people's understanding of things when it is an issue with GnuPG deviating from IETF standards) but it also feels a bit disrespectful towards us who write our contributions by hand.
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Thanks, all three points land.
+
+The missing indicator is the one I most want to chase, and your screenshot actually narrows it. The ring isn't just unlabeled, it's reading as a plain v4 Ed25519+Cv25519 pair with no trace of a composite subkey at all, which means something is dropping or failing to parse the ML-KEM subkey rather than just mislabeling it. One thing I found while digging in: RFC 9980 allows ML-KEM-768+X25519 (not the 1024 variant) on a v4 encryption subkey specifically, so if FreePGP generated a v4-framed key, the algorithm and the framing both matter here. Could you attach the public key, or the output of gpg --list-packets on it? That would tell me which algorithm and which key version you actually got, and whether it's a parsing gap on my side. Either way, FreePGP-patched GnuPG just became my live interop partner for the IETF format, which I've been missing, so this is a genuinely useful find.
+
+FLAG_SECURE isn't bugged, that's GrapheneOS behaving as designed: it deliberately allows user-initiated screenshots of secure windows while still blocking other apps and screen capture. On stock Android the flag does block screenshots, which is why the opt-in setting suggested earlier in this thread is still coming. Your OS made the same call by default that the setting will offer as a choice.
+
+On naming: you've changed my mind, and @EmanuelLoos, that means I'm walking back what I agreed to above. With the standard published, ML-KEM is the algorithm's name and gpg's kyber/ky* strings are the deviating side, so display names follow RFC 9980 for both wire formats and PGPony won't adopt the gpg names after all. Emanuel, your underlying problem still gets solved: the generator caption for the LibrePGP types now says plainly that gpg shows these keys as ky768_cv25519 and ky1024_cv448, so recognizing your own key across tools works without entrenching the nonstandard names. Standard names as the names, gpg's names as the translation.
+
+NorseHorse
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+@monospacedmagic , one more thing while I wait on that certificate: I reproduced the drop directly, standalone against BouncyCastle, outside the app.
+
+A v4-framed subkey carrying an algorithm ID BC doesn't recognize (I tried algo 35, algo 36, and a private-range id) parses the ring without throwing, but the subkey never lands in it. Silent drop, no exception, which matches your screenshot exactly, a ring that reads as a plain v4 Ed25519+Cv25519 pair with no PQC indicator at all.
+
+The root cause is structural, not a bug in how PGPony labels keys. A v5 subkey (the LibrePGP path GnuPG 2.5.x uses for the 768/1024 composites) carries an explicit key-material length, so BC's generic parser can capture unknown-algorithm bytes opaquely and PGPony re-parses that blob afterward. A v4 subkey has no such length at the key level, only the outer packet header knows the total length, so BC has nowhere safe to stop reading an algorithm it doesn't know and drops the packet instead.
+
+What I still don't know is which algorithm ID and framing FreePGP actually emitted. RFC 9980 §3.5 permits ML-KEM-768+X25519 on a v4 encryption subkey, but ML-KEM-1024+X448 is v6-only under the RFC, so if your key is really 1024 on a v4 ring, that's FreePGP doing something the spec doesn't call for. The certificate or gpg --list-packets output would settle it and tell me whether real v4 composite support is worth building.
+
+NorseHorse
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+One fix from your RC1 report is in this build: the onboarding key generator now offers the full key list instead of just the two Ed25519 options, so it matches the Keyring generator.
+
+RC2 is up: https://pgpony.app/rc/PGPony-4.2.0-RC2/PGPony-4.2.0-RC2-foss.apk
+
+NorseHorse
+--
+author:	EmanuelLoos
+association:	none
+edited:	true
+status:	none
+--
+I spotted something strange in RC3: When generating a ML-KEM-1024+X448 v6 key in PGPony, its key details show Ed25519 and X25519 subkeys.
+
+PS: I know it is a little early for this, but do you know if there have been any security audits of any software components PGPony is using? I am asking because there was a full security audit of OpenKeychain in 2015: https://cure53.de/pentest-report_openkeychain.pdf
+--
+author:	CertainBot
+association:	contributor
+edited:	false
+status:	none
+--
+> I spotted something strange in RC3: When generating a ML-KEM-1024+X448 v6 key in PGPony, its key details show Ed25519 and X25519 subkeys.
+>
+
+Noticed the same in RC3 and was about to ask if this is normal or not. I see three keys: Ed, X, and ML, both Ed and ML as encrypting.
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Good eyes, both of you, and this one deserves a proper explanation because the display is telling the truth.
+
+Every composite key PGPony generates is a hybrid: a classical base (Ed25519 v6 primary for certification and signing, X25519 v6 subkey) with the ML-KEM composite grafted on as an additional encryption subkey. That is true for the 1024 suite too; the X448 half of ML-KEM-1024+X448 lives inside the composite subkey, not in the classical base. So Key Details showing Ed25519, X25519, and ML-KEM for one key is the actual ring layout, not a labeling error.
+
+The part that matters: encryption always addresses the composite subkey. The key selection prefers ML-KEM over the classical X25519 whenever both are present, in the app and in what gets published for others to encrypt to. The classical base exists so the key can still certify, sign, and be understood by software that has never heard of algorithm 36.
+
+@CertainBot on "both Ed and ML as encrypting": if the Ed25519 primary is showing an Encrypt badge on your device, that is a display bug and I want a screenshot. The ML one is correct.
+
+On audits: honest answer, PGPony itself has had no dedicated security audit. The crypto core is BouncyCastle, which is widely reviewed, and the composite implementation is interop-tested against GnuPG in both directions every release, but that is testing, not an audit. The 2015 Cure53 report on OpenKeychain is a good precedent, and a dedicated audit is on the roadmap.
+
+NorseHorse
+--
+author:	CertainBot
+association:	contributor
+edited:	false
+status:	none
+--
+@norsehorse-dev thanks for the in-depth response. Sorry, my bad. I just mixed the terms, Ed is correctly labeled for `Sign` and X and ML for `Encrypt`. 
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Closing with 4.2.0 released. Since this issue opened it has grown into the release's spine: the 768 suite interoperating with gpg both directions, the 1024 suite alongside it, v6 composite keys, file decryption with composite keys fixed, and the fallback and signing-default machinery that makes a post-quantum key livable next to older correspondents. Your reports and retests across six release candidates shaped most of it. 4.2.0 is on GitHub now, F-Droid is submitted, and the reproducibility check is green on their pipeline's twin. Anything further on the PQC side is welcome as a new issue.
+
+NorseHorse
+--

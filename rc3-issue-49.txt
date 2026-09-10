@@ -1,0 +1,36 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Real gap. Import already recognizes authentication subkeys, but Add Subkey only offers Sign and Encrypt, so you cannot make one yet. It is in for 4.4.0.
+
+What are you using it for? If it is SSH through gpg-agent, I will set the defaults for that.
+
+NorseHorse
+--
+author:	naive-HA
+association:	none
+edited:	false
+status:	none
+--
+indeed, ssh authentication. I am programing keys with an app I am developing: sub rosa
+I will add support for importing keys from pgpony.
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+It is in RC2, up now.
+
+On a v6 key, Add Subkey now offers Ed25519 (Authenticate) next to Sign and Encrypt. On a v4 key you also get RSA 2048/4096 (Authenticate). The subkey carries the Authentication key flag, so it exports as a normal auth-capable subkey that gpg-agent and anything reading key flags will treat as an SSH authentication key.
+
+https://pgpony.app/rc/4.4.0-RC-foss/PGPony-4.4.0-RC2-foss.apk
+
+Installs over your current build, no uninstall.
+
+Good luck with sub rosa. When you wire up import, if anything looks off in the exported auth subkey, send me the key and I will look.
+
+NorseHorse
+--

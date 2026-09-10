@@ -242,8 +242,8 @@ android {
         // background-kill ROMs fixed by moving the OpenPGP API service and its
         // provider activities to a dedicated :remote_api process (#2.1), plus
         // the offline switch. versionCode 433 so it installs over 4.3.2.
-        versionCode = 434
-        versionName = "4.4.1"
+        versionCode = 435
+        versionName = "4.5.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -268,6 +268,12 @@ android {
                 signingConfigs.getByName("debug")
             }
             isMinifyEnabled = true
+            // Play Android vitals (Sep 2026): resource shrinking was off, so the
+            // "Shrinking" optimization metric sat low. minifyEnabled is required for
+            // this and is already on. R8 only removes resources it can prove are
+            // unreferenced; anything looked up dynamically by name must stay reachable
+            // via a keep rule (none in this app today). Verify on a release build.
+            isShrinkResources = true
             // Disable AGP VCS info embedding so the release APK is byte-identical
             // regardless of which working tree it is built from. Without this, the
             // APK contains META-INF/version-control-info.textproto with a git commit

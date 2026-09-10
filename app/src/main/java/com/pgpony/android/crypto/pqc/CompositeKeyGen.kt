@@ -235,6 +235,96 @@ object CompositeKeyGen {
         return ring
     }
 
+    /**
+     * item 14 (#56): graft a v4 ML-KEM-768+X25519 (algorithm 35) encryption
+     * subkey onto a v4 primary (Ed25519), per RFC 9980 sections 3.5 / 4.3.2
+     * (algo 35 is the ONE PQ method allowed in v4 encryption subkeys). Unlike
+     * the v6 IETF path, a v4 key packet carries no material-length field, so
+     * BouncyCastle cannot parse the algo-35 subkey and cannot hash its binding;
+     * both are hand-assembled here (the algo-30/31 composite-primary model), and
+     * the result is returned as RAW transferable-secret-key octets rather than a
+     * PGPSecretKeyRing. [baseSecretRing] is a v4 Ed25519 secret ring (optionally
+     * already carrying a classical ECDH subkey for pre-PQC recipients); its
+     * primary signs the v4 subkey binding (0x99 / 2-octet framing on both keys).
+     */
+    fun addV4Algo35SubkeyRings(
+        baseSecretRing: PGPSecretKeyRing,
+        passphrase: String? = null,
+        random: SecureRandom = SecureRandom(),
+        creationTime: Date = Date(),
+        expirationSeconds: Long? = null
+    ): V4Algo35Rings {
+        val suite = CompositeSuite.IETF_768
+        // 1. Fresh composite material: X25519 + ML-KEM-768.
+        val xkp = X25519KeyPairGenerator()
+            .apply { init(X25519KeyGenerationParameters(random)) }.generateKeyPair()
+        val xPub = (xkp.public as X25519PublicKeyParameters).encoded   // 32
+        val xSec = (xkp.private as X25519PrivateKeyParameters).encoded // 32
+        val mkp = MLKEMKeyPairGenerator()
+            .apply { init(MLKEMKeyGenerationParameters(random, suite.mlkem.params)) }
+            .generateKeyPair()
+        val mPub = (mkp.public as MLKEMPublicKeyParameters).encoded    // 1184
+        val mSeed = (mkp.private as MLKEMPrivateKeyParameters).seed
+            ?: error("BC ML-KEM keypair missing seed")                 // 64
+
+        val ctime = (creationTime.time / 1000L).toInt()
+        val (pubBody, secBody) = v4Algo35Bodies(ctime, xPub, mPub, xSec, mSeed, passphrase, random)
+        val secPacket = packet(TAG_SECSUBKEY, secBody)
+
+        // 2. v4 subkey binding signature from the primary (Ed25519, hand-rolled).
+        val primarySec = baseSecretRing.secretKey
+        val primaryPub = baseSecretRing.publicKey
+        val primaryPriv = primarySec.extractPrivateKey(
+            BcPBESecretKeyDecryptorBuilder(BcPGPDigestCalculatorProvider())
+                .build((passphrase ?: "").toCharArray())
+        )
+        val bindingSig = buildV4Algo35SubkeyBindingSig(
+            primaryPriv, packetBody(primaryPub.encoded), pubBody, ctime,
+            primaryPub.keyID, expirationSeconds
+        )
+
+        // 3. Assemble raw octets: base ring + v4 algo-35 subkey + binding, for
+        // both the secret (TAG_SECSUBKEY) and public (TAG_PUBSUBKEY) rings. The
+        // binding signature packet is identical in both. The primary and any
+        // classical subkey are BC-parseable; only the algo-35 subkey is not,
+        // which is why the whole ring is carried as raw transferable octets.
+        val secretRaw = ByteArrayOutputStream().apply {
+            write(baseSecretRing.encoded)
+            write(secPacket)
+            write(bindingSig)
+        }.toByteArray()
+        val publicRaw = ByteArrayOutputStream().apply {
+            write(publicRingOf(baseSecretRing).encoded)
+            write(packet(TAG_PUBSUBKEY, pubBody))
+            write(bindingSig)
+        }.toByteArray()
+        val fpHex = primaryPub.fingerprint.joinToString("") { "%02X".format(it) }
+        return V4Algo35Rings(secretRaw, publicRaw, fpHex)
+    }
+
+    /**
+     * item 14 (#56): the secret + public raw rings for a v4 Ed25519 base with a
+     * grafted algo-35 subkey, plus the primary's (SHA-1, v4) fingerprint hex.
+     * The primary and its classical subkey are ordinary v4 keys BC can parse;
+     * only the algo-35 subkey needs the raw-octet carriage.
+     */
+    data class V4Algo35Rings(
+        val secretRaw: ByteArray,
+        val publicRaw: ByteArray,
+        val primaryFingerprintHex: String
+    )
+
+    /** Back-compat: the secret raw ring alone (the original addV4Algo35Subkey). */
+    fun addV4Algo35Subkey(
+        baseSecretRing: PGPSecretKeyRing,
+        passphrase: String? = null,
+        random: SecureRandom = SecureRandom(),
+        creationTime: Date = Date(),
+        expirationSeconds: Long? = null
+    ): ByteArray = addV4Algo35SubkeyRings(
+        baseSecretRing, passphrase, random, creationTime, expirationSeconds
+    ).secretRaw
+
     /** Derive the public key ring for a ring produced by [addCompositeSubkey]. */
     fun publicRingOf(secretRing: PGPSecretKeyRing): PGPPublicKeyRing =
         PGPPublicKeyRing(secretRing.publicKeys.asSequence().toList())
@@ -305,6 +395,94 @@ object CompositeKeyGen {
             write(sum and 0xFF)
         }.toByteArray()
         return pub to sec
+    }
+
+    /**
+     * item 14 (#56): v4 (algo 35) subkey bodies. A v4 public key packet has NO
+     * material-length field, so the algo-35 material X25519(32) || ML-KEM(1184)
+     * follows the header directly; the outer packet length bounds it. The v4
+     * secret body appends s2k-usage 0, the material, and a 2-octet sum checksum
+     * (RFC 9580 5.5.3) — the unprotected on-disk form.
+     */
+    private fun v4Algo35Bodies(
+        ctime: Int, xPub: ByteArray, mPub: ByteArray, xSec: ByteArray, mSeed: ByteArray,
+        passphrase: String? = null, random: SecureRandom = SecureRandom()
+    ): Pair<ByteArray, ByteArray> {
+        val pubMat = xPub + mPub // 1216
+        val pub = ByteArrayOutputStream().apply {
+            write(4)
+            write(uint32(ctime))
+            write(35)          // ML-KEM-768 + X25519
+            write(pubMat)      // v4: no length prefix
+        }.toByteArray()
+        val material = xSec + mSeed // 96
+        val sec = ByteArrayOutputStream().apply {
+            write(pub)
+            if (!passphrase.isNullOrEmpty()) {
+                // item 14 (#56): match the base key's protection — S2K usage 254
+                // (SHA-1), AES-256 CFB, gpg's own v4 convention (V4Algo35Protection).
+                write(V4Algo35Protection.protect(material, passphrase.toCharArray(), random))
+            } else {
+                var sum = 0
+                for (b in material) sum = (sum + (b.toInt() and 0xFF)) and 0xFFFF
+                write(0)                       // s2k usage: unprotected
+                write(material)
+                write((sum ushr 8) and 0xFF)   // 2-octet checksum
+                write(sum and 0xFF)
+            }
+        }.toByteArray()
+        return pub to sec
+    }
+
+    /**
+     * item 14 (#56): a v4 subkey-binding signature (tag 2) over a v4 algo-35
+     * subkey. Same shape as [buildV4V5SubkeyBindingSig] but the subkey is framed
+     * v4 (0x99 / 2-octet), matching its version, so a v4-aware tool recomputes
+     * the same hash. Signed by the Ed25519 primary over SHA-256.
+     */
+    private fun buildV4Algo35SubkeyBindingSig(
+        primaryPriv: PGPPrivateKey,
+        primaryPubBody: ByteArray,
+        subkeyBody: ByteArray,
+        ctime: Int,
+        primaryKeyId: Long,
+        expirationSeconds: Long?
+    ): ByteArray {
+        val hashed = ByteArrayOutputStream().apply {
+            write(subpacket(2, uint32(ctime)))            // sig creation time
+            write(subpacket(27, byteArrayOf(0x0C)))       // key flags: EC | ES (encrypt)
+            if (expirationSeconds != null && expirationSeconds > 0L) {
+                write(subpacket(9, uint32(expirationSeconds.toInt())))  // key expiration
+            }
+        }.toByteArray()
+        val keyIdBytes = ByteArray(8) { ((primaryKeyId ushr (8 * (7 - it))) and 0xFF).toByte() }
+        val unhashed = subpacket(16, keyIdBytes)          // issuer key ID
+
+        val hashData = ByteArrayOutputStream().apply {
+            write(0x99); write((primaryPubBody.size ushr 8) and 0xFF); write(primaryPubBody.size and 0xFF)
+            write(primaryPubBody)
+            write(0x99); write((subkeyBody.size ushr 8) and 0xFF); write(subkeyBody.size and 0xFF)
+            write(subkeyBody)
+            write(4); write(0x18); write(22); write(8)    // ver, type(0x18), EdDSA(22), SHA-256(8)
+            write((hashed.size ushr 8) and 0xFF); write(hashed.size and 0xFF); write(hashed)
+            write(4); write(0xFF); write(uint32(6 + hashed.size))   // v4 final trailer
+        }.toByteArray()
+        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(hashData)
+
+        val signer = Ed25519Signer()
+        signer.init(true, BcPGPKeyConverter().getPrivateKey(primaryPriv))
+        signer.update(digest, 0, digest.size)
+        val sig = signer.generateSignature()   // 64 octets, R || S
+
+        val body = ByteArrayOutputStream().apply {
+            write(4); write(0x18); write(22); write(8)
+            write((hashed.size ushr 8) and 0xFF); write(hashed.size and 0xFF); write(hashed)
+            write((unhashed.size ushr 8) and 0xFF); write(unhashed.size and 0xFF); write(unhashed)
+            write(digest[0].toInt() and 0xFF); write(digest[1].toInt() and 0xFF)   // left 16 bits
+            write(canonicalMpi(sig.copyOfRange(0, 32)))
+            write(canonicalMpi(sig.copyOfRange(32, 64)))
+        }.toByteArray()
+        return packet(2, body)
     }
 
     // ── emission helpers ─────────────────────────────────────────────

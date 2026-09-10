@@ -8,6 +8,7 @@
 package com.pgpony.android.crypto.pqc
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -82,5 +83,70 @@ class CompositeKeyFacadeTest {
         val info = CompositeKeyFacade.parse(raw)
         assertEquals("expiration seconds", oneYear, info.expirationSeconds)
         assertEquals("creation time", 1_700_000_000_000L / 1000L * 1000L, info.creationTimeMillis)
+    }
+
+    @Test
+    fun `hasV4Algo35Subkey detects the v4 interop shape only`() {
+        val svc = com.pgpony.android.crypto.PGPCryptoService.shared
+        val base = svc.importKeyData(
+            svc.generateKeyPair(
+                name = "V4 Interop", email = "v4@example.test",
+                algorithm = com.pgpony.android.crypto.KeyAlgorithm.ED25519_CV25519,
+                passphrase = null
+            ).privateKeyData
+        ).secretKeyRing!!
+        val rings = CompositeKeyGen.addV4Algo35SubkeyRings(base)
+
+        assertTrue("secret ring carries the v4 algo-35 subkey",
+            CompositeKeyFacade.hasV4Algo35Subkey(rings.secretRaw))
+        assertTrue("public ring carries the v4 algo-35 subkey",
+            CompositeKeyFacade.hasV4Algo35Subkey(rings.publicRaw))
+        assertFalse("a plain v4 Ed25519+Cv25519 base has no algo-35 subkey",
+            CompositeKeyFacade.hasV4Algo35Subkey(base.encoded))
+        // The v4 interop primary is an ordinary Ed25519, not a composite
+        // primary, so the two detectors never both fire on one key.
+        assertFalse("v4 interop is not a composite primary",
+            CompositeKeyFacade.isCompositePrimary(rings.secretRaw))
+        // A composite ML-DSA key is a composite primary but its ML-KEM subkey
+        // is v6, so it is not a v4 algo-35 key.
+        val mldsa = CompositePrimaryKeyGen.assemble("PQ <pq@pgpony.app>", suite)
+        assertTrue(CompositeKeyFacade.isCompositePrimary(mldsa))
+        assertFalse("composite ML-DSA key has no v4 algo-35 subkey",
+            CompositeKeyFacade.hasV4Algo35Subkey(mldsa))
+    }
+
+    @Test
+    fun `v4 algo-35 material extraction yields 1216 public and 96 secret bytes`() {
+        val svc = com.pgpony.android.crypto.PGPCryptoService.shared
+        val base = svc.importKeyData(
+            svc.generateKeyPair(
+                name = "V4 Interop", email = "v4@example.test",
+                algorithm = com.pgpony.android.crypto.KeyAlgorithm.ED25519_CV25519,
+                passphrase = null
+            ).privateKeyData
+        ).secretKeyRing!!
+        val rings = CompositeKeyGen.addV4Algo35SubkeyRings(base)
+
+        val secBody = CompositeKeyFacade.v4Algo35SubkeyBody(rings.secretRaw)!!
+        val pubBody = CompositeKeyFacade.v4Algo35SubkeyBody(rings.publicRaw)!!
+
+        val pubMatFromSecret = CompositeKeyFacade.v4Algo35PublicMaterial(secBody)
+        val pubMatFromPublic = CompositeKeyFacade.v4Algo35PublicMaterial(pubBody)
+        assertEquals("public material is X25519(32) + ML-KEM-768(1184)", 1216, pubMatFromSecret.size)
+        assertTrue("public material identical across secret and public rings",
+            pubMatFromSecret.contentEquals(pubMatFromPublic))
+
+        val secMat = CompositeKeyFacade.v4Algo35SecretMaterial(secBody)!!
+        assertEquals("secret material is X25519 secret(32) + ML-KEM seed(64)", 96, secMat.size)
+        // A public-only body carries no secret material.
+        assertNull("public ring subkey has no secret material",
+            CompositeKeyFacade.v4Algo35SecretMaterial(pubBody))
+
+        // The v4 subkey fingerprint is SHA-1 (20 octets) and is the same whether
+        // taken from the public or secret body (both share the 1222-octet head).
+        val fp = CompositeKeyFacade.v4Algo35SubkeyFingerprint(pubBody)
+        assertEquals("v4 subkey fingerprint is SHA-1", 20, fp.size)
+        assertTrue("fingerprint identical from public and secret bodies",
+            fp.contentEquals(CompositeKeyFacade.v4Algo35SubkeyFingerprint(secBody)))
     }
 }

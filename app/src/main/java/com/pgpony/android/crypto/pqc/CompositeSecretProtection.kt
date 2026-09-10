@@ -180,15 +180,31 @@ object CompositeSecretProtection {
         val s2k = buildS2K(s2kBytes)
         val s2kKey = decryptor.makeKeyFromPassPhrase(symAlg, s2k)
 
-        return if (s2kUsage == USAGE_AEAD) {
-            decryptor.recoverKeyData(
-                symAlg, aeadAlg, s2kKey, iv, AAD_PACKET_TAG, 6, encData, pubkeyContents
-            )
-        } else {
-            val plain = decryptor.recoverKeyData(symAlg, s2kKey, iv, encData, 0, encData.size)
-            require(plain.size >= expectedLen) { "recovered composite secret material too short" }
-            plain.copyOfRange(0, expectedLen)
+        if (s2kUsage == USAGE_AEAD) {
+            // item 12 (#36): BouncyCastle binds the OpenPGP packet tag into the
+            // OCB associated data. PGPony historically protected even the
+            // composite PRIMARY as a subkey (AAD tag 7), so its own keys unlock
+            // with tag 7; an externally generated key (sequoia) protects the
+            // primary with the real tag 5 and a subkey with tag 7. Try tag 7
+            // first (our own convention, and always correct for a subkey), then
+            // tag 5 (an imported primary). A wrong tag fails OCB's authenticated
+            // tag, never yields wrong plaintext, so the fallback is safe. This is
+            // what lets an imported sq protected composite key decrypt.
+            var lastError: Exception? = null
+            for (aadTag in intArrayOf(AAD_PACKET_TAG, 5)) {
+                try {
+                    return decryptor.recoverKeyData(
+                        symAlg, aeadAlg, s2kKey, iv, aadTag, 6, encData, pubkeyContents
+                    )
+                } catch (e: Exception) {
+                    lastError = e
+                }
+            }
+            throw lastError ?: ProtectedKeyException("composite AEAD unlock failed")
         }
+        val plain = decryptor.recoverKeyData(symAlg, s2kKey, iv, encData, 0, encData.size)
+        require(plain.size >= expectedLen) { "recovered composite secret material too short" }
+        return plain.copyOfRange(0, expectedLen)
     }
 
     private fun buildS2K(b: ByteArray): S2K = when (val type = b[0].toInt() and 0xFF) {

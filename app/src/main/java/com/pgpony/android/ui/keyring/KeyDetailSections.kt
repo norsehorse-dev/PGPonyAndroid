@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.IosShare
@@ -944,7 +945,12 @@ fun UserIdsSection(
 fun SubkeysSection(
     subkeys: List<SubkeyDisplayInfo>,
     canAddSubkey: Boolean = false,
-    onAddSubkey: (() -> Unit)? = null
+    onAddSubkey: (() -> Unit)? = null,
+    // item 16 (#54): per-subkey manage actions. Shown on software key pairs
+    // only (same gating as Add Subkey); card-backed subkeys never get a menu.
+    canManageSubkeys: Boolean = false,
+    onRevokeSubkey: ((SubkeyDisplayInfo) -> Unit)? = null,
+    onRemoveSubkey: ((SubkeyDisplayInfo) -> Unit)? = null
 ) {
     SectionGroup(title = stringResource(R.string.key_detail_subkeys_title)) {
         subkeys.forEachIndexed { index, sub ->
@@ -953,7 +959,10 @@ fun SubkeysSection(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
                         text = sub.algorithmLabel,
                         style = MaterialTheme.typography.bodyMedium,
@@ -965,6 +974,43 @@ fun SubkeysSection(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (canManageSubkeys && !sub.isCardBacked &&
+                        (onRemoveSubkey != null || (onRevokeSubkey != null && !sub.isRevoked))
+                    ) {
+                        Spacer(modifier = Modifier.weight(1f))
+                        var menuOpen by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { menuOpen = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = stringResource(R.string.key_detail_subkey_more_actions)
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = menuOpen,
+                                onDismissRequest = { menuOpen = false }
+                            ) {
+                                if (onRevokeSubkey != null && !sub.isRevoked) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.key_detail_subkey_revoke_action)) },
+                                        onClick = {
+                                            menuOpen = false
+                                            onRevokeSubkey(sub)
+                                        }
+                                    )
+                                }
+                                if (onRemoveSubkey != null) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.key_detail_subkey_remove_action)) },
+                                        onClick = {
+                                            menuOpen = false
+                                            onRemoveSubkey(sub)
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
                 Text(
                     text = stringResource(R.string.key_detail_subkeys_key_id_format, sub.keyId),

@@ -1,0 +1,109 @@
+author:	AraafRoyall
+association:	none
+edited:	false
+status:	none
+--
+The same feature i have decided to suggest. 
+
+It is best. Also we need to make QR in a new thread to prevent Lag . 
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Good idea and logged for 4.3.0. Same chunk format as today, automated ColdCard-style rotation, and the manual buttons go once it proves itself. Two things to settle in the build: frame rate against what real scanner apps can keep up with, and agreeing the cadence with the iOS side since both apps share the QR format. 4.2.0 is out today; I am on iOS next per my usual schedule, which for this feature is convenient timing, back on Android after.
+
+NorseHorse
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+RC3 has the animated QR:
+
+https://pgpony.app/rc/4.3.0-RC-foss/PGPony-4.3.0-RC3-foss.apk
+
+The .asc and sha256 are beside it, and it installs in place over your current copy, F-Droid included, with no uninstall and no data loss, since it is signed with the same reproducible-build key.
+
+A multi-part key cycles its frames on its own now, both on the key's QR sheet and in the Exchange tab, with a play/pause control. The frame generation moved off the main thread, which addresses the lag raised in the thread. The manual next and prev buttons are still there on purpose: the rotation speed is provisional, and I want it verified against real scanner apps and agreed with the iOS side before the buttons come out, since both apps share the QR format.
+
+Retest: open a post-quantum key's QR and let it cycle without touching the buttons, then scan it from another device and confirm it imports. If the speed feels off for your scanner, tell me the number that works.
+
+NorseHorse
+--
+author:	CertainBot
+association:	contributor
+edited:	false
+status:	none
+--
+@norsehorse-dev I just tested RC3 on 3 different Android devices. All working fine, did many test intentionally skipping messages and not a single fail. All QR are read no matter the order in which it's done.
+
+Read time is less than 1/4 of the current time lapse for each tile in all three devices. Not sure what is the limit for iOS but overall can be halved with confidence.
+
+The buttons layout is not great, I would suggest to maintain all three buttons but use the classic tape symbols for advance and go back, thus string size wouldn't be a problem ⏪⏯️⏩ 
+
+Thanks! 
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+RC4 is up: https://pgpony.app/rc/4.3.0-RC-foss/PGPony-4.3.0-RC4-foss.apk (the .sha256 and .asc sit beside it).
+
+Two changes, both from your RC3 scanner test.
+
+The frame cadence is halved, 1000ms to 500ms. You measured the per-tile read at under a quarter of the old window on all three devices, so 500ms still leaves a 2x margin. The manual buttons stay.
+
+The prev/next buttons now use the transport symbols you suggested: rewind, play/pause, fast-forward. They are icons now, so the label width problem is gone.
+
+Retest: the same skip-around scanning you ran on RC3, now at 500ms, on your three devices. The one thing I have not verified is an iOS device scanning an Android animated QR at this rate, since your test was Android only. That is the last check before 4.3.0 final and I will confirm it separately.
+
+This is the final feature RC for 4.3.0. The app is feature complete now; what remains is the test matrix and the release.
+
+NorseHorse
+--
+author:	CertainBot
+association:	contributor
+edited:	false
+status:	none
+--
+@norsehorse-dev thank you! R4 tested. The user interfaces looks excelente and works as expected. The tile frame rate is recognizable by the scanner, still much faster than the tile frame rate which is good. The available room is ok for lower spec devices, screen reflections, dirty lenses and so on.
+
+No issues while skipping frames and then resuming the scan. Once all tiles are read the key screen pops up. Great!
+
+While testing I found two bugs unrelated to the scanner: 
+- after a key is deleted, it remains visible Keyring. The key is blank but remains on the Keyring screen until the app is reloaded. 
+- a Trust level change of a key is not shown on the Keyring screen until the app is reloaded.
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+RC5 is up: https://pgpony.app/rc/4.3.0-RC-foss/PGPony-4.3.0-RC5-foss.apk (the .sha256 and .asc sit beside it).
+
+Both bugs you found during the QR test are fixed. The Keyring was holding a cached list and only re-reading it after its own changes, so a delete or a trust change made on the key detail screen did not show until the app reloaded. It now re-reads the list every time you return to the Keyring, so a deleted key leaves it right away and a trust change shows live.
+
+Retest: delete a key and confirm it disappears from the Keyring without reloading, then change a key's trust level and confirm the Keyring reflects it live.
+
+Thanks for catching these while testing the scanner. The QR retest itself came through clean, so #37 is settled.
+
+NorseHorse
+--
+author:	CertainBot
+association:	contributor
+edited:	false
+status:	none
+--
+Thanks @norsehorse-dev , retested on RC5:
+
+- Rotating animated QR and UI changes - ✅
+- Deleted key now disappears - ✅
+- Trust level instant update - ✅
+
+Closing the issue.
+❤️
+--

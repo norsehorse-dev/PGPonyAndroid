@@ -129,9 +129,13 @@ class KeyServerRepository {
      */
     suspend fun findByEmail(email: String): KeyLookupResult? {
         // WKD attempt — returns null if both advanced and direct fail.
-        WkdService.shared.lookup(email)?.let {
-            Log.d(LOG_TAG, "findByEmail($email) → hit via ${it.source.displayName}")
-            return it
+        // item 21 (#request): honor the Settings WKD lookup toggle. Off drops
+        // WKD from the chain; the configured servers + Hagrid still run.
+        if (WkdLookup.isEnabled()) {
+            WkdService.shared.lookup(email)?.let {
+                Log.d(LOG_TAG, "findByEmail($email) → hit via ${it.source.displayName}")
+                return it
+            }
         }
 
         // Phase 6: consult the configured keyserver directory before the

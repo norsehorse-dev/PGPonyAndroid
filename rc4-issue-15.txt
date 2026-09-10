@@ -1,0 +1,29 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Marked for 4.2.0. You are right, and the dialog announcing "5 minutes" while giving you no way to change it makes it worse rather than better.
+
+Good news on how it gets built: PGPony already has this for the smartcard PIN. Settings, Remember card PIN, has a duration picker offering 1 min, 5 min, 15 min, 1 hour and "Until I clear it", with a countdown and a Clear now button. The passphrase cache never got the same treatment, so this is mostly extending something that already works.
+
+Two of your suggestions need more care. "Until the phone locks" is probably the one most people want, and it is the one thing neither cache can express today, since both expire on a timer rather than on an event. "Until reboot" I probably cannot offer honestly: the passphrase is only ever held in memory, and Android can kill the app whenever it needs the RAM, so that setting would promise something the design cannot keep. "Until PGPony closes" is the true version of it and I would rather label it accurately.
+
+Scheduled alongside a related question about how long a hardware key stays unlocked, so the two do not end up contradicting each other.
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+4.2.0, released today, ships the timeout picker: 1 minute to 1 hour, or until you clear it. The lifecycle options from your list (until the phone locks, until reboot) are on the 4.3.0 roster as one policy decision so the app's caches cannot disagree with each other. Closing with the release; the remainder is tracked in the 4.3.0 plan.
+
+NorseHorse
+--
+author:	christian179717
+association:	none
+edited:	false
+status:	none
+--
+Thanks for the quick implementation.
+--

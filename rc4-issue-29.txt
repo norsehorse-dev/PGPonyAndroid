@@ -1,0 +1,53 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Answering your two open issues in one place: this one, and the K9 error from #27.
+
+#29, multiple identities: marked for 4.3.0. Real gap: a key gets exactly one identity today, decided at generation, and that is the only place the code writes one. I have split the roadmap in two (the why is on #26), and 4.2.0 is full with the ML-KEM-1024 work, so this lands in 4.3.0 with the other key-management requests.
+
+#27, the K9 decryption error: four things will help me pin it down.
+
+1.The exact error text K9 shows.
+2. Whether a classic v4 key on the same account decrypts fine. That one answer separates the v6 key from the mail-client connection in general.
+3. If you can get it, logcat from both K9 and PGPony at the failure moment.
+4. Your PGPony version and install source. F-Droid is still on 4.0.x (their 4.1.0 build is not out yet, see #28), and 4.0.x has a known crash on exactly this boundary that 4.1.0 fixed. If that is your case, the GitHub 4.1.0 APK may resolve it outright, but back up your keyring first in Settings, Backup: the signing keys differ, Android will make you uninstall, and uninstalling deletes the keyring.
+--
+author:	bluemle
+association:	none
+edited:	false
+status:	none
+--
+Thanks for your quick reply!
+
+I just had a look, I don't see any additional error in K9 besides the screenshot I sent.
+
+v4 keys work, but any v5/v6 key doesn't. It seems to be an issue of K9/Thunderbird.
+
+I tried again with version 4.1.1 of PGPony but same results.
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Earlier in this thread I said multiple identities would be 4.3.0. I was wrong in the good direction: it landed in 4.2.0 RC3. The Key Detail restructure this cycle put all the plumbing in place, so holding the feature back a full release stopped making sense.
+
+Key Detail can now add User IDs, revoke them, and change which one is primary. Exports carry the full identity list, and gpg reads everything back correctly, including revocations. One thing worth knowing when you verify: gpg hides fully revoked User IDs from its default listing; pass --list-options show-unusable-uids to see them marked revoked.
+
+On your K-9 finding: thank you for narrowing it to v4 works, v5/v6 does not, and for re-checking on 4.1.1. Your read matches mine. K-9 and Thunderbird for Android still parse keys on their side of the OpenPGP API, and their parser predates the newer key versions, so there is nothing PGPony can do from the provider side to make a v6 key acceptable to them. For mail through K-9, a v4 key is the interop path until they catch up. I test the provider against K-9, FairEmail, and Thunderbird before every release and will keep an eye on when their v6 support lands; this caveat is going in the release notes and FAQ so the next person does not have to discover it the way you did.
+
+Download: https://pgpony.app/rc/4.2.0-RC-foss/PGPony-4.2.0-RC3-foss.apk. Installs over RC2, same versionCode.
+
+NorseHorse
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Multiple identities per key shipped in 4.2.0, released today: add, revoke, and primary selection in Key Detail. Closing with the release.
+
+NorseHorse
+--

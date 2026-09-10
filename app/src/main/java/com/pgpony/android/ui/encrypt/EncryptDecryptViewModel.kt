@@ -128,10 +128,22 @@ enum class DecryptMode(val displayName: String) {
     VERIFY("Verify")
 }
 
+/** item 2 (#36): a mixed-recipient post-quantum downgrade — the message would
+ *  be PQ-wrapped for some recipients but classically wrapped for these, which
+ *  makes the whole message recoverable by a future quantum attacker. */
+data class PqMixedWarning(val classicalRecipientNames: List<String>)
+
 data class EncryptUiState(
     val inputText: String = "",
     val outputText: String = "",
     val selectedRecipients: List<PGPKeyEntity> = emptyList(),
+    // item 2 (#36): non-blocking warning when the selected set mixes PQ and
+    // classical recipients; null when the set is uniform or single.
+    val pqMixedWarning: PqMixedWarning? = null,
+    // item 13 (#36): per-recipient encryption-subkey choices (fingerprint
+    // hex uppercase -> chosen key id) and the options each recipient offers.
+    val recipientSubkeyChoices: Map<String, Long> = emptyMap(),
+    val recipientSubkeyOptions: Map<String, List<com.pgpony.android.crypto.EncryptionKeyOption>> = emptyMap(),
     val availableRecipients: List<PGPKeyEntity> = emptyList(),
     val signingKey: PGPKeyEntity? = null,
     // §4.5 (#22): signing-subkey choices for the chosen signer (first entry
@@ -754,6 +766,50 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             current.add(key)
         }
         _encryptState.value = _encryptState.value.copy(selectedRecipients = current)
+        recomputePqWarning()
+    }
+
+    /**
+     * item 2 (#36): reclassify the selected recipients and surface a
+     * non-blocking warning naming the classical (non-PQ) ones when the set is a
+     * PQ/classical mix. Loading rings is IO, so this runs off the main thread
+     * and updates the state when done; a uniform or single-recipient set clears
+     * the warning.
+     */
+    private fun recomputePqWarning() {
+        val recipients = _encryptState.value.selectedRecipients
+        viewModelScope.launch {
+            val (warning, options) = withContext(Dispatchers.IO) {
+                val opts = LinkedHashMap<String, List<com.pgpony.android.crypto.EncryptionKeyOption>>()
+                var pqCount = 0
+                val classical = mutableListOf<String>()
+                for (r in recipients) {
+                    val ring = repo.loadEncryptionRecipientRing(r.fingerprint) ?: continue
+                    opts[r.fingerprint.uppercase()] = crypto.encryptionKeyOptions(ring)
+                    if (crypto.isPostQuantumRecipient(ring)) {
+                        pqCount++
+                    } else {
+                        classical.add(r.userName.ifBlank { r.userEmail.ifBlank { r.shortFingerprint } })
+                    }
+                }
+                val w = if (recipients.size >= 2 && pqCount > 0 && classical.isNotEmpty())
+                    PqMixedWarning(classical) else null
+                w to opts
+            }
+            val keep = _encryptState.value.selectedRecipients.map { it.fingerprint.uppercase() }.toSet()
+            _encryptState.value = _encryptState.value.copy(
+                pqMixedWarning = warning,
+                recipientSubkeyOptions = options,
+                recipientSubkeyChoices = _encryptState.value.recipientSubkeyChoices.filterKeys { it in keep }
+            )
+        }
+    }
+
+    /** item 13 (#36): set the chosen encryption subkey for one recipient. */
+    fun setRecipientSubkey(fingerprint: String, keyId: Long) {
+        val choices = _encryptState.value.recipientSubkeyChoices.toMutableMap()
+        choices[fingerprint.uppercase()] = keyId
+        _encryptState.value = _encryptState.value.copy(recipientSubkeyChoices = choices)
     }
 
     // ── A15 preflight fix ──────────────────────────────────────────────
@@ -765,10 +821,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     fun selectAllRecipients() {
         val all = _encryptState.value.availableRecipients
         _encryptState.value = _encryptState.value.copy(selectedRecipients = all.toList())
+        recomputePqWarning()
     }
 
     fun clearRecipients() {
-        _encryptState.value = _encryptState.value.copy(selectedRecipients = emptyList())
+        _encryptState.value = _encryptState.value.copy(selectedRecipients = emptyList(), pqMixedWarning = null)
     }
 
     fun setAsciiArmor(value: Boolean) {
@@ -1286,6 +1343,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 val recipientRings = withContext(Dispatchers.IO) {
                     s.selectedRecipients.mapNotNull { repo.loadEncryptionRecipientRing(it.fingerprint) }
                 }
+                val v4Recipients = v4RecipientsFor(s.selectedRecipients)
                 val signingRing = withContext(Dispatchers.IO) {
                     if (s.signMessage && s.signingKey != null) {
                         // RC3 §N (#34): PQC/classical-recipient default.
@@ -1306,7 +1364,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         passphrase = passphrase,
                         filename = s.filename,
                         armor = s.asciiArmor,
-                        signingKeyId = s.selectedSigningKeyId
+                        signingKeyId = s.selectedSigningKeyId,
+                        recipientSubkeyChoices = s.recipientSubkeyChoices,
+                        v4Algo35Recipients = v4Recipients
                     )
                 }
                 if (!s.asciiArmor) {
@@ -1497,6 +1557,17 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      * binary .pgp, and armoring a large file would inflate it by a
      * third for no benefit.
      */
+    /** item 14 (#56): the v4 Ed25519 + algo-35 recipients among [recipients].
+     *  Such a key is not a BouncyCastle ring, so loadEncryptionRecipientRing
+     *  drops it; it travels the v4Algo35Recipients channel instead. */
+    private suspend fun v4RecipientsFor(
+        recipients: List<PGPKeyEntity>
+    ): List<com.pgpony.android.crypto.pqc.V4Algo35Recipient> = withContext(Dispatchers.IO) {
+        recipients
+            .filter { it.algorithm == com.pgpony.android.crypto.KeyAlgorithm.MLKEM768_X25519_V4 }
+            .mapNotNull { repo.loadV4Algo35Recipient(it.fingerprint) }
+    }
+
     private suspend fun streamEncryptToScratch(
         uri: android.net.Uri,
         outName: String,
@@ -1506,6 +1577,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         literalFilename: String?,
         messagePassword: String?,
         signingKeyId: Long? = null,
+        v4Recipients: List<com.pgpony.android.crypto.pqc.V4Algo35Recipient> = emptyList(),
         totalBytes: Long
     ): java.io.File = withContext(Dispatchers.IO) {
         val job = coroutineContext[kotlinx.coroutines.Job]
@@ -1534,7 +1606,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     enableCompression = totalBytes in 0..COMPRESSION_LIMIT,
                     messagePassword = messagePassword,
                     useArgon2 = useArgon2Pref,
-                    signingKeyId = signingKeyId
+                    signingKeyId = signingKeyId,
+                    v4Algo35Recipients = v4Recipients
                 )
             }
         }
@@ -1611,6 +1684,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 val recipientRings = withContext(Dispatchers.IO) {
                     s.selectedRecipients.mapNotNull { repo.loadEncryptionRecipientRing(it.fingerprint) }
                 }
+                val v4Recipients = v4RecipientsFor(s.selectedRecipients)
                 val signingRing = withContext(Dispatchers.IO) {
                     if (s.signMessage && s.signingKey != null) {
                         // RC3 §N (#34): PQC/classical-recipient default.
@@ -1634,7 +1708,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             passphrase = passphrase,
                             filename = s.selectedFileName,
                             armor = false,
-                            signingKeyId = s.selectedSigningKeyId
+                            signingKeyId = s.selectedSigningKeyId,
+                            recipientSubkeyChoices = s.recipientSubkeyChoices,
+                            v4Algo35Recipients = v4Recipients
                         )
                     }
                 } else null
@@ -1648,6 +1724,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         literalFilename = s.selectedFileName,
                         messagePassword = null,
                         signingKeyId = s.selectedSigningKeyId,
+                        v4Recipients = v4Recipients,
                         totalBytes = s.selectedFileSize ?: 0L
                     )
                 } else null
@@ -2094,6 +2171,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 val recipientRings = withContext(Dispatchers.IO) {
                     s.selectedRecipients.mapNotNull { repo.loadEncryptionRecipientRing(it.fingerprint) }
                 }
+                val v4Recipients = v4RecipientsFor(s.selectedRecipients)
                 val signingRing = withContext(Dispatchers.IO) {
                     if (
                         s.signMessage && s.signingKey != null && s.signingKey.isCardBacked != true
@@ -2188,7 +2266,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                                 passphrase = passphrase,
                                 filename = null,
                                 armor = true,
-                                signingKeyId = s.selectedSigningKeyId
+                                signingKeyId = s.selectedSigningKeyId,
+                                recipientSubkeyChoices = s.recipientSubkeyChoices,
+                                v4Algo35Recipients = v4Recipients
                             )
                         }
                     }

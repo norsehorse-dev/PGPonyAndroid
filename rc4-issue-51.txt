@@ -1,0 +1,11 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Thanks, and you have it exactly right. On the send path PGPony remembers the first key you picked for that account and never offers the choice again, so a second key on the same address is unreachable.
+
+The fix is to make that a real selector on the send screen with a change control, so you can switch keys or be asked each time instead of being locked to the first pick. It is on the 4.4.0 list.
+
+NorseHorse
+--

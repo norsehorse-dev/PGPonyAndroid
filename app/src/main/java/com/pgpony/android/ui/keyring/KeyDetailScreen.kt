@@ -399,6 +399,8 @@ fun KeyDetailScreen(
                 onComingSoon = dispatchAction,
                 onEditExpiry = { viewModel.showExpirySheet() },
                 onAddSubkey = { viewModel.showAddSubkeySheet() },
+                onRevokeSubkey = { viewModel.showSubkeyRevokeSheet(it) },
+                onRemoveSubkey = { viewModel.requestSubkeyRemove(it) },
                 onAddUserId = { viewModel.showAddUserIdSheet() },
                 onMakePrimaryUserId = { uid -> viewModel.requestUserIdAction(uid, UserIdActionRequest.Kind.MAKE_PRIMARY) },
                 onRevokeUserId = { uid -> viewModel.requestUserIdAction(uid, UserIdActionRequest.Kind.REVOKE) },
@@ -605,6 +607,65 @@ fun KeyDetailScreen(
                 viewModel.applyRevocation(reason, comment, passphrase)
             },
             onDismiss = { viewModel.dismissRevokeSheet() }
+        )
+    }
+
+    // ── item 16 (#54): subkey revoke sheet (reuses RevokeKeySheet) ─────
+    val subkeyRevokeTarget = state.subkeyRevokeTarget
+    if (state.showSubkeyRevokeSheet && subkeyRevokeTarget != null) {
+        RevokeKeySheet(
+            keyOwnerLabel = subkeyRevokeTarget.algorithmLabel + " · " + subkeyRevokeTarget.keyId,
+            isProcessing = state.subkeyRevokeInFlight,
+            errorMessage = state.subkeyRevokeError,
+            onRevoke = { reason, comment, passphrase ->
+                viewModel.revokeSubkey(reason, comment, passphrase)
+            },
+            onDismiss = { viewModel.dismissSubkeyRevokeSheet() }
+        )
+    }
+
+    // ── item 16 (#54): local remove confirmation ──────────────────────
+    val subkeyRemoveTarget = state.subkeyRemoveTarget
+    if (subkeyRemoveTarget != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissSubkeyRemove() },
+            title = { Text(stringResource(R.string.key_detail_subkey_remove_confirm_title)) },
+            text = { Text(stringResource(R.string.key_detail_subkey_remove_confirm_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.confirmSubkeyRemove() },
+                    enabled = !state.subkeyRemoveInFlight
+                ) {
+                    Text(stringResource(R.string.key_detail_subkey_remove_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.dismissSubkeyRemove() },
+                    enabled = !state.subkeyRemoveInFlight
+                ) {
+                    Text(stringResource(R.string.common_button_cancel))
+                }
+            }
+        )
+    }
+
+    // ── item 16 (#54): last-encryption-subkey warning ─────────────────
+    if (state.lastEncryptionWarning != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissLastEncryptionSubkey() },
+            title = { Text(stringResource(R.string.key_detail_subkey_last_enc_title)) },
+            text = { Text(stringResource(R.string.key_detail_subkey_last_enc_body)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmLastEncryptionSubkey() }) {
+                    Text(stringResource(R.string.key_detail_subkey_last_enc_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissLastEncryptionSubkey() }) {
+                    Text(stringResource(R.string.common_button_cancel))
+                }
+            }
         )
     }
 
@@ -1251,6 +1312,8 @@ private fun LoadedBody(
     onComingSoon: (String) -> Unit,
     onEditExpiry: () -> Unit,
     onAddSubkey: () -> Unit,
+    onRevokeSubkey: (SubkeyDisplayInfo) -> Unit,
+    onRemoveSubkey: (SubkeyDisplayInfo) -> Unit,
     onAddUserId: () -> Unit,
     onMakePrimaryUserId: (String) -> Unit,
     onRevokeUserId: (String) -> Unit,
@@ -1331,7 +1394,10 @@ private fun LoadedBody(
                 SubkeysSection(
                     subkeys = state.subkeys,
                     canAddSubkey = canAddSubkey,
-                    onAddSubkey = onAddSubkey
+                    onAddSubkey = onAddSubkey,
+                    canManageSubkeys = canAddSubkey,
+                    onRevokeSubkey = onRevokeSubkey,
+                    onRemoveSubkey = onRemoveSubkey
                 )
             }
         }

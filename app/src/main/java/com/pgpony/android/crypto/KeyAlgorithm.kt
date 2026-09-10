@@ -40,6 +40,14 @@ enum class KeyAlgorithm(
     // present. Import + encrypt/decrypt supported; not offered for keygen.
     MLKEM768_X25519_V6("ML-KEM-768+X25519 (v6)", "ML-KEM-768 v6", 0, isV6 = true),
 
+    // 4.5.0 (item 14 / #56): RFC 9980 v4 interop shape — a v4 Ed25519 primary
+    // with a v4 algo-35 (ML-KEM-768 + X25519) encryption subkey. Algo 35 is the
+    // one PQ code point the RFC allows on v4 (algo 36 stays v6-only), so this is
+    // the maximum-reach shape: an ordinary v4 primary every tool handles, with
+    // only the encryption subkey needing algo-35 awareness. Stored as raw bytes
+    // because BC cannot parse a v4 subkey that carries no material-length field.
+    MLKEM768_X25519_V4("ML-KEM-768+X25519 (v4)", "ML-KEM-768 v4", 0),
+
     // 4.0.0 Phase 2b — LibrePGP post-quantum composite (draft-koch-librepgp,
     // algorithm 8): ML-KEM-768 + X25519 on a v5 encryption subkey under a
     // v4 EdDSA primary (GnuPG 2.5.x keys). Naming rule, settled twice on
@@ -68,6 +76,22 @@ enum class KeyAlgorithm(
     // offered for generation; PGPony's own keys use an Ed25519 / EdDSA primary.
     ECDSA("ECDSA", "ECDSA", 0),
 
+    // item 17 (Play review): curve-aware ECDSA labels. detectAlgorithm reads
+    // the curve OID and maps algo 19 to one of these, so a NIST / brainpool
+    // primary shows its real curve instead of "ECDSA" (bits 0) or "RSA 4096".
+    // Import-only; keyBits is the curve field size.
+    ECDSA_NIST_P256("ECDSA (NIST P-256)", "NIST P-256", 256),
+    ECDSA_NIST_P384("ECDSA (NIST P-384)", "NIST P-384", 384),
+    ECDSA_NIST_P521("ECDSA (NIST P-521)", "NIST P-521", 521),
+    ECDSA_BRAINPOOL_P256("ECDSA (brainpoolP256r1)", "brainpoolP256r1", 256),
+    ECDSA_BRAINPOOL_P384("ECDSA (brainpoolP384r1)", "brainpoolP384r1", 384),
+    ECDSA_BRAINPOOL_P512("ECDSA (brainpoolP512r1)", "brainpoolP512r1", 512),
+    ECDSA_SECP256K1("ECDSA (secp256k1)", "secp256k1", 256),
+
+    // item 17 (Play review): the truthful fallback. A key detectAlgorithm
+    // cannot model is labeled Unknown, never a confident wrong "RSA 4096".
+    UNKNOWN("Unknown", "Unknown", 0),
+
     // 4.3.x (issue #2): LibrePGP composite ML-KEM-1024 + brainpoolP384r1
     // (algorithm 8), the pairing gpg 2.5.x / GPG4WIN 5.1 emits. Import and label
     // supported; the KEM (encrypt/decrypt) is gated on gpg round-trip
@@ -94,6 +118,7 @@ enum class KeyAlgorithm(
     /** The four ML-KEM composite (post-quantum) algorithms, either format. */
     val isComposite: Boolean
         get() = this == MLKEM768_X25519_V6 || this == MLKEM1024_X448_V6 ||
+            this == MLKEM768_X25519_V4 ||
             this == MLKEM768_X25519_LIBREPGP || this == MLKEM1024_X448_LIBREPGP ||
             this == MLKEM1024_BP384_LIBREPGP
 
@@ -108,15 +133,30 @@ enum class KeyAlgorithm(
         // renders these; [generatable] stays the flat union for other callers.
         val generatableClassical = listOf(V6_ED25519, ED25519_CV25519)
         val generatablePostQuantum = listOf(
-            MLKEM768_X25519_V6, MLKEM1024_X448_V6, MLDSA65_ED25519_V6
+            // The recommended post-quantum keys: RFC 9580 v6 composite encryption
+            // and ML-DSA + EdDSA signing. The three ML-KEM-768+X25519 WIRE SHAPES
+            // (v6 / v4 / v5) live in [generatableInterop] instead, since they are
+            // the same KEM in different formats, a compatibility choice, not a
+            // security one.
+            MLKEM1024_X448_V6, MLDSA65_ED25519_V6
+        )
+        // item 14 (#56): the interop tier — the three encodings of the SAME
+        // ML-KEM-768 + X25519 key, one per target tool's expectations:
+        //   v6  RFC 9580 composite primary (algo 35), PGPony/Sequoia-native
+        //   v4  RFC 9980 Ed25519 primary + v4 algo-35 subkey, maximum reach
+        //   v5  LibrePGP composite (algo 8), GnuPG 2.5.x
+        // Grouped so a tester picks a compatibility target, not a strength.
+        val generatableInterop = listOf(
+            MLKEM768_X25519_V6, MLKEM768_X25519_V4, MLKEM768_X25519_LIBREPGP
         )
         val generatableAdvanced = listOf(
             RSA_4096, RSA_2048,
-            MLKEM768_X25519_LIBREPGP, MLKEM1024_X448_LIBREPGP
+            MLKEM1024_X448_LIBREPGP
         )
 
         /** Every generatable algorithm (the union of the picker groups). */
-        val generatable = generatableClassical + generatablePostQuantum + generatableAdvanced
+        val generatable = generatableClassical + generatablePostQuantum +
+            generatableInterop + generatableAdvanced
 
         /**
          * Map an OpenPGP algorithm ID + key version to a KeyAlgorithm.

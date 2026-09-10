@@ -74,24 +74,24 @@ object DocumentBytes {
             if (consider(resolver.openInputStream(uri)?.use { it.readBytes() })) {
                 return Detailed(best, declaredSize, displayName)
             }
-        } catch (_: Exception) {}
+        } catch (_: Throwable) {}
         try {
             if (consider(resolver.openFileDescriptor(uri, "r")?.use { pfd ->
                     java.io.FileInputStream(pfd.fileDescriptor).readBytes()
                 })) return Detailed(best, declaredSize, displayName)
-        } catch (_: Exception) {}
+        } catch (_: Throwable) {}
         try {
             if (consider(resolver.openAssetFileDescriptor(uri, "r")?.use { afd ->
                     afd.createInputStream().use { it.readBytes() }
                 })) return Detailed(best, declaredSize, displayName)
-        } catch (_: Exception) {}
+        } catch (_: Throwable) {}
         for (mime in arrayOf("application/octet-stream", "*/*")) {
             try {
                 if (consider(
                         resolver.openTypedAssetFileDescriptor(uri, mime, null)
                             ?.createInputStream()?.use { it.readBytes() }
                     )) return Detailed(best, declaredSize, displayName)
-            } catch (_: Exception) {}
+            } catch (_: Throwable) {}
         }
         return Detailed(best, declaredSize, displayName)
     }

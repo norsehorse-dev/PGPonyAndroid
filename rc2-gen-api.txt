@@ -1,0 +1,80 @@
+=== KeyPairGeneratorCallback ===
+public interface org.bouncycastle.openpgp.api.KeyPairGeneratorCallback {
+  public abstract org.bouncycastle.openpgp.PGPKeyPair generateFrom(org.bouncycastle.openpgp.operator.PGPKeyPairGenerator) throws org.bouncycastle.openpgp.PGPException;
+}
+=== OpenPGPImplementation ===
+public abstract class org.bouncycastle.openpgp.api.OpenPGPImplementation {
+  public org.bouncycastle.openpgp.api.OpenPGPImplementation();
+  public static void setInstance(org.bouncycastle.openpgp.api.OpenPGPImplementation);
+  public static org.bouncycastle.openpgp.api.OpenPGPImplementation getInstance();
+  public org.bouncycastle.openpgp.api.OpenPGPPolicy policy();
+  public org.bouncycastle.openpgp.api.OpenPGPImplementation setPolicy(org.bouncycastle.openpgp.api.OpenPGPPolicy);
+  public abstract org.bouncycastle.openpgp.PGPObjectFactory pgpObjectFactory(java.io.InputStream);
+  public abstract org.bouncycastle.openpgp.operator.PGPContentVerifierBuilderProvider pgpContentVerifierBuilderProvider();
+  public abstract org.bouncycastle.openpgp.operator.PBESecretKeyDecryptorBuilderProvider pbeSecretKeyDecryptorBuilderProvider();
+  public abstract org.bouncycastle.openpgp.operator.PGPDataEncryptorBuilder pgpDataEncryptorBuilder(int);
+  public abstract org.bouncycastle.openpgp.operator.PublicKeyKeyEncryptionMethodGenerator publicKeyKeyEncryptionMethodGenerator(org.bouncycastle.openpgp.PGPPublicKey);
+  public abstract org.bouncycastle.openpgp.operator.PBEKeyEncryptionMethodGenerator pbeKeyEncryptionMethodGenerator(char[]);
+  public abstract org.bouncycastle.openpgp.operator.PBEKeyEncryptionMethodGenerator pbeKeyEncryptionMethodGenerator(char[], org.bouncycastle.bcpg.S2K$Argon2Params);
+  public abstract org.bouncycastle.openpgp.operator.PGPContentSignerBuilder pgpContentSignerBuilder(int, int);
+  public abstract org.bouncycastle.openpgp.operator.PBEDataDecryptorFactory pbeDataDecryptorFactory(char[]) throws org.bouncycastle.openpgp.PGPException;
+  public abstract org.bouncycastle.openpgp.operator.SessionKeyDataDecryptorFactory sessionKeyDataDecryptorFactory(org.bouncycastle.openpgp.PGPSessionKey);
+  public abstract org.bouncycastle.openpgp.operator.PublicKeyDataDecryptorFactory publicKeyDataDecryptorFactory(org.bouncycastle.openpgp.PGPPrivateKey);
+  public abstract org.bouncycastle.openpgp.operator.PGPDigestCalculatorProvider pgpDigestCalculatorProvider() throws org.bouncycastle.openpgp.PGPException;
+  public abstract org.bouncycastle.openpgp.operator.PGPKeyPairGeneratorProvider pgpKeyPairGeneratorProvider();
+  public abstract org.bouncycastle.openpgp.operator.PGPContentSignerBuilderProvider pgpContentSignerBuilderProvider(int);
+  public abstract org.bouncycastle.openpgp.operator.KeyFingerPrintCalculator keyFingerPrintCalculator();
+  public abstract org.bouncycastle.openpgp.operator.PBESecretKeyEncryptorFactory pbeSecretKeyEncryptorFactory(boolean) throws org.bouncycastle.openpgp.PGPException;
+  public abstract org.bouncycastle.openpgp.operator.PBESecretKeyEncryptorFactory pbeSecretKeyEncryptorFactory(boolean, int, int) throws org.bouncycastle.openpgp.PGPException;
+}
+=== org.bouncycastle.openpgp.api.KeyPairGeneratorCallback ===
+public interface org.bouncycastle.openpgp.api.KeyPairGeneratorCallback {
+  public abstract org.bouncycastle.openpgp.PGPKeyPair generateFrom(org.bouncycastle.openpgp.operator.PGPKeyPairGenerator) throws org.bouncycastle.openpgp.PGPException;
+}
+=== org.bouncycastle.openpgp.operator.bc.BcPGPKeyPairGeneratorProvider ===
+public class org.bouncycastle.openpgp.operator.bc.BcPGPKeyPairGeneratorProvider extends org.bouncycastle.openpgp.operator.PGPKeyPairGeneratorProvider {
+  public org.bouncycastle.openpgp.operator.bc.BcPGPKeyPairGeneratorProvider();
+  public org.bouncycastle.openpgp.operator.PGPKeyPairGenerator get(int, java.util.Date);
+  public org.bouncycastle.openpgp.operator.bc.BcPGPKeyPairGeneratorProvider setSecureRandom(java.security.SecureRandom);
+  static org.bouncycastle.asn1.x9.X9ECParameters access$000(org.bouncycastle.asn1.ASN1ObjectIdentifier);
+}
+=== org.bouncycastle.openpgp.operator.jcajce.JcaPGPKeyPairGeneratorProvider ===
+public class org.bouncycastle.openpgp.operator.jcajce.JcaPGPKeyPairGeneratorProvider extends org.bouncycastle.openpgp.operator.PGPKeyPairGeneratorProvider {
+  public org.bouncycastle.openpgp.operator.jcajce.JcaPGPKeyPairGeneratorProvider();
+  public org.bouncycastle.openpgp.operator.jcajce.JcaPGPKeyPairGeneratorProvider setProvider(java.security.Provider);
+  public org.bouncycastle.openpgp.operator.jcajce.JcaPGPKeyPairGeneratorProvider setProvider(java.lang.String);
+  public org.bouncycastle.openpgp.operator.jcajce.JcaPGPKeyPairGeneratorProvider setSecureRandom(java.security.SecureRandom);
+  public org.bouncycastle.openpgp.operator.PGPKeyPairGenerator get(int, java.util.Date);
+}
+=== org.bouncycastle.openpgp.operator.PGPKeyPairGenerator ===
+public abstract class org.bouncycastle.openpgp.operator.PGPKeyPairGenerator {
+  protected final java.util.Date creationTime;
+  protected final int version;
+  protected java.security.SecureRandom random;
+  protected final org.bouncycastle.openpgp.operator.KeyFingerPrintCalculator fingerPrintCalculator;
+  public org.bouncycastle.openpgp.operator.PGPKeyPairGenerator(int, java.util.Date, java.security.SecureRandom, org.bouncycastle.openpgp.operator.KeyFingerPrintCalculator);
+  public org.bouncycastle.openpgp.PGPKeyPair generatePrimaryKey() throws org.bouncycastle.openpgp.PGPException;
+  public org.bouncycastle.openpgp.PGPKeyPair generateEncryptionSubkey() throws org.bouncycastle.openpgp.PGPException;
+  public org.bouncycastle.openpgp.PGPKeyPair generateSigningSubkey() throws org.bouncycastle.openpgp.PGPException;
+  public org.bouncycastle.openpgp.PGPKeyPair generateRsaKeyPair(int) throws org.bouncycastle.openpgp.PGPException;
+  public abstract org.bouncycastle.openpgp.PGPKeyPair generateRsaKeyPair(java.math.BigInteger, int) throws org.bouncycastle.openpgp.PGPException;
+  public abstract org.bouncycastle.openpgp.PGPKeyPair generateEd25519KeyPair() throws org.bouncycastle.openpgp.PGPException;
+  public abstract org.bouncycastle.openpgp.PGPKeyPair generateEd448KeyPair() throws org.bouncycastle.openpgp.PGPException;
+  public abstract org.bouncycastle.openpgp.PGPKeyPair generateX25519KeyPair() throws org.bouncycastle.openpgp.PGPException;
+  public abstract org.bouncycastle.openpgp.PGPKeyPair generateX448KeyPair() throws org.bouncycastle.openpgp.PGPException;
+  public abstract org.bouncycastle.openpgp.PGPKeyPair generateLegacyEd25519KeyPair() throws org.bouncycastle.openpgp.PGPException;
+  public abstract org.bouncycastle.openpgp.PGPKeyPair generateLegacyX25519KeyPair() throws org.bouncycastle.openpgp.PGPException;
+  public org.bouncycastle.openpgp.PGPKeyPair generateNistP256ECDHKeyPair() throws org.bouncycastle.openpgp.PGPException;
+  public org.bouncycastle.openpgp.PGPKeyPair generateNistP384ECDHKeyPair() throws org.bouncycastle.openpgp.PGPException;
+  public org.bouncycastle.openpgp.PGPKeyPair generateNistP521ECDHKeyPair() throws org.bouncycastle.openpgp.PGPException;
+  public org.bouncycastle.openpgp.PGPKeyPair generateNistP256ECDSAKeyPair() throws org.bouncycastle.openpgp.PGPException;
+  public org.bouncycastle.openpgp.PGPKeyPair generateNistP384ECDSAKeyPair() throws org.bouncycastle.openpgp.PGPException;
+  public org.bouncycastle.openpgp.PGPKeyPair generateNistP521ECDSAKeyPair() throws org.bouncycastle.openpgp.PGPException;
+  public abstract org.bouncycastle.openpgp.PGPKeyPair generateECDHKeyPair(org.bouncycastle.asn1.ASN1ObjectIdentifier) throws org.bouncycastle.openpgp.PGPException;
+  public abstract org.bouncycastle.openpgp.PGPKeyPair generateECDSAKeyPair(org.bouncycastle.asn1.ASN1ObjectIdentifier) throws org.bouncycastle.openpgp.PGPException;
+}
+=== org.bouncycastle.openpgp.operator.PGPKeyPairGeneratorProvider ===
+public abstract class org.bouncycastle.openpgp.operator.PGPKeyPairGeneratorProvider {
+  public org.bouncycastle.openpgp.operator.PGPKeyPairGeneratorProvider();
+  public abstract org.bouncycastle.openpgp.operator.PGPKeyPairGenerator get(int, java.util.Date);
+}

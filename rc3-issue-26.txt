@@ -1,0 +1,84 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+**Marked for 4.3.0.** You are right: there is no way to change a key's
+passphrase today, and the only workaround, regenerating the key, is
+destructive. This should exist.
+
+I have split the roadmap in two rather than let 4.2.0 swell. Where each of
+your open requests stands:
+
+- **4.2.0:** #16 Verify as a tab, #17 empty-input button states, #19 the
+  state loss under biometric lock, #20 Settings sections, #21 delete
+  safeguards, #22 the sign-key picker, and volume mounting from #18, which
+  is in the plan but still being scoped.
+- **4.3.0:** this one, first in line, then #24 trust icons and whatever #25
+  splits into.
+
+Not scheduled: #18's navigation rearrangement, where I want a second report
+or install data before demoting Exchange. Everything else is accounted for,
+and if 4.2.0 finds room this is the first thing I pull forward.
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Change passphrase is on the 4.3.0 roster, first in line in key management. It needs care rather than being rushed: the re-protection path has to handle every key format including the post-quantum ones, where the generic library path cannot. 4.2.0 is out today; I am on iOS next per my usual schedule and back on Android after.
+
+NorseHorse
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+4.3.0 RC2 is up, and it adds the passphrase change you asked for in this
+issue:
+
+https://pgpony.app/rc/4.3.0-RC-foss/PGPony-4.3.0-RC2-foss.apk
+
+The sha256 and the detached signature (.asc) sit beside it. It installs in
+place over your current copy, F-Droid included, since the reproducible
+build is signed with the same key.
+
+On a software key pair, Key Detail now has a "Change passphrase" row next
+to Export. It sets a passphrase on a key that has none, changes an existing
+one, or removes it entirely (leave the new passphrase blank, behind a
+confirmation). It works on every key type. If you have a composite ML-KEM
+key, that is the most useful one to test, in both the v6 and LibrePGP
+forms.
+
+The retest that helps most: change the passphrase on one of your keys, then
+use that key afterward, decrypt something to it and sign with it, to
+confirm it still works under the new passphrase. The set and remove
+directions are worth a try too. One thing to know: an existing backup keeps
+its old passphrase until you export the key again.
+
+NorseHorse
+--
+author:	AraafRoyall
+association:	none
+edited:	false
+status:	none
+--
+Thnx for this great feature 👌👌
+
+
+I think we need a snack or toast like Passphrase changed success . It just closing dialog no post confirm.
+
+
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Agreed. Closing the dialog with nothing said reads like it might not have worked. It should confirm with a short "Passphrase changed" message the way the rest of the app does. Going into 4.4.0.
+
+Thanks.
+
+NorseHorse
+--

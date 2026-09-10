@@ -1,0 +1,65 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Thanks for the list, this is a good one. Most of it is going into 4.4.0.
+
+Going in: the email fields become tap-to-copy in Key Detail, both the header address and the User IDs. The bottom Keyring button will pop back to the Keyring from Key Detail, which is where your thumb already expects it. Export private key goes back to the yellow warning color, since it is a sensitive action and the grey lost that signal. The groups get their counts in the header, "My Keys (6)" and so on. And the default key gets marked on the Keyring so you can pick it out at a glance.
+
+The two larger ones are in for 4.4.0 as well: collapsible group lists, which also means you can open the app without your private keys on screen, and a search that matches any part of the name, key ID, or fingerprint.
+
+None of it is complex, as you said, but together it makes the Keyring a lot nicer to live in. Thanks for thinking it through so clearly.
+
+NorseHorse
+--
+author:	yuyuchen2
+association:	none
+edited:	false
+status:	none
+--
+@norsehorse-dev hello,norsehorse,May I ask if you need help with translation?
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+@yuyuchen2 yes any help with translation would be appreciated, especially with non latin based languages as machine translation isn't greta with those languages. I have a repo for translations already here: https://github.com/norsehorse-dev/PGPony-Translations, it's mostly up to date if you want to take a look. I will try to get it 100% tonight or tomorrow.
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+The Keyring pass is in RC3.
+
+Emails are tap-to-copy in Key Detail, both the header address and each User ID. The bottom Keyring tab returns you to the list from Key Detail and reads as the active tab while you are there. Export private key is the yellow warning color again, on the row and in the overflow menu. Section headers carry their counts, "My Keys (6)". The default key wears a DEFAULT pill on its card. Groups collapse, and the collapsed state sticks, so you can open the app with My Keys folded away. And there is a search that matches any part of the name, key ID, or fingerprint.
+
+https://pgpony.app/rc/4.4.0-RC-foss/PGPony-4.4.0-RC3-foss.apk
+
+Installs over your current build, no uninstall. To retest: tap an email to copy it, collapse My Keys and reopen the app, and search by a piece of a fingerprint.
+
+NorseHorse
+--
+author:	CertainBot
+association:	contributor
+edited:	false
+status:	none
+--
+Hello @norsehorse-dev, 
+
+tested on 4.4.0 RC3:
+
+- while in Key Details the button apparently does not return the view to the Keyring page. Tested both in private and public keys.
+    - I favor better the previous behavior where the button is highlighted in Keyring page but is not in Key Details page. This is important subconscious hint for using the button to return to the Keyring page.
+ 
+<img width="1080" height="853" alt="Image" src="https://github.com/user-attachments/assets/fb2964e8-cba3-4da2-b2ba-483189be2814" />
+
+- The search field works absolutely amazing! While testing I found that maybe we should add the Notes field to the search. Reason is some keys name and email have no relation to the usage, in such cases I add a note as a remainder for the keys purpose and a search will avoid looking through each key note one by one.
+    - The search field could be collapsable to unclutter the main Keyring view, with atoggle loupe button on the top bar next to the filters button, but this is cosmetic and definitely up to you.
+
+- I suggest adding a rubbish bin icon to the Recently Deleted overflow menu. Visual cues definitely help memorizing.
+
+Thanks
+--

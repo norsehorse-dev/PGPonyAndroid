@@ -1,0 +1,13 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Confirmed, and disabling the button on press is the right call. It needs the other half too: generation was running on the main thread, so the screen froze and the disable could not take effect. Both land in the first 4.4.0 RC.
+
+The six you have are real, independent keys, not copies. Keep one and delete the other five from the keyring. Nothing was published, so there is nothing to undo beyond your device, and deletions sit in Recently Deleted for 14 days.
+
+Thanks for the clear repro.
+
+NorseHorse
+--

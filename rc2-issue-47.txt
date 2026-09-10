@@ -1,0 +1,27 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Confirmed, and your expected layout is the right one. The contact row only reads the first email on the contact and lists every key under it, so a contact with two addresses and a key on each shows both keys stacked under the first address. The second address is never drawn.
+
+The fix is to group the keys by the identity they belong to and show each address above its own key, exactly the way your example lays it out. It is going into 4.4.0 with the other contacts and keyring work.
+
+Thanks for the report. The before-and-after made it obvious.
+
+NorseHorse
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+4.4.0-RC1 is up. Contact keys are grouped by identity now, each address above its own key, the layout from your example.
+
+https://pgpony.app/rc/4.4.0-RC-foss/PGPony-4.4.0-RC1-foss.apk
+
+Installs over your current build, no uninstall. To retest: open a contact with two emails that each have a key. You should see both addresses, each above its own key.
+
+NorseHorse
+
+--

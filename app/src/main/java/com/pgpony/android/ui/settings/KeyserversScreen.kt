@@ -23,9 +23,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +56,7 @@ import com.pgpony.android.PGPonyApp
 import com.pgpony.android.R
 import com.pgpony.android.keyserver.KeyServer
 import com.pgpony.android.keyserver.KeyServerDirectory
+import com.pgpony.android.network.WkdLookup
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,6 +68,7 @@ fun KeyserversScreen(onDismiss: () -> Unit) {
 
     var servers by remember { mutableStateOf<List<KeyServer>>(emptyList()) }
     var refresh by remember { mutableIntStateOf(0) }
+    var showAdd by remember { mutableStateOf(false) }
 
     LaunchedEffect(refresh) { servers = directory.readOnce() }
 
@@ -100,6 +106,18 @@ fun KeyserversScreen(onDismiss: () -> Unit) {
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
+            // item 21 (#request): WKD is the first lookup source but is not a
+            // configured server, so surface it here as a lookup-only row that
+            // matches the Import dialog and the real behavior.
+            var wkdEnabled by remember { mutableStateOf(WkdLookup.isEnabled()) }
+            WkdCard(
+                enabled = wkdEnabled,
+                onEnabledChange = { WkdLookup.set(it); wkdEnabled = it }
+            )
+            if (servers.isNotEmpty()) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            }
+
             servers.forEachIndexed { index, server ->
                 ServerCard(
                     server = server,
@@ -108,7 +126,9 @@ fun KeyserversScreen(onDismiss: () -> Unit) {
                     onLookupChange = { scope.launch { directory.setLookupEnabled(server.id, it); reload() } },
                     onPublishChange = { scope.launch { directory.setPublishEnabled(server.id, it); reload() } },
                     onUp = { scope.launch { directory.move(server.id, up = true); reload() } },
-                    onDown = { scope.launch { directory.move(server.id, up = false); reload() } }
+                    onDown = { scope.launch { directory.move(server.id, up = false); reload() } },
+                    removable = !KeyServerDirectory.isSeed(server.id),
+                    onRemove = { scope.launch { directory.remove(server.id); reload() } }
                 )
                 if (index != servers.lastIndex) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -116,10 +136,95 @@ fun KeyserversScreen(onDismiss: () -> Unit) {
             }
 
             Spacer(modifier = Modifier.padding(vertical = 8.dp))
+            TextButton(onClick = { showAdd = true }) {
+                Icon(Icons.Filled.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(stringResource(R.string.keyservers_add))
+            }
             TextButton(onClick = { scope.launch { directory.resetToDefaults(); reload() } }) {
                 Text(stringResource(R.string.keyservers_reset))
             }
         }
+    }
+
+    if (showAdd) {
+        AddServerDialog(
+            onAdd = { label, url ->
+                scope.launch { directory.addCustom(label, url); reload() }
+                showAdd = false
+            },
+            onDismiss = { showAdd = false }
+        )
+    }
+}
+
+@Composable
+private fun AddServerDialog(
+    onAdd: (label: String, url: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var label by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.keyservers_add_title)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = label,
+                    onValueChange = { label = it },
+                    label = { Text(stringResource(R.string.keyservers_add_label_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.padding(vertical = 4.dp))
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it; error = false },
+                    label = { Text(stringResource(R.string.keyservers_add_url_hint)) },
+                    isError = error,
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (error) {
+                    Text(
+                        stringResource(R.string.keyservers_add_invalid_url),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (KeyServerDirectory.normalizeBaseUrl(url) == null) error = true
+                else onAdd(label, url)
+            }) { Text(stringResource(R.string.keyservers_add_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_button_cancel)) }
+        }
+    )
+}
+
+@Composable
+private fun WkdCard(enabled: Boolean, onEnabledChange: (Boolean) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Text(
+            stringResource(R.string.keyservers_wkd_label),
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Text(
+            stringResource(R.string.keyservers_wkd_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        ToggleRow(
+            label = stringResource(R.string.keyservers_lookup),
+            checked = enabled,
+            onCheckedChange = onEnabledChange
+        )
     }
 }
 
@@ -131,7 +236,9 @@ private fun ServerCard(
     onLookupChange: (Boolean) -> Unit,
     onPublishChange: (Boolean) -> Unit,
     onUp: () -> Unit,
-    onDown: () -> Unit
+    onDown: () -> Unit,
+    removable: Boolean = false,
+    onRemove: () -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -159,6 +266,15 @@ private fun ServerCard(
             }
             IconButton(onClick = onDown, enabled = !isLast) {
                 Icon(Icons.Filled.ArrowDownward, stringResource(R.string.keyservers_move_down))
+            }
+            if (removable) {
+                IconButton(onClick = onRemove) {
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = stringResource(R.string.keyservers_remove),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
         ToggleRow(

@@ -24,15 +24,21 @@ object CompositePkesk {
 
     const val PKESK_TAG = 1 // Public-Key Encrypted Session Key packet tag
     const val VERSION_6 = 6
+    const val VERSION_3 = 3
 
     data class Parsed(
-        /** Recipient v6 fingerprint (empty when anonymous/wildcard). */
+        /** Recipient v6 fingerprint (empty when anonymous/wildcard or v3). */
         val recipientFingerprint: ByteArray,
         val ephemeralX25519: ByteArray,
         val mlkemCiphertext: ByteArray,
         val wrappedSessionKey: ByteArray,
         /** Which IETF suite (algo 35 or 36) the packet declared. */
-        val suite: CompositeSuite = CompositeSuite.IETF_768
+        val suite: CompositeSuite = CompositeSuite.IETF_768,
+        /** item 14 (#56): v3 PKESK 8-octet recipient key ID (empty for v6/anon). */
+        val recipientKeyId: ByteArray = ByteArray(0),
+        /** item 14 (#56): symmetric-algorithm ID carried by a v3 PKESK (SEIPDv1);
+         *  0 for a v6 PKESK, where the algorithm lives in the SEIPDv2 packet. */
+        val symAlgId: Int = 0
     )
 
     /**
@@ -73,9 +79,18 @@ object CompositePkesk {
         if (recipientFpV6.isEmpty()) {
             out.write(0) // anonymous recipient
         } else {
-            require(recipientFpV6.size == 32) { "v6 fingerprint must be 32 bytes" }
-            out.write(1 + 32) // count = keyVersion(1) + fingerprint(32) = 33
-            out.write(6)      // recipient key version
+            // item 14 (#56): the PKESK stays v6 (SEIPDv2 pairing), but the
+            // TARGET key version octet and fingerprint length follow the
+            // recipient's own key version — 6 with a 32-octet fingerprint, or
+            // 4 with a 20-octet SHA-1 fingerprint for a v4 algo-35 subkey
+            // (RFC 9580 5.1). parseBody reads the length from the count octet,
+            // so both round-trip.
+            require(recipientFpV6.size == 20 || recipientFpV6.size == 32) {
+                "fingerprint must be 20 (v4) or 32 (v6) bytes"
+            }
+            val keyVersion = if (recipientFpV6.size == 32) 6 else 4
+            out.write(1 + recipientFpV6.size) // count = keyVersion(1) + fingerprint
+            out.write(keyVersion)             // recipient key version
             out.write(recipientFpV6)
         }
         out.write(suite.ietfAlgId) // 35 or 36
@@ -89,30 +104,55 @@ object CompositePkesk {
      */
     fun parseBody(body: ByteArray): Parsed? {
         try {
-            var i = 0
-            if ((body[i++].toInt() and 0xFF) != VERSION_6) return null
-            val count = body[i++].toInt() and 0xFF
-            val fp: ByteArray
-            if (count == 0) {
-                fp = ByteArray(0)
-            } else {
-                i++ // key version octet
-                val fpLen = count - 1
-                fp = body.copyOfRange(i, i + fpLen); i += fpLen
+            return when (body[0].toInt() and 0xFF) {
+                VERSION_6 -> parseV6(body)
+                VERSION_3 -> parseV3(body)
+                else -> null
             }
-            // 4.2.0 §1.1: dispatch on the algorithm octet (35 or 36) rather
-            // than requiring 35, so an inbound ML-KEM-1024 PKESK parses with
-            // X448 (56) ephemeral and ML-KEM-1024 (1568) ciphertext lengths.
-            val suite = CompositeSuite.ietfFor(body[i++].toInt() and 0xFF) ?: return null
-            val eph = body.copyOfRange(i, i + suite.curve.keyLen)
-            i += suite.curve.keyLen
-            val ct = body.copyOfRange(i, i + suite.mlkem.ctLen)
-            i += suite.mlkem.ctLen
-            val skLen = body[i++].toInt() and 0xFF
-            val wrapped = body.copyOfRange(i, i + skLen)
-            return Parsed(fp, eph, ct, wrapped, suite)
         } catch (e: Exception) {
             return null
         }
+    }
+
+    private fun parseV6(body: ByteArray): Parsed? {
+        var i = 1 // version already checked
+        val count = body[i++].toInt() and 0xFF
+        val fp: ByteArray
+        if (count == 0) {
+            fp = ByteArray(0)
+        } else {
+            i++ // key version octet (4 or 6)
+            val fpLen = count - 1
+            fp = body.copyOfRange(i, i + fpLen); i += fpLen
+        }
+        // 4.2.0 §1.1: dispatch on the algorithm octet (35 or 36) rather than
+        // requiring 35, so an inbound ML-KEM-1024 PKESK parses correctly.
+        val suite = CompositeSuite.ietfFor(body[i++].toInt() and 0xFF) ?: return null
+        val eph = body.copyOfRange(i, i + suite.curve.keyLen); i += suite.curve.keyLen
+        val ct = body.copyOfRange(i, i + suite.mlkem.ctLen); i += suite.mlkem.ctLen
+        val skLen = body[i++].toInt() and 0xFF
+        val wrapped = body.copyOfRange(i, i + skLen)
+        return Parsed(fp, eph, ct, wrapped, suite)
+    }
+
+    /**
+     * item 14 (#56): a v3 PKESK for an ML-KEM composite (RFC 9980 4.3.1). Layout:
+     *   version(1)=3 | keyId(8) | pubAlgo(1) | ecdhCt(curveLen) | mlkemCt |
+     *   len(1) | symAlgId(1) | C, where len = length of (symAlgId + C) and C is
+     *   the wrapped session key. The recipient is identified by the 8-octet key
+     *   ID; the symmetric algorithm is carried here (not encrypted) because the
+     *   paired SEIPDv1 packet has no algorithm field.
+     */
+    private fun parseV3(body: ByteArray): Parsed? {
+        var i = 1 // version
+        val keyId = body.copyOfRange(i, i + 8); i += 8
+        val suite = CompositeSuite.ietfFor(body[i++].toInt() and 0xFF) ?: return null
+        val eph = body.copyOfRange(i, i + suite.curve.keyLen); i += suite.curve.keyLen
+        val ct = body.copyOfRange(i, i + suite.mlkem.ctLen); i += suite.mlkem.ctLen
+        val len = body[i++].toInt() and 0xFF          // length of symAlgId + C
+        val symAlgId = body[i++].toInt() and 0xFF
+        val cLen = len - 1
+        val wrapped = body.copyOfRange(i, i + cLen)
+        return Parsed(ByteArray(0), eph, ct, wrapped, suite, recipientKeyId = keyId, symAlgId = symAlgId)
     }
 }

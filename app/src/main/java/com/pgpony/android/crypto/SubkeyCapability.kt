@@ -122,6 +122,10 @@ enum class SubkeyCapability(val flag: Int, val displayName: String) {
                 // (sub)key; the primary of such a key is Ed25519, not this.
                 KeyAlgorithm.MLKEM768_X25519_V6 ->
                     if (isPrimary) Certify.flag else Encrypt.flag
+                // item 14 (#56): v4 interop shape labels the whole key; its
+                // primary is Ed25519 (Certify), the algo-35 subkey encrypts.
+                KeyAlgorithm.MLKEM768_X25519_V4 ->
+                    if (isPrimary) Certify.flag else Encrypt.flag
                 KeyAlgorithm.MLKEM768_X25519_LIBREPGP ->
                     if (isPrimary) Certify.flag else Encrypt.flag
 
@@ -137,7 +141,14 @@ enum class SubkeyCapability(val flag: Int, val displayName: String) {
                 // issue #2: an ECDSA primary (gpg LibrePGP PQC keys) is a signing
                 // key, so Certify + Sign on a primary and Sign on a subkey. This is
                 // only the fallback; a real key's KeyFlags self-sig is read first.
-                KeyAlgorithm.ECDSA ->
+                KeyAlgorithm.ECDSA,
+                KeyAlgorithm.ECDSA_NIST_P256,
+                KeyAlgorithm.ECDSA_NIST_P384,
+                KeyAlgorithm.ECDSA_NIST_P521,
+                KeyAlgorithm.ECDSA_BRAINPOOL_P256,
+                KeyAlgorithm.ECDSA_BRAINPOOL_P384,
+                KeyAlgorithm.ECDSA_BRAINPOOL_P512,
+                KeyAlgorithm.ECDSA_SECP256K1 ->
                     if (isPrimary) Certify.flag or Sign.flag else Sign.flag
 
                 // 4.4.0 RC3 (#30/#31): composite ML-DSA + EdDSA is a SIGNING key.
@@ -146,6 +157,11 @@ enum class SubkeyCapability(val flag: Int, val displayName: String) {
                 KeyAlgorithm.MLDSA65_ED25519_V6,
                 KeyAlgorithm.MLDSA87_ED448_V6 ->
                     if (isPrimary) Certify.flag or Sign.flag else Sign.flag
+
+                // item 17: an unmodeled key — conservative neutral fallback (only
+                // used when the key carries no KeyFlags self-signature to read).
+                KeyAlgorithm.UNKNOWN ->
+                    if (isPrimary) Certify.flag else Encrypt.flag
             }
         }
 

@@ -105,7 +105,7 @@ object CardKeygenService {
         session.writeGenerationTime(CardSlot.DECRYPTION, creationTime)
 
         // ── PW1 (signing): the two card-produced self-signatures ──
-        val userIdBytes = "$name <$email>".toByteArray(Charsets.UTF_8)
+        val userIdBytes = com.pgpony.android.data.PGPKeyEntity.composeUserID(name, email).toByteArray(Charsets.UTF_8)
 
         val certHashed = CardKeyPacketBuilder.certificationHashedSubpackets(creationTime, expirationSeconds)
         val certHashData = CardKeyPacketBuilder.buildCertificationHashData(

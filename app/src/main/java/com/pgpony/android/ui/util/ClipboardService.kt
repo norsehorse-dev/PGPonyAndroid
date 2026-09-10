@@ -90,7 +90,15 @@ object ClipboardService {
     ) {
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
             ?: return  // Some test devices / restricted profiles return null; bail quietly
-        cm.setPrimaryClip(ClipData.newPlainText(label, text))
+        // Play vitals (item 22): setPrimaryClip crashes on some OEM ROMs and
+        // when the clip is too large for the Binder transaction
+        // (TransactionTooLargeException, or SecurityException/IllegalStateException).
+        // A failed copy must degrade to a no-op, not a RuntimeException crash.
+        try {
+            cm.setPrimaryClip(ClipData.newPlainText(label, text))
+        } catch (e: Exception) {
+            return
+        }
 
         val prefs = context.getSharedPreferences(
             "pgpony_prefs",

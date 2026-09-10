@@ -343,6 +343,13 @@
 
     <!-- ── Recipients section ───────────────────────────────────────── -->
     <string name="encrypt_recipients_label">Recipients</string>
+    <!-- item 2 (#36): mixed-recipient post-quantum warning -->
+    <string name="encrypt_pq_mixed_warning">Post-quantum weak link: %1$s will receive this message under classical encryption, so the whole message is not post-quantum secure. Every recipient needs a post-quantum key for full protection.</string>
+    <!-- item 13 (#36): per-recipient encryption-subkey picker -->
+    <string name="encrypt_subkey_label">%1$s: encryption subkey</string>
+    <string name="encrypt_subkey_pq">post-quantum</string>
+    <string name="encrypt_subkey_classical">classical</string>
+    <string name="encrypt_subkey_auto">automatic</string>
     <string name="encrypt_recipients_choose">Choose recipients</string>
     <string name="encrypt_recipients_selected_count">%1$d selected</string>
     <string name="encrypt_recipients_no_keys">No keys available. Import or generate keys first.</string>
@@ -585,17 +592,21 @@
     <!-- ── Generate Key sheet ───────────────────────────────────────── -->
     <string name="keyring_generate_title">Generate Key Pair</string>
     <string name="keyring_generate_name_label">Name</string>
-    <string name="keyring_generate_email_label">Email</string>
+    <string name="keyring_generate_email_label">Email (optional)</string>
+    <string name="settings_offer_publish_title">Offer to publish new keys</string>
+    <string name="settings_offer_publish_subtitle">After generating a key, suggest publishing it to key servers. Turn off to keep key generation fully local.</string>
     <string name="keyring_generate_algorithm_label">Algorithm</string>
     <string name="keyring_generate_algorithm_caption_v6">OpenPGP v6 (RFC 9580). Modern format with a dedicated signing subkey and hardware-key support. Pick a v4 type if your recipients use older software.</string>
     <string name="keyring_generate_algorithm_caption_ed25519">Fast, compact elliptic-curve keys (OpenPGP v4). Widely supported. A good default.</string>
     <string name="keyring_generate_algorithm_caption_rsa">Classic RSA keys (OpenPGP v4). Maximum compatibility; larger and slower than Ed25519.</string>
-    <string name="keyring_generate_algorithm_caption_pqc_ietf">Post-quantum hybrid: ML-KEM plus an elliptic curve on a modern v6 key, following RFC 9980, the OpenPGP post-quantum standard. Resists quantum attacks; readable only by up-to-date OpenPGP software. ML-KEM-1024 is the higher-strength option.</string>
+    <string name="keyring_generate_algorithm_caption_pqc_ietf">Post-quantum with a classical fallback. ML-KEM plus an elliptic curve on a modern v6 key, following RFC 9980, the IETF OpenPGP post-quantum standard where cross-tool support is heading. The key also keeps a plain classical encryption subkey, so software that cannot do ML-KEM can still encrypt to you, but a sender that uses that subkey loses the post-quantum protection. Choose the fully post-quantum option instead if you want no classical fallback at all. ML-KEM-1024 is the higher-strength option.</string>
     <string name="keyring_generate_algorithm_group_classical">Classical</string>
     <string name="keyring_generate_algorithm_group_pqc">Post-Quantum</string>
+    <string name="keyring_generate_algorithm_group_interop">Interop / compatibility</string>
     <string name="keyring_generate_algorithm_group_advanced">Advanced / compatibility</string>
-    <string name="keyring_generate_algorithm_caption_pqc_sign">Fully post-quantum: an ML-DSA signing identity plus an ML-KEM encryption subkey on a modern v6 key (RFC 9980). Both signing and encryption resist quantum attacks; readable only by up-to-date OpenPGP software.</string>
-    <string name="keyring_generate_algorithm_caption_pqc_librepgp">Post-quantum hybrid: ML-KEM (the algorithm GnuPG still calls Kyber) plus an elliptic curve, in the LibrePGP format GnuPG 2.5.x uses. gpg shows these keys as ky768_cv25519 and ky1024_cv448. ML-KEM-1024 is the higher-strength option.</string>
+    <string name="keyring_generate_algorithm_caption_pqc_v4">Post-quantum encryption with the widest reach. A standard v4 Ed25519 key that every OpenPGP tool already handles, carrying a post-quantum ML-KEM-768 encryption subkey alongside a classical one, so older software can still encrypt to you while up-to-date tools use ML-KEM. The recommended choice for post-quantum encryption that works with real correspondents. Private-key backup for this shape is not available yet.</string>
+    <string name="keyring_generate_algorithm_caption_pqc_sign">Fully post-quantum with no classical fallback: an ML-DSA signing identity plus an ML-KEM encryption subkey on a modern v6 key (RFC 9980). Both signing and encryption resist quantum attacks, and because the key carries no weaker classical subkey there is nothing to downgrade to. Only up-to-date OpenPGP software can use it.</string>
+    <string name="keyring_generate_algorithm_caption_pqc_librepgp">For GnuPG / LibrePGP interop only. This is the LibrePGP format GnuPG 2.5.x uses: ML-KEM (which GnuPG still calls Kyber) plus an elliptic curve, shown by gpg as ky768_cv25519 and ky1024_cv448. It is effectively GnuPG-only and is not broadly interoperable, so choose it only to exchange keys with GnuPG. For wider reach, use the RFC 9980 post-quantum option instead. ML-KEM-1024 is the higher-strength option.</string>
     <string name="keyring_generate_expiration_label">Expiration</string>
     <string name="keyring_generate_passphrase_label">Passphrase (optional)</string>
     <string name="keyring_generate_passphrase_confirm_label">Confirm Passphrase</string>
@@ -606,6 +617,7 @@
     <string name="keyring_error_refresh_failed_format">Refresh failed: %1$s</string>
     <string name="keyring_error_name_required">Name is required</string>
     <string name="keyring_error_email_required">Valid email is required</string>
+    <string name="keyring_error_email_invalid">That email address does not look right</string>
     <string name="keyring_error_passphrase_mismatch">Passphrases don\'t match</string>
     <string name="keyring_status_key_generated">Key pair generated successfully</string>
     <string name="keyring_error_generation_failed_format">Generation failed: %1$s</string>
@@ -814,6 +826,17 @@
     <string name="key_detail_add_subkey_passphrase_label">Passphrase</string>
     <string name="key_detail_add_subkey_apply">Add subkey</string>
     <string name="key_detail_add_subkey_failed">Could not add the subkey. Please try again.</string>
+    <!-- item 16 (#54): per-subkey revoke / remove -->
+    <string name="key_detail_subkey_revoke_action">Revoke subkey…</string>
+    <string name="key_detail_subkey_remove_action">Remove subkey…</string>
+    <string name="key_detail_subkey_more_actions">Subkey actions</string>
+    <string name="key_detail_subkey_remove_confirm_title">Remove this subkey?</string>
+    <string name="key_detail_subkey_remove_confirm_body">This removes the subkey from your copy of the key only. Anyone who already has your public key keeps it and can still encrypt to it. To tell your correspondents, revoke it instead.</string>
+    <string name="key_detail_subkey_remove_confirm_action">Remove</string>
+    <string name="key_detail_subkey_last_enc_title">Last encryption subkey</string>
+    <string name="key_detail_subkey_last_enc_body">This is the only encryption subkey on this key. Removing or revoking it leaves the key unable to receive encrypted messages. Continue anyway?</string>
+    <string name="key_detail_subkey_last_enc_action">Continue</string>
+    <string name="key_detail_subkey_action_failed">Could not complete the subkey action. Please try again.</string>
     <string name="key_detail_add_subkey_type_rsa_2048_sign">RSA 2048 (Sign)</string>
     <string name="key_detail_add_subkey_type_rsa_2048_encrypt">RSA 2048 (Encrypt)</string>
     <string name="key_detail_add_subkey_type_rsa_4096_sign">RSA 4096 (Sign)</string>
@@ -1863,15 +1886,26 @@
     <string name="settings_keyservers_subtitle">Where PGPony looks up and publishes keys</string>
     <string name="keyservers_title">Key servers</string>
     <string name="keyservers_subtitle">PGPony looks up keys from these servers in order and publishes to the ones you enable. keys.pgpony.app is PGPony\'s own server and accepts every key type.</string>
+    <string name="keyservers_wkd_label">Web Key Directory</string>
+    <string name="keyservers_wkd_desc">Tried first for email lookups, from the recipient\'s own domain. No publishing.</string>
     <string name="keyservers_first_party_badge">FIRST-PARTY</string>
     <string name="keyservers_lookup">Use for lookup</string>
     <string name="keyservers_publish">Use for publishing</string>
     <string name="keyservers_move_up">Move up</string>
     <string name="keyservers_move_down">Move down</string>
     <string name="keyservers_reset">Reset to defaults</string>
+    <!-- item 6 (#55): custom key server entry -->
+    <string name="keyservers_add">Add key server</string>
+    <string name="keyservers_add_title">Add key server</string>
+    <string name="keyservers_add_label_hint">Name (optional)</string>
+    <string name="keyservers_add_url_hint">Server URL (e.g. keys.example.org)</string>
+    <string name="keyservers_add_confirm">Add</string>
+    <string name="keyservers_add_invalid_url">Enter a valid HKPS server URL</string>
+    <string name="keyservers_remove">Remove server</string>
     <string name="publish_title">Publish key</string>
     <string name="publish_subtitle">Upload this public key so others can find it. Choose which servers to publish to.</string>
     <string name="publish_action">Publish</string>
+    <string name="publish_not_now">Not now</string>
     <string name="publish_may_not_accept_format">May not accept %1$s keys. Your other servers still will.</string>
     <string name="publish_rejected_key_type_format">Not accepted. This server likely doesn\'t support %1$s keys yet. Still published to your other servers.</string>
     <string name="publish_failed_format">Couldn\'t publish: %1$s</string>

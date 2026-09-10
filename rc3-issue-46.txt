@@ -1,0 +1,70 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+You are right, and it is our bug. The text encrypt path calls encrypt with the armor flag hard-coded on, so the toggle updates the setting but the encryption ignores it. Off has never actually produced binary there.
+
+One wrinkle that shapes the fix: the text result is shown inline as text, and binary is not text, so with the toggle off the output cannot land in the same box. It will come back as a file to save or share instead of on-screen text. That is the only sensible way to hand you raw binary from the text page.
+
+This is going into 4.4.0. Thanks for pinning it to the toggle so precisely.
+
+NorseHorse
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+4.4.0-RC1 is up. The text encrypt path honors the armor toggle now. With it off, the output comes back as a binary file to save or share, as described above.
+
+https://pgpony.app/rc/4.4.0-RC-foss/PGPony-4.4.0-RC1-foss.apk
+
+Installs over your current build, no uninstall. To retest: turn ASCII armor off, encrypt to a recipient, and confirm you get a binary file instead of armored text in the box.
+
+NorseHorse
+
+--
+author:	CertainBot
+association:	contributor
+edited:	false
+status:	none
+--
+Test on 4.4.0-RC1:
+
+- ASCII encrypt, decrypt as a text or a file ✅
+- Binary encrypt, decrypt as text, file or zip file ✅
+
+However during the test I struck got another issue during decryption. I use several private keys, some have a passphrase and a few don't.
+
+1. Decrypt tests all keys and if a key without a passphrase matches, there is no notification about which key did the job, creating the false illusion the key in the selection box did it. In the image below, "Amber" is not the key used to decrypt: 
+
+<img width="1080" height="1317" alt="Image" src="https://github.com/user-attachments/assets/2594a9cb-4427-4ec8-b6fb-517a424a241c" />
+
+- I would suggest adding an informative message stating which key decrypted the message, alongside the 'No signature'. 
+
+2. When the key needs a passphrase, I got the same error message regardless if I input a wrong passphrase or if the selected key is unable to decrypt.
+
+I suggest an explicit error message:
+- when the passphrase is incorrect for the selected key. 
+- when the passphrase is ok and it's the key that is actually unable to decrypt.
+
+Thanks
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Thanks, that is a clean confirmation on the armor toggle.
+
+Both of the new ones are real.
+
+1. When a passphraseless key decrypts, the result should name the key that actually did it, not leave the selection box implying it was the one. Decrypt walks the keys and the UI never reports the winner. It will show which key decrypted, next to the signature line.
+
+2. The passphrase path returns one error for two different failures. A wrong passphrase and a key that simply cannot decrypt the message are not the same thing and should not read the same. They become two distinct messages: wrong passphrase for the selected key, and correct passphrase but this key cannot decrypt this message.
+
+Both are going into the next 4.4.0 RC. I will ping you here when they land.
+
+NorseHorse
+--

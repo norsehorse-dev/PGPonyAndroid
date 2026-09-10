@@ -25,7 +25,9 @@ object CompositeKeyFacade {
         val algId: Int,
         val fingerprint: ByteArray,
         val publicMaterial: ByteArray,
-        val secretMaterial: ByteArray?
+        val secretMaterial: ByteArray?,
+        /** item 16 (#54): true if a 0x28 subkey-revocation follows this subkey. */
+        val isRevoked: Boolean = false
     )
 
     /**
@@ -62,6 +64,178 @@ object CompositeKeyFacade {
         val primary = packets.firstOrNull { it.tag == 5 || it.tag == 6 } ?: return false
         val algId = primary.body[1 + 4].toInt() and 0xFF
         return CompositeSignSuite.forAlgId(algId) != null
+    }
+
+    /**
+     * item 14 (#56): true if [ring] carries a v4 (version-4) ML-KEM-768+X25519
+     * (algo 35) encryption subkey. Such a ring has an ordinary BC-parseable
+     * Ed25519 primary but an algo-35 subkey BouncyCastle cannot parse (v4 key
+     * packets carry no material-length field), so load and export paths detect
+     * it here and carry the raw bytes rather than a re-serialized ring that
+     * would silently drop the subkey. The algo byte sits at offset 1+4 (after
+     * the version byte and 4-octet creation time) in both v4 and v6 framing.
+     */
+    fun hasV4Algo35Subkey(ring: ByteArray): Boolean =
+        walk(ring).any { pkt ->
+            (pkt.tag == 7 || pkt.tag == 14) &&
+                pkt.body.size > 5 &&
+                (pkt.body[0].toInt() and 0xFF) == 4 &&
+                (pkt.body[1 + 4].toInt() and 0xFF) == 35
+        }
+
+    /** item 14 (#56): the v4 algo-35 subkey packet body from [ring] (the last
+     *  such subkey), or null. Public (tag 14) or secret (tag 7). */
+    fun v4Algo35SubkeyBody(ring: ByteArray): ByteArray? =
+        walk(ring).lastOrNull { pkt ->
+            (pkt.tag == 7 || pkt.tag == 14) &&
+                pkt.body.size > 5 &&
+                (pkt.body[0].toInt() and 0xFF) == 4 &&
+                (pkt.body[1 + 4].toInt() and 0xFF) == 35
+        }?.body
+
+    /**
+     * item 14 (#56): the 1216-byte public material (X25519 32 || ML-KEM-768
+     * 1184) of a v4 algo-35 subkey body. A v4 key packet carries NO 4-octet
+     * material-length field, so the material follows version(1)+ctime(4)+algo(1)
+     * directly. This is the v4 counterpart of [publicMaterial], which reads the
+     * v6 length field. The bytes feed CompositeKem unchanged (the KEM is
+     * version-agnostic).
+     */
+    fun v4Algo35PublicMaterial(subkeyBody: ByteArray): ByteArray {
+        require((subkeyBody[0].toInt() and 0xFF) == 4) { "not a v4 key packet" }
+        require((subkeyBody[1 + 4].toInt() and 0xFF) == 35) { "not an algo-35 subkey" }
+        val start = 1 + 4 + 1
+        return subkeyBody.copyOfRange(start, start + 1216)
+    }
+
+    /**
+     * item 14 (#56): the 96-byte secret material (X25519 secret 32 || ML-KEM
+     * seed 64) of a v4 algo-35 secret subkey body, or null when the packet is
+     * public-only. An unprotected (s2k-usage 0) body returns its material with
+     * the trailing 2-octet checksum dropped; a passphrase-protected body (usage
+     * 254 CFB, gpg's v4 form) is decrypted with [passphrase] via
+     * [V4Algo35Protection.unlock], which throws when the key is protected and no
+     * passphrase is supplied or the integrity check fails.
+     */
+    fun v4Algo35SecretMaterial(subkeyBody: ByteArray, passphrase: CharArray? = null): ByteArray? =
+        V4Algo35Protection.unlock(subkeyBody, passphrase)
+
+    /** item 14 (#56): true if a v4 algo-35 subkey body is passphrase-protected. */
+    fun v4Algo35IsProtected(subkeyBody: ByteArray): Boolean =
+        V4Algo35Protection.isProtected(subkeyBody)
+
+    /**
+     * item 14 (#56): reprotect an UNPROTECTED v4 interop ring under [newPass] for
+     * export. The v4 Ed25519 primary and any classical subkey are re-encrypted by
+     * BouncyCastle (usage 254, CFB); the algo-35 subkey — which BC cannot parse —
+     * by [V4Algo35Protection] (usage 254, CFB, gpg's v4 form). The stored raw
+     * octets are armored directly on export (BC would drop the unparseable
+     * subkey), so this is the only way to add an export passphrase to a
+     * passphrase-less interop key. Assumes the source is unprotected (the caller
+     * gates on the subkey's own protection flag); the algo-35 subkey packet and
+     * its binding signature keep their positions.
+     */
+    fun protectV4Algo35ForExport(ring: ByteArray, newPass: CharArray): ByteArray {
+        val pkts = walk(ring)
+        val subIdx = pkts.indexOfFirst { it.tag == 7 && isV4Algo35SecretBody(it.body) }
+        require(subIdx >= 0) { "no v4 algo-35 secret subkey to protect" }
+
+        // Base = every packet before the algo-35 subkey: a BC-parseable v4 ring.
+        val baseBytes = ByteArrayOutputStream().apply {
+            for (k in 0 until subIdx) write(packet(pkts[k].tag, pkts[k].body))
+        }.toByteArray()
+        val baseRing = org.bouncycastle.openpgp.PGPSecretKeyRing(
+            java.io.ByteArrayInputStream(baseBytes),
+            org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator()
+        )
+        val sha1 = org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider()
+            .get(org.bouncycastle.bcpg.HashAlgorithmTags.SHA1)
+        var rebuilt = baseRing
+        for (sk in baseRing.secretKeys) {
+            // Fresh encryptor per key: distinct salt + IV, never reused.
+            val enc = org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyEncryptorBuilder(
+                org.bouncycastle.bcpg.SymmetricKeyAlgorithmTags.AES_256
+            ).build(newPass)
+            val protectedKey = org.bouncycastle.openpgp.PGPSecretKey.copyWithNewPassword(sk, null, enc, sha1)
+            rebuilt = org.bouncycastle.openpgp.PGPSecretKeyRing.insertSecretKey(rebuilt, protectedKey)
+        }
+
+        val out = ByteArrayOutputStream()
+        out.write(rebuilt.encoded)
+        val subPkt = pkts[subIdx]
+        val pubBody = subPkt.body.copyOfRange(0, 1 + 4 + 1 + 1216)
+        val material = V4Algo35Protection.unlock(subPkt.body, null)
+            ?: error("v4 algo-35 subkey carries no secret material")
+        out.write(packet(7, pubBody + V4Algo35Protection.protect(material, newPass)))
+        for (k in subIdx + 1 until pkts.size) out.write(packet(pkts[k].tag, pkts[k].body))
+        return out.toByteArray()
+    }
+
+    private fun isV4Algo35SecretBody(body: ByteArray): Boolean =
+        body.size > 5 && (body[0].toInt() and 0xFF) == 4 && (body[1 + 4].toInt() and 0xFF) == 35
+
+    /**
+     * item 14 (#56): the BC-parseable base ring bytes of a v4 interop key — every
+     * packet before the v4 algo-35 subkey (the Ed25519 primary, its user IDs and
+     * self-signatures, and any classical subkey). BouncyCastle can parse this even
+     * though it cannot parse the algo-35 subkey that follows, so it is where the
+     * key's fingerprint, user IDs, and dates are read on import. Null when the ring
+     * carries no v4 algo-35 subkey.
+     */
+    fun v4Algo35BaseBytes(raw: ByteArray): ByteArray? {
+        val pkts = walk(raw)
+        val subIdx = pkts.indexOfFirst {
+            (it.tag == 7 || it.tag == 14) && isV4Algo35SecretBody(it.body)
+        }
+        if (subIdx < 0) return null
+        return ByteArrayOutputStream().apply {
+            for (k in 0 until subIdx) write(packet(pkts[k].tag, pkts[k].body))
+        }.toByteArray()
+    }
+
+    /**
+     * item 14 (#56): the public transferable ring for a v4 interop key. A
+     * public-only import is already public and returned unchanged; a secret ring
+     * has its BC-parseable base converted to public keys and its algo-35 secret
+     * subkey reduced to its public body (tag 14). Mirrors the publicRaw that
+     * CompositeKeyGen.addV4Algo35SubkeyRings emits at generation.
+     */
+    fun v4Algo35PublicRingOf(raw: ByteArray): ByteArray {
+        if (!hasSecret(raw)) return raw
+        val pkts = walk(raw)
+        val subIdx = pkts.indexOfFirst { it.tag == 7 && isV4Algo35SecretBody(it.body) }
+        require(subIdx >= 0) { "no v4 algo-35 secret subkey to publish" }
+        val baseBytes = ByteArrayOutputStream().apply {
+            for (k in 0 until subIdx) write(packet(pkts[k].tag, pkts[k].body))
+        }.toByteArray()
+        val baseRing = org.bouncycastle.openpgp.PGPSecretKeyRing(
+            java.io.ByteArrayInputStream(baseBytes),
+            org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator()
+        )
+        val basePub = org.bouncycastle.openpgp.PGPPublicKeyRing(baseRing.publicKeys.asSequence().toList())
+        val out = ByteArrayOutputStream()
+        out.write(basePub.encoded)
+        out.write(packet(14, pkts[subIdx].body.copyOfRange(0, 1 + 4 + 1 + 1216)))
+        for (k in subIdx + 1 until pkts.size) out.write(packet(pkts[k].tag, pkts[k].body))
+        return out.toByteArray()
+    }
+
+    /**
+     * item 14 (#56): the v4 (SHA-1, 20-octet) fingerprint of a v4 algo-35 subkey
+     * from its packet body. A v4 fingerprint is SHA-1 over 0x99 || 2-octet
+     * length || public-key body, where the public body is version(1) + ctime(4)
+     * + algo(1) + material(1216) = 1222 octets. This is the fingerprint a v6
+     * PKESK carries (key-version octet 4, 20-octet fingerprint) to address the
+     * subkey, per RFC 9580 5.1 / RFC 9980.
+     */
+    fun v4Algo35SubkeyFingerprint(subkeyBody: ByteArray): ByteArray {
+        val pubBody = subkeyBody.copyOfRange(0, 1 + 4 + 1 + 1216)
+        val framed = ByteArray(3 + pubBody.size)
+        framed[0] = 0x99.toByte()
+        framed[1] = ((pubBody.size ushr 8) and 0xFF).toByte()
+        framed[2] = (pubBody.size and 0xFF).toByte()
+        System.arraycopy(pubBody, 0, framed, 3, pubBody.size)
+        return MessageDigest.getInstance("SHA-1").digest(framed)
     }
 
     /** #26 (RC4): unlock a secret region with [oldPassphrase] and re-emit it
@@ -166,15 +340,22 @@ object CompositeKeyFacade {
         }
 
         // The ML-KEM encryption subkey (algo 35/36), if any.
-        val subkey = packets.asSequence()
-            .filter { it.tag == 7 || it.tag == 14 }
-            .mapNotNull { pkt ->
-                val subPublicBody = publicKeyBody(pkt.body)
-                val subAlgId = subPublicBody[1 + 4].toInt() and 0xFF
-                if (subAlgId != 35 && subAlgId != 36) return@mapNotNull null
-                val subSecret = if (pkt.tag == 7) subkeySecret(pkt.body, subAlgId, passphrase) else null
-                SubkeyInfo(subAlgId, v6Fingerprint(subPublicBody), publicMaterial(subPublicBody), subSecret)
-            }.firstOrNull()
+        val subIdx = packets.indexOfFirst { pkt ->
+            if (pkt.tag != 7 && pkt.tag != 14) return@indexOfFirst false
+            val a = publicKeyBody(pkt.body)[1 + 4].toInt() and 0xFF
+            a == 35 || a == 36
+        }
+        val subkey = if (subIdx < 0) null else {
+            val pkt = packets[subIdx]
+            val subPublicBody = publicKeyBody(pkt.body)
+            val subAlgId = subPublicBody[1 + 4].toInt() and 0xFF
+            val subSecret = if (pkt.tag == 7) subkeySecret(pkt.body, subAlgId, passphrase) else null
+            // A 0x28 revocation sits among the signatures immediately after the subkey.
+            val revoked = (subIdx + 1 until packets.size).asSequence()
+                .takeWhile { packets[it].tag == 2 }
+                .any { (packets[it].body[1].toInt() and 0xFF) == 0x28 }
+            SubkeyInfo(subAlgId, v6Fingerprint(subPublicBody), publicMaterial(subPublicBody), subSecret, revoked)
+        }
 
         return Info(
             fingerprint = fingerprint,

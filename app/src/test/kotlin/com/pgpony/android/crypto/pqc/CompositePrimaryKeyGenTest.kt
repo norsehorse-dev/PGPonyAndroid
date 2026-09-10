@@ -160,6 +160,25 @@ class CompositePrimaryKeyGenTest {
     }
 
     /**
+     * item 1 (#36) — PQ-only invariant. A composite ML-DSA key is a FULL
+     * post-quantum certificate: a composite signing primary and a single
+     * composite ML-KEM encryption subkey, with NO standalone classical
+     * encryption subkey to downgrade to. This pins that the assembled ring
+     * carries exactly one subkey and that it is the composite ML-KEM (algo 35),
+     * so a later change that grafts a classical Cv25519 subkey here is caught.
+     */
+    @Test
+    fun `PQ-only composite key has no standalone classical encryption subkey`() {
+        val raw = CompositePrimaryKeyGen.assemble("PQ Only <pq@pgpony.app>", suite)
+        val packets = walkPackets(raw)
+        // primary(5), direct sig(2), uid(13), cert sig(2), ONE subkey(7), binding(2).
+        assertEquals("exactly one secret-subkey packet", 1, packets.count { it.tag == 7 })
+        assertEquals("no extra packets beyond the single composite subkey", 6, packets.size)
+        val subAlgId = packets[4].body[1 + 4].toInt() and 0xFF
+        assertEquals("the sole encryption subkey is the composite ML-KEM (algo 35)", 35, subAlgId)
+    }
+
+    /**
      * BouncyCastle 1.85 rejects a TOP-LEVEL composite signature: its
      * SignaturePacket throws "unknown signature key algorithm: 30". A composite
      * primary's self-signatures are top-level composite signatures, so the ring

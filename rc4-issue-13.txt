@@ -1,0 +1,75 @@
+author:	norsehorse-dev
+association:	owner
+edited:	true
+status:	none
+--
+4.1.0 is feature-complete. This is the candidate build, and I would like it tested before it ships.
+
+https://pgpony.app/rc/4.1.0-rc2/PGPony-4.1.0-rc2.apk
+
+Signature and checksum are beside it: [.asc](https://pgpony.app/rc/4.1.0-rc2/PGPony-4.1.0-rc2.apk.asc) · [.sha256](https://pgpony.app/rc/4.1.0-rc2/PGPony-4.1.0-rc2.apk.sha256)
+
+sha256  1bbd5146dead2c17c6d7ac2e564043afd3b614fec5d3182a68c36c7ecb57bc75
+
+Everything reported in this thread should be fixed in it. Please try it and tell me what is still wrong, I would much rather hear it now than after it is published. It reports as 4.1.0-rc2 in Settings → About, so we can both be certain which build you are on.
+
+If you installed PGPony from F-Droid, read this before downloading. F-Droid signs its builds with its own key, so Android will refuse to install this one over it. Getting it would mean uninstalling first, and uninstalling deletes your keyring. If you want to try the build, back up first — Settings → Backup — and keep the recovery code somewhere you can actually find it. If that is more trouble than it is worth, that is a completely fair answer: wait for the F-Droid release, and say so here so I know you are waiting.
+
+If you installed from pgpony.app or GitHub, it upgrades in place and your keys stay where they are.
+--
+author:	CertainBot
+association:	contributor
+edited:	false
+status:	none
+--
+Tested on RC3 and Save button works as expected. Thanks for the quick fix! 
+
+Estetically, I would change the "Saved." text color to green in consonance with successfully performed task notifications. And the asymmetric buttons doesn't look right in my opinion. The picture some posts above show a better button disposition. 
+
+<img width="1080" height="1191" alt="Image" src="https://github.com/user-attachments/assets/a7bba8f4-cd43-4f02-85b9-0682d3fbce72" />
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Fixed in 4.2.0, released today: shared files have a proper Save button, and the result layout got the cleanup discussed above. Closing with the release. Thanks for the clear repro that started it.
+
+NorseHorse
+--
+author:	ScottishLemur
+association:	none
+edited:	false
+status:	none
+--
+4.1.1 has arrived in fdroid and I confirm the bug is fixed.
+
+However, I noticed the buttons arrangement:
+
+# space is constrained
+having two buttons with large text in horizontal disposition leads to a lot of vertical space that is unused (wasted)
+
+<img width="794" height="1765" alt="Image" src="https://github.com/user-attachments/assets/2c902546-d671-4542-965a-675edbc74bee" />
+
+# gui is not consistent throughout the app
+1. Open pgpony
+2. Encrypt page
+3. Encrypt a file
+
+Buttons are disposed on multiple lines, neat and easy to reach them with one hand
+
+<img width="794" height="1765" alt="Image" src="https://github.com/user-attachments/assets/13811d13-47e6-4277-975c-0534222ca448" />
+
+Probably the horizontal buttons disposition will be nice with landscape orientation, but not in portrait mode
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Good, glad 4.1.1 verified in F-Droid. On the button layout: that is fixed in 4.2.0, which F-Droid has not built yet. The two horizontal buttons on that shared-file result are now stacked full width, one per line, matching the file-encrypt page you pointed at. So the inconsistency you spotted is already gone in the next version.
+
+4.2.0 is on GitHub and at https://pgpony.app/apk now if you do not want to wait for the F-Droid rebuild; it installs over the F-Droid build with the same signing key. Otherwise it will arrive on its own.
+
+NorseHorse
+--

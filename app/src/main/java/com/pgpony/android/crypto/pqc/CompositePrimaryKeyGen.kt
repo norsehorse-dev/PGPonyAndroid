@@ -61,6 +61,7 @@ object CompositePrimaryKeyGen {
     private const val TAG_USERID = 13
 
     private const val SIGTYPE_SUBKEY_BINDING = 0x18
+    private const val SIGTYPE_SUBKEY_REVOCATION = 0x28
 
     /** The composite primary's encryption subkey: IETF ML-KEM-768 + X25519 (algo 35). */
     private val KEM_SUITE = CompositeSuite.IETF_768
@@ -77,6 +78,7 @@ object CompositePrimaryKeyGen {
     private const val SUBPKT_KEY_FLAGS = 27
     private const val SUBPKT_FEATURES = 30
     private const val SUBPKT_ISSUER_FP = 33
+    private const val SUBPKT_REASON_FOR_REVOCATION = 29
 
     private const val KEY_FLAG_CERTIFY = 0x01
     private const val KEY_FLAG_SIGN = 0x02
@@ -236,6 +238,249 @@ object CompositePrimaryKeyGen {
             ring = PGPSecretKeyRing.insertSecretKey(ring, protectedKey)
         }
         return ring
+    }
+
+    /**
+     * item 4 (#55): add a User ID to an existing composite ML-DSA primary.
+     * [ring] is the transferable secret key octets. Builds the User ID packet
+     * plus a v6 composite positive certification (0x13) over the primary key
+     * body and the new User ID, with the same composite signer keygen uses, and
+     * splices both in before the first subkey (User IDs precede subkeys in a
+     * transferable key). [passphrase] unlocks a protected primary; the returned
+     * ring is UNPROTECTED (re-protect via CompositeKeyFacade.reprotect if the
+     * original was protected).
+     */
+    fun addUserId(
+        ring: ByteArray,
+        newUserId: String,
+        passphrase: CharArray? = null,
+        random: SecureRandom = SecureRandom(),
+        creationTime: Date = Date()
+    ): ByteArray {
+        val info = CompositeKeyFacade.parse(ring, passphrase)
+        val compositeSecret = info.compositeSecret
+            ?: throw IllegalStateException("composite primary secret is locked or unavailable")
+        val suite = info.suite
+
+        // Rebuild the primary public key body from the parsed material; it is
+        // byte-identical to the original, so the fingerprint and the key hash
+        // that the certification covers match.
+        val pubBody = ByteArrayOutputStream().apply {
+            write(6)
+            write(uint32((info.creationTimeMillis / 1000L).toInt()))
+            write(suite.algId)
+            write(uint32(info.compositePublic.size))
+            write(info.compositePublic)
+        }.toByteArray()
+        val keyOnly = keyFrame(pubBody)
+
+        val uid = newUserId.toByteArray(Charsets.UTF_8)
+        val certData = keyOnly + byteArrayOf(0xB4.toByte()) + uint32(uid.size) + uid
+        val certHashed = ByteArrayOutputStream().apply {
+            write(subpacket(SUBPKT_CREATION_TIME or 0x80, uint32((creationTime.time / 1000L).toInt())))
+            write(subpacket(SUBPKT_KEY_FLAGS or 0x80, byteArrayOf((KEY_FLAG_CERTIFY or KEY_FLAG_SIGN).toByte())))
+            write(issuerFingerprintSubpacket(info.fingerprint))
+        }.toByteArray()
+        val certSig = compositeSignaturePacket(
+            suite, compositeSecret, SIGTYPE_POSITIVE_CERT, certData, certHashed, random
+        )
+        val uidPacket = packet(TAG_USERID, uid)
+
+        val insertAt = firstSubkeyOffset(ring)
+        return ByteArrayOutputStream().apply {
+            write(ring, 0, insertAt)
+            write(uidPacket)
+            write(certSig)
+            write(ring, insertAt, ring.size - insertAt)
+        }.toByteArray()
+    }
+
+    /**
+     * item 16 (#54): revoke a subkey of a composite ML-DSA primary. Builds a v6
+     * composite subkey-revocation self-signature (Type ID 0x28) over the
+     * primary key body followed by the target subkey body (the same data a
+     * 0x18 binding covers), carrying a Reason for Revocation subpacket
+     * (type 29: [reasonCode] octet then optional UTF-8 [reasonText]). The
+     * revocation is spliced in after the subkey's existing signatures, so the
+     * subkey stays present but marked revoked. [subkeyFingerprint] is the
+     * target subkey's v6 fingerprint; [passphrase] unlocks a protected primary.
+     * The returned ring is UNPROTECTED (re-protect via
+     * CompositeKeyFacade.reprotect if the original was protected).
+     */
+    fun revokeSubkey(
+        ring: ByteArray,
+        subkeyFingerprint: ByteArray,
+        reasonCode: Int = 0,
+        reasonText: String = "",
+        passphrase: CharArray? = null,
+        random: SecureRandom = SecureRandom(),
+        creationTime: Date = Date()
+    ): ByteArray {
+        val info = CompositeKeyFacade.parse(ring, passphrase)
+        val compositeSecret = info.compositeSecret
+            ?: throw IllegalStateException("composite primary secret is locked or unavailable")
+        val suite = info.suite
+
+        val primaryPubBody = ByteArrayOutputStream().apply {
+            write(6)
+            write(uint32((info.creationTimeMillis / 1000L).toInt()))
+            write(suite.algId)
+            write(uint32(info.compositePublic.size))
+            write(info.compositePublic)
+        }.toByteArray()
+        val primaryFrame = keyFrame(primaryPubBody)
+
+        // Find the target subkey and the end of its packet group (the subkey
+        // packet plus every signature that already binds it).
+        val spans = packetSpans(ring)
+        var subkeyBody: ByteArray? = null
+        var insertAt = -1
+        for ((idx, span) in spans.withIndex()) {
+            if (span.tag != TAG_SECSUBKEY && span.tag != 14) continue
+            val subPubBody = publicKeyBody(span.body)
+            if (!v6Fingerprint(subPubBody).contentEquals(subkeyFingerprint)) continue
+            subkeyBody = subPubBody
+            var j = idx + 1
+            var end = span.end
+            while (j < spans.size && spans[j].tag == TAG_SIGNATURE) {
+                end = spans[j].end
+                j++
+            }
+            insertAt = end
+            break
+        }
+        val subPubBody = subkeyBody
+            ?: throw IllegalArgumentException("subkey not found in this key")
+
+        val revokeData = primaryFrame + keyFrame(subPubBody)
+        val reasonBytes = reasonText.toByteArray(Charsets.UTF_8)
+        val revHashed = ByteArrayOutputStream().apply {
+            write(subpacket(SUBPKT_CREATION_TIME or 0x80, uint32((creationTime.time / 1000L).toInt())))
+            write(subpacket(SUBPKT_REASON_FOR_REVOCATION, byteArrayOf(reasonCode.toByte()) + reasonBytes))
+            write(issuerFingerprintSubpacket(info.fingerprint))
+        }.toByteArray()
+        val revSig = compositeSignaturePacket(
+            suite, compositeSecret, SIGTYPE_SUBKEY_REVOCATION, revokeData, revHashed, random
+        )
+
+        return ByteArrayOutputStream().apply {
+            write(ring, 0, insertAt)
+            write(revSig)
+            write(ring, insertAt, ring.size - insertAt)
+        }.toByteArray()
+    }
+
+    /**
+     * item 16 (#54): remove a subkey from a composite ML-DSA primary (local
+     * delete, no revocation). Strips the target subkey packet and every
+     * signature bound to it. [subkeyFingerprint] is the subkey's v6
+     * fingerprint. Returns the ring without that subkey; throws if absent.
+     */
+    fun removeSubkey(ring: ByteArray, subkeyFingerprint: ByteArray): ByteArray {
+        val spans = packetSpans(ring)
+        var removeStart = -1
+        var removeEnd = -1
+        for ((idx, span) in spans.withIndex()) {
+            if (span.tag != TAG_SECSUBKEY && span.tag != 14) continue
+            if (!v6Fingerprint(publicKeyBody(span.body)).contentEquals(subkeyFingerprint)) continue
+            removeStart = span.start
+            var j = idx + 1
+            var end = span.end
+            while (j < spans.size && spans[j].tag == TAG_SIGNATURE) {
+                end = spans[j].end
+                j++
+            }
+            removeEnd = end
+            break
+        }
+        if (removeStart < 0) throw IllegalArgumentException("subkey not found in this key")
+        return ByteArrayOutputStream().apply {
+            write(ring, 0, removeStart)
+            write(ring, removeEnd, ring.size - removeEnd)
+        }.toByteArray()
+    }
+
+    /** Byte offset of the first subkey packet (tag 7 secret / 14 public), where
+     *  a new User ID and its certification must be inserted; ring end if none. */
+    private fun firstSubkeyOffset(ring: ByteArray): Int {
+        var i = 0
+        while (i < ring.size) {
+            val start = i
+            val c = ring[i++].toInt() and 0xFF
+            if (c and 0x80 == 0) break
+            val tag: Int
+            val len: Int
+            if (c and 0x40 != 0) {
+                tag = c and 0x3F
+                val l0 = ring[i++].toInt() and 0xFF
+                len = when {
+                    l0 < 192 -> l0
+                    l0 < 224 -> ((l0 - 192) shl 8) + (ring[i++].toInt() and 0xFF) + 192
+                    l0 == 255 -> beInt(ring, i).also { i += 4 }
+                    else -> throw IllegalStateException("partial length unsupported in a composite key")
+                }
+            } else {
+                tag = (c shr 2) and 0x0F
+                len = when (c and 0x03) {
+                    0 -> ring[i++].toInt() and 0xFF
+                    1 -> (((ring[i].toInt() and 0xFF) shl 8) or (ring[i + 1].toInt() and 0xFF)).also { i += 2 }
+                    2 -> beInt(ring, i).also { i += 4 }
+                    else -> ring.size - i
+                }
+            }
+            if (tag == TAG_SECSUBKEY || tag == 14) return start
+            i += len
+        }
+        return ring.size
+    }
+
+    private fun beInt(b: ByteArray, o: Int): Int =
+        ((b[o].toInt() and 0xFF) shl 24) or ((b[o + 1].toInt() and 0xFF) shl 16) or
+            ((b[o + 2].toInt() and 0xFF) shl 8) or (b[o + 3].toInt() and 0xFF)
+
+    private data class PacketSpan(val tag: Int, val start: Int, val end: Int, val body: ByteArray)
+
+    /** Walk the ring into packet spans (tag, byte offsets, body), so a
+     *  revocation can be spliced at an exact packet boundary. */
+    private fun packetSpans(ring: ByteArray): List<PacketSpan> {
+        val out = ArrayList<PacketSpan>()
+        var i = 0
+        while (i < ring.size) {
+            val start = i
+            val c = ring[i++].toInt() and 0xFF
+            if (c and 0x80 == 0) break
+            val tag: Int
+            val len: Int
+            if (c and 0x40 != 0) {
+                tag = c and 0x3F
+                val l0 = ring[i++].toInt() and 0xFF
+                len = when {
+                    l0 < 192 -> l0
+                    l0 < 224 -> ((l0 - 192) shl 8) + (ring[i++].toInt() and 0xFF) + 192
+                    l0 == 255 -> beInt(ring, i).also { i += 4 }
+                    else -> throw IllegalStateException("partial length unsupported in a composite key")
+                }
+            } else {
+                tag = (c shr 2) and 0x0F
+                len = when (c and 0x03) {
+                    0 -> ring[i++].toInt() and 0xFF
+                    1 -> (((ring[i].toInt() and 0xFF) shl 8) or (ring[i + 1].toInt() and 0xFF)).also { i += 2 }
+                    2 -> beInt(ring, i).also { i += 4 }
+                    else -> ring.size - i
+                }
+            }
+            val body = ring.copyOfRange(i, i + len)
+            i += len
+            out.add(PacketSpan(tag, start, i, body))
+        }
+        return out
+    }
+
+    /** The leading public-key body of a (secret or public) key packet body. */
+    private fun publicKeyBody(keyPacketBody: ByteArray): ByteArray {
+        var q = 1 + 4 + 1
+        val matLen = beInt(keyPacketBody, q); q += 4
+        return keyPacketBody.copyOfRange(0, q + matLen)
     }
 
     // -- helpers ------------------------------------------------------

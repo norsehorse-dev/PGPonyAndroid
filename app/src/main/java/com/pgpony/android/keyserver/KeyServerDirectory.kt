@@ -146,6 +146,38 @@ class KeyServerDirectory private constructor(private val appContext: Context) {
             )
         )
 
+        /** True for the two built-in seeds, which can be toggled/reordered
+         *  but not removed (Reset to defaults restores them). */
+        fun isSeed(id: String): Boolean = id == ID_OPENPGP || id == ID_PGPONY
+
+        /**
+         * item 6 (#55): validate and normalize a user-entered key server URL to
+         * "scheme://host[:port]" (no path, no trailing slash). Defaults a missing
+         * scheme to https. Returns null when the input is not a usable HKPS/HKP
+         * base URL, which the Settings UI surfaces as an inline error.
+         */
+        fun normalizeBaseUrl(input: String): String? {
+            val trimmed = input.trim()
+            if (trimmed.isEmpty()) return null
+            val withScheme =
+                if (Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://").containsMatchIn(trimmed)) trimmed
+                else "https://$trimmed"
+            return try {
+                val uri = java.net.URI(withScheme)
+                val scheme = uri.scheme?.lowercase() ?: return null
+                if (scheme != "https" && scheme != "http") return null
+                val host = uri.host?.lowercase() ?: return null
+                if (host.isBlank() || host.startsWith('.') || host.endsWith('.')) return null
+                // Require a dotted host, unless an explicit port is given (allows
+                // a self-hosted "localhost:11371" while rejecting bare typos).
+                if (!host.contains('.') && uri.port <= 0) return null
+                val port = if (uri.port > 0) ":${uri.port}" else ""
+                "$scheme://$host$port"
+            } catch (e: Exception) {
+                null
+            }
+        }
+
         @Volatile
         private var instance: KeyServerDirectory? = null
 
@@ -182,6 +214,37 @@ class KeyServerDirectory private constructor(private val appContext: Context) {
         if (j < 0 || j >= list.size) return
         val tmp = list[i]; list[i] = list[j]; list[j] = tmp
         save(list)
+    }
+
+    /**
+     * item 6 (#55): add a user-defined key server. [baseUrl] is validated and
+     * normalized via [normalizeBaseUrl]; an invalid URL returns null and nothing
+     * is saved. A duplicate baseUrl returns the existing entry rather than adding
+     * a second. New servers default to lookup + publish enabled and are assumed
+     * to accept every key type (we do not presume a custom server's limits).
+     */
+    suspend fun addCustom(label: String, baseUrl: String): KeyServer? {
+        val normalized = normalizeBaseUrl(baseUrl) ?: return null
+        val existing = readOnce()
+        existing.firstOrNull { it.baseUrl.equals(normalized, ignoreCase = true) }?.let { return it }
+        val server = KeyServer(
+            id = java.util.UUID.randomUUID().toString(),
+            label = label.trim().ifBlank { normalized.substringAfter("://") },
+            baseUrl = normalized,
+            isFirstParty = false,
+            lookupEnabled = true,
+            publishEnabled = true,
+            acceptsAllKeyTypes = true
+        )
+        save(existing + server)
+        return server
+    }
+
+    /** item 6 (#55): remove a custom server. The two seeds are protected (toggle
+     *  them off instead); a seed id is a no-op. */
+    suspend fun remove(id: String) {
+        if (isSeed(id)) return
+        save(readOnce().filterNot { it.id == id })
     }
 
     suspend fun resetToDefaults() = save(DEFAULTS)

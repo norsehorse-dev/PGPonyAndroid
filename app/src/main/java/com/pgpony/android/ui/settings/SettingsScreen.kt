@@ -279,6 +279,20 @@ fun SettingsScreen(
                 SettingsCategory.SECURITY -> {
             // ── Security Section ───────────────────────────────────────
             SectionHeader(stringResource(R.string.settings_section_security))
+            // item 10 (user request): offline mode leads the Security section so the
+            // privacy-hardening switch is the first row a user sees.
+            // RC1 offline switch: privacy hardening, grouped with Security.
+            SettingsToggle(
+                title = stringResource(R.string.settings_offline_toggle_title),
+                subtitle = stringResource(R.string.settings_offline_toggle_subtitle),
+                icon = Icons.Filled.CloudOff,
+                iconTint = Color(0xFF8B5CF6),
+                checked = com.pgpony.android.network.OfflineMode.enabled,
+                onCheckedChange = {
+                    com.pgpony.android.network.OfflineMode.set(it)
+                    com.pgpony.android.sync.KeyRefreshScheduler.apply(context)
+                }
+            )
             SettingsToggle(
                 title = stringResource(R.string.settings_biometric_lock_title),
                 subtitle = stringResource(R.string.settings_biometric_lock_subtitle),
@@ -345,18 +359,6 @@ fun SettingsScreen(
                 iconTint = Color(0xFF8B5CF6),
                 checked = state.useArgon2,
                 onCheckedChange = { viewModel.setUseArgon2(it) }
-            )
-            // RC1 offline switch: privacy hardening, grouped with Security.
-            SettingsToggle(
-                title = stringResource(R.string.settings_offline_toggle_title),
-                subtitle = stringResource(R.string.settings_offline_toggle_subtitle),
-                icon = Icons.Filled.CloudOff,
-                iconTint = Color(0xFF8B5CF6),
-                checked = com.pgpony.android.network.OfflineMode.enabled,
-                onCheckedChange = {
-                    com.pgpony.android.network.OfflineMode.set(it)
-                    com.pgpony.android.sync.KeyRefreshScheduler.apply(context)
-                }
             )
             Spacer(modifier = Modifier.height(16.dp))
             SectionHeader(stringResource(R.string.settings_section_pass_store))
@@ -683,6 +685,16 @@ fun SettingsScreen(
                 value = "${state.totalKeyPairs}",
                 icon = Icons.Filled.Key,
                 iconTint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            // item 8 (#request): opt out of the post-keygen publish suggestion
+            // (which points at key servers, keys.pgpony.app included).
+            SettingsToggle(
+                title = stringResource(R.string.settings_offer_publish_title),
+                subtitle = stringResource(R.string.settings_offer_publish_subtitle),
+                icon = Icons.Filled.CloudUpload,
+                iconTint = Color(0xFF8B5CF6),
+                checked = state.offerPublishAfterKeygen,
+                onCheckedChange = { viewModel.setOfferPublishAfterKeygen(it) }
             )
             Spacer(modifier = Modifier.height(16.dp))
             // ── OpenPGP Provider Section (4.0.0 Succession Phase 1) ────

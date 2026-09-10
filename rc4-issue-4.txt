@@ -1,0 +1,91 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Thanks for flagging this, and sorry for the trouble.
+
+The problem was on my end. 4.0.1 was built from a working copy where the AGP and Gradle version changes had never been committed, so the v4.0.1 tag described an older build config than the binary I published. Your build correctly used Gradle 9.0.0 and AGP 8.7.3 from the tag, while my binary came from 8.14.3 and AGP 8.13.2. That accounts for the dex and baseline profile differences.
+
+I've committed the missing build configuration and tagged 4.0.2, where the source and the published binary match. Nothing else changed between the two versions. 4.0.1 won't reproduce, so it isn't worth re-running.
+
+Thanks again for catching it.
+--
+author:	licaon-kter
+association:	none
+edited:	true
+status:	none
+--
+for 4.0.3 can you rebuild from a fresh clone and clean all caches, gradle cache, etc?
+
+https://gitlab.com/fdroid/fdroiddata/-/jobs/15517255236
+
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+
+Rebuilt v4.0.3 from a fresh clone with caches cleared, then downloaded the kept
+artifact from job 15517255236 and compared all three:
+
+```
+your build vs my rebuild:    IDENTICAL (every file)
+your build vs published APK: classes.dex, classes2.dex, classes3.dex, baseline.prof
+```
+
+So the project is reproducible — Debian/OpenJDK and macOS/Temurin give the same
+bytes. The published APK is the outlier.
+
+The difference is 138 bytes in a 17.8 MB `classes.dex`. Same 19,197 classes, same
+order; only the source-file attribute differs:
+
+```
+r8-map-id-9af7558ea902b208babdac7193a22c8a581831e6435f3540894bc2812bec3e0a   yours + my rebuild
+r8-map-id-7180268185d65d6537bcc7452522e7ec9c8d95efca3018b469a5b3cb25ace7ad   published
+```
+
+That's R8's map-id — a SHA-256 of the mapping file, embedded in every dex.
+`baseline.prof` follows from it, since ART profiles reference dex by checksum.
+
+Root cause: my 4.0.3 release APK wasn't built from a clean checkout of the tag.
+Same source, different mapping, different map id. Release builds now come from a
+fresh clone, which is what you do and what I should have been doing.
+
+For 4.0.3, your call:
+
+- I re-upload the release asset with the clean rebuild (same signing key,
+  `446bf9e6…`), which I've verified matches yours exactly, and you re-run; or
+- skip it — 4.0.4 is close and supersedes it.
+
+I lean towards skipping unless you'd rather get 4.0.3 through, since F-Droid is
+on 4.0.0 and 4.0.3 fixes password fields not being marked as password inputs.
+
+Heads-up for 4.0.4: it adds keep rules for `org.openintents.openpgp.**` (release
+builds were renaming the API contract and crashing clients on decrypt), so its
+dex will look quite different from 4.0.3.
+
+Thanks for the push to rebuild from scratch — that's what surfaced it.
+--
+author:	licaon-kter
+association:	none
+edited:	true
+status:	none
+--
+~~@norsehorse-dev ping us when 4.0.4 is ready then~~
+--
+author:	licaon-kter
+association:	none
+edited:	false
+status:	none
+--
+4.0.4 is ready, testing now, you changed the apk name so we have to adapt
+--
+author:	licaon-kter
+association:	none
+edited:	false
+status:	none
+--
+thanks
+--

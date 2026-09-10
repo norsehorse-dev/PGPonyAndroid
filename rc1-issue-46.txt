@@ -1,0 +1,13 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+You are right, and it is our bug. The text encrypt path calls encrypt with the armor flag hard-coded on, so the toggle updates the setting but the encryption ignores it. Off has never actually produced binary there.
+
+One wrinkle that shapes the fix: the text result is shown inline as text, and binary is not text, so with the toggle off the output cannot land in the same box. It will come back as a file to save or share instead of on-screen text. That is the only sensible way to hand you raw binary from the text page.
+
+This is going into 4.4.0. Thanks for pinning it to the toggle so precisely.
+
+NorseHorse
+--

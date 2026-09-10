@@ -27,14 +27,14 @@ changed. Other languages are unaffected.
 Whole-file SHA-256 (is this download the published file):
 
 ```
-REPLACE_WITH_WHOLE_FILE_SHA256
+f09e1577d5c20b0514980063d445d8d184ce26980dd59a3e60bf0647453175e5
 ```
 
 Content hash (for rebuilders; excludes signature, see
 REPRODUCIBLE_BUILDS_PLAYBOOK.md):
 
 ```
-REPLACE_WITH_CONTENT_HASH
+d6006d76f6779c4350f21e5e166eb2cdc5b1e11021f9b964b6b2d12d40eb8715
 ```
 
 The APK is signed with the NorseHorse release key

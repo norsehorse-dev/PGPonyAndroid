@@ -1,0 +1,96 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+This one rides with the next release, and the reason is your other report. 4.1.0 is finished and out for testing so that the bundle work can start, and reopening it for a button state would push that back. The bundle fix is the one that matters and I would rather not delay it.
+
+One thing I would like your view on, since you have spent more time on this screen than anyone. Disabling a button hides the reason it is disabled. Look at your screenshot again: the red "Paste an encrypted or signed message" is already showing before you have touched anything, so the form is complaining at you on arrival. I think that is the real defect rather than the button being live.
+
+My instinct is to hold that message until you type something or tap Decrypt, and leave the button enabled. Nothing scolds you on arrival, and the error only appears when it is earned. Does that solve it, or would you still rather have it disabled?
+--
+author:	AraafRoyall
+association:	none
+edited:	true
+status:	none
+--
+See there is no red warning it allows and asks for encrypt or fingerprint then shows warning .
+I mean it allows clicking 
+
+We should make like to check edittext not empty first before go through encrypt or decrypt process , 
+
+Hope u understood.
+
+In easy 
+
+On button click
+If edittext empty 
+Then show warning immediately 
+Else 
+Go to next process
+
+Or for your understanding
+
+```java
+if (edittext1.getText().toString().trim().isEmpty()) {
+    edittext1.setError("Please enter something");
+    edittext1.requestFocus();
+} else {
+    // Next process
+}
+```
+
+
+
+![Screenshot_20260731-084237.png](https://github.com/user-attachments/assets/4348aaef-6bbd-450c-b5ee-27469fd878bb)
+
+
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Looking closer at your screenshot, I think the disabled button isn't quite the right fix. The red "Paste an encrypted or signed message" is showing before you've touched the field at all, the form is complaining on arrival, with nothing entered and nothing submitted. That's the actual bug. A disabled button would paper over it without a reason attached, which is usually the wrong call for disabled buttons in general.
+
+What I'd rather build: hold that validation message until you've either submitted or edited the field, and leave the button live the whole time. The button stays honest and the error only shows up once it's earned. Same pattern would apply to Decrypt and to the Sign/Verify sheets, since they show the same message-on-arrival behavior.
+
+Does that work for you, or would you still rather see the button itself disabled while the field is empty? Wanted your take before building either one.
+
+NorseHorse
+--
+author:	AraafRoyall
+association:	none
+edited:	false
+status:	none
+--
+I mean its good now , but On biometric enabled when we click that button with empty text it asks fingerprint then shows error.
+
+I mean simply, 
+
+If edittext is empty then show this error very first before reaching to biometric or actual encrypt/decrypt ,
+
+Yes , disabling button is not good choice
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Fixed as you described: the button stays enabled, and the empty-input check now runs before the biometric prompt instead of after.
+
+Two more of your reports are in this build too: #19 (lock screen resetting to Keyring and losing state) and #22 (the duplicated sign-as picker).
+
+RC2 is up: https://pgpony.app/rc/PGPony-4.2.0-RC2/PGPony-4.2.0-RC2-foss.apk
+
+NorseHorse
+--
+author:	AraafRoyall
+association:	none
+edited:	false
+status:	none
+--
+Thnx. Its working.
+
+Once you complete all current uggested features i will post new soon
+--

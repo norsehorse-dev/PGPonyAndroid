@@ -50,6 +50,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -922,6 +924,17 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
 //      is always binary and sign-only's clear-signed output is
 //      always armored by definition.
 
+@Composable
+private fun encryptionOptionText(
+    opt: com.pgpony.android.crypto.EncryptionKeyOption,
+    isFirst: Boolean
+): String {
+    val kind = if (opt.isPostQuantum) stringResource(R.string.encrypt_subkey_pq)
+        else stringResource(R.string.encrypt_subkey_classical)
+    val auto = if (isFirst) " · " + stringResource(R.string.encrypt_subkey_auto) else ""
+    return "${opt.algorithmLabel} · $kind$auto · ${opt.keyIdHex}"
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RecipientPickerCard(
@@ -982,6 +995,77 @@ private fun RecipientPickerCard(
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
+    }
+
+    // item 2 (#36): mixed-recipient post-quantum downgrade warning.
+    state.pqMixedWarning?.let { warning ->
+        Surface(
+            color = MaterialTheme.colorScheme.errorContainer,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+        ) {
+            Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.Top) {
+                Icon(
+                    Icons.Filled.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    stringResource(
+                        R.string.encrypt_pq_mixed_warning,
+                        warning.classicalRecipientNames.joinToString(", ")
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
+    }
+
+    // item 13 (#36): per-recipient encryption-subkey picker. Only shown for a
+    // recipient whose key offers more than one encryption target; the first
+    // option is the automatic pick.
+    state.selectedRecipients.forEach { key ->
+        val options = state.recipientSubkeyOptions[key.fingerprint.uppercase()].orEmpty()
+        if (options.size >= 2) {
+            val recipientLabel = when {
+                key.userName.isNotBlank() -> key.userName
+                key.userEmail.isNotBlank() -> key.userEmail
+                else -> key.shortFingerprint
+            }
+            val chosenId = state.recipientSubkeyChoices[key.fingerprint.uppercase()] ?: options.first().keyId
+            var expanded by remember(key.fingerprint) { mutableStateOf(false) }
+
+            Text(
+                stringResource(R.string.encrypt_subkey_label, recipientLabel),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Box(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+                    val chosen = options.firstOrNull { it.keyId == chosenId } ?: options.first()
+                    Text(
+                        encryptionOptionText(chosen, options.first().keyId == chosen.keyId),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    options.forEachIndexed { index, opt ->
+                        DropdownMenuItem(
+                            text = { Text(encryptionOptionText(opt, index == 0)) },
+                            onClick = {
+                                expanded = false
+                                viewModel.setRecipientSubkey(key.fingerprint, opt.keyId)
+                            }
+                        )
+                    }
+                }
+            }
+        }
     }
 
     // Phase E - collapse the always-visible recipient checkbox list into a
@@ -2449,12 +2533,31 @@ internal fun formatFileSize(bytes: Long): String {
 // composables are switched to call SignPassphraseDialog /
 // DecryptPassphraseDialog instead.
 
+/**
+ * item 20 (#59): focus a dialog's passphrase field as soon as it appears and
+ * raise the software keyboard, so the user can type without an extra tap. A
+ * short delay lets the dialog window attach before the focus request.
+ */
+@Composable
+private fun rememberAutoFocusRequester(): FocusRequester {
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(50)
+        try {
+            requester.requestFocus()
+        } catch (_: Exception) {
+        }
+    }
+    return requester
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SignPassphraseDialog(
     state: EncryptUiState,
     viewModel: EncryptDecryptViewModel
 ) {
+    val fr = rememberAutoFocusRequester()
     val signingKey = state.signingKey
     // Mode-driven copy. The primary button label changes with mode
     // (Sign vs Encrypt vs Encrypt File); the body text adapts the
@@ -2566,6 +2669,7 @@ private fun SignPassphraseDialog(
                     // 4.1.0 §3 (issue #8) — see ui/util/Autofill.kt.
                     modifier = Modifier
                         .fillMaxWidth()
+                        .focusRequester(fr)
                         .autofillPassword { viewModel.updateSignPassphrase(it) }
                 )
                 state.errorMessage?.let {
@@ -2629,6 +2733,7 @@ private fun DecryptPassphraseDialog(
     state: DecryptUiState,
     viewModel: EncryptDecryptViewModel
 ) {
+    val fr = rememberAutoFocusRequester()
     // The key the passphrase belongs to is the one whose fingerprint
     // matches state.selectedKeyFingerprint, looked up in
     // state.availableKeys. Null-fall-through if neither is set
@@ -2713,6 +2818,7 @@ private fun DecryptPassphraseDialog(
                     // 4.1.0 §3 (issue #8) — see ui/util/Autofill.kt.
                     modifier = Modifier
                         .fillMaxWidth()
+                        .focusRequester(fr)
                         .autofillPassword { viewModel.updatePassphrase(it) }
                 )
                 // Phase A10e: parity with the encrypt-side dialog —
@@ -2764,6 +2870,7 @@ private fun LegacySignPassphraseDialog(
     state: EncryptUiState,
     viewModel: EncryptDecryptViewModel
 ) {
+    val fr = rememberAutoFocusRequester()
     AlertDialog(
         onDismissRequest = { viewModel.dismissSignPassphraseDialog() },
         title = { Text(stringResource(R.string.encrypt_passphrase_dialog_title)) },
@@ -2789,6 +2896,7 @@ private fun LegacySignPassphraseDialog(
                     // 4.1.0 §3 (issue #8) — see ui/util/Autofill.kt.
                     modifier = Modifier
                         .fillMaxWidth()
+                        .focusRequester(fr)
                         .autofillPassword { viewModel.updateSignPassphrase(it) }
                 )
                 state.errorMessage?.let {
@@ -2836,6 +2944,7 @@ private fun LegacyDecryptPassphraseDialog(
     state: DecryptUiState,
     viewModel: EncryptDecryptViewModel
 ) {
+    val fr = rememberAutoFocusRequester()
     AlertDialog(
         onDismissRequest = { viewModel.dismissPassphraseDialog() },
         title = { Text(stringResource(R.string.encrypt_passphrase_dialog_title)) },
@@ -2850,7 +2959,7 @@ private fun LegacyDecryptPassphraseDialog(
                 // 4.1.0 §3 (issue #8) — see ui/util/Autofill.kt. This is the
                 // prompt a decrypt raises mid-flow, so it is the one a manager
                 // most needs to recognise.
-                modifier = Modifier.autofillPassword { viewModel.updatePassphrase(it) }
+                modifier = Modifier.focusRequester(fr).autofillPassword { viewModel.updatePassphrase(it) }
             )
         },
         confirmButton = {

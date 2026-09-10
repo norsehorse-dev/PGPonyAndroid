@@ -1,0 +1,62 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+The permission is expected — the app opens files through the system document picker, which doesn't require the files-and-media permission.
+
+The freeze is real and it's fixed. Decrypt was loading and parsing the entire keyring, then running the decryption, all on the UI thread. On a fast phone that's invisible; on a slower one it's long enough for Android to decide the app has stopped responding, which shows as a freeze or a force-close dialog. 4.0.4 also fixes the file picker not showing key files in some locations.
+
+4.0.4 goes out shortly. I don't have a MIUI device here, so please try it and let me know either way. If it still happens: roughly how large is the file, and are you picking it inside the app or sharing it in from a file manager?
+--
+author:	Umotas
+association:	none
+edited:	true
+status:	none
+--
+1. Size of file 13M.
+2. I try any way and 'share' file from File manager into PGPony, and open App, go to Decrypt, and 'Choose encrypted file'
+
+Sometimes pressing on 'Decrypt File' button has no reaction.
+Sometimes this button is pressed and I have small-small dot (as begin of round = begin of process) and have crashes.
+
+3. You are right about size. Now I try encrypt and decrypt small file = 35kb. No problem is.
+
+P.S. I use password (no keys).  And have no keys in the App
+--
+author:	norsehorse-dev
+association:	owner
+edited:	true
+status:	none
+--
+Thanks, that comparison is what identified it. 13 MB failing and 35 KB working is the whole answer: it was a memory problem, not a decrypt problem. And knowing you use password mode explains why it failed every single time rather than occasionally.
+
+There were two costs stacking up. First, both Encrypt and Decrypt held whole files in memory: the picked file was read in, the output accumulated in a buffer that doubles as it grows and is copied once more at the end, and the result was held again for the result screen. For a 13 MB file that peaks around 60 MB. Second, password mode puts your passphrase through Argon2id, a key derivation deliberately made expensive so the password is hard to attack by brute force, and PGPony uses the memory-constrained setting of 64 MB. That cost is fixed and applies to every password-protected file regardless of size.
+
+So your 13 MB decrypt was asking for roughly 60 MB of file buffers and 64 MB of key derivation at the same time, on a device that will not hand an app anything close to that. Your 35 KB file needed the same 64 MB, but with almost nothing on top of it, so it fit.
+
+Your point 3 was a separate bug. Pressing "Decrypt File" with no reaction was not the button being missed; the work ran on the interface thread, so the app was frozen rather than idle. That is also why it sometimes got as far as showing the spinner before dying.
+
+4.0.4 fixes both. Files are now streamed straight to and from disk, so the file side of that peak is a fixed 64 KB no matter how large the file is: a 105 MB file now costs the same as a 105 KB one. The 64 MB for key derivation stays, because it is written into the encrypted file's own format and is what makes your password hard to attack, but it is one fixed cost instead of one fixed cost plus an unbounded one. The work also moved off the interface thread, so the button responds immediately, and large files now show a progress bar with the byte count and a Cancel button so you can see it working instead of guessing.
+
+This covers every route you described: the Decrypt tab, sharing a file into PGPony from your file manager, and the share sheet Quick Action. Password mode is covered for both encrypting and decrypting, and you do not need any keys in the app for it.
+
+One limit worth stating: hardware key (NFC) operations still need the file in memory, because the card session has to stay open for the whole operation. That does not affect you, but large files with a card key now say so clearly instead of crashing.
+
+Please reopen this if anything still misbehaves at size.
+--
+author:	Umotas
+association:	none
+edited:	false
+status:	none
+--
+Ok, Thanks
+I will try 4.0.4. I plan to encrypt/decrypt multiple files at once.
+--
+author:	Umotas
+association:	none
+edited:	true
+status:	none
+--
+Thanks, is working
+--

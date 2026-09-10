@@ -87,14 +87,14 @@ A provider hang on certain operations is resolved.
 Whole-file SHA-256 (is this download the published file):
 
 ```
-<FILL_WHOLE_FILE_SHA256>
+3c10b9ea225a748d87dacbf5a233e20bdf456b4cfc2313ba700e6e06e10ae411
 ```
 
 Content hash (for rebuilders; excludes signature, see
 REPRODUCIBLE_BUILDS_PLAYBOOK.md):
 
 ```
-<FILL_CONTENT_HASH>
+c7f352eefd3253d2dec97cf591f2a8d9546471bfcf0727835d7de1ef7f1255fd
 ```
 
 The APK is signed with the NorseHorse release key
