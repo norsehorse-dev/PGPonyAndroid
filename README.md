@@ -76,8 +76,7 @@ verification, is in `REPRODUCIBLE_BUILDS_PLAYBOOK.md` and
 
 Apache License 2.0. See `LICENSE`.
 
-The cryptographic core is maintained separately as open source:
-[PGPonyCore-Kotlin](https://github.com/norsehorse-dev/PGPonyCore-Kotlin).
+
 
 ## Links
 
