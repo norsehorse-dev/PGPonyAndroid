@@ -607,6 +607,9 @@
     <string name="keyring_generate_algorithm_caption_pqc_v4">Post-quantum encryption with the widest reach. A standard v4 Ed25519 key that every OpenPGP tool already handles, carrying a post-quantum ML-KEM-768 encryption subkey alongside a classical one, so older software can still encrypt to you while up-to-date tools use ML-KEM. The recommended choice for post-quantum encryption that works with real correspondents. Private-key backup for this shape is not available yet.</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign">Fully post-quantum with no classical fallback: an ML-DSA signing identity plus an ML-KEM encryption subkey on a modern v6 key (RFC 9980). Both signing and encryption resist quantum attacks, and because the key carries no weaker classical subkey there is nothing to downgrade to. Only up-to-date OpenPGP software can use it.</string>
     <string name="keyring_generate_algorithm_caption_pqc_librepgp">For GnuPG / LibrePGP interop only. This is the LibrePGP format GnuPG 2.5.x uses: ML-KEM (which GnuPG still calls Kyber) plus an elliptic curve, shown by gpg as ky768_cv25519 and ky1024_cv448. It is effectively GnuPG-only and is not broadly interoperable, so choose it only to exchange keys with GnuPG. For wider reach, use the RFC 9980 post-quantum option instead. ML-KEM-1024 is the higher-strength option.</string>
+    <string name="keyring_generate_granular_toggle">Advanced: compose subkeys</string>
+    <string name="keyring_generate_granular_include_default">Include default encryption subkey</string>
+    <string name="keyring_generate_granular_add_subkey">Add subkey</string>
     <string name="keyring_generate_expiration_label">Expiration</string>
     <string name="keyring_generate_passphrase_label">Passphrase (optional)</string>
     <string name="keyring_generate_passphrase_confirm_label">Confirm Passphrase</string>
@@ -843,6 +846,12 @@
     <string name="key_detail_add_subkey_type_rsa_4096_encrypt">RSA 4096 (Encrypt)</string>
     <string name="key_detail_add_subkey_type_ed25519_sign">Ed25519 (Sign)</string>
     <string name="key_detail_add_subkey_type_x25519_encrypt">X25519 (Encrypt)</string>
+    <string name="key_detail_add_subkey_group_classical">Classical</string>
+    <string name="key_detail_add_subkey_group_pq">Post-Quantum</string>
+    <string name="key_detail_add_subkey_type_mlkem768">ML-KEM-768 (Encrypt)</string>
+    <string name="key_detail_add_subkey_type_mlkem1024">ML-KEM-1024 (Encrypt)</string>
+    <string name="key_detail_add_subkey_type_mldsa65">ML-DSA-65 (Sign)</string>
+    <string name="key_detail_add_subkey_type_mldsa87">ML-DSA-87 (Sign)</string>
     <string name="key_detail_add_subkey_type_rsa_2048_auth">RSA 2048 (Authenticate)</string>
     <string name="key_detail_add_subkey_type_rsa_4096_auth">RSA 4096 (Authenticate)</string>
     <string name="key_detail_add_subkey_type_ed25519_auth">Ed25519 (Authenticate)</string>

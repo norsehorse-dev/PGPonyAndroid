@@ -12,6 +12,8 @@ import androidx.lifecycle.viewModelScope
 import com.pgpony.android.PGPonyApp
 import com.pgpony.android.R
 import com.pgpony.android.crypto.KeyAlgorithm
+import com.pgpony.android.crypto.AddSubkeyChoice
+import com.pgpony.android.crypto.GranularSubkeySpec
 import com.pgpony.android.crypto.pqc.CompositeLibrePGPKeyMaterial
 import com.pgpony.android.data.PGPKeyEntity
 import com.pgpony.android.data.PgpSubkeyEntity
@@ -91,6 +93,10 @@ data class KeyringUiState(
     val generatePassphrase: String = "",
     val generateConfirmPassphrase: String = "",
     val generateExpiration: ExpirationOption = ExpirationOption.TWO_YEARS,
+    // item 7 (#55): advanced granular keygen — compose the primary's subkey set.
+    val generateGranular: Boolean = false,
+    val granularIncludeDefaultEncryption: Boolean = true,
+    val granularSubkeys: List<AddSubkeyChoice> = emptyList(),
     val isGenerating: Boolean = false,
     // 4.0.0 Phase 5a (§6 Q6) — set to the new key's fingerprint right
     // after a successful generate so the UI can offer the publish
@@ -559,6 +565,25 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
         _state.value = _state.value.copy(generateExpiration = exp)
     }
 
+    // ── item 7 (#55): advanced granular keygen controls ──────────────────
+    fun toggleGenerateGranular(on: Boolean) {
+        _state.value = _state.value.copy(generateGranular = on)
+    }
+
+    fun setGranularIncludeDefaultEncryption(on: Boolean) {
+        _state.value = _state.value.copy(granularIncludeDefaultEncryption = on)
+    }
+
+    fun addGranularSubkey(choice: AddSubkeyChoice) {
+        _state.value = _state.value.copy(granularSubkeys = _state.value.granularSubkeys + choice)
+    }
+
+    fun removeGranularSubkey(index: Int) {
+        _state.value = _state.value.copy(
+            granularSubkeys = _state.value.granularSubkeys.filterIndexed { i, _ -> i != index }
+        )
+    }
+
     fun generateKey() {
         val s = _state.value
         // #48: synchronous re-entry guard. isGenerating was set inside the
@@ -585,13 +610,26 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
         viewModelScope.launch {
             try {
                 val passphrase = s.generatePassphrase.ifBlank { null }
-                val generated = repo.generateKey(
-                    name = s.generateName.trim(),
-                    email = s.generateEmail.trim(),
-                    algorithm = s.generateAlgorithm,
-                    passphrase = passphrase,
-                    expirationSeconds = s.generateExpiration.seconds
-                )
+                val generated = if (s.generateGranular) {
+                    repo.generateGranularKey(
+                        name = s.generateName.trim(),
+                        email = s.generateEmail.trim(),
+                        includeDefaultEncryptionSubkey = s.granularIncludeDefaultEncryption,
+                        subkeys = s.granularSubkeys.map {
+                            GranularSubkeySpec(it, s.generateExpiration.seconds)
+                        },
+                        passphrase = passphrase,
+                        expirationSeconds = s.generateExpiration.seconds
+                    )
+                } else {
+                    repo.generateKey(
+                        name = s.generateName.trim(),
+                        email = s.generateEmail.trim(),
+                        algorithm = s.generateAlgorithm,
+                        passphrase = passphrase,
+                        expirationSeconds = s.generateExpiration.seconds
+                    )
+                }
                 _state.value = _state.value.copy(
                     isGenerating = false,
                     showGenerateSheet = false,

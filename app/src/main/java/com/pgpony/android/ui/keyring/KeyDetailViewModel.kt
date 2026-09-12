@@ -24,6 +24,7 @@ import com.pgpony.android.contacts.ContactsService
 import com.pgpony.android.contacts.DeviceContact
 import com.pgpony.android.crypto.KeyAlgorithm
 import com.pgpony.android.crypto.ClassicalSubkeyGen
+import com.pgpony.android.crypto.AddSubkeyChoice
 import com.pgpony.android.crypto.KeyExpirationService
 import com.pgpony.android.crypto.PGPCryptoService
 import com.pgpony.android.crypto.RevocationError
@@ -1353,7 +1354,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
      * error handling shape.
      */
     fun addSubkey(
-        type: ClassicalSubkeyGen.ClassicalSubkeyType,
+        choice: AddSubkeyChoice,
         expirationSeconds: Long?,
         passphrase: String?
     ) {
@@ -1361,7 +1362,14 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
         _state.value = _state.value.copy(addSubkeyInFlight = true, addSubkeyError = null)
         viewModelScope.launch {
             try {
-                repo.addSubkey(key.fingerprint, type, expirationSeconds, passphrase)
+                when (choice) {
+                    is AddSubkeyChoice.Classical ->
+                        repo.addSubkey(key.fingerprint, choice.type, expirationSeconds, passphrase)
+                    is AddSubkeyChoice.PqEncryption ->
+                        repo.addCompositeEncryptionSubkey(key.fingerprint, choice.suite, expirationSeconds, passphrase)
+                    is AddSubkeyChoice.PqSigning ->
+                        repo.addCompositeSigningSubkey(key.fingerprint, choice.suite, expirationSeconds, passphrase)
+                }
                 val reloaded = repo.getByFingerprint(key.fingerprint)
                 _state.value = _state.value.copy(
                     key = reloaded ?: key,

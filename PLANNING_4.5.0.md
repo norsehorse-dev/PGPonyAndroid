@@ -260,6 +260,14 @@ CompositeKeyGen.addCompositeSubkey already grafts a post-quantum composite subke
 generation time. Two asks: attach PQ subkeys to an existing certificate, and a granular
 mode that lets the user pick the exact subkey set.
 
+Status (DONE): all five slices green. Composite ML-KEM encryption subkey on an existing v6 key
+(addCompositeEncryptionSubkey), on a v4 key (converts to the RFC 9980 interop shape, with a
+loadSecretKeyRing base-ring fallback so signing/classical-decrypt survive), composite ML-DSA signing
+subkey (CompositeSignSubkeyGen, 0x18 + embedded 0x19 back-sig), a unified AddSubkeyChoice threading
+classical + PQ types through the Add Subkey sheet, and advanced granular keygen (pick primary, strip or
+keep the default encryption subkey, compose the exact subkey set) with an Advanced toggle. Tests:
+CompositeAddSubkeyV6/V4Test, AddSubkeyChoiceTest, GranularKeygenTest.
+
 Work:
 
 - Expose PQ subkey grafting in the add-subkey UI (ML-KEM-768/1024 composite encryption,
@@ -536,7 +544,10 @@ where the composite subkey is the one at issue in the import bug. Sequence after
 Priority: high. Origin: hko-s (#56). Adds a third, more interoperable key shape to the
 key-shape choice in item 1.
 
-Status (in progress, RC3): crypto-core keygen done. CompositeKeyGen.addV4Algo35Subkey grafts a v4 algo-35 (X25519 32 || ML-KEM-768 1184) encryption subkey onto a v4 Ed25519 base ring and hand-rolls the v4 subkey-binding signature (0x99 / 2-octet framing on both keys, Ed25519 over SHA-256, key flags EC|ES, optional key-expiration subpacket). v4 has no material-length field so BC cannot parse the subkey; like the algo-30/31 composite primary the result is returned as RAW transferable-secret octets, not a PGPSecretKeyRing. New v4Algo35Bodies (v4 pub with no length prefix; secret = usage0 + material + 2-octet sum checksum) and buildV4Algo35SubkeyBindingSig, alongside the existing v5 LibrePGP hand-rolled path. CompositeV4Algo35Test verifies the binding offline (recomputes the v4-framed hash, Ed25519-verifies under the primary) and checks the subkey's SHA-1 (v4) fingerprint framing (green).
+Status (DONE): shipped end to end. v3-PKESK/SEIPDv1 + v6-PKESK/SEIPDv2 decrypt (both RFC 9980 A.2
+vectors conform), at-rest protection (S2K usage 254 CFB) + private export, encrypt-to-v4 across
+text/file/bundle, import detection, and the three-shape interop keygen tier, all green and committed.
+Original notes: Status (in progress, RC3): crypto-core keygen done. CompositeKeyGen.addV4Algo35Subkey grafts a v4 algo-35 (X25519 32 || ML-KEM-768 1184) encryption subkey onto a v4 Ed25519 base ring and hand-rolls the v4 subkey-binding signature (0x99 / 2-octet framing on both keys, Ed25519 over SHA-256, key flags EC|ES, optional key-expiration subpacket). v4 has no material-length field so BC cannot parse the subkey; like the algo-30/31 composite primary the result is returned as RAW transferable-secret octets, not a PGPSecretKeyRing. New v4Algo35Bodies (v4 pub with no length prefix; secret = usage0 + material + 2-octet sum checksum) and buildV4Algo35SubkeyBindingSig, alongside the existing v5 LibrePGP hand-rolled path. CompositeV4Algo35Test verifies the binding offline (recomputes the v4-framed hash, Ed25519-verifies under the primary) and checks the subkey's SHA-1 (v4) fingerprint framing (green).
 
 Status (Sep 9 2026, slice): the public-ring plumbing is done. CompositeKeyGen.addV4Algo35Subkey is
 refactored into addV4Algo35SubkeyRings, which returns a V4Algo35Rings(secretRaw, publicRaw,
@@ -1103,6 +1114,58 @@ Delivery: isShrinkResources verified on a release build with a full crypto/keyge
 smoke test (R8 + resource shrinking failures are runtime, not compile). ANR fix follows the pulled
 stack trace.
 
+## 23. Truncated PGP message throws a raw range error instead of a clear "incomplete message"
+
+Priority: medium (error-handling / UX). Not a decrypt correctness bug. Origin: Grigori Perelman
+(4.4.1 feedback), then self-resolved.
+
+RESOLVED as user error, with a real follow-up. The reporter first saw "Decryption failed: toIndex
+(3370) is greater than size (2784)" on a post-quantum message and thought it was a length limit. He then
+found the actual cause himself: copying the armored message out of Telegram, he did not select the whole
+block, so PGPony was handed a truncated message. A cut-off armored message decodes to fewer bytes than
+its own packet headers declare (a header says 3370 bytes follow, the buffer ends at 2784), and the read
+runs off the end. That is exactly the observed error.
+
+So there is no crypto bug here. The remaining, legitimate item is error handling: PGPony should detect a
+truncated or malformed OpenPGP message and surface a clear message ("this message looks incomplete, make
+sure you copied the whole block") instead of a raw range-check exception that reads like a crash. This is
+common: chat apps that scroll make partial selection easy, and the next person will hit the same thing.
+
+Work:
+- Wrap the decrypt entry so an IndexOutOfBounds / range error (and a dearmor that ends without a proper
+  END line, or a packet whose declared length exceeds the remaining bytes) maps to a friendly
+  "incomplete or corrupted message" error string, not the exception text. Cheap, no crypto change.
+- Optional: a lightweight pre-check that the armored block has a matching BEGIN/END and a CRC that lines
+  up, to catch truncation before decrypt even starts.
+
+Compression (his second question) is answered and needs nothing: PGPony already ZLIB-compresses every
+payload on encrypt; a post-quantum message is large because of the ML-KEM encapsulation in the header,
+which does not compress. See the reply sent for 4.4.1.
+
+## 24. Primary "Never" report — not a current-code bug (stale display on re-import)
+
+Priority: low (resolved / deferred nicety). Origin: lukascomer (4.4.x feedback), imported RSA 3072 v4 key.
+
+Reported: the primary read "Never" while the encryption subkey read "Sep 13, 2050" on the same key.
+First hypothesis was that PGPony (via BouncyCastle getValidSeconds) missed a primary expiry stored on the
+UID self-certification (0x13) rather than a direct-key sig (0x1F).
+
+Disproven by the reporter's actual key (fixture keys/uid-selfsig-expiry-rsa.asc): gpg AND BouncyCastle
+both read the primary as expiring 2050-09-13. PrimaryKeyExpirationTest confirms master.validSeconds =
+851472000 (2050-09-13) in current code, so a fresh import shows the primary expiry correctly. There is
+no current-code parsing bug. The speculative primaryKeyValiditySeconds helper was reverted.
+
+What the reporter actually saw: a stale entity.expiresAt. The primary expiry is computed once at import and
+stored on the entity; the subkey expiry is recomputed live (deriveSubkeys) every time Key Details opens.
+His stored primary value was from an older import (or an older app build), so it showed "Never" while the
+live subkey read the real 2050 date. Re-importing / refreshing the key corrected it, which he confirmed.
+
+Deferred nicety (not shipping in the RC): recompute the primary expiry live at Key Details display from the
+ring, the same way subkeys are, so a stale stored value self-corrects without a re-import. Low value (the
+symptom only appears when a key's on-disk expiry changes after import and the user does not re-import), low
+risk, but a clean consistency win for a later release. PrimaryKeyExpirationTest stays as a regression guard
+that current code keeps reading the primary expiry right.
+
 ## Carried-over follow-ups (optional, from the 4.4.x cycle)
 
 - loadPublicKeyRing returns null for a private-only key, which breaks encrypt-to-self and
@@ -1112,6 +1175,13 @@ stack trace.
 
 
 ## Parked (not 4.5.0 unless promoted)
+
+- Move a software key onto a hardware key (idea from lukascomer). Feasible direction only: writing an
+  existing software key onto a security token / OpenPGP smartcard that supports key import (a keytocard
+  style flow). The reverse (hardware to software) is impossible by design, a hardware key never releases
+  its private key, and root does not bridge it (root reaches the phone's storage, not a token's protected
+  key). If promoted, scope it to software-to-card import on tokens that allow it; PGPony already has the
+  card plumbing (importCardKey / card-backed entities).
 
 - Fully UID-less (fingerprint-only) v6 keys, if name-only (item 3) covers the need.
 - UID revocation and primary-UID reordering for composite keys (beyond item 4's add/show).

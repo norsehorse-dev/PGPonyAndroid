@@ -127,6 +127,8 @@ sealed class PGPCryptoError(message: String) : Exception(message) {
     class KeyGenerationFailed(msg: String) : PGPCryptoError("Key generation failed: $msg")
     class EncryptionFailed(msg: String) : PGPCryptoError("Encryption failed: $msg")
     class DecryptionFailed(msg: String) : PGPCryptoError("Decryption failed: $msg")
+    /** item 23 (#55): a truncated or corrupted message (e.g. an incomplete paste). */
+    class MessageIncomplete : PGPCryptoError("The message looks incomplete. Make sure you copied the whole block, from BEGIN to END.")
     class SigningFailed(msg: String) : PGPCryptoError("Signing failed: $msg")
     class VerificationFailed(msg: String) : PGPCryptoError("Verification failed: $msg")
     class KeyNotFound : PGPCryptoError("Key not found in keyring")
@@ -583,6 +585,60 @@ class PGPCryptoService private constructor() {
             userID, passphrase, creationDate, expirationSeconds,
             features = (0x01 or 0x08).toByte()
         ).generateSecretKeyRing()
+
+    /**
+     * item 7 (#55): assemble an advanced granular v6 key. The primary is a v6
+     * Ed25519 (sign + certify); its default X25519 encryption subkey is kept or
+     * stripped per [includeDefaultEncryptionSubkey], then each spec in [subkeys]
+     * is grafted on with its own expiry. Every shape here stays a BouncyCastle
+     * ring (classical, v6 composite ML-KEM encryption, v6 composite ML-DSA
+     * signing), so the result persists through the ordinary storage path. Returns
+     * the finished secret ring; the caller stores it and builds the entity.
+     */
+    fun assembleGranularV6Ring(
+        userID: String,
+        includeDefaultEncryptionSubkey: Boolean,
+        subkeys: List<GranularSubkeySpec>,
+        passphrase: String?,
+        creationDate: Date = Date(),
+        expirationSeconds: Long? = null
+    ): PGPSecretKeyRing {
+        var ring = buildV6Ed25519X25519KeyRings(userID, passphrase, creationDate, expirationSeconds).first
+
+        if (!includeDefaultEncryptionSubkey) {
+            val defaultEnc = ring.secretKeys.asSequence().firstOrNull {
+                !it.publicKey.isMasterKey && it.publicKey.isEncryptionKey
+            }
+            if (defaultEnc != null) {
+                ring = ClassicalSubkeyGen.removeSubkey(ring, defaultEnc.keyID)
+            }
+        }
+
+        for (spec in subkeys) {
+            ring = when (val choice = spec.choice) {
+                is AddSubkeyChoice.Classical -> {
+                    val v6Type = when (choice.type) {
+                        ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_SIGN -> V6SubkeyGen.V6SubkeyType.ED25519_SIGN
+                        ClassicalSubkeyGen.ClassicalSubkeyType.X25519_ENCRYPT -> V6SubkeyGen.V6SubkeyType.X25519_ENCRYPT
+                        ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_AUTH -> V6SubkeyGen.V6SubkeyType.ED25519_AUTH
+                        else -> throw ClassicalSubkeyGen.SubkeyAddError(
+                            "A v6 granular key takes Ed25519/X25519 classical subkeys only"
+                        )
+                    }
+                    V6SubkeyGen.addSubkey(ring, v6Type, passphrase, spec.expirationSeconds)
+                }
+                is AddSubkeyChoice.PqEncryption ->
+                    com.pgpony.android.crypto.pqc.CompositeKeyGen.addCompositeSubkey(
+                        ring, choice.suite, passphrase, expirationSeconds = spec.expirationSeconds
+                    )
+                is AddSubkeyChoice.PqSigning ->
+                    com.pgpony.android.crypto.pqc.CompositeSignSubkeyGen.addCompositeSigningSubkey(
+                        ring, choice.suite, passphrase, expirationSeconds = spec.expirationSeconds
+                    )
+            }
+        }
+        return ring
+    }
 
     private fun buildV6Ed25519X25519KeyRings(
         userID: String,
@@ -1847,11 +1903,13 @@ class PGPCryptoService private constructor() {
             ) {
                 throw PGPCryptoError.InvalidPassphrase()
             }
+            if (looksIncomplete(e)) throw PGPCryptoError.MessageIncomplete()
             throw PGPCryptoError.DecryptionFailed(msg)
         } catch (e: Exception) {
             // A wrong symmetric passphrase can also throw a plain (non-PGP)
             // exception while reading the corrupted stream.
             if (usedSymmetric) throw PGPCryptoError.InvalidPassphrase()
+            if (looksIncomplete(e)) throw PGPCryptoError.MessageIncomplete()
             throw PGPCryptoError.DecryptionFailed(e.message ?: "Unknown error")
         }
     }
@@ -2049,9 +2107,11 @@ class PGPCryptoService private constructor() {
             ) {
                 throw PGPCryptoError.InvalidPassphrase()
             }
+            if (looksIncomplete(e)) throw PGPCryptoError.MessageIncomplete()
             throw PGPCryptoError.DecryptionFailed(msg)
         } catch (e: Exception) {
             if (usedSymmetric) throw PGPCryptoError.InvalidPassphrase()
+            if (looksIncomplete(e)) throw PGPCryptoError.MessageIncomplete()
             throw PGPCryptoError.DecryptionFailed(e.message ?: "Unknown error")
         }
     }
@@ -2818,6 +2878,27 @@ class PGPCryptoService private constructor() {
      * LibrePGP composite (algo 8), then classical encryption subkeys, then an
      * encryption-capable primary. Deduped by key id.
      */
+    /**
+     * item 23 (#55): does this decrypt failure look like a truncated or corrupted
+     * message (a partial copy-paste) rather than a genuine crypto error? A cut-off
+     * armored block leaves a packet length pointing past the end of the buffer,
+     * which surfaces as a range / end-of-stream error deep in the parser.
+     */
+    internal fun looksIncomplete(e: Throwable): Boolean {
+        var cur: Throwable? = e
+        while (cur != null) {
+            if (cur is IndexOutOfBoundsException || cur is java.io.EOFException) return true
+            val m = cur.message?.lowercase() ?: ""
+            if (m.contains("greater than size") || m.contains("toindex") ||
+                m.contains("premature end") || m.contains("unexpected end") ||
+                m.contains("end of stream") || m.contains("out of bounds") ||
+                m.contains("truncat")
+            ) return true
+            cur = cur.cause
+        }
+        return false
+    }
+
     internal fun encryptionKeys(ring: PGPPublicKeyRing): List<PGPPublicKey> {
         val out = LinkedHashMap<Long, PGPPublicKey>()
         com.pgpony.android.crypto.pqc.CompositeKeyMaterial.encryptionSubkey(ring)?.let { out[it.keyID] = it }

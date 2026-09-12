@@ -44,6 +44,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
 import com.pgpony.android.crypto.KeyAlgorithm
+import com.pgpony.android.crypto.AddSubkeyChoice
 import com.pgpony.android.data.PGPKeyEntity
 import androidx.compose.ui.unit.Dp
 import com.pgpony.android.ui.components.KeyCard
@@ -673,12 +674,80 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Algorithm picker
-            KeygenAlgorithmPicker(
-                selected = state.generateAlgorithm,
-                onSelect = { viewModel.updateGenerateAlgorithm(it) }
-            )
-            Spacer(modifier = Modifier.height(12.dp))
+            // Algorithm picker (hidden in granular mode: the primary is fixed to
+            // a v6 Ed25519 base whose subkey set the user composes below).
+            if (!state.generateGranular) {
+                KeygenAlgorithmPicker(
+                    selected = state.generateAlgorithm,
+                    onSelect = { viewModel.updateGenerateAlgorithm(it) }
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // item 7 (#55): advanced granular composer.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Switch(
+                    checked = state.generateGranular,
+                    onCheckedChange = { viewModel.toggleGenerateGranular(it) }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.keyring_generate_granular_toggle))
+            }
+            if (state.generateGranular) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                        checked = state.granularIncludeDefaultEncryption,
+                        onCheckedChange = { viewModel.setGranularIncludeDefaultEncryption(it) }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.keyring_generate_granular_include_default))
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                if (state.granularSubkeys.isNotEmpty()) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.granularSubkeys.forEachIndexed { index, choice ->
+                            InputChip(
+                                selected = false,
+                                onClick = { viewModel.removeGranularSubkey(index) },
+                                label = { Text(addSubkeyChoiceLabel(choice)) },
+                                trailingIcon = {
+                                    Icon(
+                                        Icons.Filled.Close,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                var granularMenuOpen by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedButton(onClick = { granularMenuOpen = true }) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(stringResource(R.string.keyring_generate_granular_add_subkey))
+                    }
+                    DropdownMenu(
+                        expanded = granularMenuOpen,
+                        onDismissRequest = { granularMenuOpen = false }
+                    ) {
+                        (AddSubkeyChoice.classicalFor(isV6 = true) +
+                            AddSubkeyChoice.postQuantumFor(isV6 = true)).forEach { choice ->
+                            DropdownMenuItem(
+                                text = { Text(addSubkeyChoiceLabel(choice)) },
+                                onClick = {
+                                    viewModel.addGranularSubkey(choice)
+                                    granularMenuOpen = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
 
             // Expiration picker
             Text(stringResource(R.string.keyring_generate_expiration_label), style = MaterialTheme.typography.labelMedium)

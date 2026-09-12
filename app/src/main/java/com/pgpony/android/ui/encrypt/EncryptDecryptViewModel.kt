@@ -3328,7 +3328,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             } catch (e: Exception) {
                 _decryptState.value = _decryptState.value.copy(
                     isProcessing = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.encdec_error_decryption_failed_format, e.message ?: "")
+                    errorMessage = if (e is com.pgpony.android.crypto.PGPCryptoError.MessageIncomplete) e.message
+                        else PGPonyApp.instance.getString(R.string.encdec_error_decryption_failed_format, e.message ?: "")
                 )
             }
         }
@@ -4292,10 +4293,12 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     isProcessing = false,
                     processedBytes = 0L,
                     totalBytes = 0L,
-                    errorMessage = if (e is OutOfMemoryError) {
-                        PGPonyApp.instance.getString(R.string.encdec_error_file_too_large)
-                    } else {
-                        PGPonyApp.instance.getString(R.string.encdec_error_decryption_failed_format, e.message ?: "")
+                    errorMessage = when {
+                        e is OutOfMemoryError ->
+                            PGPonyApp.instance.getString(R.string.encdec_error_file_too_large)
+                        e is com.pgpony.android.crypto.PGPCryptoError.MessageIncomplete -> e.message
+                        else ->
+                            PGPonyApp.instance.getString(R.string.encdec_error_decryption_failed_format, e.message ?: "")
                     }
                 )
             }
@@ -4461,7 +4464,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             } catch (e: Exception) {
                 _decryptState.value = _decryptState.value.copy(
                     isProcessing = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.encdec_error_decryption_failed_format, e.message ?: "")
+                    errorMessage = if (e is com.pgpony.android.crypto.PGPCryptoError.MessageIncomplete) e.message
+                        else PGPonyApp.instance.getString(R.string.encdec_error_decryption_failed_format, e.message ?: "")
                 )
             }
         }

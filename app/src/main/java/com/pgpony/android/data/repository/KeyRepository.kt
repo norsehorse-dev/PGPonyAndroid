@@ -14,6 +14,7 @@ import com.pgpony.android.crypto.KeyAlgorithm
 import com.pgpony.android.crypto.KeyExpirationService
 import com.pgpony.android.crypto.PGPCryptoService
 import com.pgpony.android.crypto.ClassicalSubkeyGen
+import com.pgpony.android.crypto.GranularSubkeySpec
 import com.pgpony.android.crypto.V6SubkeyGen
 import com.pgpony.android.crypto.RevocationError
 import com.pgpony.android.crypto.RevocationService
@@ -362,6 +363,57 @@ class KeyRepository(
         )
         dao.insert(entity)
         return entity
+    }
+
+    /**
+     * item 7 (#55): advanced granular key generation. Builds a v6 Ed25519
+     * primary, keeps or strips its default X25519 encryption subkey, then grafts
+     * the chosen [subkeys] (classical, composite ML-KEM encryption, composite
+     * ML-DSA signing). Every shape stays a BouncyCastle ring, so it persists like
+     * an ordinary v6 key. The primary is labelled V6_ED25519; the subkey list
+     * carries the rest.
+     */
+    suspend fun generateGranularKey(
+        name: String,
+        email: String,
+        includeDefaultEncryptionSubkey: Boolean,
+        subkeys: List<GranularSubkeySpec>,
+        passphrase: String?,
+        expirationSeconds: Long? = null
+    ): PGPKeyEntity = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        val uid = PGPKeyEntity.composeUserID(name, email)
+        val ring = crypto.assembleGranularV6Ring(
+            userID = uid,
+            includeDefaultEncryptionSubkey = includeDefaultEncryptionSubkey,
+            subkeys = subkeys,
+            passphrase = passphrase,
+            expirationSeconds = expirationSeconds
+        )
+        val publicRing = PGPPublicKeyRing(ring.publicKeys.asSequence().toList())
+        val primary = publicRing.publicKey
+        val fpHex = primary.fingerprint.joinToString("") { "%02X".format(it) }.uppercase()
+
+        store.storePublicKey(fpHex, publicRing.encoded)
+        store.storePrivateKey(fpHex, ring.encoded)
+
+        val validSec = primary.validSeconds
+        val expiresAtMs = if (validSec > 0) primary.creationTime.time + validSec * 1000 else null
+        val parsed = PGPKeyEntity.parseUserID(uid)
+        val entity = PGPKeyEntity(
+            id = UUID.randomUUID().toString(),
+            fingerprint = fpHex,
+            userID = uid,
+            userName = parsed.first,
+            userEmail = parsed.second,
+            algorithm = KeyAlgorithm.V6_ED25519,
+            isKeyPair = true,
+            createdAt = System.currentTimeMillis(),
+            expiresAt = expiresAtMs,
+            armoredPublicKey = crypto.exportArmoredPublicKey(publicRing),
+            revocationCertificate = null
+        )
+        dao.insert(entity)
+        return@withContext entity
     }
 
     // ── Import ─────────────────────────────────────────────────────────
@@ -1048,9 +1100,25 @@ class KeyRepository(
 
     fun loadSecretKeyRing(fingerprint: String): PGPSecretKeyRing? {
         val data = store.loadPrivateKey(fingerprint) ?: return null
-        return try {
-            crypto.importKeyData(data).secretKeyRing
-        } catch (_: Exception) { null }
+        try {
+            crypto.importKeyData(data).secretKeyRing?.let { return it }
+        } catch (_: Exception) { }
+        // item 7 (#55): a v4 interop key carries an algo-35 subkey BouncyCastle
+        // cannot parse, so the whole ring fails to load. Fall back to the
+        // BC-parseable base ring (Ed25519 primary + any classical subkey) so
+        // signing and classical decrypt still work; the algo-35 subkey is opened
+        // through the raw v4 paths.
+        if (CompositeKeyFacade.hasV4Algo35Subkey(data)) {
+            CompositeKeyFacade.v4Algo35BaseBytes(data)?.let { baseBytes ->
+                return try {
+                    org.bouncycastle.openpgp.PGPSecretKeyRing(
+                        java.io.ByteArrayInputStream(baseBytes),
+                        org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator()
+                    )
+                } catch (_: Exception) { null }
+            }
+        }
+        return null
     }
 
     /**
@@ -1852,6 +1920,141 @@ class KeyRepository(
         }
         val updatedPublicRing = PGPPublicKeyRing(updatedSecretRing.publicKeys.asSequence().toList())
 
+        store.storePublicKey(fingerprint, updatedPublicRing.encoded)
+        store.storePrivateKey(fingerprint, updatedSecretRing.encoded)
+        dao.update(
+            entity.copy(
+                armoredPublicKey = crypto.exportArmoredPublicKey(updatedPublicRing)
+            )
+        )
+    }
+
+    /**
+     * item 7 (#55): graft a post-quantum composite ML-KEM encryption subkey onto
+     * an existing classical key pair. A v6 key uses CompositeKeyGen.addCompositeSubkey
+     * (the same path generation uses for MLKEM768_X25519_V6); the v6 composite
+     * subkey has a material-length field, so the ring stays BC-parseable and
+     * persists through the ordinary flow. A v4 key uses the RFC 9980 v4 shape
+     * (addV4Algo35SubkeyRings): the algo-35 subkey is unparseable by BC, so the
+     * key converts to raw-octet storage and its label becomes MLKEM768_X25519_V4.
+     * Composite ML-DSA primaries take their own path (slice 3).
+     *
+     * [suite] selects the level: CompositeSuite.IETF_768 (algo 35) or IETF_1024
+     * (algo 36). ML-KEM-1024 has no v4 encoding, so a v4 key rejects IETF_1024.
+     */
+    suspend fun addCompositeEncryptionSubkey(
+        fingerprint: String,
+        suite: com.pgpony.android.crypto.pqc.CompositeSuite,
+        expirationSeconds: Long?,
+        passphrase: String?
+    ) {
+        val entity = dao.getByFingerprint(fingerprint)
+            ?: throw KeyRepoError.NotFound(fingerprint)
+        if (!entity.isKeyPair) {
+            throw ClassicalSubkeyGen.SubkeyAddError(
+                "Cannot add a subkey to a public-only key — the private key is required to sign the binding"
+            )
+        }
+        if (entity.isCardBacked) {
+            throw ClassicalSubkeyGen.SubkeyAddError(
+                "This key lives on a hardware key — subkeys can't be added to a card-backed key from here"
+            )
+        }
+        val secRing = loadSecretKeyRing(fingerprint)
+            ?: throw ClassicalSubkeyGen.SubkeyAddError(
+                "Secret key ring could not be loaded for $fingerprint"
+            )
+        if (entity.isV6Key) {
+            // v6: the composite subkey has a material-length field, so the ring
+            // stays BC-parseable and persists through the ordinary flow.
+            val updatedSecretRing = com.pgpony.android.crypto.pqc.CompositeKeyGen.addCompositeSubkey(
+                secretRing = secRing,
+                suite = suite,
+                passphrase = passphrase,
+                expirationSeconds = expirationSeconds
+            )
+            val updatedPublicRing = PGPPublicKeyRing(updatedSecretRing.publicKeys.asSequence().toList())
+            store.storePublicKey(fingerprint, updatedPublicRing.encoded)
+            store.storePrivateKey(fingerprint, updatedSecretRing.encoded)
+            dao.update(
+                entity.copy(
+                    armoredPublicKey = crypto.exportArmoredPublicKey(updatedPublicRing)
+                )
+            )
+            return
+        }
+        // item 7 (#55): a v4 key takes the RFC 9980 v4 shape — a v4 algo-35
+        // (ML-KEM-768 + X25519) subkey grafted on. That subkey is unparseable by
+        // BouncyCastle, so the key converts to raw-octet storage and its label
+        // becomes MLKEM768_X25519_V4 (the item-14 interop shape). Only ML-KEM-768
+        // has a v4 encoding; ML-KEM-1024 is v6-only.
+        if (suite.ietfAlgId != 35) {
+            throw ClassicalSubkeyGen.SubkeyAddError(
+                "A v4 key supports the ML-KEM-768 (algorithm 35) post-quantum subkey only"
+            )
+        }
+        val rings = com.pgpony.android.crypto.pqc.CompositeKeyGen.addV4Algo35SubkeyRings(
+            baseSecretRing = secRing,
+            passphrase = passphrase,
+            expirationSeconds = expirationSeconds
+        )
+        store.storePublicKey(fingerprint, rings.publicRaw)
+        store.storePrivateKey(fingerprint, rings.secretRaw)
+        dao.update(
+            entity.copy(
+                algorithm = KeyAlgorithm.MLKEM768_X25519_V4,
+                armoredPublicKey = CompositeSigPacket.armor(
+                    "-----BEGIN PGP PUBLIC KEY BLOCK-----",
+                    "-----END PGP PUBLIC KEY BLOCK-----",
+                    rings.publicRaw
+                )
+            )
+        )
+    }
+
+    /**
+     * item 7 (#55): graft a post-quantum composite ML-DSA + EdDSA SIGNING subkey
+     * (algo 30/31) onto an existing v6 classical EdDSA key, via
+     * CompositeSignSubkeyGen (which hand-emits the 0x18 binding plus the embedded
+     * 0x19 back-signature a signing subkey requires). The primary stays classical,
+     * so the ring is BC-parseable and persists through the ordinary flow; the
+     * algo-30 subkey rides as an UnknownBCPGKey. [suite] picks the level
+     * (MLDSA65_ED25519 or MLDSA87_ED448).
+     */
+    suspend fun addCompositeSigningSubkey(
+        fingerprint: String,
+        suite: com.pgpony.android.crypto.pqc.CompositeSignSuite,
+        expirationSeconds: Long?,
+        passphrase: String?
+    ) {
+        val entity = dao.getByFingerprint(fingerprint)
+            ?: throw KeyRepoError.NotFound(fingerprint)
+        if (!entity.isKeyPair) {
+            throw ClassicalSubkeyGen.SubkeyAddError(
+                "Cannot add a subkey to a public-only key — the private key is required to sign the binding"
+            )
+        }
+        if (entity.isCardBacked) {
+            throw ClassicalSubkeyGen.SubkeyAddError(
+                "This key lives on a hardware key — subkeys can't be added to a card-backed key from here"
+            )
+        }
+        if (!entity.isV6Key) {
+            throw ClassicalSubkeyGen.SubkeyAddError(
+                "A composite signing subkey needs a v6 EdDSA primary; this key is not v6"
+            )
+        }
+        val secRing = loadSecretKeyRing(fingerprint)
+            ?: throw ClassicalSubkeyGen.SubkeyAddError(
+                "Secret key ring could not be loaded for $fingerprint"
+            )
+        val updatedSecretRing = com.pgpony.android.crypto.pqc.CompositeSignSubkeyGen.addCompositeSigningSubkey(
+            secretRing = secRing,
+            suite = suite,
+            passphrase = passphrase,
+            expirationSeconds = expirationSeconds
+        )
+        val updatedPublicRing = PGPPublicKeyRing(updatedSecretRing.publicKeys.asSequence().toList())
         store.storePublicKey(fingerprint, updatedPublicRing.encoded)
         store.storePrivateKey(fingerprint, updatedSecretRing.encoded)
         dao.update(

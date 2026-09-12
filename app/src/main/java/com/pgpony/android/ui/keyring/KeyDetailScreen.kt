@@ -719,8 +719,8 @@ fun KeyDetailScreen(
             isProcessing = state.addSubkeyInFlight,
             errorMessage = state.addSubkeyError,
             isV6 = keyForAddSubkey.isV6Key,
-            onApply = { type, expiresAt, passphrase ->
-                viewModel.addSubkey(type, expiresAt, passphrase)
+            onApply = { choice, expiresAt, passphrase ->
+                viewModel.addSubkey(choice, expiresAt, passphrase)
             },
             onDismiss = { viewModel.dismissAddSubkeySheet() }
         )

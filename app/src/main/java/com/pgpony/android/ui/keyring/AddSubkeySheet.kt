@@ -8,10 +8,10 @@
 // sheet — KeyDetailScreen only wires the Add Subkey button for
 // software key pairs, matching the Edit Expiry row's own gating.
 //
-// Composite (post-quantum) subkey types are intentionally not offered
-// here yet; §17.2 H asks for them to be exposed "deliberately" from
-// this same entry point, tracked as a follow-up once the type picker
-// grows a second group of options.
+// item 7 (#55): post-quantum subkey types are offered here too, in a
+// second "Post-Quantum" group — ML-KEM encryption (768 on any key, 1024
+// on v6) and, on a v6 key, ML-DSA signing. The sheet speaks a single
+// AddSubkeyChoice, and the view model routes each kind to its generator.
 
 package com.pgpony.android.ui.keyring
 
@@ -27,6 +27,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
 import com.pgpony.android.crypto.ClassicalSubkeyGen
+import com.pgpony.android.crypto.AddSubkeyChoice
+import com.pgpony.android.crypto.pqc.CompositeSignSuite
+import com.pgpony.android.crypto.pqc.CompositeSuite
 import java.text.DateFormat
 import java.util.Date
 
@@ -37,12 +40,14 @@ fun AddSubkeySheet(
     isProcessing: Boolean = false,
     errorMessage: String? = null,
     isV6: Boolean = false,
-    onApply: (type: ClassicalSubkeyGen.ClassicalSubkeyType, expiresAtEpochSeconds: Long?, passphrase: String?) -> Unit,
+    onApply: (choice: AddSubkeyChoice, expiresAtEpochSeconds: Long?, passphrase: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    var selectedType by remember { mutableStateOf(ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_SIGN) }
+    var selectedChoice: AddSubkeyChoice by remember {
+        mutableStateOf(AddSubkeyChoice.Classical(ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_SIGN))
+    }
     var selectedPreset by remember { mutableStateOf<AddSubkeyExpiryOption?>(AddSubkeyExpiryOption.NEVER) }
     var customMillis by remember { mutableStateOf<Long?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -89,9 +94,9 @@ fun AddSubkeySheet(
                 style = MaterialTheme.typography.labelLarge
             )
             AddSubkeyTypeChips(
-                selected = selectedType,
+                selected = selectedChoice,
                 isV6 = isV6,
-                onSelect = { selectedType = it }
+                onSelect = { selectedChoice = it }
             )
 
             Text(
@@ -147,7 +152,7 @@ fun AddSubkeySheet(
                 ) { Text(stringResource(R.string.common_button_cancel)) }
                 Button(
                     onClick = {
-                        onApply(selectedType, computeExpiresAtEpochSeconds(), passphrase.ifBlank { null })
+                        onApply(selectedChoice, computeExpiresAtEpochSeconds(), passphrase.ifBlank { null })
                     },
                     enabled = canApply,
                     modifier = Modifier.weight(1f)
@@ -235,34 +240,63 @@ private fun AddSubkeyExpiryChips(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AddSubkeyTypeChips(
-    selected: ClassicalSubkeyGen.ClassicalSubkeyType,
+    selected: AddSubkeyChoice,
     isV6: Boolean,
-    onSelect: (ClassicalSubkeyGen.ClassicalSubkeyType) -> Unit
+    onSelect: (AddSubkeyChoice) -> Unit
 ) {
-    // RC2: v6 keys take Ed25519/X25519 subkeys only; RSA is a v4 shape.
-    val types = if (isV6) listOf(
-        ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_SIGN,
-        ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_AUTH,
-        ClassicalSubkeyGen.ClassicalSubkeyType.X25519_ENCRYPT
-    ) else ClassicalSubkeyGen.ClassicalSubkeyType.entries
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        types.forEach { type ->
-            val label = when (type) {
-                ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_SIGN -> stringResource(R.string.key_detail_add_subkey_type_rsa_2048_sign)
-                ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_ENCRYPT -> stringResource(R.string.key_detail_add_subkey_type_rsa_2048_encrypt)
-                ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_SIGN -> stringResource(R.string.key_detail_add_subkey_type_rsa_4096_sign)
-                ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_ENCRYPT -> stringResource(R.string.key_detail_add_subkey_type_rsa_4096_encrypt)
-                ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_AUTH -> stringResource(R.string.key_detail_add_subkey_type_rsa_2048_auth)
-                ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_AUTH -> stringResource(R.string.key_detail_add_subkey_type_rsa_4096_auth)
-                ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_SIGN -> stringResource(R.string.key_detail_add_subkey_type_ed25519_sign)
-                ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_AUTH -> stringResource(R.string.key_detail_add_subkey_type_ed25519_auth)
-                ClassicalSubkeyGen.ClassicalSubkeyType.X25519_ENCRYPT -> stringResource(R.string.key_detail_add_subkey_type_x25519_encrypt)
+    val classical = AddSubkeyChoice.classicalFor(isV6)
+    val postQuantum = AddSubkeyChoice.postQuantumFor(isV6)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.key_detail_add_subkey_group_classical),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            classical.forEach { choice ->
+                FilterChip(
+                    selected = selected == choice,
+                    onClick = { onSelect(choice) },
+                    label = { Text(addSubkeyChoiceLabel(choice)) }
+                )
             }
-            FilterChip(
-                selected = selected == type,
-                onClick = { onSelect(type) },
-                label = { Text(label) }
-            )
         }
+        Text(
+            text = stringResource(R.string.key_detail_add_subkey_group_pq),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            postQuantum.forEach { choice ->
+                FilterChip(
+                    selected = selected == choice,
+                    onClick = { onSelect(choice) },
+                    label = { Text(addSubkeyChoiceLabel(choice)) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun addSubkeyChoiceLabel(choice: AddSubkeyChoice): String = when (choice) {
+    is AddSubkeyChoice.Classical -> when (choice.type) {
+        ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_SIGN -> stringResource(R.string.key_detail_add_subkey_type_rsa_2048_sign)
+        ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_ENCRYPT -> stringResource(R.string.key_detail_add_subkey_type_rsa_2048_encrypt)
+        ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_SIGN -> stringResource(R.string.key_detail_add_subkey_type_rsa_4096_sign)
+        ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_ENCRYPT -> stringResource(R.string.key_detail_add_subkey_type_rsa_4096_encrypt)
+        ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_AUTH -> stringResource(R.string.key_detail_add_subkey_type_rsa_2048_auth)
+        ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_AUTH -> stringResource(R.string.key_detail_add_subkey_type_rsa_4096_auth)
+        ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_SIGN -> stringResource(R.string.key_detail_add_subkey_type_ed25519_sign)
+        ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_AUTH -> stringResource(R.string.key_detail_add_subkey_type_ed25519_auth)
+        ClassicalSubkeyGen.ClassicalSubkeyType.X25519_ENCRYPT -> stringResource(R.string.key_detail_add_subkey_type_x25519_encrypt)
+    }
+    is AddSubkeyChoice.PqEncryption -> when (choice.suite) {
+        CompositeSuite.IETF_1024 -> stringResource(R.string.key_detail_add_subkey_type_mlkem1024)
+        else -> stringResource(R.string.key_detail_add_subkey_type_mlkem768)
+    }
+    is AddSubkeyChoice.PqSigning -> when (choice.suite) {
+        CompositeSignSuite.MLDSA87_ED448 -> stringResource(R.string.key_detail_add_subkey_type_mldsa87)
+        else -> stringResource(R.string.key_detail_add_subkey_type_mldsa65)
     }
 }
