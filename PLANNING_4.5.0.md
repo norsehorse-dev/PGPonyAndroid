@@ -331,7 +331,13 @@ and confirm no publish sheet; with offline off, confirm the "Not now" skip; togg
 generate, and confirm the sheet stays suppressed across app restarts.
 
 
-## 9. Korean localization (strings shipped hidden in 4.4.1; enable in 4.5.0)
+## 9. Korean localization (DEFERRED to a later build)
+
+Status (Sep 12 2026): DEFERRED out of 4.5.0. The contributed translation is still short of the app's
+current string set, so Korean stays dormant exactly as it shipped: res/values-ko/strings.xml is present
+but "ko" is NOT in locales_config.xml and KO is NOT in SupportedLanguage, so it does not appear in either
+language picker. No code change was needed to defer, and no release-notes "eighth language" line. Revisit
+once the translation is topped up (the enable steps below still apply then).
 
 Origin: community translation (PGPony-Translations PR #1, nuraqueer). The contributed
 file is only ~22% translated (302 of 1389 strings; the rest English, 33 keys absent), so

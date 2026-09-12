@@ -243,7 +243,7 @@ android {
         // provider activities to a dedicated :remote_api process (#2.1), plus
         // the offline switch. versionCode 433 so it installs over 4.3.2.
         versionCode = 435
-        versionName = "4.5.0"
+        versionName = "4.5.0-rc1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
