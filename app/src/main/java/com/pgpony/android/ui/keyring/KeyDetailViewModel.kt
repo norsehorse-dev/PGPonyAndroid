@@ -355,7 +355,9 @@ class KeyDetailViewModel(
         }
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, errorMessage = null)
-            val loaded = repo.getByFingerprint(fingerprint)
+            // item 24 (#55, lukascomer): reconcile the primary expiry live
+            // from the ring so a stale stored "Never" self-corrects on open.
+            val loaded = repo.getByFingerprint(fingerprint)?.let { repo.reconcilePrimaryExpiry(it) }
             _state.value = _state.value.copy(
                 key = loaded,
                 isLoading = false,

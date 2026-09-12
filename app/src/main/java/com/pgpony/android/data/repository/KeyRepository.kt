@@ -1416,6 +1416,33 @@ class KeyRepository(
     suspend fun getAllKeys(): List<PGPKeyEntity> = dao.getAllKeys()
     suspend fun getKeyPairs(): List<PGPKeyEntity> = dao.getKeyPairs()
     suspend fun getByFingerprint(fp: String): PGPKeyEntity? = dao.getByFingerprint(fp)
+
+    /**
+     * item 24 (#55, lukascomer): the primary key's expiry is captured on the
+     * entity at import time and can go stale when the key is later updated on
+     * disk and re-imported, or when it was first imported by an older build
+     * that missed a UID-self-cert expiry. Subkeys are always read live from the
+     * ring each time Key Details opens, so a stale primary shows "Never" beside
+     * a subkey that shows the real date. This reconciles the primary the same
+     * way, reading its Key Expiration Time straight off the ring, and persists
+     * the corrected value so the fix survives without a manual re-import.
+     * Composite-sign primaries do not load as a PGPPublicKeyRing (their expiry
+     * is read elsewhere), so they are returned unchanged.
+     */
+    suspend fun reconcilePrimaryExpiry(entity: PGPKeyEntity): PGPKeyEntity =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            if (entity.algorithm.isCompositeSign) return@withContext entity
+            val ring = loadPublicKeyRing(entity.fingerprint) ?: return@withContext entity
+            val master = ring.publicKey
+            val live = master.validSeconds.takeIf { it > 0L }?.let { secs ->
+                master.creationTime.time + secs * 1000L
+            }
+            if (live == entity.expiresAt) return@withContext entity
+            val corrected = entity.copy(expiresAt = live)
+            dao.update(corrected)
+            corrected
+        }
+
     suspend fun getByEmail(email: String): List<PGPKeyEntity> = dao.getByEmail(email)
 
     /**

@@ -1142,29 +1142,28 @@ Compression (his second question) is answered and needs nothing: PGPony already 
 payload on encrypt; a post-quantum message is large because of the ML-KEM encapsulation in the header,
 which does not compress. See the reply sent for 4.4.1.
 
-## 24. Primary "Never" report — not a current-code bug (stale display on re-import)
+## 24. Primary "Never" shows stale beside a live subkey date - reconcile primary expiry live (FIXED in RC)
 
-Priority: low (resolved / deferred nicety). Origin: lukascomer (4.4.x feedback), imported RSA 3072 v4 key.
+Priority: low. Origin: lukascomer (4.4.x feedback), imported RSA 3072 v4 key.
 
-Reported: the primary read "Never" while the encryption subkey read "Sep 13, 2050" on the same key.
-First hypothesis was that PGPony (via BouncyCastle getValidSeconds) missed a primary expiry stored on the
-UID self-certification (0x13) rather than a direct-key sig (0x1F).
+Reported: the primary read "Never" while the encryption subkey read "Sep 13, 2050" on the same key. The
+first hypothesis (PGPony missing a primary expiry stored on the UID self-cert rather than a direct-key sig)
+was wrong, and its speculative primaryKeyValiditySeconds helper was reverted.
 
-Disproven by the reporter's actual key (fixture keys/uid-selfsig-expiry-rsa.asc): gpg AND BouncyCastle
-both read the primary as expiring 2050-09-13. PrimaryKeyExpirationTest confirms master.validSeconds =
-851472000 (2050-09-13) in current code, so a fresh import shows the primary expiry correctly. There is
-no current-code parsing bug. The speculative primaryKeyValiditySeconds helper was reverted.
+Root cause (confirmed, not a parsing bug): the primary expiry is captured on the entity at import and stored,
+while the subkey expiry is recomputed live from the ring every time Key Details opens. gpg AND BouncyCastle
+both read this key's primary as expiring 2050-09-13 (fixture keys/uid-selfsig-expiry-rsa.asc;
+PrimaryKeyExpirationTest asserts master.validSeconds = 851472000 = 2050-09-13). The stale entity.expiresAt
+came from an older import or older build, so the stored primary showed "Never" while the live subkey read the
+real date.
 
-What the reporter actually saw: a stale entity.expiresAt. The primary expiry is computed once at import and
-stored on the entity; the subkey expiry is recomputed live (deriveSubkeys) every time Key Details opens.
-His stored primary value was from an older import (or an older app build), so it showed "Never" while the
-live subkey read the real 2050 date. Re-importing / refreshing the key corrected it, which he confirmed.
-
-Deferred nicety (not shipping in the RC): recompute the primary expiry live at Key Details display from the
-ring, the same way subkeys are, so a stale stored value self-corrects without a re-import. Low value (the
-symptom only appears when a key's on-disk expiry changes after import and the user does not re-import), low
-risk, but a clean consistency win for a later release. PrimaryKeyExpirationTest stays as a regression guard
-that current code keeps reading the primary expiry right.
+Fix (shipping in RC): KeyRepository.reconcilePrimaryExpiry(entity) reads the primary's Key Expiration Time
+straight off the ring, using the same creationTime + validSeconds formula deriveSubkeys uses for subkeys, and
+persists the corrected value via dao.update when it has drifted. KeyDetailViewModel.load() calls it right
+after getByFingerprint, so opening Key Details self-corrects a stale primary without a manual re-import, and
+because the corrected value is persisted the key list and every reload path inherit it. Composite-sign
+primaries do not load as a PGPPublicKeyRing, so they are left unchanged. PrimaryKeyExpirationTest stays as the
+regression guard that BC keeps reading the primary expiry reconcile depends on.
 
 ## Carried-over follow-ups (optional, from the 4.4.x cycle)
 

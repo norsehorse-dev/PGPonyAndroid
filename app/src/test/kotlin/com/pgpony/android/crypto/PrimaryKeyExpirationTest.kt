@@ -6,9 +6,11 @@
 // shows the opposite: BouncyCastle reads this key's primary expiry correctly.
 // This RSA 3072 key (created 2023-09-20) carries a 27-year Key Expiration Time on
 // its primary User-ID self-certification and its subkey binding; gpg and BC both
-// read both as expiring 2050-09-13. So there is no current-code bug; the tester's
-// stale "Never" came from an older import, and re-importing fixed it. This test
-// is a regression guard that current code keeps reading the primary expiry right.
+// read both as expiring 2050-09-13. So there was no parsing bug; the tester's
+// stale "Never" came from an older import. 4.5.0 reconciles it live at Key Details
+// open (KeyRepository.reconcilePrimaryExpiry) using the creationTime + validSeconds
+// formula this test locks. This is the regression guard that BC keeps reading the
+// primary expiry that reconcile depends on.
 
 package com.pgpony.android.crypto
 
