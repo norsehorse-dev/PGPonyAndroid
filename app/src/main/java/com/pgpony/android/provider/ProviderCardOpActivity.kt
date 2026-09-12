@@ -160,7 +160,7 @@ class ProviderCardOpActivity : ComponentActivity() {
                                 singleLine = true,
                                 visualTransformation = PasswordVisualTransformation(),
                                 keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.NumberPassword
+                                    keyboardType = KeyboardType.Password
                                 ),
                                 label = { Text(stringResource(R.string.provider_cardop_pin_hint)) },
                                 modifier = Modifier.fillMaxWidth()
