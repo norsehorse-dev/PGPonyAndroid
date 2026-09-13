@@ -594,7 +594,7 @@ class PGPonyOpenPgpService : Service() {
                             ) && plaintext.size < 1 shl 20
                         )
                     )
-                    return cardInteractionResult(opKey)
+                    return cardInteractionResult(opKey, data)
                 }
                 is SignResolve.Ok -> {
                     signingRing = resolved.ring
@@ -671,6 +671,7 @@ class PGPonyOpenPgpService : Service() {
         if (resolved is SignResolve.Fail) return resolved.response
         if (resolved is SignResolve.Card) {
             return cardOpRoundTrip(
+                data = data,
                 action = OpenPgpApi.ACTION_CLEARTEXT_SIGN,
                 resolved = resolved,
                 input = text.toByteArray(Charsets.UTF_8),
@@ -741,7 +742,7 @@ class PGPonyOpenPgpService : Service() {
                     senderAddress = null
                 )
             )
-            return cardInteractionResult(opKey)
+            return cardInteractionResult(opKey, data)
         }
         val ok = resolved as SignResolve.Ok
 
@@ -1092,7 +1093,7 @@ class PGPonyOpenPgpService : Service() {
                         senderAddress = senderAddress
                     )
                 )
-                return cardInteractionResult(opKey)
+                return cardInteractionResult(opKey, data)
             }
             return errorResult(
                 OpenPgpError.GENERIC_ERROR,
@@ -1338,6 +1339,7 @@ class PGPonyOpenPgpService : Service() {
 
     /** Shared card round-trip for the simple sign-only stream ops. */
     private fun cardOpRoundTrip(
+        data: Intent,
         action: String,
         resolved: SignResolve.Card,
         input: ByteArray,
@@ -1362,7 +1364,7 @@ class PGPonyOpenPgpService : Service() {
                 senderAddress = null
             )
         )
-        return cardInteractionResult(opKey)
+        return cardInteractionResult(opKey, data)
     }
 
     private fun cardTooLargeError(): Intent = errorResult(
@@ -1395,9 +1397,15 @@ class PGPonyOpenPgpService : Service() {
         }
     }
 
-    private fun cardInteractionResult(opKey: String): Intent {
+    private fun cardInteractionResult(opKey: String, apiData: Intent): Intent {
         val cardIntent = Intent(this, ProviderCardOpActivity::class.java).apply {
             putExtra(ProviderCardOpActivity.EXTRA_OP_KEY, opKey)
+            // #61 (DorianRudolph): echo the client's original API request so the
+            // activity hands it back on RESULT_OK and the client re-calls the
+            // service to collect the completed card op (same as the passphrase and
+            // key-picker paths). Without it FairEmail gets a bare RESULT_OK, never
+            // re-calls, and the signed message never sends.
+            putExtra(ProviderCardOpActivity.EXTRA_API_DATA, apiData)
             setData(android.net.Uri.parse("pgpony-api-cardop://$opKey"))
         }
         val pendingIntent = PendingIntent.getActivity(

@@ -17,6 +17,7 @@
 package com.pgpony.android.provider
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -56,6 +57,13 @@ class ProviderCardOpActivity : ComponentActivity() {
         const val EXTRA_OP_KEY = "com.pgpony.android.provider.CARD_OP_KEY"
 
         /**
+         * #61 (DorianRudolph): the client's original OpenPGP API request Intent,
+         * echoed back on RESULT_OK so the client re-calls the service to collect
+         * the completed card op. Mirrors ProviderPassphraseActivity.EXTRA_API_DATA.
+         */
+        const val EXTRA_API_DATA = "com.pgpony.android.provider.CARD_OP_API_DATA"
+
+        /**
          * 4.1.0 - the cap on holding NFC reader mode after a successful card
          * operation while waiting for the user to lift the card.
          *
@@ -84,6 +92,7 @@ class ProviderCardOpActivity : ComponentActivity() {
 
     private var reader: OpenPgpCardReader? = null
     private var opKey: String = ""
+    private var apiData: Intent? = null
 
     // Mirrors of Compose state readable from the NFC binder thread.
     @Volatile private var currentPin: String = ""
@@ -97,6 +106,12 @@ class ProviderCardOpActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         opKey = intent.getStringExtra(EXTRA_OP_KEY) ?: ""
+        @Suppress("DEPRECATION")
+        apiData = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(EXTRA_API_DATA, Intent::class.java)
+        } else {
+            intent.getParcelableExtra(EXTRA_API_DATA)
+        }
         val op = ProviderCardOpStore.getPending(opKey)
         if (op == null) {
             // Expired or already handled — the client will simply get a
@@ -385,7 +400,9 @@ class ProviderCardOpActivity : ComponentActivity() {
                     CardPinCache.remember(currentPin)
                 }
                 ProviderCardOpStore.complete(opKey, completedOp)
-                setResult(Activity.RESULT_OK)
+                // #61: return the client's original request so it re-calls the
+                // service (which then returns the completed op), not a bare OK.
+                setResult(Activity.RESULT_OK, Intent(apiData ?: Intent()))
                 // 4.1.0 - by the time this runs the reader has already waited
                 // for the card to leave the field (see CARD_RELEASE_MAX_WAIT_MS
                 // and the 4.0.5 note below). Only a short settle remains, to
