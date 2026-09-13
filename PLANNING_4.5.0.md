@@ -1190,6 +1190,19 @@ expiry the stored key has); adding/extending/matching still merges, and a publis
 separately upstream so it is not suppressed. KeyDeduplicationExpiryGuardTest locks the guard. lukas re-imports
 the good key once and it sticks. rc3.
 
+## 25. Onboarding toggle to drop the PGPony armor comment
+
+Priority: low. Origin: NorseHorse (Sep 13 2026, rc3).
+
+The "Comment: PGPony - PGPony.app" armor header on encrypted/signed output was already user-configurable
+in Settings (ArmorCommentStore.setInclude, default on). Surfaced the same message-comment toggle on the
+onboarding privacy slide so users can turn it off up front: OnboardingSlide.showCommentToggle (set on the
+privacy slide), a CommentToggleRow in OnboardingPage wired to ArmorCommentStore.get(context).setInclude,
+and onboarding_page_comment_toggle_title/subtitle strings. Reads its initial state from
+ArmorCommentHeader.current, writes through the same DataStore the Settings screen uses, so the two stay in
+sync. Message comment only (the pubkey-export comment keeps its own Settings toggle). UI-only, verified on
+device. rc3.
+
 ## Carried-over follow-ups (optional, from the 4.4.x cycle)
 
 - loadPublicKeyRing returns null for a private-only key, which breaks encrypt-to-self and

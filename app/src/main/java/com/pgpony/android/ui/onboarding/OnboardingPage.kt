@@ -30,6 +30,8 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Comment
+import kotlinx.coroutines.launch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.foundation.clickable
@@ -164,6 +166,11 @@ fun OnboardingPage(
         if (slide.showOfflineToggle) {
             Spacer(modifier = Modifier.height(16.dp))
             OfflineToggleRow(prefs = prefs)
+        }
+        // rc3: drop the PGPony armor comment from output, from onboarding.
+        if (slide.showCommentToggle) {
+            Spacer(modifier = Modifier.height(16.dp))
+            CommentToggleRow()
         }
         // §5.6.9 (Piotr): sideload update-check opt-in.
         if (slide.showUpdateToggle) {
@@ -439,6 +446,55 @@ private fun OfflineToggleRow(prefs: SharedPreferences) {
                     enabled = newValue
                     com.pgpony.android.network.OfflineMode.set(newValue)
                     com.pgpony.android.sync.KeyRefreshScheduler.apply(context)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun CommentToggleRow() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
+    var enabled by remember {
+        mutableStateOf(com.pgpony.android.data.ArmorCommentHeader.current != null)
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Filled.Comment,
+                contentDescription = null,
+                tint = Color(0xFF22C55E),
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.onboarding_page_comment_toggle_title),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    stringResource(R.string.onboarding_page_comment_toggle_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = { newValue ->
+                    enabled = newValue
+                    scope.launch {
+                        com.pgpony.android.data.ArmorCommentStore.get(context).setInclude(newValue)
+                    }
                 }
             )
         }

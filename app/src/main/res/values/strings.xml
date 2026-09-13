@@ -2034,4 +2034,6 @@
     <!-- RC1 offline switch: onboarding offer -->
     <string name="onboarding_page_offline_toggle_title">Offline mode</string>
     <string name="onboarding_page_offline_toggle_subtitle">Keep PGPony fully offline: no keyserver lookups, no key refresh, no update checks. You can change this later in Settings.</string>
+    <string name="onboarding_page_comment_toggle_title">PGPony comment</string>
+    <string name="onboarding_page_comment_toggle_subtitle">Add a PGPony - PGPony.app comment to your encrypted and signed output. You can change this later in Settings.</string>
 </resources>

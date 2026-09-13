@@ -48,6 +48,10 @@ data class OnboardingSlide(
     val showUpdateToggle: Boolean = false,
     // RC1 offline switch: privacy slide offers turning the whole app offline.
     val showOfflineToggle: Boolean = false,
+    // rc3 (#36 adjacent): let the user drop the "PGPony - PGPony.app" armor
+    // comment from encrypted/signed output right from onboarding (Settings
+    // already has this; onboarding surfaces it up front).
+    val showCommentToggle: Boolean = false,
 )
 
 object OnboardingSlides {
@@ -112,7 +116,8 @@ object OnboardingSlides {
             titleResId = R.string.onboarding_slide_privacy_title,
             bodyResId = R.string.onboarding_slide_privacy_body,
             showBiometricToggle = true,
-            showOfflineToggle = true
+            showOfflineToggle = true,
+            showCommentToggle = true
         ),
 
         // ── Slide 6 — Stay up to date (sideload only) ────────────────────
