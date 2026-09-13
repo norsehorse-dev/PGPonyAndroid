@@ -42,4 +42,26 @@ class PrimaryKeyExpirationTest {
         val expiryEpoch = master.creationTime.time / 1000L + master.validSeconds
         assertEquals("primary expires 2050-09-13, same as gpg", 2546656205L, expiryEpoch)
     }
+
+    @Test
+    fun `the app load path preserves the primary expiry the reconcile reads`() {
+        // The reconcile reads loadPublicKeyRing(fp).publicKey.validSeconds, and
+        // loadPublicKeyRing re-parses the STORED bytes through importKeyData. The
+        // stored form is the ring's binary encoding, so round-trip the fixture the
+        // same way and confirm importKeyData keeps the primary's UID-cert expiry.
+        // If this reads 0, the reconcile shows "Never" and the RC2 fix does not
+        // actually resolve the reporter's key.
+        val fixtureBytes =
+            javaClass.getResourceAsStream("/keys/uid-selfsig-expiry-rsa.asc")!!.readBytes()
+        val original = PGPPublicKeyRing(
+            ArmoredInputStream(ByteArrayInputStream(fixtureBytes)),
+            JcaKeyFingerprintCalculator()
+        )
+        val reloaded = PGPCryptoService.shared.importKeyData(original.encoded).publicKeyRing!!
+        assertEquals(
+            "importKeyData keeps the primary expiry, so the reconcile shows 2050 not Never",
+            851472000L,
+            reloaded.publicKey.validSeconds
+        )
+    }
 }
