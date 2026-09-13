@@ -895,6 +895,8 @@
     <string name="recycle_bin_restored">Key restored</string>
     <string name="key_delete_biometric_title">Confirm key deletion</string>
     <string name="key_delete_biometric_subtitle">Authenticate to delete this key pair</string>
+    <string name="key_detail_subkey_remove_biometric_title">Confirm subkey removal</string>
+    <string name="key_detail_subkey_remove_biometric_subtitle">Authenticate to remove this subkey</string>
     <!-- RC4 O5 (#16, CertainBot): optional passphrase on exported/backed-up private keys. -->
     <string name="export_passphrase_label">Protect this export with a passphrase (optional)</string>
     <string name="export_private_gpg_compat_label">GnuPG-compatible format</string>
@@ -963,6 +965,7 @@
     <string name="kd_vm_status_trust_updated">Trust level updated</string>
     <string name="kd_vm_status_notes_cleared">Notes cleared</string>
     <string name="kd_vm_status_notes_saved">Notes saved</string>
+    <string name="kd_vm_status_subkey_removed">Subkey removed</string>
     <string name="kd_vm_error_no_email_to_match">This key has no email to match against</string>
     <string name="kd_vm_status_linked_to_format">Linked to %1$s</string>
     <string name="kd_vm_error_contacts_permission_needed">Contacts permission is needed to link a key to a contact</string>

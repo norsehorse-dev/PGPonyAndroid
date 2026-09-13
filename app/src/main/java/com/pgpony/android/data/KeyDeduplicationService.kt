@@ -70,6 +70,18 @@ class KeyDeduplicationService(
         private const val TAG = "KeyringDedup"
 
         /**
+         * item 24 (#55, lukascomer): a keyserver refresh must not silently
+         * downgrade a primary key's expiry. True when taking [fetchedExpiresAtMs]
+         * over [existingExpiresAtMs] would remove an expiry the stored key already
+         * carries, or shorten it. Adding an expiry where there was none, extending
+         * one, or matching it is not a downgrade.
+         */
+        internal fun isExpiryDowngrade(existingExpiresAtMs: Long?, fetchedExpiresAtMs: Long?): Boolean {
+            val existing = existingExpiresAtMs ?: return false
+            return fetchedExpiresAtMs == null || fetchedExpiresAtMs < existing
+        }
+
+        /**
          * Canonical form for fingerprint equality: bare lowercase hex.
          * Every producer in the app emits bare hex (BC's
          * Hex.toHexString, V4Fingerprint); whitespace is stripped
@@ -120,6 +132,12 @@ class KeyDeduplicationService(
         val newBytes = newPublicRing.encoded
         val stored = store.loadPublicKey(existing.fingerprint)
         if (stored != null && stored.isNotEmpty() && newBytes.contentEquals(stored)) {
+            return existing to DuplicateResolution.ALREADY_IN_KEYRING
+        }
+        // item 24 guard: never let a fetched copy strip or shorten a primary
+        // expiry the stored key already has. A published revocation is scanned
+        // separately upstream (KeyRefreshService), so this does not suppress one.
+        if (isExpiryDowngrade(existing.expiresAt, newExpiresAtMs)) {
             return existing to DuplicateResolution.ALREADY_IN_KEYRING
         }
         val merged = merge(

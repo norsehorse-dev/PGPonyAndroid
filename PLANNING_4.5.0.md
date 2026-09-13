@@ -793,7 +793,12 @@ the promoted default.
 Priority: medium. Origin: user request (4.4.0, Pixel 8, Android 17). The add/remove counterpart
 to item 7.
 
-Status (in progress): composite subkey-revocation crypto core done. CompositePrimaryKeyGen.revokeSubkey builds a v6 composite 0x28 subkey-revocation self-signature over primary + subkey with a Reason-for-Revocation subpacket (type 29), spliced in after the subkey's binding sigs; CompositeRevokeSubkeyTest verifies it offline with CompositeSigVerifier (green). Classical 0x28 done too: RevocationService.generateSubkeyRevocation / applySubkeyRevocation (BC SUBKEY_REVOCATION, signed by the primary), ClassicalSubkeyRevokeTest green. Local remove done: ClassicalSubkeyGen.removeSubkey (BC removeSecretKey, v4+v6) and CompositePrimaryKeyGen.removeSubkey (byte-splice), SubkeyRemoveTest green. Repo + UI done: KeyRepository.revokeSubkey/removeSubkey (composite and classical dispatch, KeyRepoError.LastEncryptionSubkey guard), KeyDetailViewModel subkey revoke/remove flows, SubkeysSection per-subkey overflow menu, reused RevokeKeySheet for the revoke, remove-confirm + last-encryption-subkey warning dialogs, and CompositeKeyFacade now reports composite subkey revocation state (SubkeyInfo.isRevoked). item 16 COMPLETE pending device build + on-device check that gpg/sq see the revocation.
+Status (in progress): composite subkey-revocation crypto core done. CompositePrimaryKeyGen.revokeSubkey builds a v6 composite 0x28 subkey-revocation self-signature over primary + subkey with a Reason-for-Revocation subpacket (type 29), spliced in after the subkey's binding sigs; CompositeRevokeSubkeyTest verifies it offline with CompositeSigVerifier (green). Classical 0x28 done too: RevocationService.generateSubkeyRevocation / applySubkeyRevocation (BC SUBKEY_REVOCATION, signed by the primary), ClassicalSubkeyRevokeTest green. Local remove done: ClassicalSubkeyGen.removeSubkey (BC removeSecretKey, v4+v6) and CompositePrimaryKeyGen.removeSubkey (byte-splice), SubkeyRemoveTest green. Repo + UI done: KeyRepository.revokeSubkey/removeSubkey (composite and classical dispatch, KeyRepoError.LastEncryptionSubkey guard), KeyDetailViewModel subkey revoke/remove flows, SubkeysSection per-subkey overflow menu, reused RevokeKeySheet for the revoke, remove-confirm + last-encryption-subkey warning dialogs, and CompositeKeyFacade now reports composite subkey revocation state (SubkeyInfo.isRevoked). item 16 COMPLETE pending device build + on-device check that gpg/sq see the revocation. Follow-up (Sep 13 2026, #36 Araaf, on RC2): subkey REMOVE
+confirmed but gave no success feedback and no biometric gate (unlike primary-key delete). Fixed for rc3:
+the remove-confirm dialog's Remove now runs behind deleteWithOptionalBiometricGate (generalized to take a
+title/subtitle; new key_detail_subkey_remove_biometric_* strings), gated on device biometric capability and
+falling through when unavailable; doRemoveSubkey now sets successMessage (kd_vm_status_subkey_removed ->
+"Subkey removed" snackbar). UI-only, verified on device.
 
 Add-subkey exists (ClassicalSubkeyGen, extended to PQ by item 7), but there is no way to remove a
 subkey once it is on a cert. The request is a delete function. Two distinct operations sit behind
@@ -1170,6 +1175,20 @@ after getByFingerprint, so opening Key Details self-corrects a stale primary wit
 because the corrected value is persisted the key list and every reload path inherit it. Composite-sign
 primaries do not load as a PGPPublicKeyRing, so they are left unchanged. PrimaryKeyExpirationTest stays as the
 regression guard that BC keeps reading the primary expiry reconcile depends on.
+
+
+Reopened (Sep 13 2026, lukascomer on RC2): the reconcile was correct but he still saw "Never", because the
+REAL cause was upstream. KeyDeduplicationService.merge (reached from the keyserver refresh via
+KeyRefreshService.processFetchedArmored -> mergeFetchedPublicMaterial -> resolveDuplicate) overwrote the
+stored public material and set expiresAt to the fetched value unconditionally, with no "prefer later expiry"
+guard. His re-published keyserver copy has a no-expiry primary, so a background refresh (his screenshot shows
+a recent "Last checked") replaced his stored 2050 key with the no-expiry one; the reconcile then correctly
+showed Never for what was stored (the subkey kept 2050 from its own binding). gpg on his actual key confirms
+the primary really does expire 2050-09-13. Fix: resolveDuplicate now bails to ALREADY_IN_KEYRING when
+KeyDeduplicationService.isExpiryDowngrade(existing.expiresAt, fetched) is true (fetched removes or shortens an
+expiry the stored key has); adding/extending/matching still merges, and a published revocation is scanned
+separately upstream so it is not suppressed. KeyDeduplicationExpiryGuardTest locks the guard. lukas re-imports
+the good key once and it sticks. rc3.
 
 ## Carried-over follow-ups (optional, from the 4.4.x cycle)
 

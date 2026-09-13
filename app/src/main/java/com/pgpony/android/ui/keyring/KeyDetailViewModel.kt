@@ -1475,7 +1475,8 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                     key = reloaded ?: key,
                     subkeys = reloaded?.let { deriveSubkeys(it) } ?: _state.value.subkeys,
                     subkeyRemoveInFlight = false,
-                    subkeyRemoveTarget = null
+                    subkeyRemoveTarget = null,
+                    successMessage = PGPonyApp.instance.getString(R.string.kd_vm_status_subkey_removed)
                 )
             } catch (e: KeyRepoError.LastEncryptionSubkey) {
                 _state.value = _state.value.copy(

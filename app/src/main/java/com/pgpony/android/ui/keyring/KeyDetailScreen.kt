@@ -633,7 +633,13 @@ fun KeyDetailScreen(
             text = { Text(stringResource(R.string.key_detail_subkey_remove_confirm_body)) },
             confirmButton = {
                 TextButton(
-                    onClick = { viewModel.confirmSubkeyRemove() },
+                    onClick = {
+                        deleteWithOptionalBiometricGate(
+                            context,
+                            title = context.getString(R.string.key_detail_subkey_remove_biometric_title),
+                            subtitle = context.getString(R.string.key_detail_subkey_remove_biometric_subtitle)
+                        ) { viewModel.confirmSubkeyRemove() }
+                    },
                     enabled = !state.subkeyRemoveInFlight
                 ) {
                     Text(stringResource(R.string.key_detail_subkey_remove_confirm_action))
@@ -1127,6 +1133,8 @@ private fun ensureContactsPermission(
  */
 internal fun deleteWithOptionalBiometricGate(
     context: android.content.Context,
+    title: String = context.getString(R.string.key_delete_biometric_title),
+    subtitle: String = context.getString(R.string.key_delete_biometric_subtitle),
     onConfirmed: () -> Unit
 ) {
     val activity = context as? androidx.fragment.app.FragmentActivity
@@ -1143,8 +1151,8 @@ internal fun deleteWithOptionalBiometricGate(
     ) {
         BiometricGate.authenticate(
             activity = activity,
-            title = context.getString(R.string.key_delete_biometric_title),
-            subtitle = context.getString(R.string.key_delete_biometric_subtitle),
+            title = title,
+            subtitle = subtitle,
             onSuccess = onConfirmed,
             onError = { _, _ -> /* cancelled — the sheet stays open */ }
         )
