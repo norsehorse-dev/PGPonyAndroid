@@ -558,6 +558,15 @@ fun KeyDetailScreen(
                 onDelete = {
                     deleteWithOptionalBiometricGate(context) { viewModel.deleteKey() }
                 },
+                // #36 (CertainBot): revoke instead of a bare delete. Closes
+                // the delete sheet and opens the existing revoke flow. Hidden
+                // for an already-revoked key, where there is nothing to retire.
+                onRevokeInstead = if (!key.isRevoked) {
+                    {
+                        viewModel.dismissDeleteConfirm()
+                        viewModel.showRevokeSheet()
+                    }
+                } else null,
                 onDismiss = { viewModel.dismissDeleteConfirm() }
             )
         } else {
@@ -1147,6 +1156,7 @@ internal fun deleteWithOptionalBiometricGate(
     // same stakes at smaller scope. Now gated purely on device
     // capability, same rule as the gauntlet.
     if (activity != null &&
+        DestructiveActionLock.isEnabled(context) &&
         BiometricGate.canAuthenticate(context) == BiometricAvailability.Available
     ) {
         BiometricGate.authenticate(

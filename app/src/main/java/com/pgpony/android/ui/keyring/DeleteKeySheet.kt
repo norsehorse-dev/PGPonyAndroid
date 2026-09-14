@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -43,6 +44,10 @@ fun DeleteKeySheet(
     lastBackedUpAt: Long? = null,
     onSaveBackup: (exportPassphrase: String?) -> Unit,
     onDelete: () -> Unit,
+    // #36 (CertainBot): offer a revoke path from the delete sheet. A revoke
+    // cert can't be made after the key is gone, so this lets the user retire
+    // it properly instead of a bare delete. Null hides the button.
+    onRevokeInstead: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -187,6 +192,26 @@ fun DeleteKeySheet(
                     text = stringResource(R.string.key_delete_ack_label),
                     style = MaterialTheme.typography.bodyMedium
                 )
+            }
+
+            if (onRevokeInstead != null) {
+                Text(
+                    text = stringResource(R.string.key_delete_revoke_instead_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = onRevokeInstead,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Block,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.key_delete_revoke_instead_button))
+                }
             }
 
             Row(

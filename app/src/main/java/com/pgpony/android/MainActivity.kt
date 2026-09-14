@@ -940,6 +940,22 @@ fun PGPonyMainScreen(
         }
     }
 
+    // #58 (CertainBot): a shared public key can jump to Encrypt with itself
+    // preselected as recipient. The import flow sets the fingerprint; consume
+    // it once the nav graph exists, preselect the recipient, and route over.
+    val keyringStateForEncryptJump by keyringVm.state.collectAsState()
+    LaunchedEffect(keyringStateForEncryptJump.pendingEncryptToFingerprint) {
+        val encryptToFp = keyringStateForEncryptJump.pendingEncryptToFingerprint
+        if (encryptToFp != null) {
+            keyringVm.consumeEncryptToFingerprint()
+            encDecVm.preselectRecipient(encryptToFp)
+            navController.navigate(Screen.Encrypt.route) {
+                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                launchSingleTop = true
+            }
+        }
+    }
+
     // Handle pending intent actions
     val action = pendingAction.value
     LaunchedEffect(action) {

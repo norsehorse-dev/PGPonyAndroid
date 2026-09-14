@@ -145,6 +145,9 @@ data class KeyringUiState(
      *  the "Already in Keyring" dialog (with its View Key jump) hosted
      *  in KeyringScreen. Null when no dialog is showing. */
     val duplicateImportResult: DuplicateImportOutcome? = null,
+    // #58 (CertainBot): one-shot signal to jump to Encrypt with this
+    // just-shared key preselected as recipient. Consumed by the host.
+    val pendingEncryptToFingerprint: String? = null,
     // Delete confirm
     val keyToDelete: PGPKeyEntity? = null,
     // Keyring sorting (Lukas feedback). Default MANUAL + empty order
@@ -1032,6 +1035,42 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
     /** 4.0.0 Phase 1 — dismiss the "Already in Keyring" dialog. */
     fun dismissDuplicateAlert() {
         _state.value = _state.value.copy(duplicateImportResult = null)
+    }
+
+    /**
+     * #58 (CertainBot): import the previewed public key and then jump to the
+     * Encrypt screen with it selected as recipient. A key shared into PGPony
+     * is often shared to encrypt TO that person, not only to file it away.
+     * Tolerant of an already-in-keyring key: the goal is to encrypt to it.
+     */
+    fun confirmImportAndEncrypt() {
+        val preview = _state.value.importPreview ?: return
+        val fp = preview.fingerprint
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isImporting = true, errorMessage = null)
+            try {
+                repo.importArmoredKeyDetailed(preview.armoredText)
+                _state.value = _state.value.copy(
+                    isImporting = false,
+                    showImportSheet = false,
+                    importPreview = null,
+                    pendingEncryptToFingerprint = fp
+                )
+                loadKeys()
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    isImporting = false,
+                    errorMessage = PGPonyApp.instance.getString(
+                        R.string.keyring_error_import_failed_format, e.message ?: ""
+                    )
+                )
+            }
+        }
+    }
+
+    /** #58 — host acknowledges the encrypt-to jump so it fires once. */
+    fun consumeEncryptToFingerprint() {
+        _state.value = _state.value.copy(pendingEncryptToFingerprint = null)
     }
 
     /**

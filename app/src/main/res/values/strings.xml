@@ -257,6 +257,10 @@
     <string name="settings_security_confirm_sign_title">Confirm signing requirement change</string>
     <string name="settings_security_confirm_enable_subtitle">Authenticate to turn this security setting on</string>
     <string name="settings_security_confirm_disable_subtitle">Authenticate to turn this security setting off</string>
+    <!-- #36 (Araaf): global destructive-action lock -->
+    <string name="settings_protect_destructive_title">Protect destructive actions</string>
+    <string name="settings_protect_destructive_subtitle">Require your device authentication before deleting a key, removing a subkey, or clearing all data. Confirmation dialogs still apply when this is off.</string>
+    <string name="settings_security_confirm_destructive_title">Confirm destructive-action lock change</string>
     <string name="settings_data_clear_key_list_header_format">Keys that will be permanently destroyed (%1$d):</string>
     <string name="settings_data_clear_type_word">DELETE</string>
     <string name="settings_data_clear_type_label_format">Type %1$s to confirm</string>
@@ -705,6 +709,8 @@
     <!-- ── Confirm/cancel buttons (preview card) ────────────────────── -->
     <string name="import_button_upgrade_key">Upgrade Key</string>
     <string name="import_button_import_key">Import Key</string>
+    <!-- #58 (CertainBot): encrypt to a shared public key -->
+    <string name="import_button_encrypt_to_key">Encrypt to this key</string>
     <string name="import_button_pair_card">Pair with Hardware Key</string>
 
     <!-- ════════════════════════════════════════════════════════════════
@@ -879,6 +885,9 @@
     <string name="key_delete_backup_button">Save a backup first (.asc)</string>
     <string name="key_delete_ack_label">I understand it will be destroyed after the recovery window</string>
     <string name="key_delete_confirm_button">Delete key pair</string>
+    <!-- #36 (CertainBot): revoke instead of delete -->
+    <string name="key_delete_revoke_instead_note">You can\'t create a revocation certificate after a key is deleted. If others may hold this key, revoke it instead so they stop trusting it.</string>
+    <string name="key_delete_revoke_instead_button">Revoke this key instead</string>
     <string name="key_delete_backed_up_on">In a backup from %1$s</string>
     <string name="key_delete_never_backed_up">Never backed up. Save a backup first if you might need it.</string>
     <string name="settings_section_keys">Keys</string>

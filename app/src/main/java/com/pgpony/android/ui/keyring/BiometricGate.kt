@@ -174,3 +174,21 @@ object BiometricGate {
         }
     }
 }
+
+/**
+ * #36 (AraafRoyall): one global switch that gates the app's destructive
+ * actions behind device authentication. When enabled (the default), a
+ * delete key, remove subkey, or clear-all-data runs the [BiometricGate]
+ * first; when disabled, those actions keep their confirm dialogs but skip
+ * the biometric prompt. Backed by the shared "pgpony_prefs" store so the
+ * Settings screen and each action site read the same value.
+ */
+object DestructiveActionLock {
+    const val PREF_KEY = "protect_destructive_actions"
+    private const val PREFS_NAME = "pgpony_prefs"
+
+    /** Default ON: destructive actions are gated unless the user opts out. */
+    fun isEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(PREF_KEY, true)
+}

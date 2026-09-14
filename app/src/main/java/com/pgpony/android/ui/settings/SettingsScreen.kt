@@ -331,6 +331,20 @@ fun SettingsScreen(
                     ) { viewModel.setRequireBiometricForSign(target) }
                 }
             )
+            // ── #36 (Araaf): global destructive-action lock ─────────────
+            SettingsToggle(
+                title = stringResource(R.string.settings_protect_destructive_title),
+                subtitle = stringResource(R.string.settings_protect_destructive_subtitle),
+                icon = Icons.Filled.Shield,
+                iconTint = Color(0xFF8B5CF6),
+                checked = state.protectDestructiveActions,
+                onCheckedChange = { target ->
+                    guardSecurityChange(
+                        context.getString(R.string.settings_security_confirm_destructive_title),
+                        context.getString(if (target) R.string.settings_security_confirm_enable_subtitle else R.string.settings_security_confirm_disable_subtitle)
+                    ) { viewModel.setProtectDestructiveActions(target) }
+                }
+            )
             // ── 3.1.0 Phase 8 (E5 F-item): sign-by-default ──────────────
             SignByDefaultToggle()
             // ── 3.1.0 Phase 7 (B1/B2/B3): Remember Card PIN ─────────────
@@ -1098,7 +1112,12 @@ fun SettingsScreen(
         var clearAck2 by remember { mutableStateOf(false) }
         val runClearWithBiometric = {
             val fragmentActivity = context as? androidx.fragment.app.FragmentActivity
+            // #36 (Araaf): the global destructive-action lock governs the
+            // biometric layer here too. The two-step confirm gauntlet below
+            // stays regardless; this only skips the device-auth prompt when
+            // the user has turned the lock off.
             if (fragmentActivity != null &&
+                com.pgpony.android.ui.keyring.DestructiveActionLock.isEnabled(context) &&
                 com.pgpony.android.ui.keyring.BiometricGate.canAuthenticate(context) ==
                 com.pgpony.android.ui.keyring.BiometricAvailability.Available
             ) {

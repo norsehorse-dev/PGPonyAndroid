@@ -200,6 +200,23 @@ fun ImportKeyScreen(state: KeyringUiState, viewModel: KeyringViewModel) {
                         )
                     }
                 }
+                // #58 (CertainBot): a shared PUBLIC key can go straight to
+                // Encrypt with itself as recipient, not only get filed away.
+                if (!preview.hasPrivateKey) {
+                    FilledTonalButton(
+                        onClick = { viewModel.confirmImportAndEncrypt() },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !state.isImporting
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.import_button_encrypt_to_key))
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))

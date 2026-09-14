@@ -35,6 +35,9 @@ data class SettingsUiState(
     val biometricLockEnabled: Boolean = false,
     val requireBiometricForDecrypt: Boolean = false,
     val requireBiometricForSign: Boolean = false,
+    // #36 (Araaf): global switch — gate destructive actions (delete key,
+    // remove subkey, clear all data) behind device auth. Default ON.
+    val protectDestructiveActions: Boolean = true,
     // Password Store (Phase C) — opt-in feature (default off); biometric gate default on
     val passStoreEnabled: Boolean = false,
     val requireBiometricForPassStore: Boolean = true,
@@ -216,6 +219,9 @@ class SettingsViewModel(
             biometricLockEnabled = prefs.getBoolean("biometric_lock", false),
             requireBiometricForDecrypt = prefs.getBoolean("biometric_decrypt", false),
             requireBiometricForSign = prefs.getBoolean("biometric_sign", false),
+            protectDestructiveActions = prefs.getBoolean(
+                com.pgpony.android.ui.keyring.DestructiveActionLock.PREF_KEY, true
+            ),
             passStoreEnabled = prefs.getBoolean("pass_store_enabled", false),
             requireBiometricForPassStore = prefs.getBoolean("biometric_pass_store", true),
             clipboardAutoClear = prefs.getBoolean("clipboard_auto_clear", true),
@@ -385,6 +391,16 @@ class SettingsViewModel(
     fun setRequireBiometricForSign(enabled: Boolean) {
         prefs.edit().putBoolean("biometric_sign", enabled).apply()
         _state.value = _state.value.copy(requireBiometricForSign = enabled)
+    }
+
+    /** #36 (Araaf): flip the global destructive-action lock. When on, delete
+     *  key / remove subkey / clear all data require device auth; when off,
+     *  they keep their confirm dialogs but skip the biometric prompt. */
+    fun setProtectDestructiveActions(enabled: Boolean) {
+        prefs.edit().putBoolean(
+            com.pgpony.android.ui.keyring.DestructiveActionLock.PREF_KEY, enabled
+        ).apply()
+        _state.value = _state.value.copy(protectDestructiveActions = enabled)
     }
 
     // ── Password Store (Phase C) ───────────────────────────────────────

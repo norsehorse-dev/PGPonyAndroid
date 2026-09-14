@@ -700,10 +700,19 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 _encryptState.value.selectedRecipients
             }
 
+            // #58 (CertainBot): an explicit one-shot preselect from the
+            // import-and-encrypt jump wins over the default-recipient rule so
+            // the freshly-shared key lands selected as recipient.
+            val explicitPreselect = pendingPreselectRecipientFp?.let { fp ->
+                unrevokedRecipients.firstOrNull { it.fingerprint.equals(fp, ignoreCase = true) }
+            }?.let { listOf(it) }
+            pendingPreselectRecipientFp = null
+            val finalRecipients = explicitPreselect ?: preselectedRecipients
+
             _encryptState.value = _encryptState.value.copy(
                 availableRecipients = unrevokedRecipients,
                 availableSigningKeys = signableKeys,
-                selectedRecipients = preselectedRecipients,
+                selectedRecipients = finalRecipients,
                 // If the currently-selected signing key was just revoked
                 // (loadKeys runs on tab return, so this can happen), bump
                 // it back to default-or-first to avoid the user signing
@@ -756,6 +765,17 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
 
     fun updateEncryptInput(text: String) {
         _encryptState.value = _encryptState.value.copy(inputText = text, outputText = "", errorMessage = null)
+    }
+
+    // #58 (CertainBot): a key shared into PGPony can jump straight to
+    // Encrypt with itself preselected. Set by the import-and-encrypt flow;
+    // applied on the next loadKeys so the just-imported key is in the pool.
+    private var pendingPreselectRecipientFp: String? = null
+
+    /** #58 — preselect a recipient by fingerprint and refresh the key pool. */
+    fun preselectRecipient(fingerprint: String) {
+        pendingPreselectRecipientFp = fingerprint.uppercase()
+        loadKeys()
     }
 
     fun toggleRecipient(key: PGPKeyEntity) {
