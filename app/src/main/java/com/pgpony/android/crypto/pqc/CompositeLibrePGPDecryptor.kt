@@ -49,14 +49,17 @@ object CompositeLibrePGPDecryptor {
     ): Result? {
         val binary = toBinary(encryptedData)
         val split = split(binary) ?: return null // no LibrePGP algo-8 PKESK
-        val pkesk = split.pkesk
 
-        val sessionKey = recover(pkesk, secretKeyRings, passphrase)
+        // Scott Lu (4.4.1): a multi-recipient message carries one composite
+        // PKESK per recipient. Try each held key against every slot, not just
+        // the first, so a message addressed to us plus others opens even when
+        // we are not the first recipient.
+        val recovered = recoverAmong(split.pkesks, secretKeyRings, passphrase)
 
         val bcpgIn = BCPGInputStream(ByteArrayInputStream(split.remainder))
         val encList = PGPEncryptedDataList(bcpgIn)
         val sessionEnc = encList.extractSessionKeyEncryptedData()
-        val factory = BcSessionKeyDataDecryptorFactory(PGPSessionKey(pkesk.symAlgo, sessionKey))
+        val factory = BcSessionKeyDataDecryptorFactory(PGPSessionKey(recovered.symAlgo, recovered.sessionKey))
         return Result(sessionEnc.getDataStream(factory), sessionEnc)
     }
 
@@ -93,11 +96,40 @@ object CompositeLibrePGPDecryptor {
         secretKeyRings: List<PGPSecretKeyRing>,
         passphrase: String? = null
     ): PGPSessionKey? {
-        val pkesk = firstPkesk(eskRegion) ?: return null
-        return PGPSessionKey(pkesk.symAlgo, recover(pkesk, secretKeyRings, passphrase))
+        val pkesks = allPkesks(eskRegion)
+        if (pkesks.isEmpty()) return null
+        val recovered = recoverAmong(pkesks, secretKeyRings, passphrase)
+        return PGPSessionKey(recovered.symAlgo, recovered.sessionKey)
     }
 
-    /** Shared decapsulation core behind [tryDecrypt] and [recoverSessionKey].
+    private class Recovered(val sessionKey: ByteArray, val symAlgo: Int)
+
+    /**
+     * Scott Lu (4.4.1): try each composite PKESK in a multi-recipient message
+     * against the held keys and return the first that opens, mirroring
+     * CompositeDecryptor.recoverAmong on the IETF path. A slot addressed to a
+     * key we do not hold misses with NoMatchingKey and we move on; a matched
+     * but locked key surfaces its error as-is. Throw only when no slot matches.
+     */
+    private fun recoverAmong(
+        pkesks: List<Pkesk>,
+        secretKeyRings: List<PGPSecretKeyRing>,
+        passphrase: String?
+    ): Recovered {
+        for (pkesk in pkesks) {
+            try {
+                return Recovered(recover(pkesk, secretKeyRings, passphrase), pkesk.symAlgo)
+            } catch (e: NoMatchingKey) {
+                // this recipient slot is not ours; try the next PKESK
+            }
+        }
+        throw NoMatchingKey(
+            "no held LibrePGP composite secret key for any of the " +
+                "${pkesks.size} composite recipient(s) in this message"
+        )
+    }
+
+    /** Shared decapsulation core behind [recoverAmong].
      *  An all-zero key ID (GnuPG's wildcard, `gpg -R`) has nothing to look
      *  up, so it trials every held v5 algo-8 secret key instead. */
     private fun recover(
@@ -164,19 +196,20 @@ object CompositeLibrePGPDecryptor {
         throw NoMatchingKey("no held LibrePGP composite secret key opens this anonymous PKESK")
     }
 
-    /** First parseable v3 algo-8 PKESK in a region of ESK packets. */
-    private fun firstPkesk(region: ByteArray): Pkesk? {
+    /** All parseable v3 algo-8 PKESKs in a region of ESK packets, in order. */
+    private fun allPkesks(region: ByteArray): List<Pkesk> {
+        val out = mutableListOf<Pkesk>()
         var i = 0
         while (i < region.size) {
-            val h = try { header(region, i) } catch (e: Exception) { null } ?: return null
+            val h = try { header(region, i) } catch (e: Exception) { null } ?: break
             val end = h.bodyStart + h.bodyLen
-            if (h.bodyLen < 0 || end > region.size || end <= i) return null
+            if (h.bodyLen < 0 || end > region.size || end <= i) break
             if (h.tag == TAG_PKESK) {
-                parsePkesk(region.copyOfRange(h.bodyStart, end))?.let { return it }
+                parsePkesk(region.copyOfRange(h.bodyStart, end))?.let { out.add(it) }
             }
             i = end
         }
-        return null
+        return out
     }
 
     // ── PKESK parsing ────────────────────────────────────────────────
@@ -216,11 +249,11 @@ object CompositeLibrePGPDecryptor {
 
     // ── packet splitting ─────────────────────────────────────────────
 
-    private class Split(val pkesk: Pkesk, val remainder: ByteArray)
+    private class Split(val pkesks: List<Pkesk>, val remainder: ByteArray)
 
     private fun split(data: ByteArray): Split? {
         var i = 0
-        var pkesk: Pkesk? = null
+        val pkesks = mutableListOf<Pkesk>()
         val n = data.size
         while (i < n) {
             // 4.1.2 (issue #33): same fix as CompositeDecryptor.split, and
@@ -231,12 +264,14 @@ object CompositeLibrePGPDecryptor {
             if (first and 0x80 == 0) break
             val tag = if (first and 0x40 != 0) first and 0x3F else (first shr 2) and 0x0F
             if (tag != TAG_PKESK && tag != TAG_SKESK) {
-                val p = pkesk ?: return null
-                return Split(p, data.copyOfRange(i, n))
+                // Scott Lu (4.4.1): collect EVERY composite PKESK, not just the
+                // first, so multi-recipient messages try all recipient slots.
+                if (pkesks.isEmpty()) return null
+                return Split(pkesks, data.copyOfRange(i, n))
             }
             val h = header(data, i) ?: break
-            if (h.tag == TAG_PKESK && pkesk == null) {
-                parsePkesk(data.copyOfRange(h.bodyStart, h.bodyStart + h.bodyLen))?.let { pkesk = it }
+            if (h.tag == TAG_PKESK) {
+                parsePkesk(data.copyOfRange(h.bodyStart, h.bodyStart + h.bodyLen))?.let { pkesks.add(it) }
             }
             i = h.bodyStart + h.bodyLen
         }

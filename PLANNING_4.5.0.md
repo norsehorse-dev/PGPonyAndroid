@@ -918,6 +918,8 @@ propagating a matched-but-locked ProtectedKeyException and throwing NoMatchingKe
 after all PKESKs miss; the streaming path uses allCompositePkesks() in place of
 firstCompositePkesk().
 
+LibrePGP counterpart (Scott Lu, PGPony Android 4.4.1, Pixel 8): the identical bug lived in the SEPARATE algo-8 path, CompositeLibrePGPDecryptor, which the #57 fix above never touched (that was the IETF algo-35/36 CompositeDecryptor). Reported as a multi-recipient message to all-LibrePGP-PQC recipients failing with "no held LibrePGP composite secret key", even for PGPony-generated keys; single-recipient to self worked. Same root cause: split() kept one PKESK, recover() tried one. Fixed the same way for RC6: split() and a new allPkesks() collect every algo-8 PKESK, and a new recoverAmong() tries each held key against every slot (addressed and anonymous), propagating a locked-key error and throwing NoMatchingKey only after all slots miss. Regression test: CompositeLibrePGPMultiRecipientDecryptTest (768 + 1024 LibrePGP, both recipients decrypt), mirroring CompositeMultiRecipientDecryptTest on the IETF side.
+
 Report: two ML-KEM-1024 v6 keypairs, both generated in PGPony (the reporter's own and a friend's). A
 message encrypted to both recipients, unsigned, decrypts fine for the friend but fails for the reporter
 with "Decryption failed: no held composite secret key for recipient <subkey-fp>" (the error prints
