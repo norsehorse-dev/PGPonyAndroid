@@ -3,7 +3,7 @@
 //
 // KeyServerDirectory.normalizeBaseUrl is the gate for user-entered key server
 // URLs. It defaults a missing scheme to https, keeps only scheme://host[:port],
-// and rejects anything that is not a usable HKPS/HKP base URL.
+// accepts hkps/hkp (mapping them to https/http), and rejects anything else.
 
 package com.pgpony.android.keyserver
 
@@ -43,9 +43,21 @@ class KeyServerUrlValidationTest {
     }
 
     @Test
-    fun `non-web schemes and junk are rejected`() {
-        assertNull(norm("hkps://keys.example.org"))
+    fun `hkps maps to https`() {
+        assertEquals("https://keys.example.org", norm("hkps://keys.example.org"))
+        assertEquals("https://keys.example.org:8443", norm("hkps://keys.example.org:8443"))
+    }
+
+    @Test
+    fun `hkp maps to http on the default hkp port`() {
+        assertEquals("http://keys.example.org:11371", norm("hkp://keys.example.org"))
+        assertEquals("http://keys.example.org:11372", norm("hkp://keys.example.org:11372"))
+    }
+
+    @Test
+    fun `unknown schemes and junk are rejected`() {
         assertNull(norm("ftp://keys.example.org"))
+        assertNull(norm("gopher://keys.example.org"))
         assertNull(norm("   "))
         assertNull(norm(""))
         assertNull(norm("not a url"))

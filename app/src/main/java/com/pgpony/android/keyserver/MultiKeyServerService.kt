@@ -145,15 +145,35 @@ class MultiKeyServerService {
      */
     suspend fun publish(server: KeyServer, armoredPublicKey: String): PublishOutcome =
         withContext(Dispatchers.IO) {
-            try {
-                val vks = tryVksUpload(server, armoredPublicKey)
-                if (vks != null) return@withContext vks
-                // VKS not available (404 on the endpoint) → HKP add.
-                tryHkpAdd(server, armoredPublicKey)
-            } catch (e: Exception) {
-                PublishOutcome.Failed(e.message ?: "Upload failed")
+            // VKS first. A clean 404 means "no VKS here"; a thrown connection
+            // error (some HKP-only servers reset rather than drain a large key
+            // body posted to a missing endpoint) is treated the same way, so the
+            // HKP fallback still runs instead of the whole publish aborting.
+            val vks = runCatching { tryVksUpload(server, armoredPublicKey) }.getOrNull()
+            if (vks != null) return@withContext vks
+            // HKP add, with one retry: keyservers like keyserver.ubuntu.com
+            // routinely drop a pooled connection with "unexpected end of stream".
+            var last: Exception? = null
+            repeat(2) {
+                try {
+                    return@withContext tryHkpAdd(server, armoredPublicKey)
+                } catch (e: Exception) {
+                    last = e
+                }
             }
+            PublishOutcome.Failed(friendlyPublishError(server, last))
         }
+
+    /**
+     * A user-safe failure message for a thrown transport error. Never surfaces
+     * the raw okhttp/ktor exception text, which can include internal object
+     * hashcodes like "com.android.okhttp.Address@96702914".
+     */
+    private fun friendlyPublishError(server: KeyServer, e: Exception?): String {
+        val host = runCatching { java.net.URI(server.baseUrl).host }.getOrNull()
+            ?: server.baseUrl
+        return "Couldn't reach $host. Check your connection and try again."
+    }
 
     /** @return null if the server has no /vks/v1/upload (caller falls back to HKP). */
     private suspend fun tryVksUpload(server: KeyServer, armored: String): PublishOutcome? {

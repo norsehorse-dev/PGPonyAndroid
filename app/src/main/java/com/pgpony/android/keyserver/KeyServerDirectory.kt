@@ -164,14 +164,25 @@ class KeyServerDirectory private constructor(private val appContext: Context) {
                 else "https://$trimmed"
             return try {
                 val uri = java.net.URI(withScheme)
-                val scheme = uri.scheme?.lowercase() ?: return null
-                if (scheme != "https" && scheme != "http") return null
+                val rawScheme = uri.scheme?.lowercase() ?: return null
+                // Map the HKP keyserver schemes onto the transport the client
+                // actually speaks: hkps -> https (TLS, default 443), hkp -> http
+                // (plaintext, default 11371). Accepting hkps:// matters because
+                // that is the canonical form keyserver docs hand out.
+                val scheme = when (rawScheme) {
+                    "https", "hkps" -> "https"
+                    "http", "hkp" -> "http"
+                    else -> return null
+                }
                 val host = uri.host?.lowercase() ?: return null
                 if (host.isBlank() || host.startsWith('.') || host.endsWith('.')) return null
                 // Require a dotted host, unless an explicit port is given (allows
                 // a self-hosted "localhost:11371" while rejecting bare typos).
                 if (!host.contains('.') && uri.port <= 0) return null
-                val port = if (uri.port > 0) ":${uri.port}" else ""
+                // hkp:// with no explicit port defaults to the HKP plaintext port.
+                val hkpDefaultPort = if (rawScheme == "hkp" && uri.port <= 0) 11371 else -1
+                val effectivePort = if (uri.port > 0) uri.port else hkpDefaultPort
+                val port = if (effectivePort > 0) ":$effectivePort" else ""
                 "$scheme://$host$port"
             } catch (e: Exception) {
                 null

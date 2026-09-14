@@ -78,6 +78,8 @@ still encrypt, at the cost of a downgrade path). REMAINING for item 1: fold the 
 interop-tier keygen choice with item 14's v4 shape as the recommended default (blocked on item 14
 wiring); on-device sq/gpg round-trip of a PQ-only (MLDSA65) key.
 
+On-device VERIFIED Sep 14 2026 (RC4 foss debug, moto g play): both shapes generate the correct key material, confirmed in Key Details. PQ-only (MLDSA65_ED25519_V6): composite ML-DSA signing primary plus exactly one ML-KEM-768 (algo 35) encryption subkey, NO standalone classical X25519 encrypt. Compatibility (MLKEM768_X25519_V6): Ed25519 v6 signing plus TWO encryption subkeys, a standalone X25519 v6 (classical downgrade path) and the composite ML-KEM-768 v6. The standalone-X25519 presence/absence is the clean UI-visible differentiator; external sq/gpg inspection stays best-effort only because this Mac's sq is non-PQC and gpg 2.5.21 has no algo-35 parser.
+
 
 ## 2. Mixed-recipient post-quantum warning
 
@@ -232,7 +234,9 @@ no regression on 768 and 4096.
 Priority: high. Origin: requested by more than one user (#55 feature 1, plus a separate
 request). Parity with the desktop version. Bumped from medium given the repeat demand.
 
-Status (implemented, RC2): the directory backend already stored an ordered, user-editable list (KeyServerDirectory in DataStore) and both lookup (KeyServerRepository.directoryLookupServers) and publish (MultiKeyServerService against an arbitrary KeyServer.baseUrl, via the proxy-aware client) already iterated it, so custom servers ride the offline/Tor switch for free. Added the missing pieces: KeyServerDirectory.addCustom / remove / isSeed and a pure, testable normalizeBaseUrl (defaults https, keeps scheme://host[:port], rejects non-http(s)/junk, dotless host only with an explicit port); KeyserversScreen now has an Add-key-server dialog (label + URL, inline validation) and a delete action on custom (non-seed) servers; the two seeds stay protected (toggle, not remove). KeyServerUrlValidationTest covers the normalizer. Delivery check (add an HKPS server, look up and upload through it) is on-device.
+Status (implemented, RC2): the directory backend already stored an ordered, user-editable list (KeyServerDirectory in DataStore) and both lookup (KeyServerRepository.directoryLookupServers) and publish (MultiKeyServerService against an arbitrary KeyServer.baseUrl, via the proxy-aware client) already iterated it, so custom servers ride the offline/Tor switch for free. Added the missing pieces: KeyServerDirectory.addCustom / remove / isSeed and a pure, testable normalizeBaseUrl (defaults https, keeps scheme://host[:port], rejects non-http(s)/junk, dotless host only with an explicit port); KeyserversScreen now has an Add-key-server dialog (label + URL, inline validation) and a delete action on custom (non-seed) servers; the two seeds stay protected (toggle, not remove). KeyServerUrlValidationTest covers the normalizer.
+
+On-device VERIFIED Sep 14 2026 (RC4 foss debug, moto g play): custom-server add/lookup/publish all work. Added keyserver.ubuntu.com as a custom (non-seed) entry; it takes a delete action while the two seeds keep toggle-only. A fresh fake-email key published to ubuntu cleanly; the real long-lived key A0CB..DE62 published to both seeds (openpgp.org VKS + pgpony.app VKS) and, on RETRY, to ubuntu too. First ubuntu attempt on the real key threw okhttp "unexpected end of stream" (transient, retry succeeded). ROBUSTNESS GAP found (not a blocker, feature works): publish() tries VKS then HKP, but a connection-level throw during the VKS probe (full key body POSTed to a non-VKS Hockeypuck server that resets rather than draining a large body) hits the outer catch and aborts, so the HKP fallback never runs; and the catch returns PublishOutcome.Failed(e.message) which leaks the raw okhttp Address hashcode to the UI. Also found: normalizeBaseUrl accepted only https/http and REJECTED hkps:// (and hkp://), even though its own doc claimed HKPS/HKP support and hkps:// is the canonical form keyserver docs hand out; KeyServerUrlValidationTest had even baked in the wrong spec (asserted hkps:// rejected). FIXED for RC5: normalizeBaseUrl now maps hkps->https and hkp->http (hkp defaults to port 11371), rejecting only truly unknown schemes; test updated with hkps/hkp mapping cases. Publish hardening also landed for RC5: publish() now runCatching-wraps the VKS probe so a thrown connection error falls through to HKP (was aborting the whole publish), HKP add retries once on a dropped connection, and failures return a sanitized friendlyPublishError (host + "check your connection") instead of leaking the raw okhttp Address string. Re-verify on RC5: hkps:// entry accepted, and a large real key publishes to a custom HKP-only server without a manual retry.
 
 KeyServerRepository uses a fixed set of lookup sources (WKD, keys.openpgp.org,
 keys.pgpony.app, the directory). Desktop lets the user add their own key servers.
@@ -475,6 +479,8 @@ runs long, A and B are worth pulling into a dedicated hardening release sooner.
 
 
 ## 12. Decrypt to imported composite ML-KEM keys
+
+On-device VERIFIED Sep 14 2026 (RC4 foss debug, moto g play): the committed sq fixtures, armored and pushed to the phone, imported and decrypted end to end through the UI. Unprotected (sq-sec/sq-msg) and passphrase-protected (sq-sec-protected/sq-msg-protected, passphrase pgpony-test) both returned plaintext, no "no held composite secret key". Single-recipient imported-composite decrypt is good on device; multi-recipient stays on the separate #57 / item 18 track.
 
 Priority: HIGH. Origin: issue #36 (Umotas), surfaced in the 4.4.1 RC1 verification.
 
@@ -799,6 +805,8 @@ the remove-confirm dialog's Remove now runs behind deleteWithOptionalBiometricGa
 title/subtitle; new key_detail_subkey_remove_biometric_* strings), gated on device biometric capability and
 falling through when unavailable; doRemoveSubkey now sets successMessage (kd_vm_status_subkey_removed ->
 "Subkey removed" snackbar). UI-only, verified on device.
+
+On-device VERIFIED Sep 14 2026 (RC4 foss debug, moto g play): local remove and classical revoke both confirmed externally. REMOVE: removed the standalone X25519 encrypt subkey from a v6 compatibility key; exported cert dropped from three subkeys to two (small classical + 1226-byte ML-KEM composite), the removed subkey is gone. gpg parse is structural-only on v6 (unknown version 6), so the authoritative shape check is on-phone Key Details, which matched. REVOKE (classical path, v4 key, gpg-verified end to end): the target rsa4096 encrypt subkey 0AAE4A86353837FC carries a proper 0x28 subkey-revocation self-sig (sigclass 0x28, revocation-reason subpacket type 29 code 0x00, issued by the primary B39860A99A9B345D); sibling encrypt subkeys stay live, gpg hides the revoked subkey from --list-keys and keeps valid encryption targets, i.e. it stops selecting the revoked one. COMPOSITE revoke path (0x28 over a composite ML-DSA primary) not gpg-checkable here (algo-30/35 tooling gap); stays covered by CompositeRevokeSubkeyTest (green) plus the phone isRevoked flag.
 
 Add-subkey exists (ClassicalSubkeyGen, extended to PQ by item 7), but there is no way to remove a
 subkey once it is on a cert. The request is a delete function. Two distinct operations sit behind
