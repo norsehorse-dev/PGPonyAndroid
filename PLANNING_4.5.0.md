@@ -1246,3 +1246,27 @@ Priority: medium-high. Origin: NorseHorse, on-device 4.5.0 verify batch (Sep 14 
 Root cause: QrChunking capped multipart at MAX_FRAMES (16) x PAYLOAD_MAX (1,000) = 16 KB of text, and split() returns null past that. A composite ML-DSA (PQ-only) certificate armors to ~18.5 KB (measured: a real MLDSA65_ED25519_V6 public key exported to 18,503 characters) because every self-signature on the composite ML-DSA primary is a ~3.3 KB ML-DSA-65 signature, versus ~100 bytes for a classical Ed25519 sig. So the cert sits above the 16 KB ceiling and split() returns null -> no QR. Compatibility keys scan fine because their signatures are classical. The QrChunking header comment had half-predicted this ("ML-KEM-1024 will not fit under any amount of shrinking") but the cap was never lifted for the composite-signing shapes.
 
 Fixed for RC (QrChunking.kt): PAYLOAD_MAX 1,000 -> 1,800 (a level-L symbol holds ~2,953 bytes; +~23 header still encodes to a ~version-30 symbol that scans screen to screen) and MAX_FRAMES 16 -> 24, so capacity is ~43 KB. The 18.5 KB PQ-only key now chunks to ~11 frames, with headroom for the larger ML-DSA-87 / ML-KEM-1024 shapes to come. No format or scanner change: frames still carry the PGPONY1: header and reassemble byte-identically; classical keys under SINGLE_MAX still emit one unheadered symbol. QrChunkingTest gains compositeMlDsaSizedKey_chunksInsteadOfOverflowing (an 18,503-char armored cert chunks within the cap and round-trips); the existing symbolic MAX_FRAMES/PAYLOAD_MAX tests still hold. Re-verify on the next RC: Share Public Key -> QR on a PQ-only key produces an animated multipart QR, and a second PGPony scans it back to the identical key.
+
+## 27. Global destructive-action lock (#36, AraafRoyall)
+
+Priority: medium. Origin: AraafRoyall (#36, Sep 12 2026) - "a global option to Block Remove subkey, keys, keyring, clear data etc. Like a Global Switch."
+
+Implemented (Android). New Settings > Security toggle "Protect destructive actions" (default ON), backed by DestructiveActionLock (pref key protect_destructive_actions in pgpony_prefs, added beside BiometricGate). When ON, delete key, remove subkey, and clear-all-data run the device-auth BiometricGate first; when OFF, those actions keep their confirm dialogs / two-step gauntlet but skip the biometric prompt. Wired by having deleteWithOptionalBiometricGate (key delete + subkey remove) and the SettingsScreen clear-all gate both consult DestructiveActionLock.isEnabled(). Default ON preserves the existing always-gate-when-capable behavior and newly brings the clear-all biometric layer under one user-visible switch. Interpretation note: read as "require auth for destructive actions", not a hard block, since a device with no screen lock has nothing to prompt with.
+
+Delivery: on device, toggle off -> deleting a key / removing a subkey / clearing data no longer prompts for biometric (dialogs still confirm); toggle on -> each prompts again.
+
+## 28. Revoke instead of delete, from the delete sheet (#36, CertainBot)
+
+Priority: medium. Origin: CertainBot (#36, Sep 13 2026) - a revoke / "revoke and delete" button in the delete dialog, because a revocation certificate can't be made after a key is deleted, and the button makes the user think twice.
+
+Implemented (Android). The key-pair DeleteKeySheet gains a "Revoke this key instead" button (with a one-line note that a revocation cert can't be created after deletion). It closes the delete sheet and opens the existing RevokeKeySheet / showRevokeSheet flow. Hidden for an already-revoked key. Public-only keys keep their lightweight delete dialog (they are re-importable; nothing to revoke). Reuses the item-16 revoke machinery, no new crypto.
+
+Delivery: on device, open Delete on a key pair -> "Revoke this key instead" -> the revoke sheet opens and revoking produces the cert; the key is not deleted.
+
+## 29. Encrypt to a shared public key, not just import (#58, CertainBot)
+
+Priority: medium. Origin: CertainBot (#58, Sep 13 2026) - when a public key is shared into PGPony, only "Import" is offered; there should also be an option to encrypt to it, since that can be the purpose of sharing.
+
+Implemented (Android). The import preview now shows an "Encrypt to this key" button when the shared key is public (no private material). It imports the key (tolerant of already-in-keyring) and sets a one-shot pendingEncryptToFingerprint signal; MainActivity consumes it, calls EncryptDecryptViewModel.preselectRecipient(fp) (a new one-shot preselect honored by loadKeys, overriding the default-recipient rule), and routes to the Encrypt screen with that key selected as recipient. Import-only path is unchanged.
+
+Delivery: on device, share a public key to PGPony -> "Encrypt to this key" -> lands on Encrypt with that key preselected as recipient; plain "Import" still just files it.
