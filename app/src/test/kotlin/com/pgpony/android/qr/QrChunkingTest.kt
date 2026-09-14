@@ -230,6 +230,24 @@ class QrChunkingTest {
     }
 
     @Test
+    fun compositeMlDsaSizedKey_chunksInsteadOfOverflowing() {
+        // A PQ-only composite ML-DSA cert armors to ~18.5 KB (every self-sig is
+        // a ~3.3 KB ML-DSA signature). Under the old 1,000 x 16 = 16 KB ceiling
+        // split() returned null and no QR was produced, single or multipart.
+        // It must now chunk within the frame cap and reassemble intact.
+        val text = armored(18_503)
+        val frames = QrChunking.split(text)
+        assertNotNull("a composite ML-DSA cert must chunk, not overflow the cap", frames)
+        assertTrue(
+            "must fit within the frame ceiling",
+            frames!!.size <= QrChunking.MAX_FRAMES
+        )
+        val outcome = feed(frames)
+        assertTrue(outcome is QrChunking.Outcome.Complete)
+        assertEquals(text, (outcome as QrChunking.Outcome.Complete).text)
+    }
+
+    @Test
     fun everyFrameStaysUnderASensibleSymbolSize() {
         val text = armored(12_000)
         val frames = QrChunking.split(text)!!

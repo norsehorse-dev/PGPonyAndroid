@@ -49,20 +49,24 @@ object QrChunking {
     const val SINGLE_MAX = 2_000
 
     /**
-     * Payload characters per frame. Deliberately far below what a symbol can
-     * hold: a version-40 QR is dense enough to be genuinely hard to scan from
-     * a phone screen, and chunking lets us trade capacity we no longer need
-     * for symbols that scan on the first try.
+     * Payload characters per frame. A single symbol at level L holds ~2,953
+     * bytes and the frame header is ~23, so 1,800 leaves comfortable margin
+     * while still encoding to a version-30-ish symbol that scans screen to
+     * screen on the first try. Raised from 1,000 in 4.5.x: a composite ML-DSA
+     * (PQ-only) cert armors to ~18.5 KB because every self-signature is a
+     * ~3.3 KB ML-DSA signature, and the old 1,000 x 16 = 16 KB ceiling could
+     * not hold it at all (no QR, single or multipart).
      */
-    const val PAYLOAD_MAX = 1_000
+    const val PAYLOAD_MAX = 1_800
 
     /**
-     * Ceiling on frames. 16 matches what structured append allows and is far
-     * more than any certificate needs (16 KB). Past this, the caller falls
-     * back to the actionable "use Share or Copy" message rather than emitting
-     * a sequence nobody will finish scanning.
+     * Ceiling on frames. At 1,800 chars each this is ~43 KB of capacity, which
+     * holds a composite ML-DSA PQ-only cert (~18.5 KB) with headroom for the
+     * larger ML-DSA-87 / ML-KEM-1024 shapes to come. Past this the caller
+     * falls back to the actionable "use Share or Copy" message rather than
+     * emitting a sequence nobody will finish scanning.
      */
-    const val MAX_FRAMES = 16
+    const val MAX_FRAMES = 24
 
     private const val ID_LEN = 8
     private const val HEX = "0123456789abcdef"
