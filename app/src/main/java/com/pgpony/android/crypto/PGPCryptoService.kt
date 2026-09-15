@@ -1725,15 +1725,30 @@ class PGPCryptoService private constructor() {
             // algorithm), so try the hand-rolled composite path first. It
             // returns null when the message carries no composite PKESK, in
             // which case we fall back to BC's normal PKESK/SKESK discovery.
-            val composite = com.pgpony.android.crypto.pqc.CompositeDecryptor.tryDecrypt(
-                encryptedData, secretKeyRings, passphrase, compositePrimaryRings
-            )
+            // Scott Lu (RC7): catch a composite "no held key" miss instead of
+            // failing outright. A miss means a composite recipient slot was
+            // present but none of our held keys opened it; the message may
+            // still carry a classical PKESK we can open, so we fall through to
+            // the stripped-BC path below rather than throwing here.
+            var compositeMiss: Exception? = null
+            val composite = try {
+                com.pgpony.android.crypto.pqc.CompositeDecryptor.tryDecrypt(
+                    encryptedData, secretKeyRings, passphrase, compositePrimaryRings
+                )
+            } catch (e: com.pgpony.android.crypto.pqc.CompositeDecryptor.NoMatchingKey) {
+                compositeMiss = e; null
+            }
             // LibrePGP composite (algo 8) is a separate framing; try it when
-            // the IETF (algo 35) path declined.
+            // the IETF (algo 35) path declined or missed.
             val librePgp = if (composite == null)
-                com.pgpony.android.crypto.pqc.CompositeLibrePGPDecryptor.tryDecrypt(
-                    encryptedData, secretKeyRings, passphrase
-                ) else null
+                try {
+                    com.pgpony.android.crypto.pqc.CompositeLibrePGPDecryptor.tryDecrypt(
+                        encryptedData, secretKeyRings, passphrase
+                    )
+                } catch (e: com.pgpony.android.crypto.pqc.CompositeLibrePGPDecryptor.NoMatchingKey) {
+                    if (compositeMiss == null) compositeMiss = e
+                    null
+                } else null
             var decryptedStream: java.io.InputStream? = composite?.stream ?: librePgp?.stream
             var pbeData: PGPPBEEncryptedData? = null
             if (composite != null) {
@@ -1741,10 +1756,27 @@ class PGPCryptoService private constructor() {
             } else if (librePgp != null) {
                 integrityObj = librePgp.integrity
             } else {
-                val inputStream = if (isArmored(encryptedData)) {
-                    ArmoredInputStream(ByteArrayInputStream(encryptedData))
+                // Scott Lu (RC7): a mixed multi-recipient message (composite +
+                // classical) that we hold only a classical key for. BC can't
+                // parse a message that still has a composite PKESK in it, so
+                // when a composite slot missed, strip the composite PKESKs and
+                // let BC open the classical slot on the remainder. If nothing
+                // classical remains, surface the original composite miss.
+                val miss = compositeMiss
+                val bcBytes = if (miss != null) {
+                    val stripped = com.pgpony.android.crypto.pqc.CompositePkeskStripper.strip(encryptedData)
+                    if (stripped != null && stripped.removedComposite && stripped.hasOtherEsk) {
+                        stripped.message
+                    } else {
+                        throw miss
+                    }
                 } else {
-                    ByteArrayInputStream(encryptedData)
+                    encryptedData
+                }
+                val inputStream = if (isArmored(bcBytes)) {
+                    ArmoredInputStream(ByteArrayInputStream(bcBytes))
+                } else {
+                    ByteArrayInputStream(bcBytes)
                 }
 
                 val pgpFactory = JcaPGPObjectFactory(inputStream)
