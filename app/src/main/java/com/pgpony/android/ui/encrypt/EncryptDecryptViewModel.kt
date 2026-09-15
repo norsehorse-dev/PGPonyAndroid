@@ -4132,6 +4132,13 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 val secretRings = withContext(Dispatchers.IO) {
                     orderedKeys.mapNotNull { repo.loadSecretKeyRing(it.fingerprint) }
                 }
+                // Umotas (RC8): composite-primary keys are raw (non-BC) rings;
+                // the streaming path must pass them too so a file encrypted to
+                // an imported composite key opens, matching the in-memory path.
+                val compositeRings = withContext(Dispatchers.IO) {
+                    orderedKeys.filter { it.algorithm.isCompositeSign }
+                        .mapNotNull { repo.loadCompositePrivateRing(it.fingerprint) }
+                }
                 val verifyRings = withContext(Dispatchers.IO) {
                     repo.getAllKeys().mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
                 }
@@ -4186,7 +4193,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                                 output = sink,
                                 secretKeyRings = secretRings,
                                 passphrase = effPass,
-                                verificationKeys = verifyRings
+                                verificationKeys = verifyRings,
+                                compositePrimaryRings = compositeRings
                             )
                         }
                     }

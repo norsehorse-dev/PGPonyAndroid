@@ -88,7 +88,7 @@ class CompositeAnonymousPkeskTest {
         val alice = party("Alice", "alice@pgpony.test", KeyAlgorithm.MLKEM768_X25519_V6)
         val pkesk = anonymousIetfPkesk(alice)
 
-        val session = CompositeDecryptor.recoverSessionKey(pkesk, listOf(alice.secRing), null)
+        val session = CompositeDecryptor.recoverSessionKey(pkesk, listOf(alice.secRing), passphrase = null)
         assertArrayEquals(sessionKey, session!!.key)
         assertEquals(SymmetricKeyAlgorithmTags.AES_256, session.algorithm)
     }
@@ -100,7 +100,7 @@ class CompositeAnonymousPkeskTest {
         val pkesk = anonymousIetfPkesk(alice)
 
         try {
-            CompositeDecryptor.recoverSessionKey(pkesk, listOf(bob.secRing), null)
+            CompositeDecryptor.recoverSessionKey(pkesk, listOf(bob.secRing), passphrase = null)
             fail("expected NoMatchingKey")
         } catch (e: CompositeDecryptor.NoMatchingKey) {
             // expected
@@ -116,7 +116,7 @@ class CompositeAnonymousPkeskTest {
         // Bob's ring is tried first and must be silently skipped, not
         // treated as a failure that aborts the scan.
         val session = CompositeDecryptor.recoverSessionKey(
-            pkesk, listOf(bob.secRing, alice.secRing), null
+            pkesk, listOf(bob.secRing, alice.secRing), passphrase = null
         )
         assertArrayEquals(sessionKey, session!!.key)
     }

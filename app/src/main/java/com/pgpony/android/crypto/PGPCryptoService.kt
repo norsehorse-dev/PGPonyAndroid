@@ -1961,7 +1961,11 @@ class PGPCryptoService private constructor() {
         output: java.io.OutputStream,
         secretKeyRings: List<PGPSecretKeyRing>,
         passphrase: String?,
-        verificationKeys: List<PGPPublicKeyRing>? = null
+        verificationKeys: List<PGPPublicKeyRing>? = null,
+        // Umotas (RC8): raw composite-PRIMARY rings for the streaming path, so a
+        // file encrypted to an imported composite key opens like the in-memory
+        // decrypt already does.
+        compositePrimaryRings: List<ByteArray> = emptyList()
     ): DecryptStreamResult {
         var usedSymmetric = false
         var integrityObj: org.bouncycastle.openpgp.PGPEncryptedData? = null
@@ -2017,7 +2021,7 @@ class PGPCryptoService private constructor() {
                 val eskRegion = readLeadingEskPackets(binaryIn)
                 val session =
                     com.pgpony.android.crypto.pqc.CompositeDecryptor
-                        .recoverSessionKey(eskRegion, secretKeyRings, passphrase)
+                        .recoverSessionKey(eskRegion, secretKeyRings, compositePrimaryRings, passphrase)
                         ?: com.pgpony.android.crypto.pqc.CompositeLibrePGPDecryptor
                             .recoverSessionKey(eskRegion, secretKeyRings, passphrase)
                 if (session != null) {

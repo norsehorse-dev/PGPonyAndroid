@@ -113,11 +113,16 @@ object CompositeDecryptor {
     fun recoverSessionKey(
         eskRegion: ByteArray,
         secretKeyRings: List<PGPSecretKeyRing>,
+        // Scott Lu / Umotas (RC8): the streaming (file) path must thread the
+        // raw composite-PRIMARY rings too, or a file encrypted to an imported
+        // composite key (ML-DSA primary + ML-KEM subkey) never reaches
+        // findRawComposite and fails with "no held composite secret key".
+        rawCompositeRings: List<ByteArray> = emptyList(),
         passphrase: String? = null
     ): PGPSessionKey? {
         val parsedList = allCompositePkesks(eskRegion)
         if (parsedList.isEmpty()) return null
-        val recovered = recoverAmong(parsedList, secretKeyRings, emptyList(), passphrase)
+        val recovered = recoverAmong(parsedList, secretKeyRings, rawCompositeRings, passphrase)
         return PGPSessionKey(symAlgOrDefault(recovered.symAlgId), recovered.sessionKey)
     }
 
