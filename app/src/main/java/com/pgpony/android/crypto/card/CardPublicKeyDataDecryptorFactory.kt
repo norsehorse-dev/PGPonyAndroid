@@ -106,7 +106,14 @@ class CardPublicKeyDataDecryptorFactory(
         val kekAlgoId = ecdh.symmetricKeyAlgorithm.toInt() and 0xFF
         val recipientFingerprint = encryptionKey.fingerprint   // 20-byte v4 fp
 
-        val param = Rfc6637.kdfParam(Rfc6637.CURVE25519_OID, kdfHashId, kekAlgoId, recipientFingerprint)
+        // The RFC 6637 KDF hashes the recipient key's curve OID as part of its
+        // input, so it must be the key's actual curve (Curve25519, NIST
+        // P-256/384/521, brainpool), not a hardcoded one. Take the OID content
+        // octets straight off the key packet: getEncoded() is 06 <len> <body>,
+        // and the KDF param wants <body>. Every curve in play is short-form.
+        val curveOidDer = ecdh.curveOID.encoded
+        val curveOid = curveOidDer.copyOfRange(2, curveOidDer.size)
+        val param = Rfc6637.kdfParam(curveOid, kdfHashId, kekAlgoId, recipientFingerprint)
         val kek = Rfc6637.deriveKek(shared, param, kdfHashId, kekAlgoId)
         val padded = Rfc6637.aesKeyUnwrap(kek, wrapped)
         return Rfc6637.stripPad(padded)

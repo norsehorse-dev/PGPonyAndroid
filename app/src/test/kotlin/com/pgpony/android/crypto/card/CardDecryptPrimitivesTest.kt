@@ -52,4 +52,36 @@ class CardDecryptPrimitivesTest {
         assertArrayEquals(point, doBytes.copyOfRange(7, 7 + 33))
         assertEquals(40, doBytes.size)
     }
+
+    @Test
+    fun cipherDoUsesLongFormLengthsForP521Point() {
+        // NIST P-521 uncompressed point 0x04 || X(66) || Y(66) = 133 bytes,
+        // which exceeds the 127-byte short-form TLV limit at every level. This
+        // is the case the reported card decrypt failed on (issue #62).
+        val point = ByteArray(133) { if (it == 0) 0x04 else it.toByte() }
+        val doBytes = EcdhCipherData.cipherDoForPoint(point)
+        // A6 81 8C  7F 49 81 88  86 81 85  <133 bytes>
+        val expectedHead = byteArrayOf(
+            0xA6.toByte(), 0x81.toByte(), 0x8C.toByte(),
+            0x7F, 0x49, 0x81.toByte(), 0x88.toByte(),
+            0x86.toByte(), 0x81.toByte(), 0x85.toByte()
+        )
+        assertArrayEquals(expectedHead, doBytes.copyOfRange(0, expectedHead.size))
+        assertArrayEquals(point, doBytes.copyOfRange(expectedHead.size, expectedHead.size + 133))
+        assertEquals(expectedHead.size + 133, doBytes.size) // 143
+    }
+
+    @Test
+    fun cipherDoKeepsPointLengthShortFormAt127() {
+        // A 127-byte point value still fits a short-form length octet in its 86
+        // DO (128 would flip it to long form). The outer 7F49/A6 lengths do go
+        // long here because the 86 DO is then 129 bytes, so check the point's
+        // own length octet off the tail rather than at a fixed index.
+        val point = ByteArray(127) { it.toByte() }
+        val doBytes = EcdhCipherData.cipherDoForPoint(point)
+        val pointStart = doBytes.size - 127
+        assertEquals(0x86, doBytes[pointStart - 2].toInt() and 0xFF) // 86 DO tag
+        assertEquals(127, doBytes[pointStart - 1].toInt() and 0xFF)  // short-form len
+        assertArrayEquals(point, doBytes.copyOfRange(pointStart, doBytes.size))
+    }
 }
