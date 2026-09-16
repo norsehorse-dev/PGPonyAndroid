@@ -16,10 +16,14 @@
 -keep class org.bouncycastle.crypto.digests.SHA3Digest { *; }
 -keep class org.bouncycastle.crypto.macs.KMAC { *; }
 
-# ── PGPony app classes that crypto / Room / network code touches ──────
--keep class com.pgpony.android.crypto.** { *; }
--keep class com.pgpony.android.data.** { *; }
--keep class com.pgpony.android.network.** { *; }
+# ── PGPony app classes ────────────────────────────────────────────────
+# 4.5.1 (Play vitals): the broad app-package keeps were removed to raise
+# DEX-code optimization. App code is called directly, not by name, so R8 may
+# shrink and obfuscate it. What still needs keeping is covered specifically:
+# the composite PQ path above, Room entities/DAOs by their annotations below,
+# Parcelables by the CREATOR rule, serializers by the kotlinx.serialization
+# rules, and manifest-declared components (the OpenPGP service, activities)
+# which R8 keeps automatically as entry points.
 
 # ── OpenPGP API contract (org.openintents.openpgp) ────────────────────
 # CRITICAL: do not rename. These classes cross a Binder boundary.
@@ -69,9 +73,8 @@
 }
 
 # ── Compose ──────────────────────────────────────────────────────────
-# Compose's own consumer ProGuard rules cover most of this, but the
-# explicit keep guards against future BOM changes that loosen things.
--keep class androidx.compose.** { *; }
+# Compose ships its own consumer R8 rules; the whole-library keep was
+# dropped in 4.5.1 to let R8 optimize (Play vitals).
 -dontwarn androidx.compose.**
 
 # ── Kotlinx Serialization (used by Ktor JSON) ────────────────────────
@@ -92,18 +95,15 @@
 # Keep all KSerializer implementations
 -keep,includedescriptorclasses class * implements kotlinx.serialization.KSerializer { *; }
 
-# ── Ktor ─────────────────────────────────────────────────────────────
--keep class io.ktor.** { *; }
+# ── Ktor / coroutines ────────────────────────────────────────────────
+# Both ship consumer R8 rules; whole-library keeps dropped in 4.5.1.
 -dontwarn io.ktor.**
--keep class kotlinx.coroutines.** { *; }
 -dontwarn kotlinx.coroutines.**
 
 # ── CameraX (QR scanner) ─────────────────────────────────────────────
--keep class androidx.camera.** { *; }
 -dontwarn androidx.camera.**
 
 # ── Biometric ────────────────────────────────────────────────────────
--keep class androidx.biometric.** { *; }
 -dontwarn androidx.biometric.**
 
 # ── Room ─────────────────────────────────────────────────────────────
