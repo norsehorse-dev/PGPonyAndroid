@@ -42,31 +42,31 @@ object QrChunking {
     const val PREFIX = "PGPONY1:"
 
     /**
-     * At or under this, emit one unheadered symbol exactly as before. Set
-     * comfortably below the ~2,953-byte level-L ceiling so a key that encodes
-     * today keeps encoding, with margin for the encoder's own overhead.
+     * At or under this, emit one unheadered symbol. Kept near the per-frame
+     * payload rather than the encoder's ~2,953-byte ceiling: a symbol that
+     * dense renders with tiny modules a second phone struggles to scan (#63),
+     * so a key past this splits into several roomier frames instead.
      */
-    const val SINGLE_MAX = 2_000
+    const val SINGLE_MAX = 1_200
 
     /**
-     * Payload characters per frame. A single symbol at level L holds ~2,953
-     * bytes and the frame header is ~23, so 1,800 leaves comfortable margin
-     * while still encoding to a version-30-ish symbol that scans screen to
-     * screen on the first try. Raised from 1,000 in 4.5.x: a composite ML-DSA
-     * (PQ-only) cert armors to ~18.5 KB because every self-signature is a
-     * ~3.3 KB ML-DSA signature, and the old 1,000 x 16 = 16 KB ceiling could
-     * not hold it at all (no QR, single or multipart).
+     * Payload characters per frame. Back to 1,000 for 4.5.1 (#63). 4.5.0 raised
+     * this to 1,800 to fit a large post-quantum cert, but that packs each frame
+     * into a dense ~version-30 symbol whose small modules a second phone
+     * struggles to scan. A composite ML-DSA (PQ-only) cert still fits because
+     * the capacity now comes from more frames (MAX_FRAMES) rather than denser
+     * ones, which is the scannable trade.
      */
-    const val PAYLOAD_MAX = 1_800
+    const val PAYLOAD_MAX = 1_000
 
     /**
-     * Ceiling on frames. At 1,800 chars each this is ~43 KB of capacity, which
-     * holds a composite ML-DSA PQ-only cert (~18.5 KB) with headroom for the
-     * larger ML-DSA-87 / ML-KEM-1024 shapes to come. Past this the caller
-     * falls back to the actionable "use Share or Copy" message rather than
-     * emitting a sequence nobody will finish scanning.
+     * Ceiling on frames. At 1,000 chars each this is ~32 KB of capacity, which
+     * holds a composite ML-DSA PQ-only cert (~18.5 KB, ~19 frames) with headroom
+     * for the larger ML-DSA-87 / ML-KEM-1024 shapes to come. Past this the
+     * caller falls back to the actionable "use Share or Copy" message rather
+     * than emitting a sequence nobody will finish scanning.
      */
-    const val MAX_FRAMES = 24
+    const val MAX_FRAMES = 32
 
     private const val ID_LEN = 8
     private const val HEX = "0123456789abcdef"

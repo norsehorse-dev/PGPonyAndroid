@@ -22,7 +22,7 @@ import com.google.zxing.qrcode.QRCodeWriter
 
 object QrBitmap {
 
-    private const val SIZE = 800
+    private const val TARGET = 800
 
     /**
      * Encode [text] as one or more QR bitmaps.
@@ -41,17 +41,29 @@ object QrBitmap {
 
     /** One symbol. Throws ZXing's WriterException if even this will not fit. */
     fun encodeOne(text: String): Bitmap {
+        // Encode at the QR's natural module resolution: a 1x1 requested output
+        // makes ZXing emit one pixel per module (multiple = 1), so there is no
+        // variable centering border, only the 1-module quiet zone. #63: at a
+        // fixed large size ZXing centered a dense symbol inside a wide white
+        // field and frames sized differently. Scaling the natural matrix up by
+        // an integer factor here fills the frame uniformly and keeps the modules
+        // crisp regardless of how the ImageView resizes it.
         val hints = mapOf(EncodeHintType.MARGIN to 1)
-        val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, SIZE, SIZE, hints)
-        val width = matrix.width
-        val height = matrix.height
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
-        for (x in 0 until width) {
-            for (y in 0 until height) {
-                bitmap.setPixel(
-                    x, y,
-                    if (matrix.get(x, y)) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
-                )
+        val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 1, 1, hints)
+        val modules = matrix.width
+        val scale = (TARGET / modules).coerceAtLeast(1)
+        val size = modules * scale
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
+        for (mx in 0 until modules) {
+            for (my in 0 until modules) {
+                val color = if (matrix.get(mx, my)) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
+                val ox = mx * scale
+                val oy = my * scale
+                for (dx in 0 until scale) {
+                    for (dy in 0 until scale) {
+                        bitmap.setPixel(ox + dx, oy + dy, color)
+                    }
+                }
             }
         }
         return bitmap
