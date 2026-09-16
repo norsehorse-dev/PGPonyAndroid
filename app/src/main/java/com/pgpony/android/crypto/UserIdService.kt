@@ -113,6 +113,21 @@ class UserIdService private constructor() {
             if (currentPrimaryUid != null) {
                 primary = reissueSelfCert(primary, currentPrimaryUid, isPrimary = false, signer = ::signer)
             }
+        } else {
+            // Bug (Bart, Sep 2026): the new UID's self-cert is stamped "now". If
+            // no existing UID carries an explicit IsPrimaryUserId flag (the usual
+            // case, since generation never flags a lone UID), keyservers and gpg
+            // fall back to "newest self-sig wins" and show the just-added address
+            // as primary, even though the user did not ask for that. Pin the
+            // current primary by reissuing its self-cert WITH the flag, so the
+            // explicit flag beats recency and the original stays primary. A UID
+            // that is already explicitly flagged needs nothing.
+            val currentPrimaryUid = currentPrimaryUserId(primary)
+            val alreadyExplicit = currentPrimaryUid != null &&
+                latestSelfCert(primary, currentPrimaryUid)?.hashedSubPackets?.isPrimaryUserID == true
+            if (currentPrimaryUid != null && !alreadyExplicit) {
+                primary = reissueSelfCert(primary, currentPrimaryUid, isPrimary = true, signer = ::signer)
+            }
         }
 
         val sub = PGPSignatureSubpacketGenerator()
