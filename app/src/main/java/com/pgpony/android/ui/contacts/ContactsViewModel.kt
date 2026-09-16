@@ -34,7 +34,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class ContactsUiState(
     val isAuthorized: Boolean = false,
@@ -137,8 +139,14 @@ class ContactsViewModel(
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true)
             try {
-                val allKeys = repo.getAllKeys()
-                val contacts = contactsService.buildContactsList(allKeys)
+                // ANR fix (Play vitals): buildContactsList queries the contacts
+                // provider and decodes a photo per contact (openContactPhotoInputStream,
+                // a Binder call), so it must run off the main thread. viewModelScope
+                // is Dispatchers.Main, so hop to IO for the key load and the build.
+                val contacts = withContext(Dispatchers.IO) {
+                    val allKeys = repo.getAllKeys()
+                    contactsService.buildContactsList(allKeys)
+                }
                 _state.value = _state.value.copy(
                     contactsList = contacts,
                     isLoading = false
