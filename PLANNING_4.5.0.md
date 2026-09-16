@@ -1276,3 +1276,33 @@ Priority: medium. Origin: CertainBot (#58, Sep 13 2026) - when a public key is s
 Implemented (Android). The import preview now shows an "Encrypt to this key" button when the shared key is public (no private material). It imports the key (tolerant of already-in-keyring) and sets a one-shot pendingEncryptToFingerprint signal; MainActivity consumes it, calls EncryptDecryptViewModel.preselectRecipient(fp) (a new one-shot preselect honored by loadKeys, overriding the default-recipient rule), and routes to the Encrypt screen with that key selected as recipient. Import-only path is unchanged.
 
 Delivery: on device, share a public key to PGPony -> "Encrypt to this key" -> lands on Encrypt with that key preselected as recipient; plain "Import" still just files it.
+
+## 30. nistp521 card decrypt fails: "ECDH point too large for short form TLV: 133" (#62, wreps8Owt)
+
+Priority: high. Origin: wreps8Owt (#62, Sep 15 2026) - PGPony fails to decrypt with a nistp521 secret key on a JavaCard running SmartPGP, while OpenKeychain succeeds. Error "Unexpected error talking to card: ECDH point too large for short form TLV: 133".
+
+Root cause, two bugs on the same card ECDH path, both from an X25519-only assumption:
+1. EcdhCipherData.cipherDoForPoint hardcoded short-form TLV length octets (size.toByte() guarded by require(< 0x80)) for the A6 { 7F49 { 86 point } } Cipher DO. A NIST P-521 uncompressed point is 0x04||X||Y = 133 bytes, over the 127-byte short-form limit, so the first require threw. Even past it, all three lengths exceed 127 and need long-form BER. P-256 (65) and P-384 (97) points stay under 127, which is why only P-521 failed; OpenKeychain encodes long-form correctly.
+2. CardPublicKeyDataDecryptorFactory fed Rfc6637.CURVE25519_OID into the RFC 6637 KDF param unconditionally. The KDF hashes the curve OID, so a P-521 key derives the wrong KEK and fails AES key-unwrap even after bug 1 is fixed.
+
+Fix (RC9): EcdhCipherData now BER-encodes every length (short form < 128, else 0x81 xx / 0x82 xx xx); X25519 output is byte-identical, P-521 goes long-form at all three levels. The factory now takes the OID content octets straight off the encryption key packet (ecdh.curveOID.encoded minus the 06/len prefix) instead of the hardcoded constant. Regression tests in CardDecryptPrimitivesTest: the 133-byte P-521 point asserts the exact long-form bytes (A6 81 8C 7F 49 81 88 86 81 85 ...), plus a 127-byte point-length boundary check. No nistp521 SmartPGP card on hand, so the end-to-end round-trip is the reporter's to confirm on RC9; the unit tests lock the byte encoding where the bug was.
+
+Delivery: on a nistp521 SmartPGP JavaCard, decrypt a message encrypted to the card key -> succeeds instead of "ECDH point too large for short form TLV: 133".
+
+## 31. Recipient picker cannot tell apart keys with the same name (Bart, email)
+
+Priority: medium. Origin: Bart (email, Sep 15 2026) - when several keys share a display name, the recipient list shows only the name and a short key code (shortFingerprint), so the rows look identical and he had to type the full email to land on the right key. Reporter is a Google Play user, so this ships in the 4.5.0 Play release, not an RC.
+
+Implemented (Android). In EncryptDecryptScreens the recipient picker row (RecipientPickerRow) and the decrypt key picker row (DecryptKeyPickerRow) now show "email · shortFingerprint" on the secondary line whenever the primary label is the name and an email exists, instead of the fingerprint alone. Same-name keys are now distinguishable at a glance. The selected-recipient chips are collision-aware: a chip shows "name (email)" only when another selected recipient shares the same display name, so the common single-name case stays compact. Search already matched on email, this only makes it visible. No crypto or data-model change. iOS gets the same treatment later.
+
+Delivery: on device, have two keys under the same name, open the recipient picker -> each row shows its email under the name; select both -> the chips show the email to tell them apart.
+
+## 32. Adding a second User ID silently makes it primary on upload (Bart, email)
+
+Priority: high. Origin: Bart (email, Sep 16 2026) - added a second email to his key without marking it primary; after uploading to a keyserver the new address showed as primary. Reporter is a Google Play user, so this ships in the 4.5.0 Play release.
+
+Root cause: a freshly generated key has one UID with no explicit IsPrimaryUserId subpacket (generation never flags a lone UID), so it is only implicitly primary (first UID). UserIdService.addUserId(makePrimary = false) issued the new UID's self-cert with a current timestamp and left the original unflagged. PGPony's own currentPrimaryUserId falls back to the first UID so the app UI still showed the original, but keyservers and gpg use "newest self-signature wins" when no UID is explicitly flagged, so the just-added address became the de-facto primary once uploaded. That is why it only appeared after upload.
+
+Fix (4.5.0). In addUserId, the makePrimary = false branch now pins the current primary: when no UID carries an explicit IsPrimaryUserId flag, it reissues the current primary UID's self-cert WITH the flag, so the explicit flag beats recency and the original stays primary everywhere. A UID that is already explicitly flagged is left untouched, and the makePrimary = true path is unchanged. Regression tests in UserIdAddPrimaryTest cover both directions (non-primary add keeps and pins the original; primary add moves the flag and clears the old). Note: this fixes new additions going forward; a key already uploaded with the wrong primary is corrected by using Set Primary on the right address and re-uploading.
+
+Delivery: on device, add a second User ID without marking it primary, export or upload the key -> the original address stays primary in gpg and on the keyserver.
