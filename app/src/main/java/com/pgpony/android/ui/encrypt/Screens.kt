@@ -966,12 +966,20 @@ private fun RecipientPickerCard(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
+            // Bart (email): when two selected recipients share a display name,
+            // a plain name chip cannot tell them apart. Show the email on the
+            // colliding ones only, so the common single-name case stays compact.
+            val selectedNameCounts = state.selectedRecipients
+                .groupingBy { it.userName.trim().lowercase() }
+                .eachCount()
             state.selectedRecipients.forEach { key ->
-                // Display label fallback chain: userName → userEmail →
-                // shortFingerprint. Computed as a local val to avoid
-                // any parser ambiguity from chained .ifBlank across
-                // lines inside the @Composable lambda.
+                val nameCollides = key.userName.isNotBlank() &&
+                    (selectedNameCounts[key.userName.trim().lowercase()] ?: 0) > 1
+                // Fallback chain: userName → userEmail → shortFingerprint,
+                // with the email appended when the name collides.
                 val chipLabel = when {
+                    nameCollides && key.userEmail.isNotBlank() ->
+                        "${key.userName} (${key.userEmail})"
                     key.userName.isNotBlank() -> key.userName
                     key.userEmail.isNotBlank() -> key.userEmail
                     else -> key.shortFingerprint
@@ -1248,8 +1256,14 @@ private fun RecipientPickerRow(
                 key.userName.ifBlank { key.userEmail },
                 style = MaterialTheme.typography.bodyMedium
             )
+            // Bart (email): show the email on the secondary line when the row's
+            // primary label is the name, so several keys under one name are told
+            // apart without typing the address. Falls back to the fingerprint
+            // alone when there is no name (email already leads) or no email.
             Text(
-                key.shortFingerprint,
+                if (key.userName.isNotBlank() && key.userEmail.isNotBlank())
+                    "${key.userEmail} · ${key.shortFingerprint}"
+                else key.shortFingerprint,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -4276,8 +4290,14 @@ private fun DecryptKeyPickerRow(
                 key.userName.ifBlank { key.userEmail },
                 style = MaterialTheme.typography.bodyMedium
             )
+            // Bart (email): show the email on the secondary line when the row's
+            // primary label is the name, so several keys under one name are told
+            // apart without typing the address. Falls back to the fingerprint
+            // alone when there is no name (email already leads) or no email.
             Text(
-                key.shortFingerprint,
+                if (key.userName.isNotBlank() && key.userEmail.isNotBlank())
+                    "${key.userEmail} · ${key.shortFingerprint}"
+                else key.shortFingerprint,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
