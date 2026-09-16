@@ -237,6 +237,7 @@
 
     <!-- ── Key Management section ───────────────────────────────────── -->
     <string name="settings_key_default_label">Default Key</string>
+    <string name="settings_key_default_choose">Choose a default key</string>
     <string name="settings_key_total_keys_label">Total Keys</string>
     <string name="settings_key_total_pairs_label">Key Pairs</string>
     <string name="settings_key_default_format">%1$s (%2$s)</string>
@@ -260,6 +261,8 @@
     <!-- #36 (Araaf): global destructive-action lock -->
     <string name="settings_protect_destructive_title">Protect destructive actions</string>
     <string name="settings_protect_destructive_subtitle">Require your device authentication before deleting a key, removing a subkey, or clearing all data. Confirmation dialogs still apply when this is off.</string>
+    <string name="settings_disable_destructive_title">Hide destructive actions</string>
+    <string name="settings_disable_destructive_subtitle">Hide delete key, remove subkey, remove User ID, and clear all data for people who never use them. Revoke stays available. Off by default.</string>
     <string name="settings_security_confirm_destructive_title">Confirm destructive-action lock change</string>
     <string name="settings_data_clear_key_list_header_format">Keys that will be permanently destroyed (%1$d):</string>
     <string name="settings_data_clear_type_word">DELETE</string>
@@ -846,6 +849,7 @@
     <string name="key_detail_subkey_remove_confirm_title">Remove this subkey?</string>
     <string name="key_detail_subkey_remove_confirm_body">This removes the subkey from your copy of the key only. Anyone who already has your public key keeps it and can still encrypt to it. To tell your correspondents, revoke it instead.</string>
     <string name="key_detail_subkey_remove_confirm_action">Remove</string>
+    <string name="key_detail_subkey_revoke_instead_button">Revoke this subkey instead</string>
     <string name="key_detail_subkey_last_enc_title">Last encryption subkey</string>
     <string name="key_detail_subkey_last_enc_body">This is the only encryption subkey on this key. Removing or revoking it leaves the key unable to receive encrypted messages. Continue anyway?</string>
     <string name="key_detail_subkey_last_enc_action">Continue</string>
@@ -1135,7 +1139,7 @@
     <string name="security_info_not_doing_bullet_4">Use third-party crypto libraries beyond Bouncy Castle</string>
     <string name="security_info_not_doing_bullet_5">Store passphrases. They\'re only ever used in memory</string>
 
-    <string name="security_info_footer">Full privacy policy and technical details: pgpony.norsehor.se/privacy</string>
+    <string name="security_info_footer">Full privacy policy and technical details: pgpony.app/privacy</string>
 
     <!-- ════════════════════════════════════════════════════════════════
          Onboarding — slide carousel (OnboardingSlide.kt)
@@ -1461,6 +1465,7 @@
          another app. Mirrors the iOS PGPonyAction extension.
     -->
     <string name="share_target_activity_label">PGPony Quick Action</string>
+    <string name="share_encrypt_text_label">Encrypt in PGPony</string>
     <string name="share_target_dismiss_cd">Dismiss</string>
 
     <!-- Root / classification screen -->

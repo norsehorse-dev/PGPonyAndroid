@@ -38,6 +38,7 @@ data class SettingsUiState(
     // #36 (Araaf): global switch — gate destructive actions (delete key,
     // remove subkey, clear all data) behind device auth. Default ON.
     val protectDestructiveActions: Boolean = true,
+    val destructiveActionsDisabled: Boolean = false,
     // Password Store (Phase C) — opt-in feature (default off); biometric gate default on
     val passStoreEnabled: Boolean = false,
     val requireBiometricForPassStore: Boolean = true,
@@ -119,7 +120,10 @@ data class SettingsUiState(
     /** Fingerprint of the pinned recipient (PINNED mode). */
     val defaultRecipientFingerprint: String? = null,
     /** Candidate recipient keys for the pinned picker (all non-revoked keys). */
-    val recipientKeyChoices: List<PGPKeyEntity> = emptyList()
+    val recipientKeyChoices: List<PGPKeyEntity> = emptyList(),
+    // #63 (CertainBot): signing key pairs eligible to be the default key, for the
+    // interactive Default Key picker in Settings > Key Management.
+    val signingKeyChoices: List<PGPKeyEntity> = emptyList()
 )
 
 class SettingsViewModel(
@@ -222,6 +226,9 @@ class SettingsViewModel(
             protectDestructiveActions = prefs.getBoolean(
                 com.pgpony.android.ui.keyring.DestructiveActionLock.PREF_KEY, true
             ),
+            destructiveActionsDisabled = prefs.getBoolean(
+                com.pgpony.android.ui.keyring.DestructiveActionsDisabled.PREF_KEY, false
+            ),
             passStoreEnabled = prefs.getBoolean("pass_store_enabled", false),
             requireBiometricForPassStore = prefs.getBoolean("biometric_pass_store", true),
             clipboardAutoClear = prefs.getBoolean("clipboard_auto_clear", true),
@@ -318,12 +325,22 @@ class SettingsViewModel(
                 // offers as a recipient).
                 recipientKeyChoices = all.filter {
                     !it.isRevoked && (!it.isCardBacked || it.armoredPublicKey != null)
-                }
+                },
+                signingKeyChoices = pairs.filter { !it.isRevoked }
             )
         }
     }
 
     // ── Phase A4: default / remembered recipient ────────────────────────
+
+    /** #63 (CertainBot): set the default signing key from Settings, then reload
+     *  so the picker and totals reflect it. */
+    fun setDefaultSigningKey(fingerprint: String) {
+        viewModelScope.launch {
+            repo.setDefaultKey(fingerprint)
+            loadKeyStats()
+        }
+    }
 
     fun setDefaultRecipientMode(mode: DefaultRecipientMode) {
         DefaultRecipientPrefs.setMode(prefs, mode)
@@ -401,6 +418,15 @@ class SettingsViewModel(
             com.pgpony.android.ui.keyring.DestructiveActionLock.PREF_KEY, enabled
         ).apply()
         _state.value = _state.value.copy(protectDestructiveActions = enabled)
+    }
+
+    /** #36 (Araaf, 4.5.1): opt-in switch (default off) that hides the data-loss
+     *  actions entirely. Distinct from the auth-gate toggle above. */
+    fun setDestructiveActionsDisabled(enabled: Boolean) {
+        prefs.edit().putBoolean(
+            com.pgpony.android.ui.keyring.DestructiveActionsDisabled.PREF_KEY, enabled
+        ).apply()
+        _state.value = _state.value.copy(destructiveActionsDisabled = enabled)
     }
 
     // ── Password Store (Phase C) ───────────────────────────────────────

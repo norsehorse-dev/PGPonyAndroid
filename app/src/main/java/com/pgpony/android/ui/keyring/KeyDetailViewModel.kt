@@ -1459,6 +1459,16 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
         _state.value = _state.value.copy(subkeyRemoveTarget = null)
     }
 
+    /** #36 (CertainBot): from the subkey-remove dialog, switch to revoke instead,
+     *  since a removed subkey cannot be revoked afterward. Closes the remove
+     *  dialog and opens the existing subkey revoke sheet. */
+    fun revokeSubkeyInstead() {
+        if (_state.value.subkeyRemoveInFlight) return
+        val target = _state.value.subkeyRemoveTarget ?: return
+        _state.value = _state.value.copy(subkeyRemoveTarget = null)
+        showSubkeyRevokeSheet(target)
+    }
+
     fun confirmSubkeyRemove() {
         val sub = _state.value.subkeyRemoveTarget ?: return
         doRemoveSubkey(sub.fingerprint, allowLast = false)

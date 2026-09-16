@@ -193,6 +193,12 @@ object IntentHandler {
     const val EXTRA_SIGNATURE_NAME = "com.pgpony.android.extra.SIGNATURE_NAME"
     const val FORWARD_SIZE_LIMIT = 256 * 1024
 
+    // 4.5.1 (#58): the "Encrypt in PGPony" share alias forwards its text here so
+    // it goes straight to the Encrypt screen as plaintext, skipping the Quick
+    // Action's classify (import key / decrypt / encrypt) step.
+    const val ACTION_ENCRYPT_TEXT = "com.pgpony.android.action.ENCRYPT_TEXT"
+    const val EXTRA_ENCRYPT_TEXT = "com.pgpony.android.extra.ENCRYPT_TEXT"
+
     // ── 3.1.0 Phase 1 (C3) — size-aware routing constants ──────────────
     //
     // TEXT_PREFILL_LIMIT: armored content at or under this size prefills
@@ -304,6 +310,10 @@ object IntentHandler {
                 } else {
                     IntentAction.None
                 }
+            }
+            ACTION_ENCRYPT_TEXT -> {
+                val text = intent.getStringExtra(EXTRA_ENCRYPT_TEXT)
+                if (!text.isNullOrBlank()) IntentAction.EncryptText(text) else IntentAction.None
             }
             else -> IntentAction.None
         }

@@ -70,12 +70,27 @@ that takes the shared text straight to the Encrypt screen as the plaintext to en
 import and not encrypt-to-key. A second ACTION_SEND text share target routed to encrypt with the
 shared text prefilled.
 
+Implemented. New activity-alias EncryptTextShareAlias (label "Encrypt in PGPony") of ShareTargetActivity
+with an ACTION_SEND text/plain filter, so the share sheet shows a second PGPony entry beside the Quick
+Action. Launched through the alias, ShareTargetActivity.forwardEncryptTextIfNeeded forwards the text to
+MainActivity as IntentHandler.ACTION_ENCRYPT_TEXT, which process() maps to the existing
+IntentAction.EncryptText, landing on Encrypt with the text prefilled and skipping classify. New string
+share_encrypt_text_label (joins the translation pass). Verify on device: share text from a notes app or
+browser, confirm both "Open in PGPony" and "Encrypt in PGPony" appear, and the latter opens Encrypt with
+the text ready.
+
 ## 5. Interactive Default Key setting (#63, CertainBot)
 
 Priority: low. Origin: CertainBot (#63).
 
 Settings > Keys & Servers > Key Management > Default Key is display-only. Make it a picker so the
 default signing key can be chosen from Settings, consistent with it living there.
+
+Implemented. The Default Key row in Settings > Key Management is now a dropdown picker (reusing the
+default-recipient pattern) over the signing key pairs, letting the user switch it via
+SettingsViewModel.setDefaultSigningKey -> repo.setDefaultKey. It shows even when no default is set yet
+("Choose a default key"). New string settings_key_default_choose (joins the translation pass). UI-only;
+verify on device.
 
 ## 6. Key Details encrypt/decrypt shortcut (#63, CertainBot)
 
@@ -95,6 +110,12 @@ same on the "Remove this subkey" dialog, since a removed subkey cannot be revoke
 either. Add a revoke-first affordance alongside Cancel/Remove, reusing the item-16 subkey revoke
 path.
 
+Implemented. The subkey-remove AlertDialog gains a "Revoke this subkey instead" button below the body
+(hidden when the subkey is already revoked, matching the key-delete revoke-instead). It calls a new
+KeyDetailViewModel.revokeSubkeyInstead which closes the remove dialog and opens the existing subkey
+revoke sheet (showSubkeyRevokeSheet). New string key_detail_subkey_revoke_instead_button (joins the
+translation pass). UI-only; verify on device.
+
 ## 8. Opt-in switch to fully disable destructive actions (#36, Araaf)
 
 Priority: low. Origin: Araaf (#36), resolved as a happy medium.
@@ -105,6 +126,16 @@ set in Settings and offered on onboarding, that when ON hides or disables delete
 subkey, remove User ID, and clear-all-data entirely until the user turns it back off. Off by
 default keeps the UI clean for everyone else; only opt-in users lose the actions. Distinct from
 the auth-gate toggle, which stays as is.
+
+Implemented (Settings + gating). New DestructiveActionsDisabled store (pref disable_destructive_actions,
+default off) in BiometricGate.kt, alongside DestructiveActionLock. A "Hide destructive actions" toggle in
+Settings > Security (guarded like the protect toggle) via SettingsViewModel.setDestructiveActionsDisabled.
+When on, the data-loss actions are hidden: the Delete key menu item (KeyDetailScreen), the Remove subkey
+menu item and the Remove User ID button (both already hide on a null callback, so the wrapper passes null
+when hideDestructiveActions), and the Clear all data button in Settings. Revoke and every non-loss action
+stay. New strings settings_disable_destructive_title/subtitle (join the translation pass). DEFERRED (small
+follow-on): the onboarding surface, mirroring item 25's armor-comment onboarding toggle. UI-only; verify on
+device: toggle on, confirm delete/remove/clear disappear and revoke remains, toggle off and they return.
 
 ## Decisions and replies owed (not code unless decided)
 
@@ -147,3 +178,11 @@ contract (documented BadParcelableException crash history), androidx.security.cr
 key managers guarding the stored keys), and Room. R8 breakage is runtime-only, so verification is a full
 release build plus on-device smoke test: keygen, encrypt, decrypt, sign, verify, import/export, the
 K-9 / Thunderbird provider path, QR, and card.
+
+## 11. Dead privacy policy link (user email)
+
+Priority: medium. Origin: user email. The privacy policy link pointed at pgpony.norsehor.se/privacy,
+which is dead after the site moved to pgpony.app. Replaced every pgpony.norsehor.se instance with
+pgpony.app: the clickable link in SettingsScreen (https://pgpony.app/privacy) and the security_info_footer
+string in the base plus all seven locales. Repo-wide grep confirms none remain. Left as-is (still correct):
+the pony.norsehor.se "whole family" link and the norsehorse@norsehor.se feedback email.

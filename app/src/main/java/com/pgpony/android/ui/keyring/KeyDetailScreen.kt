@@ -44,6 +44,8 @@ import com.pgpony.android.crypto.KeyExpirationService
 import com.pgpony.android.crypto.card.OpenPgpCardException
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -368,11 +370,13 @@ fun KeyDetailScreen(
                                     onClick = { menuOpen = false; dispatchAction(KeyDetailActionIds.REVOKE_KEY) }
                                 )
                             }
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.key_detail_action_delete_key), color = MaterialTheme.colorScheme.error) },
-                                leadingIcon = { Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error) },
-                                onClick = { menuOpen = false; dispatchAction(KeyDetailActionIds.DELETE_KEY) }
-                            )
+                            if (!DestructiveActionsDisabled.isEnabled(context)) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.key_detail_action_delete_key), color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = { Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                                    onClick = { menuOpen = false; dispatchAction(KeyDetailActionIds.DELETE_KEY) }
+                                )
+                            }
                         }
                     }
                 }
@@ -640,7 +644,23 @@ fun KeyDetailScreen(
         AlertDialog(
             onDismissRequest = { viewModel.dismissSubkeyRemove() },
             title = { Text(stringResource(R.string.key_detail_subkey_remove_confirm_title)) },
-            text = { Text(stringResource(R.string.key_detail_subkey_remove_confirm_body)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.key_detail_subkey_remove_confirm_body))
+                    if (!subkeyRemoveTarget.isRevoked) {
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(
+                            onClick = { viewModel.revokeSubkeyInstead() },
+                            enabled = !state.subkeyRemoveInFlight
+                        ) {
+                            Text(
+                                stringResource(R.string.key_detail_subkey_revoke_instead_button),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1345,6 +1365,7 @@ private fun LoadedBody(
     onStrictFallbacksChange: (Boolean) -> Unit
 ) {
     val key = state.key ?: return  // Defensive — caller already filtered
+    val hideDestructiveActions = DestructiveActionsDisabled.isEnabled(androidx.compose.ui.platform.LocalContext.current)
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1378,7 +1399,7 @@ private fun LoadedBody(
                     canEdit = canEditUserIds,
                     onMakePrimary = onMakePrimaryUserId,
                     onRevoke = onRevokeUserId,
-                    onRemove = onRemoveUserId,
+                    onRemove = if (hideDestructiveActions) null else onRemoveUserId,
                     onAddUserId = onAddUserId,
                     onCopyEmail = onCopyEmail
                 )
@@ -1418,7 +1439,7 @@ private fun LoadedBody(
                     onAddSubkey = onAddSubkey,
                     canManageSubkeys = canAddSubkey,
                     onRevokeSubkey = onRevokeSubkey,
-                    onRemoveSubkey = onRemoveSubkey
+                    onRemoveSubkey = if (hideDestructiveActions) null else onRemoveSubkey
                 )
             }
         }

@@ -345,6 +345,20 @@ fun SettingsScreen(
                     ) { viewModel.setProtectDestructiveActions(target) }
                 }
             )
+            // ── #36 (Araaf, 4.5.1): opt-in hide of destructive actions ──
+            SettingsToggle(
+                title = stringResource(R.string.settings_disable_destructive_title),
+                subtitle = stringResource(R.string.settings_disable_destructive_subtitle),
+                icon = Icons.Filled.Shield,
+                iconTint = Color(0xFF8B5CF6),
+                checked = state.destructiveActionsDisabled,
+                onCheckedChange = { target ->
+                    guardSecurityChange(
+                        context.getString(R.string.settings_security_confirm_destructive_title),
+                        context.getString(if (target) R.string.settings_security_confirm_enable_subtitle else R.string.settings_security_confirm_disable_subtitle)
+                    ) { viewModel.setDestructiveActionsDisabled(target) }
+                }
+            )
             // ── 3.1.0 Phase 8 (E5 F-item): sign-by-default ──────────────
             SignByDefaultToggle()
             // ── 3.1.0 Phase 7 (B1/B2/B3): Remember Card PIN ─────────────
@@ -680,13 +694,41 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
             // ── Key Management Section ─────────────────────────────────
             SectionHeader(stringResource(R.string.settings_section_key_management))
-            state.defaultKeyName?.let { name ->
-                SettingsRow(
-                    title = stringResource(R.string.settings_key_default_label),
-                    value = stringResource(R.string.settings_key_default_format, name, state.defaultKeyFingerprint ?: ""),
-                    icon = Icons.Filled.Star,
-                    iconTint = Color(0xFFF59E0B)
+            // #63 (CertainBot): the Default Key is pickable from here, not just
+            // shown. Reuses the same dropdown pattern as the default recipient.
+            if (state.signingKeyChoices.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.settings_key_default_label),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(start = 16.dp, top = 8.dp)
                 )
+                var defaultKeyMenuExpanded by remember { mutableStateOf(false) }
+                Box(modifier = Modifier.padding(start = 16.dp, top = 4.dp, end = 16.dp)) {
+                    OutlinedButton(onClick = { defaultKeyMenuExpanded = true }) {
+                        Text(
+                            text = state.defaultKeyName
+                                ?: stringResource(R.string.settings_key_default_choose),
+                            maxLines = 1,
+                        )
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                    }
+                    DropdownMenu(
+                        expanded = defaultKeyMenuExpanded,
+                        onDismissRequest = { defaultKeyMenuExpanded = false }
+                    ) {
+                        state.signingKeyChoices.forEach { key ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(key.userName.ifBlank { key.userEmail }.ifBlank { key.userID })
+                                },
+                                onClick = {
+                                    viewModel.setDefaultSigningKey(key.fingerprint)
+                                    defaultKeyMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
             SettingsRow(
                 title = stringResource(R.string.settings_key_total_keys_label),
@@ -842,13 +884,15 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
             // ── Data Section ───────────────────────────────────────────
             SectionHeader(stringResource(R.string.settings_section_data))
-            TextButton(
-                onClick = { viewModel.showClearConfirm() },
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-            ) {
-                Icon(Icons.Filled.Delete, null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.settings_data_clear_all_button))
+            if (!state.destructiveActionsDisabled) {
+                TextButton(
+                    onClick = { viewModel.showClearConfirm() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Icon(Icons.Filled.Delete, null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.settings_data_clear_all_button))
+                }
             }
             Spacer(modifier = Modifier.height(16.dp))
 

@@ -476,5 +476,22 @@
                 android:name="autoStoreLocales"
                 android:value="true" />
         </service>
+        <!-- 4.5.1 (#58, CertainBot): a dedicated "Encrypt in PGPony" share
+             entry that takes shared text straight to the Encrypt screen as
+             plaintext, distinct from the Quick Action which classifies the text
+             (import a key, decrypt a message). An alias of ShareTargetActivity
+             so it reuses the same handling; the activity forwards it as
+             IntentAction.EncryptText. -->
+        <activity-alias
+            android:name=".ui.share.EncryptTextShareAlias"
+            android:targetActivity=".ui.share.ShareTargetActivity"
+            android:exported="true"
+            android:label="@string/share_encrypt_text_label">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
     </application>
 </manifest>

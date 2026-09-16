@@ -112,9 +112,28 @@ class ShareTargetActivity : AppCompatActivity(), DocumentCreatorHost {
         return true
     }
 
+    /** 4.5.1 (#58): the "Encrypt in PGPony" share entry is an alias of this
+     *  activity. Launched through it, forward the shared text straight to the
+     *  Encrypt screen as plaintext instead of classifying it. */
+    private fun forwardEncryptTextIfNeeded(intent: android.content.Intent): Boolean {
+        if (componentName.className != ENCRYPT_TEXT_ALIAS) return false
+        if (intent.action != android.content.Intent.ACTION_SEND || intent.type != "text/plain") return false
+        val text = intent.getStringExtra(android.content.Intent.EXTRA_TEXT)
+        if (text.isNullOrBlank()) return false
+        val forward = android.content.Intent(this, com.pgpony.android.MainActivity::class.java).apply {
+            action = IntentHandler.ACTION_ENCRYPT_TEXT
+            putExtra(IntentHandler.EXTRA_ENCRYPT_TEXT, text)
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        startActivity(forward)
+        finish()
+        return true
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        if (forwardEncryptTextIfNeeded(intent)) return
         val content = IntentHandler.classifyShareIntent(intent, contentResolver)
         // 3.1.0 Phase 1 Fix3 — detached signatures go to the main app's
         // verify sheet; skip rendering entirely when forwarded.
@@ -142,6 +161,7 @@ class ShareTargetActivity : AppCompatActivity(), DocumentCreatorHost {
         // and reinitialize. The user is opting into a new task, so
         // any in-flight state from a prior share is discarded.
         setIntent(intent)
+        if (forwardEncryptTextIfNeeded(intent)) return
         val content = IntentHandler.classifyShareIntent(intent, contentResolver)
         // 3.1.0 Phase 1 Fix3 — same forward as onCreate.
         if (forwardDetachedSignatureIfNeeded(content)) return
@@ -240,5 +260,6 @@ class ShareTargetActivity : AppCompatActivity(), DocumentCreatorHost {
     private companion object {
         /** Small enough for FragmentActivity's 0xFFFF0000 mask. */
         const val REQ_DOCUMENT_CREATOR = 1003
+        const val ENCRYPT_TEXT_ALIAS = "com.pgpony.android.ui.share.EncryptTextShareAlias"
     }
 }

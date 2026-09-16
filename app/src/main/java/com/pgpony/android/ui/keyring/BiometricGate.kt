@@ -192,3 +192,19 @@ object DestructiveActionLock {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getBoolean(PREF_KEY, true)
 }
+
+/**
+ * #36 (Araaf, 4.5.1): an opt-in switch, OFF by default, that hides the data-loss
+ * actions (delete key, remove subkey, remove User ID, clear all data) for users
+ * who never want them. Distinct from DestructiveActionLock, which keeps those
+ * actions available but gates them behind device auth.
+ */
+object DestructiveActionsDisabled {
+    const val PREF_KEY = "disable_destructive_actions"
+    private const val PREFS_NAME = "pgpony_prefs"
+
+    /** Default OFF: the actions stay available unless the user opts in to hiding them. */
+    fun isEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(PREF_KEY, false)
+}
