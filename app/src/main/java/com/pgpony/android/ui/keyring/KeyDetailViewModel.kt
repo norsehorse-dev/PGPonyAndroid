@@ -74,7 +74,7 @@ data class UserIdActionRequest(
     val userId: String,
     val kind: Kind
 ) {
-    enum class Kind { REVOKE, MAKE_PRIMARY }
+    enum class Kind { REVOKE, MAKE_PRIMARY, REMOVE }
 }
 
 /**
@@ -1682,6 +1682,9 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                     )
                     UserIdActionRequest.Kind.MAKE_PRIMARY -> repo.setPrimaryUserId(
                         key.fingerprint, request.userId, passphrase
+                    )
+                    UserIdActionRequest.Kind.REMOVE -> repo.removeUserId(
+                        key.fingerprint, request.userId
                     )
                 }
                 val reloaded = repo.getByFingerprint(key.fingerprint)

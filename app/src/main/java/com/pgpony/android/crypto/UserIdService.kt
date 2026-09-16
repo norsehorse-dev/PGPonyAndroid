@@ -235,6 +235,31 @@ class UserIdService private constructor() {
     }
 
     /**
+     * Remove [userId] from the key locally: strip the User ID and its
+     * self-certifications from the ring. Local only, like a subkey remove:
+     * it tells no correspondent, and anyone who already holds the public key
+     * keeps the UID. Use revokeUserId to retire a UID that has been shared.
+     * Blocks removing the last User ID, which would leave the key with no
+     * identity. Structural only, so no passphrase is needed.
+     */
+    fun removeUserId(
+        secretRing: PGPSecretKeyRing,
+        publicRing: PGPPublicKeyRing,
+        userId: String
+    ): UpdatedRings {
+        val primary = publicRing.publicKey
+        if (primary.userIDs.asSequence().none { it == userId }) {
+            throw UserIdError.NotFound("This key has no such User ID")
+        }
+        if (primary.userIDs.asSequence().count() <= 1) {
+            throw UserIdError.UnsupportedKey("Cannot remove the only User ID on this key")
+        }
+        val stripped = PGPPublicKey.removeCertification(primary, userId)
+            ?: throw UserIdError.Failed("Failed to remove the User ID")
+        return reassemble(secretRing, publicRing, stripped)
+    }
+
+    /**
      * Make [userId] the primary identity: reissue its self-cert with
      * IsPrimaryUserId set, and reissue the self-cert of whichever UID
      * currently carries that flag (if any) without it. A no-op flag

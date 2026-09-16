@@ -788,6 +788,7 @@
     <!-- ── 4.2.0 RC3 workstream I (#29): add/revoke/promote User IDs ── -->
     <string name="key_detail_userids_make_primary">Make Primary</string>
     <string name="key_detail_userids_revoke">Revoke</string>
+    <string name="key_detail_userids_remove">Remove</string>
     <string name="key_detail_userids_add_action">Add User ID…</string>
     <string name="key_detail_add_userid_sheet_title">Add User ID</string>
     <string name="key_detail_add_userid_sheet_subtitle">New identity for %1$s</string>
@@ -811,11 +812,14 @@
     <string name="key_detail_notations_failed">Could not update notations</string>
     <string name="key_detail_add_userid_failed">Could not add the User ID. Please try again.</string>
     <string name="key_detail_userid_action_sheet_title_revoke">Revoke User ID</string>
+    <string name="key_detail_userid_action_sheet_title_remove">Remove User ID</string>
     <string name="key_detail_userid_action_sheet_title_make_primary">Make Primary User ID</string>
     <string name="key_detail_userid_action_sheet_subtitle_revoke">%1$s will be marked revoked. This cannot be undone.</string>
+    <string name="key_detail_userid_action_sheet_subtitle_remove">Removes %1$s from your copy of this key and keeps it removed here. Key servers keep it, so revoke it instead to retire it for others.</string>
     <string name="key_detail_userid_action_sheet_subtitle_make_primary">%1$s will become the primary identity on this key.</string>
     <string name="key_detail_userid_action_passphrase_label">Passphrase</string>
     <string name="key_detail_userid_action_apply_revoke">Revoke</string>
+    <string name="key_detail_userid_action_apply_remove">Remove</string>
     <string name="key_detail_userid_action_apply_make_primary">Make Primary</string>
     <string name="key_detail_userid_action_failed">Could not complete this action. Please try again.</string>
 

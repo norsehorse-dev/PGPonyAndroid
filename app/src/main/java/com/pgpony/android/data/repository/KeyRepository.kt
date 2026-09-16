@@ -1383,6 +1383,7 @@ class KeyRepository(
     /** Permanently destroy a binned key: secret material, related rows, and
      *  the DB row. Mirrors the old hard-delete cleanup. */
     suspend fun purgeKey(entity: PGPKeyEntity) {
+        com.pgpony.android.data.RemovedUserIdStore.clear(entity.fingerprint)
         store.deleteKeys(entity.fingerprint)
         fallbackDao?.deleteAllReferencing(entity.fingerprint)
         signingDefaultsDao?.deleteFor(entity.fingerprint)
@@ -2119,6 +2120,7 @@ class KeyRepository(
                 "This key lives on a hardware key — User IDs can't be edited on a card-backed key from here"
             )
         }
+        com.pgpony.android.data.RemovedUserIdStore.forget(fingerprint, userId)
         if (entity.algorithm.isCompositeSign) {
             // #55 item 4: composite ML-DSA keys are not BouncyCastle rings, so
             // add the User ID with the composite signer and re-store the raw
@@ -2216,6 +2218,64 @@ class KeyRepository(
         persistUserIdChange(entity, updated, newPrimaryUserId = null)
     }
 
+    /** Remove [userId] locally from a key pair: strip the User ID packet and its
+     *  self-certification. Structural only, no signing, so no passphrase. If the
+     *  removed UID was the key's cached identity, the cached name/email move to
+     *  the first remaining UID. See UserIdService.removeUserId /
+     *  CompositePrimaryKeyGen.removeUserId for the last-UID guard. */
+    suspend fun removeUserId(fingerprint: String, userId: String) {
+        val entity = dao.getByFingerprint(fingerprint)
+            ?: throw KeyRepoError.NotFound(fingerprint)
+        if (!entity.isKeyPair) {
+            throw UserIdService.UserIdError.UnsupportedKey(
+                "Removing a User ID is only supported on your own key pairs"
+            )
+        }
+        if (entity.isCardBacked) {
+            throw UserIdService.UserIdError.UnsupportedKey(
+                "This key lives on a hardware key, so User IDs cannot be edited on a card-backed key from here"
+            )
+        }
+        val removedWasCached = userId == entity.userID
+        if (entity.algorithm.isCompositeSign) {
+            val raw = store.loadPrivateKey(fingerprint)
+                ?: throw UserIdService.UserIdError.UnsupportedKey(
+                    "Composite secret key could not be loaded for $fingerprint"
+                )
+            val updated = com.pgpony.android.crypto.pqc.CompositePrimaryKeyGen.removeUserId(raw, userId)
+            val publicRing = CompositeKeyFacade.publicRingOf(updated)
+            val armoredPublic = com.pgpony.android.crypto.pqc.CompositeSigPacket.armor(
+                "-----BEGIN PGP PUBLIC KEY BLOCK-----",
+                "-----END PGP PUBLIC KEY BLOCK-----",
+                publicRing
+            )
+            store.storePrivateKey(fingerprint, updated)
+            store.storePublicKey(fingerprint, publicRing)
+            val newPrimary = if (removedWasCached)
+                CompositeKeyFacade.parse(updated).userIds.firstOrNull() else null
+            val parsed = newPrimary?.let { PGPKeyEntity.parseUserID(it) }
+            dao.update(
+                entity.copy(
+                    armoredPublicKey = armoredPublic,
+                    userID = newPrimary ?: entity.userID,
+                    userName = parsed?.first ?: entity.userName,
+                    userEmail = parsed?.second ?: entity.userEmail
+                )
+            )
+            com.pgpony.android.data.RemovedUserIdStore.addRemoved(fingerprint, userId)
+            return
+        }
+        val secRing = loadSecretKeyRing(fingerprint)
+            ?: throw UserIdService.UserIdError.UnsupportedKey("Secret key ring could not be loaded for $fingerprint")
+        val pubRing = loadPublicKeyRing(fingerprint)
+            ?: throw UserIdService.UserIdError.UnsupportedKey("Public key ring could not be loaded for $fingerprint")
+        val updated = userIdService.removeUserId(secRing, pubRing, userId)
+        val newPrimary = if (removedWasCached)
+            updated.publicRing.publicKey.userIDs.asSequence().firstOrNull() else null
+        persistUserIdChange(entity, updated, newPrimaryUserId = newPrimary)
+        com.pgpony.android.data.RemovedUserIdStore.addRemoved(fingerprint, userId)
+    }
+
     /** Make [userId] the primary identity on a software key pair. */
     suspend fun setPrimaryUserId(
         fingerprint: String,
@@ -2278,10 +2338,30 @@ class KeyRepository(
         fetchedArmored: String?,
         fetchedExpiresAtMs: Long?
     ): Pair<PGPKeyEntity, Boolean> {
+        // Tombstone (4.5.1): a User ID removed locally must not creep back when
+        // the append-only key server hands it to us again on refresh. Strip any
+        // tombstoned UIDs from the fetched ring before it is merged, keeping at
+        // least one. Classical only: composite keys do not round-trip the
+        // BouncyCastle refresh path.
+        var ring = fetchedRing
+        var armored = fetchedArmored
+        val tombstoned = com.pgpony.android.data.RemovedUserIdStore.removed(existing.fingerprint)
+        if (tombstoned.isNotEmpty()) {
+            var primary = ring.publicKey
+            val present = primary.userIDs.asSequence().toList()
+            val toStrip = present.filter { it in tombstoned }
+            if (toStrip.isNotEmpty() && present.size - toStrip.size >= 1) {
+                for (uid in toStrip) {
+                    primary = org.bouncycastle.openpgp.PGPPublicKey.removeCertification(primary, uid) ?: primary
+                }
+                ring = org.bouncycastle.openpgp.PGPPublicKeyRing.insertPublicKey(ring, primary)
+                armored = crypto.exportArmoredPublicKey(ring)
+            }
+        }
         val (row, resolution) = dedup.resolveDuplicate(
             existing = existing,
-            newPublicRing = fetchedRing,
-            newArmoredPublicKey = fetchedArmored,
+            newPublicRing = ring,
+            newArmoredPublicKey = armored,
             newExpiresAtMs = fetchedExpiresAtMs
         )
         return row to (resolution == KeyDeduplicationService.DuplicateResolution.MERGED_NEW_MATERIAL)

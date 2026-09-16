@@ -404,6 +404,7 @@ fun KeyDetailScreen(
                 onAddUserId = { viewModel.showAddUserIdSheet() },
                 onMakePrimaryUserId = { uid -> viewModel.requestUserIdAction(uid, UserIdActionRequest.Kind.MAKE_PRIMARY) },
                 onRevokeUserId = { uid -> viewModel.requestUserIdAction(uid, UserIdActionRequest.Kind.REVOKE) },
+                onRemoveUserId = { uid -> viewModel.requestUserIdAction(uid, UserIdActionRequest.Kind.REMOVE) },
                 onEditNotations = { viewModel.showNotationsSheet() },
                 // RC3 §N (#34)
                 onToggleFallback = { fp -> viewModel.toggleFallback(fp) },
@@ -1335,6 +1336,7 @@ private fun LoadedBody(
     onAddUserId: () -> Unit,
     onMakePrimaryUserId: (String) -> Unit,
     onRevokeUserId: (String) -> Unit,
+    onRemoveUserId: (String) -> Unit,
     onEditNotations: () -> Unit,
     // RC3 §N (#34)
     onToggleFallback: (String) -> Unit,
@@ -1376,6 +1378,7 @@ private fun LoadedBody(
                     canEdit = canEditUserIds,
                     onMakePrimary = onMakePrimaryUserId,
                     onRevoke = onRevokeUserId,
+                    onRemove = onRemoveUserId,
                     onAddUserId = onAddUserId,
                     onCopyEmail = onCopyEmail
                 )

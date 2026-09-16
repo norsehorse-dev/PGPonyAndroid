@@ -850,6 +850,7 @@ fun UserIdsSection(
     canEdit: Boolean = false,
     onMakePrimary: ((String) -> Unit)? = null,
     onRevoke: ((String) -> Unit)? = null,
+    onRemove: ((String) -> Unit)? = null,
     onAddUserId: (() -> Unit)? = null,
     onCopyEmail: ((String) -> Unit)? = null
 ) {
@@ -911,6 +912,15 @@ fun UserIdsSection(
                             TextButton(onClick = { onRevoke(uid.raw) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
                                 Text(
                                     stringResource(R.string.key_detail_userids_revoke),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                        if (onRemove != null && userIds.size > 1) {
+                            TextButton(onClick = { onRemove(uid.raw) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                                Text(
+                                    stringResource(R.string.key_detail_userids_remove),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.error
                                 )

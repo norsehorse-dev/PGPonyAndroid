@@ -400,6 +400,41 @@ object CompositePrimaryKeyGen {
         }.toByteArray()
     }
 
+    /**
+     * 4.5.1: remove a User ID from a composite ML-DSA primary (local delete,
+     * no revocation). Strips the matching User ID packet and every signature
+     * bound to it. Purely structural: no signing, the protected primary is
+     * untouched, and no passphrase is needed. Refuses the last User ID; throws
+     * if the User ID is absent.
+     */
+    fun removeUserId(ring: ByteArray, userId: String): ByteArray {
+        val target = userId.toByteArray(Charsets.UTF_8)
+        val spans = packetSpans(ring)
+        if (spans.count { it.tag == TAG_USERID } <= 1) {
+            throw IllegalStateException("Cannot remove the only User ID on this key")
+        }
+        var removeStart = -1
+        var removeEnd = -1
+        for ((idx, span) in spans.withIndex()) {
+            if (span.tag != TAG_USERID) continue
+            if (!span.body.contentEquals(target)) continue
+            removeStart = span.start
+            var j = idx + 1
+            var end = span.end
+            while (j < spans.size && spans[j].tag == TAG_SIGNATURE) {
+                end = spans[j].end
+                j++
+            }
+            removeEnd = end
+            break
+        }
+        if (removeStart < 0) throw IllegalArgumentException("User ID not found in this key")
+        return ByteArrayOutputStream().apply {
+            write(ring, 0, removeStart)
+            write(ring, removeEnd, ring.size - removeEnd)
+        }.toByteArray()
+    }
+
     /** Byte offset of the first subkey packet (tag 7 secret / 14 public), where
      *  a new User ID and its certification must be inserted; ring end if none. */
     private fun firstSubkeyOffset(ring: ByteArray): Int {

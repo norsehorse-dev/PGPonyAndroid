@@ -37,14 +37,17 @@ fun UserIdActionSheet(
     val title = when (request.kind) {
         UserIdActionRequest.Kind.REVOKE -> stringResource(R.string.key_detail_userid_action_sheet_title_revoke)
         UserIdActionRequest.Kind.MAKE_PRIMARY -> stringResource(R.string.key_detail_userid_action_sheet_title_make_primary)
+        UserIdActionRequest.Kind.REMOVE -> stringResource(R.string.key_detail_userid_action_sheet_title_remove)
     }
     val subtitle = when (request.kind) {
         UserIdActionRequest.Kind.REVOKE -> stringResource(R.string.key_detail_userid_action_sheet_subtitle_revoke, displayName)
         UserIdActionRequest.Kind.MAKE_PRIMARY -> stringResource(R.string.key_detail_userid_action_sheet_subtitle_make_primary, displayName)
+        UserIdActionRequest.Kind.REMOVE -> stringResource(R.string.key_detail_userid_action_sheet_subtitle_remove, displayName)
     }
     val applyLabel = when (request.kind) {
         UserIdActionRequest.Kind.REVOKE -> stringResource(R.string.key_detail_userid_action_apply_revoke)
         UserIdActionRequest.Kind.MAKE_PRIMARY -> stringResource(R.string.key_detail_userid_action_apply_make_primary)
+        UserIdActionRequest.Kind.REMOVE -> stringResource(R.string.key_detail_userid_action_apply_remove)
     }
 
     ModalBottomSheet(
@@ -68,16 +71,19 @@ fun UserIdActionSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            OutlinedTextField(
-                value = passphrase,
-                onValueChange = { passphrase = it },
-                label = { Text(stringResource(R.string.key_detail_userid_action_passphrase_label)) },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
-                singleLine = true,
-                enabled = !isProcessing,
-                modifier = Modifier.fillMaxWidth()
-            )
+            // Remove is structural (no signing), so it needs no passphrase.
+            if (request.kind != UserIdActionRequest.Kind.REMOVE) {
+                OutlinedTextField(
+                    value = passphrase,
+                    onValueChange = { passphrase = it },
+                    label = { Text(stringResource(R.string.key_detail_userid_action_passphrase_label)) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
+                    singleLine = true,
+                    enabled = !isProcessing,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             if (errorMessage != null) {
                 Text(
