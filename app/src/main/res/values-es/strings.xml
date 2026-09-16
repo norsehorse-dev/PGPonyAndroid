@@ -851,7 +851,7 @@ Toda la criptografía la realiza Bouncy Castle 1.85, una biblioteca estándar de
     <string name="security_info_not_doing_bullet_4">Usar bibliotecas de cifrado de terceros más allá de Bouncy Castle</string>
     <string name="security_info_not_doing_bullet_5">Almacenar frases de contraseña: solo se usan en memoria</string>
 
-    <string name="security_info_footer">Política de privacidad completa y detalles técnicos: pgpony.norsehor.se/privacy</string>
+    <string name="security_info_footer">Política de privacidad completa y detalles técnicos: pgpony.app/privacy</string>
 
     <!-- ════════════════════════════════════════════════════════════════
          Onboarding — slide carousel (OnboardingSlide.kt)

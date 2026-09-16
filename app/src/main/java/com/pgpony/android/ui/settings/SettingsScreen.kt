@@ -902,7 +902,7 @@ fun SettingsScreen(
                         val tab = CustomTabsIntent.Builder().build()
                         tab.launchUrl(
                             context,
-                            android.net.Uri.parse("https://pgpony.norsehor.se/privacy")
+                            android.net.Uri.parse("https://pgpony.app/privacy")
                         )
                     } catch (e: Exception) {
                         viewModel.showError(context.getString(R.string.settings_support_browser_error))

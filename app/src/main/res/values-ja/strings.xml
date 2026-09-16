@@ -851,7 +851,7 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="security_info_not_doing_bullet_4">Bouncy Castle 以外のサードパーティ暗号ライブラリの使用</string>
     <string name="security_info_not_doing_bullet_5">パスフレーズは保存しません（メモリ内でのみ使用されます）</string>
 
-    <string name="security_info_footer">プライバシーポリシーと技術的な詳細: pgpony.norsehor.se/privacy</string>
+    <string name="security_info_footer">プライバシーポリシーと技術的な詳細: pgpony.app/privacy</string>
 
     <!-- ════════════════════════════════════════════════════════════════
          Onboarding — slide carousel (OnboardingSlide.kt)

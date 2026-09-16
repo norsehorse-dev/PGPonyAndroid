@@ -1066,7 +1066,7 @@
     <string name="security_info_not_doing_bullet_4">Use third-party crypto libraries beyond Bouncy Castle</string>
     <string name="security_info_not_doing_bullet_5">Store passphrases. They\'re only ever used in memory</string>
 
-    <string name="security_info_footer">Full privacy policy and technical details: pgpony.norsehor.se/privacy</string>
+    <string name="security_info_footer">Full privacy policy and technical details: pgpony.app/privacy</string>
 
     <!-- ════════════════════════════════════════════════════════════════
          Onboarding — slide carousel (OnboardingSlide.kt)

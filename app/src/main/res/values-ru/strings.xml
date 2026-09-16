@@ -1058,7 +1058,7 @@
     <string name="security_info_not_doing_bullet_4">Использовать сторонние криптобиблиотеки помимо Bouncy Castle</string>
     <string name="security_info_not_doing_bullet_5">Хранить парольные фразы — они используются только в памяти</string>
 
-    <string name="security_info_footer">Полная политика конфиденциальности и технические детали: pgpony.norsehor.se/privacy</string>
+    <string name="security_info_footer">Полная политика конфиденциальности и технические детали: pgpony.app/privacy</string>
 
     <!-- ════════════════════════════════════════════════════════════════
          Onboarding — slide carousel (OnboardingSlide.kt)

@@ -851,7 +851,7 @@ Die gesamte Kryptografie wird von Bouncy Castle 1.85 ausgeführt, einer in Unter
     <string name="security_info_not_doing_bullet_4">Verwendung von Drittanbieter-Krypto-Bibliotheken neben Bouncy Castle</string>
     <string name="security_info_not_doing_bullet_5">Passphrasen speichern – sie werden nur im Arbeitsspeicher verwendet</string>
 
-    <string name="security_info_footer">Vollständige Datenschutzerklärung und technische Details: pgpony.norsehor.se/privacy</string>
+    <string name="security_info_footer">Vollständige Datenschutzerklärung und technische Details: pgpony.app/privacy</string>
 
     <!-- ════════════════════════════════════════════════════════════════
          Onboarding — slide carousel (OnboardingSlide.kt)
