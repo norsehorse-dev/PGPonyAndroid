@@ -95,27 +95,3 @@ explicit confirm. Verified on device with a raw .asc URL and with a key embedded
 Android first per the new-feature procedure. iOS mirrors each item once the Android version is verified,
 tracked separately. This document is seeded from the forum.dark.vegas thread; add further items here as they
 come in before the 4.6.0 scope is locked.
-
-## 3. Global destructive-action lock (#36, AraafRoyall)
-
-Origin: AraafRoyall (#36, Sep 12 2026) - "a global option to Block Remove subkey, keys, keyring, clear data etc. Like a Global Switch."
-
-Implemented (Android). New Settings > Security toggle "Protect destructive actions" (default ON), backed by DestructiveActionLock (pref key protect_destructive_actions in pgpony_prefs, added beside BiometricGate). When ON, delete key, remove subkey, and clear-all-data run the device-auth BiometricGate first; when OFF, those actions keep their confirm dialogs / two-step gauntlet but skip the biometric prompt. Wired by having deleteWithOptionalBiometricGate (key delete + subkey remove) and the SettingsScreen clear-all gate both consult DestructiveActionLock.isEnabled(). Default ON preserves the existing always-gate-when-capable behavior and newly brings the clear-all biometric layer under one user-visible switch. Interpretation note: read as "require auth for destructive actions", not a hard block, since a device with no screen lock has nothing to prompt with.
-
-Delivery: on device, toggle off -> deleting a key / removing a subkey / clearing data no longer prompts for biometric (dialogs still confirm); toggle on -> each prompts again.
-
-## 4. Revoke instead of delete, from the delete sheet (#36, CertainBot)
-
-Origin: CertainBot (#36, Sep 13 2026) - a revoke / "revoke and delete" button in the delete dialog, because a revocation certificate can't be made after a key is deleted, and the button makes the user think twice.
-
-Implemented (Android). The key-pair DeleteKeySheet gains a "Revoke this key instead" button (with a one-line note that a revocation cert can't be created after deletion). It closes the delete sheet and opens the existing RevokeKeySheet / showRevokeSheet flow. Hidden for an already-revoked key. Public-only keys keep their lightweight delete dialog (they are re-importable; nothing to revoke). Reuses the item-16 revoke machinery, no new crypto.
-
-Delivery: on device, open Delete on a key pair -> "Revoke this key instead" -> the revoke sheet opens and revoking produces the cert; the key is not deleted.
-
-## 5. Encrypt to a shared public key, not just import (#58, CertainBot)
-
-Origin: CertainBot (#58, Sep 13 2026) - when a public key is shared into PGPony, only "Import" is offered; there should also be an option to encrypt to it, since that can be the purpose of sharing.
-
-Implemented (Android). The import preview now shows an "Encrypt to this key" button when the shared key is public (no private material). It imports the key (tolerant of already-in-keyring) and sets a one-shot pendingEncryptToFingerprint signal; MainActivity consumes it, calls EncryptDecryptViewModel.preselectRecipient(fp) (a new one-shot preselect honored by loadKeys, overriding the default-recipient rule), and routes to the Encrypt screen with that key selected as recipient. Import-only path is unchanged.
-
-Delivery: on device, share a public key to PGPony -> "Encrypt to this key" -> lands on Encrypt with that key preselected as recipient; plain "Import" still just files it.

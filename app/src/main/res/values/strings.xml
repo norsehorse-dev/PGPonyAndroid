@@ -238,6 +238,8 @@
     <!-- ── Key Management section ───────────────────────────────────── -->
     <string name="settings_key_default_label">Default Key</string>
     <string name="settings_key_default_choose">Choose a default key</string>
+    <string name="kd_avatar_hint_encrypt">Tip: tap the avatar to encrypt to this key</string>
+    <string name="kd_avatar_hint_decrypt">Tip: tap the avatar to decrypt with this key</string>
     <string name="settings_key_total_keys_label">Total Keys</string>
     <string name="settings_key_total_pairs_label">Key Pairs</string>
     <string name="settings_key_default_format">%1$s (%2$s)</string>
@@ -2054,4 +2056,7 @@
     <string name="onboarding_page_offline_toggle_subtitle">Keep PGPony fully offline: no keyserver lookups, no key refresh, no update checks. You can change this later in Settings.</string>
     <string name="onboarding_page_comment_toggle_title">PGPony comment</string>
     <string name="onboarding_page_comment_toggle_subtitle">Add a PGPony - PGPony.app comment to your encrypted and signed output. You can change this later in Settings.</string>
+    <string name="onboarding_page_destructive_toggle_title">Hide destructive actions</string>
+    <string name="onboarding_page_destructive_toggle_subtitle">Hide delete key, remove subkey, remove User ID, and clear all data. Revoke stays available. You can change this later in Settings.</string>
+    <string name="onboarding_scroll_more">More options below</string>
 </resources>

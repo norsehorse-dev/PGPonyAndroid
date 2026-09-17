@@ -1,0 +1,527 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Status on the three parts: the biometric confirmation on key pair delete shipped in 4.2.0, released today. The recycle bin is on the 4.3.0 roster, designed together with per-key backup tracking so restore windows rest on real state. The Key Detail redesign is logged for 4.3.0's UI pass, decided in one sitting with the trust icons rather than piecemeal. I am on iOS next per my usual schedule, back on Android after.
+
+NorseHorse
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+RC4 is up: https://pgpony.app/rc/4.3.0-RC-foss/PGPony-4.3.0-RC4-foss.apk (the .sha256 and .asc sit beside it).
+
+Two things for you in this build.
+
+Recycle bin (#36, part 1): deleting a key now soft-deletes it. Deleted keys go to Keys, then Recently Deleted, where you can restore them or purge them for good, and they auto-purge after 14 days. The delete sheet also shows whether the key is in a backup, so you know what you are about to lose before you confirm.
+
+Zip result-sheet layout (#31, from your RC3 retest): you flagged that the Wrap in .zip toggle looked like it governed the .eml. The Bundle result sheet is now split into a Send as email block and a Send as file block, with the toggle under the file block, so it plainly wraps the .asc and leaves the .eml alone.
+
+Retest: for the recycle bin, delete a key, confirm it lands in Recently Deleted, restore it, then delete another and purge it. For the layout, open a Bundle result and confirm the toggle reads as file-only.
+
+This is the final feature RC for 4.3.0. The app is feature complete now; what remains is the test matrix and the release.
+
+NorseHorse
+--
+author:	AraafRoyall
+association:	none
+edited:	false
+status:	none
+--
+👌👌 thanks for the updates.
+
+
+Here is some overview 
+
+#  QR click lag 
+Even QR now generating in bg the dialog appears after generating , looks like ui lag. The dialog should appear first then Show QR as Loading....
+
+# Trust level image color
+
+The last ultimate level option in trust level image should have green color ,all other should have diff color
+
+
+# Sign as Optimization
+
+We currently swiching sign switch then selecting key
+We should need direct selector with a none option for not signed this will prevent or remove switch ,
+
+
+
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Thanks, all three noted and headed for 4.4.0.
+
+The QR dialog lag is a real one: the sheet waits for the image before it appears, so the tap feels dead. It should open right away showing "Loading" and fill in the QR when the background render is done. That is how it will work.
+
+Sign-as: agreed, the toggle-then-pick flow is a step too many. It becomes one signing-key selector with a "None, don't sign" option, and the switch goes away.
+
+On the trust colors, I want to get this right rather than quick. Ultimate is purple today and Verified is already green, so making Ultimate green would put two greens on the ladder and weaken the "higher means more trust" read. I am going to look at recoloring the whole ladder so the top still stands out without clashing. Open to what you had in mind for the green.
+
+NorseHorse
+--
+author:	AraafRoyall
+association:	none
+edited:	false
+status:	none
+--
+Good that you understood. 
+
+Just swap that colors then one become green . 
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+All three are in RC3.
+
+The QR sheet opens the moment you tap, showing a spinner, and fills in the code when the render finishes, so the tap no longer feels dead. Sign-as is one selector now with a "None, don't sign" option, and the separate switch is gone. On the trust colors, I moved green to the top: Ultimate is green now and Verified moved to blue, so there is a single green and it marks the highest trust. Ultimate keeps its star too, so it stands out on shape as well as color.
+
+https://pgpony.app/rc/4.4.0-RC-foss/PGPony-4.4.0-RC3-foss.apk
+
+Installs over your current build, no uninstall. To retest: open a QR on a large key and watch for the instant spinner, set sign-as to None and then to a key on the encrypt screen, and check the trust ladder on a key card and in Key Detail.
+
+NorseHorse
+--
+author:	CertainBot
+association:	contributor
+edited:	true
+status:	none
+--
+Hello, @AraafRoyall and @norsehorse-dev. I am not sure the new trust level colors are better or more intuitive than older layout. Reasoning:
+
+Usually semaphore colors is the most intuitive way to identify trust level. Of course red is not necessary as user won't use malicious keys thus the neutral grey is a good choice for uncknown keys, gold for unverified and green for the trusted keys.
+
+Expending green for my keys is unnecessary as I trust them anyway, so using the green as best level for public keys is what I expect for quick visual reference.
+
+As said I already trust my private keys so marking them as ultimate, unless some is compromised, with a special color as the blue looked very intuitive to me.
+
+I leave it here for discussion and do at your discretion. All other changes are very welcome.
+
+Thanks
+--
+author:	CertainBot
+association:	contributor
+edited:	true
+status:	none
+--
+And while we are on it, I would also suggest exchanging the X and ! shield symbols. 
+
+X suits better the grey unknown shield where you don't really want to use the key in real life until some higher degree of trust. 
+
+! symbol suits better the yellow shield denoting caution, a term which is even used in the explanatory text. Usually you want or need to use this key in real life but you still have to precede with caution as the identity is still not fully certain. I found the ! and yellow color being an excellent reminder in this case.
+
+Thanks
+--
+author:	Umotas
+association:	none
+edited:	true
+status:	none
+--
+Encrypted file has +30% size vs original size.
+Does the app use --compression? (-zlib f.ex.)
+(This file is not armor)
+
+I use sq.exe in Windows, and the size of encrypted file <= the size of original file
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+@Umotas PGPony does compress. File encryption runs the data through ZLIB before encrypting, so a compressible file should come out smaller, not larger. Two exceptions: files above roughly 105 MB skip compression on purpose, since deflate over a large archive costs real time and saves almost nothing, and a file that is already compressed (JPEG, PNG, MP4, ZIP, PDF, most Office formats) can't be shrunk further by anyone.
+
+The output itself is binary .gpg, not ASCII armor, so there's no base64 expansion inflating it.
+
+On an already-compressed file, the +30% you're seeing would be OpenPGP's own per-message overhead: a public-key packet for each recipient, the integrity (SEIPD/MDC) data, and the packet headers. That is a fixed cost, so it looks large on a small file and negligible on a big one. sq carries the same overhead, so if its output came out smaller, the test file was compressible.
+
+To tell which case this is, can you tell me the file type and rough size, and whether you used File mode or Text? If it was a compressible file under the size cutoff and we still came out bigger than the original, that's a real gap and I'd like a closer look, so the exact numbers or a sample I can reproduce with would help.
+
+NorseHorse
+--
+author:	Umotas
+association:	none
+edited:	false
+status:	none
+--
+Files:
+<img width="448" height="195" alt="Image" src="https://github.com/user-attachments/assets/395105e6-fd88-425d-a9a2-388effba934d" />
+SQ:
+<img width="271" height="70" alt="Image" src="https://github.com/user-attachments/assets/40315b89-3194-479b-85a2-a8ce8068cae5" />
+File was encrypted by PGPony:
+<img width="724" height="273" alt="Image" src="https://github.com/user-attachments/assets/63dc640d-501d-4cce-8833-83508ffca45f" />
+File was encrypted by SQ:
+<img width="720" height="398" alt="Image" src="https://github.com/user-attachments/assets/fbfd4e90-cd14-402d-85cf-4e0469eb7444" />
+my BAT-file for ENCRYPT by SQ:
+<img width="627" height="113" alt="Image" src="https://github.com/user-attachments/assets/a05d9b89-c536-4d25-a92a-915053da4798" />
+--
+author:	Umotas
+association:	none
+edited:	false
+status:	none
+--
+Check PLS:
+<img width="270" height="573" alt="Image" src="https://github.com/user-attachments/assets/8f636247-2c58-4a6d-95c0-73a724ecbb8c" />
+I try to encrypt by this keys:
+ML-KEM-768 v6 - OK
+ML-KEM-1024 v6 - OK
+ML-DSA-65 v6 - I have this screen. But If I include 2 keys as Recipients (ML-DSA-65 v6 + ML-KEM-768 v6) - I have no problem.
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Two separate things here, both real, and both worth fixing. Thanks for the detail on each.
+
+On file size: your packet dumps pinned it, and it isn't compression. PGPony compresses the file to essentially the same size sq does. The difference is the AEAD chunk size. A SEIPD v2 / OCB container splits the data into chunks and appends a 16-byte authentication tag to each one. sq uses 4096-byte chunks, so those tags cost about 0.4%. PGPony is writing 64-byte chunks, so it adds a tag every 64 bytes, about 25% overhead. On your APK that's roughly 3.2 MB of tags, the whole gap between our 16,299 KB and sq's 13,089 KB. It only shows on v6 (post-quantum) encryption, since that's the path that uses the AEAD container. The fix is to write a normal chunk size like sq's, which drops the overhead to a fraction of a percent.
+
+On encrypting to an ML-DSA-65 key: that key isn't signing-only, it carries an ML-KEM-768 encryption subkey, so encrypting to it should work. The failure is on our side. PGPony can't yet read a composite ML-DSA key when it's used as a recipient, so the key gets dropped before its encryption subkey is reached, and you land on the misleading "No recipients and no password" error. One thing worth knowing: when you added ML-KEM-768 alongside it and it succeeded, it encrypted to the ML-KEM-768 key only, not to the ML-DSA-65 key, so that success is hiding the same gap rather than working around it. The ML-KEM-768 and ML-KEM-1024 keys work because they can be read directly; the composite ML-DSA primary is the part we can't read yet. We'll make a composite ML-DSA key usable as a recipient through its encryption subkey, and replace that error with one that says what actually happened.
+
+Thanks for testing each key type separately and sending the dumps.
+
+NorseHorse
+--
+author:	Umotas
+association:	none
+edited:	false
+status:	none
+--
+I have a question. 
+Why are you generating the key using the old "pre-quantum" algorithm?
+<img width="626" height="394" alt="Image" src="https://github.com/user-attachments/assets/7c2f03b3-c85c-42e9-afe4-f761e40e13f7" />
+I read this in manuals: "confidentiality is not post-quantum secure when encrypting to different keys unless all keys support PQ(/T) encryption schemes"
+Maybe is this 'PQC-ready + backward compatibility'?
+I think PGPony must generate or clear-post-quantum or compatibility-key.
+What is your opinion.
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Good eye, and you're right to question it. That key has two encryption subkeys: the ML-KEM-768+X25519 composite, which is post-quantum, and a separate plain X25519 one, which is classical.
+
+Here's the thing worth knowing. The composite subkey is already hybrid: it combines ML-KEM with X25519 in a single subkey, secure if either half holds. So on its own it gives you both post-quantum security and a classical safety net. The separate plain X25519 subkey doesn't add to that. Its only job is to let a tool that can't handle the composite algorithm still encrypt to the key.
+
+And you've spotted its real cost. A sender that encrypts to every encryption subkey, which is what sq did in your earlier dump when it wrapped the session key to both subkeys, ends up protecting the message with the breakable X25519. At that point the message isn't post-quantum confidential, even though the PQ subkey is right there. So for a key whose whole point is post-quantum confidentiality, that classical subkey is a downgrade path, exactly the property your quoted caveat describes, happening inside one key rather than across recipients.
+
+The fix is to make it a choice, and I'm planning it for 4.5.0: a post-quantum-only key option, the composite ML-KEM subkey with no standalone classical encryption subkey, so nothing can downgrade it. The tradeoff is that only post-quantum-capable tools can encrypt to it, which is the honest cost of guaranteed PQ confidentiality. The current key stays available as a clearly labeled compatibility option for people who still need to receive from classical-only tools.
+
+Thanks for the inspect output, it made the issue concrete.
+
+NorseHorse
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Correction to my last comment here: I crossed a couple of issues and pulled in two items that were from a different report. The two fixes below are the ones that came from your reports on this thread. Sorry for the mix-up.
+
+4.4.1 RC1 is up with both, and a check before the full release would help, since these are hard to verify without your setup.
+
+https://pgpony.app/rc/4.4.1-RC-foss/PGPony-4.4.1-RC1-foss.apk
+
+File size. The AEAD chunk was 64 bytes, so OCB added a tag every 64 bytes. It is 64 KiB now, so that overhead drops to a fraction of a percent. Encrypt your APK again and it should land near sq's size, and an sq packet dump should show a much larger chunk size than before.
+Encrypting to an ML-DSA-65 key. It now uses that key's ML-KEM encryption subkey, so selecting it alone should encrypt instead of failing with "no recipients." Please encrypt a file to only the ML-DSA-65 key and then decrypt it back. That round trip is the one I most want confirmed.
+
+Thanks again for the packet dumps, they made all of this concrete.
+
+NorseHorse
+--
+author:	Umotas
+association:	none
+edited:	true
+status:	none
+--
+> 4.4.1 RC1
+Size: Yes. Smaller than SQ.
+Keys. I re-generated new ML-DSA-65. And encrypt a file by PGPony.
+Key:
+
+<img width="617" height="259" alt="Image" src="https://github.com/user-attachments/assets/6b817506-2b0e-4ae3-8093-c84d595f0725" />
+
+Encrypted file:
+
+<img width="619" height="271" alt="Image" src="https://github.com/user-attachments/assets/fa297e59-9379-4e50-8d68-9e04c5bce60e" />
+
+I can decrypt this file by SQ. I think There is no problem.
+--
+author:	Umotas
+association:	none
+edited:	false
+status:	none
+--
+1. I generated keys 768, 1024 by SQ.
+2. I mported these keys into PGPony.
+3. I cannot decrypt files (files were encrypted by SQ)
+This is preliminary. I'll check it later.
+--
+author:	Umotas
+association:	none
+edited:	false
+status:	none
+--
+Yes, I cannot decrypt file by PGPony with key. (The file and key were created by SQ)
+Key:
+
+<img width="627" height="444" alt="Image" src="https://github.com/user-attachments/assets/969c123c-217f-4c85-9a26-dc4e65b5c98e" />
+
+File:
+
+<img width="592" height="276" alt="Image" src="https://github.com/user-attachments/assets/53e41f0d-7aa8-4b16-ba50-2ee27910dcd5" />
+
+PGPony:
+
+<img width="270" height="534" alt="Image" src="https://github.com/user-attachments/assets/2261c174-41cb-48e1-848b-6877a51f81e0" />
+--
+author:	AraafRoyall
+association:	none
+edited:	false
+status:	none
+--
+I think we need an option to select which subkey is going to encrypt or decrypt
+--
+author:	norsehorse-dev
+association:	owner
+edited:	true
+status:	none
+--
+Your RC1 dumps confirm the two 4.4.1 fixes, @Umotas . The file size is back in
+line (the dump shows 65536-byte chunks now, and your output came out smaller
+than SQ's), and a PGPony-generated ML-DSA-65 key encrypts a file SQ decrypts
+without trouble.
+
+The new one you hit is real, and I can reproduce it: an ML-KEM key generated
+in SQ (768 or 1024), imported into PGPony, then used to decrypt a file SQ
+encrypted to it, fails with "no held composite secret key." That is a
+different code path from what 4.4.1 changed. 4.4.1 fixed the encrypt side
+(using a composite key as a recipient) and the chunk size; decrypting to an
+imported composite key was never on that path, so the RC did not break it, it
+just does not work yet. Rather than hold the two confirmed fixes, I am moving
+this into the 4.5.0 work and will fix it there with a proper SQ round-trip
+test so imported keys decrypt. Thanks for testing the import case
+specifically, that is what turned it up.
+
+@AraafRoyall , on choosing which subkey encrypts or decrypts: agreed, and it
+ties directly into the import case above, since the composite key's ML-KEM
+subkey is exactly the one that needs selecting. I have added a subkey
+selector to the 4.5.0 plan, defaulting to the current automatic choice so
+keys with a single encryption subkey are unaffected.
+
+NorseHorse
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Two things from this thread landed in 4.5.0-RC2.
+
+@AraafRoyall, the subkey selector you asked for is in. On the encrypt screen, when a recipient's key has more than one encryption subkey, you get a per-recipient picker labeled post-quantum or classical, with the automatic choice marked. A key with a single encryption subkey is unchanged.
+
+@Umotas, the imported-key case you hit is addressed too: decrypting to an ML-KEM key that was generated in sq (768 or 1024) and imported into PGPony should now work instead of failing with "no held composite secret key." That was the last open item from your testing, so a retest of that exact round trip, sq-generated key imported, then decrypt an sq-encrypted file, is the one I would most like confirmed.
+
+On the trust-level colors and the shield symbols: I have not changed those in this build, they are still open for discussion, so consider that feedback noted rather than actioned.
+
+Installs over your current build, no uninstall:
+https://pgpony.app/rc/4.5.0-RC-foss/PGPony-4.5.0-RC2-foss.apk
+
+NorseHorse
+
+--
+author:	AraafRoyall
+association:	none
+edited:	false
+status:	none
+--
+Removing subkey has no confirmation. 
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+@AraafRoyall You are right, removing a subkey should confirm first and right now it does not. I will add the confirmation so a remove asks before it goes through, like the revoke path already does.
+That one slipped through when I pushed the RC out to testers. Thanks for catching it.
+NorseHorse
+--
+author:	AraafRoyall
+association:	none
+edited:	false
+status:	none
+--
+👍👍
+
+I will restart feature suggestion soon. I am busy on another project
+--
+author:	AraafRoyall
+association:	none
+edited:	false
+status:	none
+--
+@norsehorse-dev 
+
+I think there should be a global option to Block Remove subkey, keys, keyring , clear data etc. Like a Global Switch
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+The subkey remove confirmation you flagged is sorted in 4.5.0-RC3. Removing a subkey now asks for your device biometric first, when you have a screen lock set, and shows a "Subkey removed" message after. With no lock set it falls through to the tap dialog so it still works.
+
+https://pgpony.app/rc/4.5.0-RC-foss/PGPony-4.5.0-RC3-foss.apk
+
+Installs over your current build, no uninstall.
+
+NorseHorse
+
+--
+author:	CertainBot
+association:	contributor
+edited:	false
+status:	none
+--
+Hello, please correct me if I am wrong because my PGP knowledge is a little bit rusty. 
+
+When removing a key, maybe would be better to add a 'revoke' or 'revoke and delete' button to the delete dialog as well. The reason is as far as I know there is no way to create a revoke certificate later for a deleted key. This is already stated in the dialog box, but the presence of a revoke button will help think twice before promptly deleting a key. 
+
+The picture shows the dialog in its current state:
+
+<img width="1080" height="1162" alt="Image" src="https://github.com/user-attachments/assets/d7ffba26-f808-43c1-a286-936d8bc21725" />
+--
+author:	Umotas
+association:	none
+edited:	false
+status:	none
+--
+PGPony-4.5.0-RC3-foss.apk
+I can import the keys ML-KEM-1024+X448
+but I cannot decrypt the file with them.
+I have some other text:
+
+<img width="540" height="1075" alt="Image" src="https://github.com/user-attachments/assets/88882e00-7ec9-4c40-8abc-c91a238c8cd4" />
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+A few things from this thread are in 4.5.0-RC5.
+
+@AraafRoyall, the global switch you asked for is in. Settings > Security has a "Protect destructive actions" toggle, on by default. With it on, deleting a key, removing a subkey, and clearing all data all ask for your device authentication first. Turn it off and those actions keep their confirm dialogs but skip the prompt. On the trust colors: you and @CertainBot want opposite things there (you want green at the top for Ultimate, CertainBot wants green for verified public keys with blue for Ultimate), so I have left the ladder as it is for now rather than pick a side mid-thread. Same for the X and ! shield swap CertainBot raised. Both are still open, and I would rather settle them than flip them across builds.
+
+@CertainBot, the delete dialog now has a "Revoke this key instead" button on key pairs. It opens the revoke flow so you can generate a revocation certificate before the key is gone, which is the case you made: there is no way to make one after a delete.
+
+@Umotas, the ML-KEM-1024+X448 decrypt you hit on RC3 is not fixed with certainty yet. RC5 carries the imported-composite decrypt work, but my own sq build is not post-quantum, so I could not reproduce the 1024+X448 case locally the way you can. If you retest that exact round trip on RC5 (import the 1024+X448 key, then decrypt a file made for it) and it still fails, that pins it as a real gap specific to that key shape and I will chase it from there.
+
+https://pgpony.app/rc/4.5.0-RC-foss/PGPony-4.5.0-RC5-foss.apk
+
+Installs over your current build, no uninstall.
+
+NorseHorse
+
+--
+author:	Umotas
+association:	none
+edited:	false
+status:	none
+--
+RC5 cannot decrypt the file also. Maybe can I share for you my SQ? Will this help you?
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+@Umotas yes, please do, that is exactly what would help. My own sq build is not post-quantum, so I cannot generate an ML-KEM-1024+X448 key or a file encrypted to one on my side, which is why this case is hard for me to reproduce directly.
+
+What would let me reproduce it end to end:
+
+- A throwaway ML-KEM-1024+X448 key pair generated in sq, secret key included. Make it a test key, not one you use for real, since you would be sending the private half.
+- A small file encrypted in sq to that key that PGPony fails to decrypt.
+- Your sq version and the exact commands you ran to generate the key and to encrypt the file.
+
+With the key and the failing file in hand I can trace exactly where import or decrypt drops it and fix it against your real output instead of guessing. Attach them here, or send them to NorseHorse@norsehor.se, whichever you prefer.
+
+NorseHorse
+
+--
+author:	AraafRoyall
+association:	none
+edited:	false
+status:	none
+--
+@norsehorse-dev 
+Protect delete options means disable all such options when switch enabled .
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+@AraafRoyall on the destructive-action lock: it is in RC7 and on by default, but as a confirm step rather than a full disable. When it is on, deleting a key, removing a subkey, or clearing data asks for your device unlock first, so a stray tap cannot destroy anything. You do not have to turn the switch off to delete, you just confirm.
+
+I went with that instead of greying the options out because deleting a key already sends it to Recently Deleted for 14 days, where you can restore it. So an accidental delete is stopped at the moment by the confirm, and reversible after through the recycle bin. Between the two, a key is hard to lose by accident.
+
+If you specifically want the switch to fully disable the options so they cannot be tapped at all until you turn it back off, I can add that too. I just think the confirm plus the recycle bin already covers the accidental-loss case with less friction. Which would you rather have?
+--
+author:	Umotas
+association:	none
+edited:	true
+status:	none
+--
+ok
+--
+author:	norsehorse-dev
+association:	owner
+edited:	true
+status:	none
+--
+@Umotas Fixed in RC8. Once I had your sq build and could encrypt a file to that 1024+X448 key myself, it broke right away and I could trace it.
+
+It was not the crypto. Pasting the same message as text decrypted fine, opening it as a FILE did not. The file path streams the data, and the streaming decrypt never handed your imported composite key to the part that opens the ML-KEM subkey, so it reported no held composite secret key even though the key was right there. The file path now passes the composite key through the same way the text path already did, and there is a regression test built from your key and file so it stays fixed.
+
+https://pgpony.app/rc/4.5.0-RC-foss/PGPony-4.5.0-RC8-foss.apk
+
+Installs over your current build, no uninstall. Import your 1024+X448 key again and decrypt the file, that is the exact case this fixes.
+
+NorseHorse
+
+--
+author:	Umotas
+association:	none
+edited:	false
+status:	none
+--
+Yes. I can confirm: RC8 works. Many thanks.
+--
+author:	CertainBot
+association:	contributor
+edited:	true
+status:	none
+--
+@norsehorse-dev, the "revoke key instead" works great. thank you! This was in part lucky coincidence as I was talking about keys but was actually meaning subkeys which have the same problem once deleted. Please, consider adding a text for 'revoke first' or something similar alongside 'Cancel' and 'Remove' in the "Remove this subkey" popup. 
+Regarding the shields colors we may open a separate issue exposing the reasons there before committing any changes.
+
+Thanks
+--
+author:	AraafRoyall
+association:	none
+edited:	false
+status:	none
+--
+@norsehorse-dev But it will be a global switch for disabling all harmful options for those who never want to use these respective options. 
+
+
+--

@@ -242,8 +242,14 @@ android {
         // background-kill ROMs fixed by moving the OpenPGP API service and its
         // provider activities to a dedicated :remote_api process (#2.1), plus
         // the offline switch. versionCode 433 so it installs over 4.3.2.
-        versionCode = 444
-        versionName = "4.5.0"
+        // 4.5.1: nistp521 card decrypt fix (#62), delete User IDs, subkey
+        // revoke-instead, Key Detail encrypt/decrypt shortcut (#63), Encrypt-in-
+        // PGPony share, default-key picker, hide-destructive switch + onboarding
+        // surface (#36 Araaf), contacts ANR fix, R8 keep-rule narrowing, privacy
+        // link to pgpony.app, and a full translations pass for the six active
+        // locales. versionCode 445 so it installs over 4.5.0.
+        versionCode = 445
+        versionName = "4.5.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

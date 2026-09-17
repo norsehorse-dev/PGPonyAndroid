@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Comment
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import kotlinx.coroutines.launch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -40,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -74,10 +77,12 @@ fun OnboardingPage(
     // with no way to reach it. Issue #23, "impossible to create keys", and
     // the reporter was right. fillMaxSize stays so short slides still
     // center; the scroll only engages once content overflows the pager.
+    val scrollState = rememberScrollState()
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = 32.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -172,6 +177,11 @@ fun OnboardingPage(
             Spacer(modifier = Modifier.height(16.dp))
             CommentToggleRow()
         }
+        // #36 (Araaf, 4.5.1): opt-in hide of the data-loss actions, from onboarding.
+        if (slide.showDestructiveToggle) {
+            Spacer(modifier = Modifier.height(16.dp))
+            DestructiveToggleRow()
+        }
         // §5.6.9 (Piotr): sideload update-check opt-in.
         if (slide.showUpdateToggle) {
             Spacer(modifier = Modifier.height(32.dp))
@@ -190,6 +200,33 @@ fun OnboardingPage(
         if (slide.showLanguagePicker) {
             Spacer(modifier = Modifier.height(32.dp))
             OnboardingLanguagePicker()
+        }
+    }
+
+        // When a slide's content overflows the pager (large font scale, or the
+        // privacy slide's stack of toggles), there was no sign the list scrolls.
+        // Show a bottom fade + down chevron while there is more below, and hide
+        // it once the user reaches the end.
+        if (scrollState.maxValue > 0 && scrollState.value < scrollState.maxValue) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, MaterialTheme.colorScheme.background)
+                        )
+                    ),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = stringResource(R.string.onboarding_scroll_more),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+            }
         }
     }
 
@@ -495,6 +532,55 @@ private fun CommentToggleRow() {
                     scope.launch {
                         com.pgpony.android.data.ArmorCommentStore.get(context).setInclude(newValue)
                     }
+                }
+            )
+        }
+    }
+}
+
+// #36 (Araaf, 4.5.1): opt-in switch that hides the data-loss actions. Off by
+// default. Mirrors the Settings > Security toggle; both read/write the same pref
+// (DestructiveActionsDisabled), so a choice made here shows up in Settings too.
+@Composable
+private fun DestructiveToggleRow() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var enabled by remember {
+        mutableStateOf(com.pgpony.android.ui.keyring.DestructiveActionsDisabled.isEnabled(context))
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Filled.Shield,
+                contentDescription = null,
+                tint = Color(0xFF8B5CF6),
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.onboarding_page_destructive_toggle_title),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    stringResource(R.string.onboarding_page_destructive_toggle_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = { newValue ->
+                    enabled = newValue
+                    com.pgpony.android.ui.keyring.DestructiveActionsDisabled.setEnabled(context, newValue)
                 }
             )
         }

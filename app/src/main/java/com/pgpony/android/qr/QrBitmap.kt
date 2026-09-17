@@ -51,21 +51,25 @@ object QrBitmap {
         val hints = mapOf(EncodeHintType.MARGIN to 1)
         val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 1, 1, hints)
         val modules = matrix.width
-        val scale = (TARGET / modules).coerceAtLeast(1)
-        val size = modules * scale
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565)
-        for (mx in 0 until modules) {
-            for (my in 0 until modules) {
-                val color = if (matrix.get(mx, my)) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
-                val ox = mx * scale
-                val oy = my * scale
-                for (dx in 0 until scale) {
-                    for (dy in 0 until scale) {
-                        bitmap.setPixel(ox + dx, oy + dy, color)
-                    }
-                }
+        // Fill the module-resolution image in one IntArray and let the native
+        // bitmap scaler blow it up. The old path wrote every scaled pixel with
+        // Bitmap.setPixel (hundreds of thousands of JNI calls per frame, times
+        // up to MAX_FRAMES frames), which took seconds to render a multipart
+        // key on the Exchange screen. Building one small bitmap and scaling it
+        // nearest-neighbor is the same crisp result in a fraction of the time.
+        val colors = IntArray(modules * modules)
+        for (my in 0 until modules) {
+            val row = my * modules
+            for (mx in 0 until modules) {
+                colors[row + mx] = if (matrix.get(mx, my)) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
             }
         }
-        return bitmap
+        val small = Bitmap.createBitmap(colors, modules, modules, Bitmap.Config.RGB_565)
+        val scale = (TARGET / modules).coerceAtLeast(1)
+        if (scale == 1) return small
+        val size = modules * scale
+        val scaled = Bitmap.createScaledBitmap(small, size, size, false)
+        small.recycle()
+        return scaled
     }
 }

@@ -109,7 +109,9 @@ fun KeyDetailScreen(
     fingerprint: String,
     viewModel: KeyDetailViewModel,
     onBack: () -> Unit,
-    onChangeCardPin: () -> Unit = {}
+    onChangeCardPin: () -> Unit = {},
+    onEncryptToKey: (String) -> Unit = {},
+    onDecryptWithKey: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     val clipboard = LocalClipboardManager.current
@@ -120,6 +122,19 @@ fun KeyDetailScreen(
     // immediately after writing to the clipboard without round-tripping
     // through the VM's state machine).
     val scope = rememberCoroutineScope()
+    // #63 (CertainBot): one-time hint that the header avatar is a shortcut.
+    LaunchedEffect(state.key?.fingerprint) {
+        val k = state.key ?: return@LaunchedEffect
+        val prefs = context.getSharedPreferences("pgpony_prefs", android.content.Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("kd_avatar_shortcut_hint_shown", false)) {
+            prefs.edit().putBoolean("kd_avatar_shortcut_hint_shown", true).apply()
+            snackbarHostState.showSnackbar(
+                context.getString(
+                    if (k.isKeyPair) R.string.kd_avatar_hint_decrypt else R.string.kd_avatar_hint_encrypt
+                )
+            )
+        }
+    }
     // 4.0.0 Phase 5a — multi-server publish sheet overlay flag.
     var showPublish by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
 
@@ -409,6 +424,8 @@ fun KeyDetailScreen(
                 onMakePrimaryUserId = { uid -> viewModel.requestUserIdAction(uid, UserIdActionRequest.Kind.MAKE_PRIMARY) },
                 onRevokeUserId = { uid -> viewModel.requestUserIdAction(uid, UserIdActionRequest.Kind.REVOKE) },
                 onRemoveUserId = { uid -> viewModel.requestUserIdAction(uid, UserIdActionRequest.Kind.REMOVE) },
+                onEncryptToKey = onEncryptToKey,
+                onDecryptWithKey = onDecryptWithKey,
                 onEditNotations = { viewModel.showNotationsSheet() },
                 // RC3 §N (#34)
                 onToggleFallback = { fp -> viewModel.toggleFallback(fp) },
@@ -1357,6 +1374,8 @@ private fun LoadedBody(
     onMakePrimaryUserId: (String) -> Unit,
     onRevokeUserId: (String) -> Unit,
     onRemoveUserId: (String) -> Unit,
+    onEncryptToKey: (String) -> Unit,
+    onDecryptWithKey: () -> Unit,
     onEditNotations: () -> Unit,
     // RC3 §N (#34)
     onToggleFallback: (String) -> Unit,
@@ -1373,7 +1392,7 @@ private fun LoadedBody(
         contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item { KeyHeaderSection(key = key, onCopyEmail = onCopyEmail) }
+        item { KeyHeaderSection(key = key, onCopyEmail = onCopyEmail, onAvatarClick = { if (key.isKeyPair) onDecryptWithKey() else onEncryptToKey(key.fingerprint) }) }
         // Phase A6 — Revoked banner directly under the header so it's
         // the first thing the user sees on a revoked key without having
         // to scroll to Danger Zone. RevokedBanner internally no-ops when

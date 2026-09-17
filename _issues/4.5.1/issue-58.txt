@@ -1,0 +1,70 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Confirmed, and stripping it is the right fix. The share-from-browser path hands us the selected text plus the page's extra markup, and right now import expects the input to be just the key, so the extra characters trip it. Copy-paste and shared .asc files skip that because they arrive clean.
+
+The fix is to pull the armored block out of whatever is shared, between the BEGIN and END PGP lines, and ignore everything around it, so a select-all-and-share imports the same as a clean paste. Handling more than one block in the payload comes with it.
+
+It is in for the next release. Thanks for pinning down exactly which path adds the noise.
+
+NorseHorse
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+This shipped in 4.5.0-RC2. Sharing a key to PGPony now pulls the armored block out of whatever the share hands over, between the BEGIN and END lines, and ignores the surrounding page text, so a select-all-and-share imports the same as a clean paste. More than one block in the payload is handled, and it prefers the key block over anything else such as a detached signature.
+
+Installs in place, no uninstall:
+https://pgpony.app/rc/4.5.0-RC-foss/PGPony-4.5.0-RC2-foss.apk
+
+If you find a share source that still trips it, tell me where you shared from and I will take a look.
+
+NorseHorse
+
+--
+author:	CertainBot
+association:	contributor
+edited:	false
+status:	none
+--
+Hello @norsehorse-dev,
+
+thanks for the update! The first part is OK now as shown bellow, only the Pub key is read in the import text box and the rest is ignored. I haven't tested what happens with more than one Pub key in the text yet. 
+
+<img width="1080" height="2127" alt="Image" src="https://github.com/user-attachments/assets/d91a2c8e-1481-4587-b538-1390d37b8e70" />
+
+
+I noticed when Pub key is detected only import action is available, see the picture bellow. There should still be a second encrypting option available as this could be the purpose for sharing with PGPony
+
+<img width="1080" height="1774" alt="Image" src="https://github.com/user-attachments/assets/d3138a86-73c1-4d12-84d9-06f960e2793a" />
+
+Thanks
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+The second part is in 4.5.0-RC5. When you share a public key to PGPony, the import screen now has an "Encrypt to this key" button next to Import. It brings the key in and takes you straight to the Encrypt screen with that key set as recipient, so sharing a key to encrypt to that person is one step instead of import and then go find it.
+
+The first part, pulling just the key out of a select-all share, you confirmed on RC2, so that stays as is.
+
+https://pgpony.app/rc/4.5.0-RC-foss/PGPony-4.5.0-RC5-foss.apk
+
+Installs over your current build, no uninstall.
+
+NorseHorse
+
+--
+author:	CertainBot
+association:	contributor
+edited:	false
+status:	none
+--
+@norsehorse-dev that is funny, the feature you added is cool, alghough was not what I meant. Nevermind I like it and works as expected.
+What I meant was this, if you look in my last image there is a field that sais "Open in PGPony". Since its a text there could be a second tab bellow "Encrypt in PGPony", because the user may not want to import or encrypt to the recipient of the key, but simply to encypt the text as is. Hope I explained it better this time, definitely not my strongpoint.
+--

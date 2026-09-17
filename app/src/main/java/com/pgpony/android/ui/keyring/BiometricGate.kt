@@ -207,4 +207,10 @@ object DestructiveActionsDisabled {
     fun isEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getBoolean(PREF_KEY, false)
+
+    /** Persist the choice. Shared by Settings and the onboarding privacy slide. */
+    fun setEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putBoolean(PREF_KEY, enabled).apply()
+    }
 }

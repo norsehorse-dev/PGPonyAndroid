@@ -52,6 +52,10 @@ data class OnboardingSlide(
     // comment from encrypted/signed output right from onboarding (Settings
     // already has this; onboarding surfaces it up front).
     val showCommentToggle: Boolean = false,
+    // #36 (Araaf, 4.5.1): opt-in switch that hides the data-loss actions
+    // (delete key, remove subkey, remove User ID, clear all data). Off by
+    // default; Settings has it too, onboarding surfaces it on the privacy slide.
+    val showDestructiveToggle: Boolean = false,
 )
 
 object OnboardingSlides {
@@ -117,7 +121,8 @@ object OnboardingSlides {
             bodyResId = R.string.onboarding_slide_privacy_body,
             showBiometricToggle = true,
             showOfflineToggle = true,
-            showCommentToggle = true
+            showCommentToggle = true,
+            showDestructiveToggle = true
         ),
 
         // ── Slide 6 — Stay up to date (sideload only) ────────────────────

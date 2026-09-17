@@ -1,0 +1,28 @@
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Thanks, this is a clean repro and it points right at the multi-recipient path. Encrypting to your own key alone works, so your secret key is loading fine. The failure only shows up when the message carries more than one composite recipient, which means the decrypt side is not matching your held ML-KEM subkey against the right recipient block when several are present. That is the bug, not your key.
+
+The error printing twice is the two recovery attempts, the Bouncy Castle ring lookup and the raw-composite trial, both missing, which lines up with the same cause.
+
+One thing that would narrow it down: does your friend decrypt with PGPony too, or with another tool like gpg or sq? If another tool opens the same message and only PGPony fails on your side, that confirms it is our recipient matching and nothing in how the message was built.
+
+It is going into the next release. I will post an RC here once the fix is in so you can retest with your two-key setup.
+
+NorseHorse
+--
+author:	norsehorse-dev
+association:	owner
+edited:	false
+status:	none
+--
+Fixed in 4.5.0-RC1. The decrypt path only ever tried the first composite recipient in a message, so when your key was not the first recipient it reported "no held composite secret key" even though you hold the key. It now tries every recipient slot, so a message encrypted to you plus anyone else decrypts for you. Single-recipient was never affected, which is why encrypting to just yourself worked.
+
+https://pgpony.app/rc/4.5.0-RC-foss/PGPony-4.5.0-RC1-foss.apk
+
+Installs over your current build, no uninstall. To retest: your two-key setup, encrypt a file to both keys, and confirm each one opens it.
+
+NorseHorse
+--

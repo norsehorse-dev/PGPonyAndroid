@@ -1198,7 +1198,20 @@ fun PGPonyMainScreen(
                         fingerprint = fingerprint,
                         viewModel = detailVm,
                         onBack = { navController.popBackStack() },
-                        onChangeCardPin = { navController.navigate("card_pin_change") }
+                        onChangeCardPin = { navController.navigate("card_pin_change") },
+                        onEncryptToKey = { fp ->
+                            encDecVm.preselectRecipient(fp)
+                            navController.navigate(Screen.Encrypt.route) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                            }
+                        },
+                        onDecryptWithKey = {
+                            navController.navigate(Screen.Decrypt.route) {
+                                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                launchSingleTop = true
+                            }
+                        }
                     )
                 }
                 // HW Phase 1: NFC hardware-key scan destination. Reached from

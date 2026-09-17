@@ -16,6 +16,22 @@ values/strings.xml, produce a per-language gap list (missing and stale keys), an
 Revisit Korean (4.5.0 item 9, deferred): if it can be brought to a shippable level, enable it
 (KO in SupportedLanguage, "ko" in locales_config.xml).
 
+Done (gap top-up, all 7 locales). Audited every values-*/strings.xml against base: base carries 1479
+translatable strings; the union gap was 107 keys (de/es/fr/ja/pt-rBR each missing all 107, ru 104, ko 97),
+no stale/extra keys anywhere. Filled every gap, matching each locale's shipped terminology (subkey,
+passphrase, key server, revoke, User ID, offline mode, post-quantum/classical), preserving %1$s/%2$s
+placeholders and escaping, keeping brand and algorithm tokens (PGPony, ML-KEM/ML-DSA, Ed25519, RSA, Argon2,
+Tor, SOCKS, HKPS, Web Key Directory) verbatim. Only gaps were filled; no existing translation was touched.
+Verified: all seven parse as XML, zero missing keys, placeholder sets match base, no double-escaping.
+de/es/fr/ja/pt-rBR now at full key coverage; ru full; ko now has every key present.
+Residual still-English present strings in de/es/fr/ja/pt/ru are cognates and proper tokens (Passphrase,
+Contacts, Port, AID, Password Store, version numbers) that read correctly as-is or were deliberately left
+by the existing translators, so they are left untouched.
+DECIDED: Korean stays as-is for 4.5.1 (NorseHorse). It remains dormant (not in SupportedLanguage /
+locales_config.xml), ~967 strings still English; not enabled, not further translated this release. The 97
+union-gap keys added to ko during the audit are kept (harmless, since ko is not user-selectable) but do not
+make it shippable. 4.5.1 ships fully localized in the six active locales: de, es, fr, ja, pt-rBR, ru.
+
 ## 2. Delete User IDs
 
 Priority: medium. Origin: NorseHorse.
@@ -60,6 +76,16 @@ with crisp modules. QrChunkingTest is symbolic over the constants, so it holds. 
 on-device only: Share Public Key -> QR on a PQ-only key, confirm the multipart frames fill the box and a
 second phone scans them.
 
+Follow-up (NorseHorse, found on RC1): the Exchange screen took ~10 s to show its QR codes after the tab
+opened. Generation already runs on Dispatchers.Default, so the UI was not blocked, it was encodeOne being
+slow: it wrote every scaled pixel with Bitmap.setPixel, hundreds of thousands of JNI calls per frame times
+up to MAX_FRAMES (32) frames. Rewrote encodeOne to fill one module-resolution IntArray, build a small
+RGB_565 bitmap from it in one call, and scale it up nearest-neighbor with Bitmap.createScaledBitmap. Pixels
+are identical to the old integer-replication loop, so scannability and the #63 sizing are unchanged, but
+the render drops from seconds to well under one. Not JVM-unit-testable (Android Bitmap); on-device: open
+Exchange on a PQ-only key and confirm the QR appears effectively immediately. Needs an RC2 (RC1 already
+shipped the slow path).
+
 ## 4. "Encrypt in PGPony" share action for shared text (#58, CertainBot)
 
 Priority: medium. Origin: CertainBot (#58).
@@ -101,6 +127,17 @@ a key pair, to shortcut browsing keys then encrypting. CertainBot floated the he
 circle as the button, or adding the key to the current recipient set. UI decision needed; keep
 Key Detail uncluttered.
 
+Implemented (option 2, avatar as tap target, with a first-open hint). The Key Detail header avatar is
+the tap target: on a public key it goes to Encrypt with that key preselected as recipient; on a key
+pair it goes to Decrypt. KeyHeaderSection wraps KeyAvatarHero in a clickable, circle-clipped Box when
+onAvatarClick is non-null; KeyDetailScreen wires onAvatarClick to onDecryptWithKey (key pair) or
+onEncryptToKey(fingerprint) (public), and MainActivity routes those to Screen.Encrypt (via
+encDecVm.preselectRecipient) and Screen.Decrypt. A one-time snackbar hint fires on first open of any Key
+Detail (LaunchedEffect on fingerprint, guarded by pref kd_avatar_shortcut_hint_shown): kd_avatar_hint_decrypt
+for a key pair, kd_avatar_hint_encrypt otherwise. New strings kd_avatar_hint_encrypt/decrypt (join the
+translation pass). Gated by nothing destructive, so no hide-destructive interaction. UI/navigation only;
+verify on device.
+
 ## 7. Revoke option in the subkey-remove dialog (#36, CertainBot)
 
 Priority: low. Origin: CertainBot (#36).
@@ -133,9 +170,12 @@ Settings > Security (guarded like the protect toggle) via SettingsViewModel.setD
 When on, the data-loss actions are hidden: the Delete key menu item (KeyDetailScreen), the Remove subkey
 menu item and the Remove User ID button (both already hide on a null callback, so the wrapper passes null
 when hideDestructiveActions), and the Clear all data button in Settings. Revoke and every non-loss action
-stay. New strings settings_disable_destructive_title/subtitle (join the translation pass). DEFERRED (small
-follow-on): the onboarding surface, mirroring item 25's armor-comment onboarding toggle. UI-only; verify on
-device: toggle on, confirm delete/remove/clear disappear and revoke remains, toggle off and they return.
+stay. New strings settings_disable_destructive_title/subtitle (join the translation pass). Onboarding surface added: the privacy slide (slide 5, alongside biometric / offline / armor-comment)
+gains a "Hide destructive actions" toggle via DestructiveToggleRow, off by default. It shares the pref with
+Settings through a new DestructiveActionsDisabled.setEnabled, so a choice made in onboarding shows in
+Settings and vice versa. New strings onboarding_page_destructive_toggle_title/subtitle (join the translation
+pass). UI-only; verify on device: flip it on in onboarding, confirm Settings shows it on and delete/remove/
+clear are hidden; flip off, confirm they return.
 
 ## Decisions and replies owed (not code unless decided)
 

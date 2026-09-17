@@ -305,7 +305,7 @@ private fun CopyableEmailRow(
 }
 
 @Composable
-fun KeyHeaderSection(key: PGPKeyEntity, onCopyEmail: ((String) -> Unit)? = null) {
+fun KeyHeaderSection(key: PGPKeyEntity, onCopyEmail: ((String) -> Unit)? = null, onAvatarClick: (() -> Unit)? = null) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -313,7 +313,12 @@ fun KeyHeaderSection(key: PGPKeyEntity, onCopyEmail: ((String) -> Unit)? = null)
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        KeyAvatarHero(key = key)
+        Box(
+            modifier = if (onAvatarClick != null)
+                Modifier.clip(CircleShape).clickable { onAvatarClick() } else Modifier
+        ) {
+            KeyAvatarHero(key = key)
+        }
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
