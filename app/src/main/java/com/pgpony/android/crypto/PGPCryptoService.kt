@@ -204,6 +204,13 @@ data class DecryptResult(
      *  unwrapped the session key. Null on the symmetric path and on the
      *  composite ML-KEM path, which do not report a recipient key id. */
     val decryptingKeyIdRaw: Long? = null,
+    /** #30/#31: set when the decrypted inner payload is an inline one-pass
+     *  COMPOSITE (ML-DSA + EdDSA) signed message. BouncyCastle cannot parse
+     *  those, so [data] holds the extracted literal and the caller verifies the
+     *  signature over [compositeInlineBytes] via CompositeDocumentVerifier. */
+    val compositeInline: Boolean = false,
+    val compositeInlineBytes: ByteArray? = null,
+    val compositeClaimedSignerFp: String? = null,
     /** item 11 (#54 Finding C): signer trust grade. VERIFIED only when the
      *  crypto check passed AND the signer key is unrevoked, unexpired, and
      *  sign-flagged. [signatureVerified] is now (signerStatus == VERIFIED). */
@@ -1051,7 +1058,14 @@ class PGPCryptoService private constructor() {
         recipientSubkeyChoices: Map<String, Long> = emptyMap(),
         // item 14 (#56): v4 Ed25519 + algo-35 recipients, carried separately
         // because their algo-35 subkey is not a BouncyCastle public key.
-        v4Algo35Recipients: List<com.pgpony.android.crypto.pqc.V4Algo35Recipient> = emptyList()
+        v4Algo35Recipients: List<com.pgpony.android.crypto.pqc.V4Algo35Recipient> = emptyList(),
+        // #30/#31: composite ML-DSA + EdDSA inline signing. When set, the message
+        // is signed through the raw-bytes composite path (CompositeDocumentSigner)
+        // instead of BouncyCastle, which cannot build an algo-30/31 signature.
+        // signingSecretKey is ignored in that case.
+        compositeSignSuite: com.pgpony.android.crypto.pqc.CompositeSignSuite? = null,
+        compositeSignSecret: ByteArray? = null,
+        compositeSignerFingerprint: ByteArray? = null
     ): ByteArray {
         val outputStream = ByteArrayOutputStream()
         val armoredOut = if (armor) ArmoredOutputStream(outputStream).stripVersion() else null
@@ -1139,6 +1153,18 @@ class PGPCryptoService private constructor() {
             val compGen = PGPCompressedDataGenerator(PGPCompressedData.ZLIB)
             val compOut = compGen.open(encryptedOut)
 
+            // #30/#31: composite ML-DSA + EdDSA cannot be signed by BouncyCastle.
+            // When a composite signer is supplied, write the whole inline one-pass
+            // signed payload (OPS + Literal + Signature) through the raw-bytes
+            // composite path and skip the BC signing block entirely.
+            if (compositeSignSecret != null && compositeSignSuite != null && compositeSignerFingerprint != null) {
+                compOut.write(
+                    com.pgpony.android.crypto.pqc.CompositeDocumentSigner.signInline(
+                        compositeSignSuite, compositeSignSecret, compositeSignerFingerprint,
+                        data, fileName = filename ?: ""
+                    )
+                )
+            } else {
             // Optional signature
             var sigGen: PGPSignatureGenerator? = null
             // Phase A3 fix: the prior guard was `signingSecretKey != null
@@ -1242,6 +1268,7 @@ class PGPCryptoService private constructor() {
             if (sigGen != null) {
                 sigGen.update(data)
                 sigGen.generate().encode(compOut)
+            }
             }
 
             compOut.close()
@@ -1844,8 +1871,45 @@ class PGPCryptoService private constructor() {
                 throw PGPCryptoError.NoMatchingKey(hiddenRecipient = sawWildcardPkesk)
             }
 
-            // Parse the decrypted content
-            val plainFactory = JcaPGPObjectFactory(decryptedStream)
+            // Parse the decrypted content. #30/#31: buffer the SEIPD plaintext
+            // first. An inline COMPOSITE (ML-DSA + EdDSA) signed payload carries an
+            // algo-30/31 one-pass packet that BouncyCastle throws on, so it must be
+            // detected and routed to CompositeDocumentVerifier instead of the BC
+            // object factory. The buffer is the (usually ZLIB-compressed) inner
+            // packet stream, bounded by the same plaintext size cap.
+            fun readDecrypted(): ByteArray {
+                val cap = SecurityLimits.MAX_MESSAGE_PLAINTEXT_BYTES
+                val bufOut = ByteArrayOutputStream()
+                val chunk = ByteArray(8192)
+                var total = 0L
+                var n = decryptedStream!!.read(chunk)
+                while (n >= 0) {
+                    total += n
+                    if (total > cap)
+                        throw PGPCryptoError.ResourceLimitExceeded("decrypted message exceeds size cap")
+                    bufOut.write(chunk, 0, n)
+                    n = decryptedStream!!.read(chunk)
+                }
+                return bufOut.toByteArray()
+            }
+            fun parsePlain(plainBytes: ByteArray): DecryptResult {
+                if (com.pgpony.android.crypto.pqc.CompositeDocumentVerifier.isCompositeInline(plainBytes)) {
+                    val content = com.pgpony.android.crypto.pqc.CompositeDocumentVerifier.inlineContent(plainBytes)
+                        ?: throw PGPCryptoError.DecryptionFailed("No literal data in composite inline message")
+                    val claimedFp = com.pgpony.android.crypto.pqc.CompositeDocumentVerifier.claimedSignerOfInline(plainBytes)
+                    return DecryptResult(
+                        plaintext = try { String(content, Charsets.UTF_8) } catch (_: Exception) { "" },
+                        data = content,
+                        hasSignature = true,
+                        compositeInline = true,
+                        compositeInlineBytes = plainBytes,
+                        compositeClaimedSignerFp = claimedFp
+                    )
+                }
+                return processDecryptedContent(
+                    JcaPGPObjectFactory(ByteArrayInputStream(plainBytes)), verificationKeys
+                )
+            }
             // item 11 (#54 Finding D): a corrupted, integrity-protected SEIPD can
             // fail either during content parsing (garbage packets, an earlier CFB
             // block) OR at the MDC gate below. On the public-key path those must
@@ -1856,7 +1920,7 @@ class PGPCryptoService private constructor() {
             val integrityProtected = integrityObj?.let { it.isIntegrityProtected() || it.isAEAD() } ?: false
             val result = if (integrityProtected && !usedSymmetric) {
                 try {
-                    processDecryptedContent(plainFactory, verificationKeys)
+                    parsePlain(readDecrypted())
                 } catch (rle: PGPCryptoError.ResourceLimitExceeded) {
                     throw rle
                 } catch (any: Exception) {
@@ -1865,7 +1929,7 @@ class PGPCryptoService private constructor() {
                     )
                 }
             } else {
-                processDecryptedContent(plainFactory, verificationKeys)
+                parsePlain(readDecrypted())
             }
 
             // INTEGRITY GATE. processDecryptedContent has now fully consumed the

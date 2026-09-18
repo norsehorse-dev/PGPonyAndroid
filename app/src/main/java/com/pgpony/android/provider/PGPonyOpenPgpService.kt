@@ -499,7 +499,7 @@ class PGPonyOpenPgpService : Service() {
         runBlocking {
             requestedKeyIds?.forEach { id ->
                 val entity = findEntityByKeyId(id)?.takeIf { !it.isRevoked }
-                val ring = entity?.let { repo.loadPublicKeyRing(it.fingerprint) }
+                val ring = entity?.let { repo.loadEncryptionRecipientRing(it.fingerprint) }
                 if (ring != null) rings[entity.fingerprint] = ring
                 else missing += String.format("0x%016X", id)
             }
@@ -522,7 +522,7 @@ class PGPonyOpenPgpService : Service() {
                 val matches = repo.getByAnyUserEmail(email).filter { !it.isRevoked }
                 var added = false
                 matches.forEach { entity ->
-                    repo.loadPublicKeyRing(entity.fingerprint)?.let { ring ->
+                    repo.loadEncryptionRecipientRing(entity.fingerprint)?.let { ring ->
                         rings[entity.fingerprint] = ring
                         added = true
                     }
@@ -555,9 +555,15 @@ class PGPonyOpenPgpService : Service() {
         var signPassphrase: String? = null
         var signKeyId = 0L
         var signKeyLabel = ""
+        var compositeSign: SignResolve.Composite? = null
         if (withSignature) {
             when (val resolved = resolveSigningMaterial(data, rings.values)) {
                 is SignResolve.Fail -> return resolved.response
+                is SignResolve.Composite -> {
+                    compositeSign = resolved
+                    signKeyId = resolved.keyId
+                    signKeyLabel = resolved.label
+                }
                 is SignResolve.Card -> {
                     // P2c: the entire sign+encrypt runs during the NFC
                     // tap (the card must be present while BC signs), so
@@ -634,6 +640,36 @@ class PGPonyOpenPgpService : Service() {
         if (output == null) {
             return errorResult(OpenPgpError.GENERIC_ERROR, "No output pipe provided")
         }
+        val compSigner = compositeSign
+        if (compSigner != null) {
+            // #55: sign+encrypt with a composite ML-DSA signer. BouncyCastle
+            // cannot sign algo-30/31, so build the inline composite signature
+            // through crypto.encrypt (buffered) rather than the streaming path.
+            return try {
+                val info = runBlocking {
+                    repo.loadCompositeKeyInfo(
+                        compSigner.entity.fingerprint,
+                        compSigner.passphrase?.takeIf { it.isNotEmpty() }?.toCharArray()
+                    )
+                }
+                val secret = info?.compositeSecret
+                    ?: return passphraseRequiredResult(data, compSigner.keyId, compSigner.label, wasWrong = false)
+                val plaintext = ParcelFileDescriptor.AutoCloseInputStream(input).use { it.readBytes() }
+                val encrypted = crypto.encrypt(
+                    data = plaintext,
+                    recipientPublicKeys = rings.values.toList(),
+                    filename = filename,
+                    armor = armor,
+                    compositeSignSuite = info.suite,
+                    compositeSignSecret = secret,
+                    compositeSignerFingerprint = info.fingerprint
+                )
+                ParcelFileDescriptor.AutoCloseOutputStream(output).use { it.write(encrypted) }
+                successResult()
+            } catch (e: Exception) {
+                errorResult(OpenPgpError.GENERIC_ERROR, e.message ?: "Encryption failed")
+            }
+        }
         return try {
             ParcelFileDescriptor.AutoCloseInputStream(input).use { ins ->
                 ParcelFileDescriptor.AutoCloseOutputStream(output).use { outs ->
@@ -678,6 +714,25 @@ class PGPonyOpenPgpService : Service() {
                 armor = true,
                 output = output
             )
+        }
+        if (resolved is SignResolve.Composite) {
+            return try {
+                val info = runBlocking {
+                    repo.loadCompositeKeyInfo(
+                        resolved.entity.fingerprint,
+                        resolved.passphrase?.takeIf { it.isNotEmpty() }?.toCharArray()
+                    )
+                }
+                val secret = info?.compositeSecret
+                    ?: return passphraseRequiredResult(data, resolved.keyId, resolved.label, wasWrong = false)
+                val signed = com.pgpony.android.crypto.pqc.CompositeDocumentSigner.signCleartext(
+                    info.suite, secret, info.fingerprint, text
+                )
+                writeAll(output, signed.toByteArray(Charsets.UTF_8))
+                successResult()
+            } catch (e: Exception) {
+                errorResult(OpenPgpError.GENERIC_ERROR, e.message ?: "Signing failed")
+            }
         }
         val ok = resolved as SignResolve.Ok
 
@@ -743,6 +798,34 @@ class PGPonyOpenPgpService : Service() {
                 )
             )
             return cardInteractionResult(opKey, data)
+        }
+        if (resolved is SignResolve.Composite) {
+            val payload = readAll(input)
+                ?: return errorResult(OpenPgpError.GENERIC_ERROR, "No input data provided")
+            return try {
+                val info = runBlocking {
+                    repo.loadCompositeKeyInfo(
+                        resolved.entity.fingerprint,
+                        resolved.passphrase?.takeIf { it.isNotEmpty() }?.toCharArray()
+                    )
+                }
+                val secret = info?.compositeSecret
+                    ?: return passphraseRequiredResult(data, resolved.keyId, resolved.label, wasWrong = false)
+                val signature: ByteArray = if (armor) {
+                    com.pgpony.android.crypto.pqc.CompositeDocumentSigner
+                        .signDetachedArmored(info.suite, secret, info.fingerprint, payload)
+                        .toByteArray(Charsets.UTF_8)
+                } else {
+                    com.pgpony.android.crypto.pqc.CompositeDocumentSigner
+                        .signDetached(info.suite, secret, info.fingerprint, payload)
+                }
+                successResult().apply {
+                    putExtra(OpenPgpApi.RESULT_DETACHED_SIGNATURE, signature)
+                    putExtra(OpenPgpApi.RESULT_SIGNATURE_MICALG, "pgp-sha256")
+                }
+            } catch (e: Exception) {
+                errorResult(OpenPgpError.GENERIC_ERROR, e.message ?: "Signing failed")
+            }
         }
         val ok = resolved as SignResolve.Ok
 
@@ -1497,7 +1580,9 @@ class PGPonyOpenPgpService : Service() {
                     "Could not export key material for ${entity.userEmail}"
                 )
         } else {
-            repo.loadPublicKeyRing(entity.fingerprint)?.encoded
+            // #55: composite ML-DSA primaries are not BouncyCastle rings, so use
+            // the raw-bytes export (the armored branch above already does).
+            repo.exportPublicKeyBytes(entity.fingerprint)
                 ?: return errorResult(
                     OpenPgpError.GENERIC_ERROR,
                     "Could not export key material for ${entity.userEmail}"
@@ -1525,6 +1610,14 @@ class PGPonyOpenPgpService : Service() {
         class Card(
             val entity: com.pgpony.android.data.PGPKeyEntity,
             val keyId: Long
+        ) : SignResolve()
+
+        /** #55: a composite ML-DSA primary, signed via CompositeDocumentSigner. */
+        class Composite(
+            val entity: com.pgpony.android.data.PGPKeyEntity,
+            val keyId: Long,
+            val label: String,
+            val passphrase: String?
         ) : SignResolve()
 
         class Fail(val response: Intent) : SignResolve()
@@ -1572,6 +1665,13 @@ class PGPonyOpenPgpService : Service() {
             } catch (e: Exception) {
                 keyId
             }
+        }
+        if (entity.algorithm.isCompositeSign) {
+            // #55: composite ML-DSA primaries are not BouncyCastle rings; the
+            // caller signs them through CompositeDocumentSigner instead.
+            val pass = data.getStringExtra(OpenPgpApi.EXTRA_PASSPHRASE)
+                ?: ProviderPassphraseCache.get(effectiveKeyId)
+            return SignResolve.Composite(entity, effectiveKeyId, entity.userID, pass)
         }
         if (entity.isCardBacked) {
             // P2c: card-backed signing goes through the NFC interaction

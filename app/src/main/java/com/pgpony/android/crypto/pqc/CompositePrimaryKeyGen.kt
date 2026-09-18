@@ -38,6 +38,13 @@ import org.bouncycastle.crypto.params.Ed448PrivateKeyParameters
 import org.bouncycastle.crypto.params.X25519KeyGenerationParameters
 import org.bouncycastle.crypto.params.X25519PrivateKeyParameters
 import org.bouncycastle.crypto.params.X25519PublicKeyParameters
+import org.bouncycastle.crypto.generators.X448KeyPairGenerator
+import org.bouncycastle.crypto.params.X448KeyGenerationParameters
+import org.bouncycastle.crypto.params.X448PrivateKeyParameters
+import org.bouncycastle.crypto.params.X448PublicKeyParameters
+import org.bouncycastle.crypto.signers.Ed25519Signer
+import org.bouncycastle.bcpg.PublicKeyAlgorithmTags
+import com.pgpony.android.crypto.ClassicalSubkeyGen
 import org.bouncycastle.openpgp.PGPSecretKey
 import org.bouncycastle.openpgp.PGPSecretKeyRing
 import org.bouncycastle.openpgp.operator.bc.BcAEADSecretKeyEncryptorBuilder
@@ -84,6 +91,10 @@ object CompositePrimaryKeyGen {
     private const val KEY_FLAG_SIGN = 0x02
     private const val KEY_FLAG_ENCRYPT_COMMS = 0x04
     private const val KEY_FLAG_ENCRYPT_STORAGE = 0x08
+    private const val KEY_FLAG_AUTHENTICATE = 0x20
+    private const val SIGTYPE_PRIMARY_BINDING = 0x19
+    private const val SUBPKT_EMBEDDED_SIG = 32
+    private const val TAG_PUBSUBKEY = 14
     private const val FEATURE_SEIPD_V1 = 0x01
     private const val FEATURE_SEIPD_V2 = 0x08
 
@@ -518,9 +529,255 @@ object CompositePrimaryKeyGen {
         return keyPacketBody.copyOfRange(0, q + matLen)
     }
 
+    // -- add subkey (raw composite primary) --------------------------
+
+    private class PrimaryCtx(
+        val suite: CompositeSignSuite,
+        val secret: ByteArray,
+        val fingerprint: ByteArray,
+        val pubBody: ByteArray
+    )
+
+    /** Parse and unlock the composite primary, and rebuild its public body. */
+    private fun primaryContext(ring: ByteArray, passphrase: CharArray?): PrimaryCtx {
+        val info = CompositeKeyFacade.parse(ring, passphrase)
+        val secret = info.compositeSecret
+            ?: throw IllegalStateException("composite primary secret is locked or unavailable")
+        val pubBody = v6PubBody((info.creationTimeMillis / 1000L).toInt(), info.suite.algId, info.compositePublic)
+        return PrimaryCtx(info.suite, secret, info.fingerprint, pubBody)
+    }
+
+    private fun v6PubBody(ctime: Int, algId: Int, material: ByteArray): ByteArray =
+        ByteArrayOutputStream().apply {
+            write(6)
+            write(uint32(ctime))
+            write(algId)
+            write(uint32(material.size))
+            write(material)
+        }.toByteArray()
+
+    /**
+     * Sign a v6 0x18 subkey-binding over primary||subkey with the composite
+     * primary, then append the secret subkey packet and the binding to [ring].
+     */
+    private fun bindAndAppend(
+        ring: ByteArray,
+        ctx: PrimaryCtx,
+        subPubBody: ByteArray,
+        subSecBody: ByteArray,
+        hashed: ByteArray,
+        random: SecureRandom
+    ): ByteArray {
+        val bindingData = keyFrame(ctx.pubBody) + keyFrame(subPubBody)
+        val binding = compositeSignaturePacket(ctx.suite, ctx.secret, SIGTYPE_SUBKEY_BINDING, bindingData, hashed, random)
+        return ByteArrayOutputStream().apply {
+            write(ring)
+            write(packet(TAG_SECSUBKEY, subSecBody))
+            write(binding)
+        }.toByteArray()
+    }
+
+    private fun bindingHashed(
+        ctime: Int,
+        keyFlags: Int,
+        primaryFingerprint: ByteArray,
+        expirationSeconds: Long?,
+        embeddedBackSig: ByteArray?
+    ): ByteArray = ByteArrayOutputStream().apply {
+        write(subpacket(SUBPKT_CREATION_TIME or 0x80, uint32(ctime)))
+        write(subpacket(SUBPKT_KEY_FLAGS or 0x80, byteArrayOf(keyFlags.toByte())))
+        if (expirationSeconds != null && expirationSeconds > 0L) {
+            write(subpacket(SUBPKT_KEY_EXPIRE, uint32(expirationSeconds.toInt())))
+        }
+        write(issuerFingerprintSubpacket(primaryFingerprint))
+        if (embeddedBackSig != null) write(subpacket(SUBPKT_EMBEDDED_SIG, embeddedBackSig))
+    }.toByteArray()
+
+    /**
+     * Add a composite ML-KEM + ECDH encryption subkey (algo 35/36) to a
+     * composite ML-DSA primary. Mirrors the encryption subkey [assemble] emits.
+     * Returns the raw ring; the caller re-protects if the primary was protected.
+     */
+    fun addCompositeEncryptionSubkey(
+        ring: ByteArray,
+        kemSuite: CompositeSuite = CompositeSuite.IETF_768,
+        expirationSeconds: Long? = null,
+        passphrase: CharArray? = null,
+        random: SecureRandom = SecureRandom(),
+        creationTime: Date = Date()
+    ): ByteArray {
+        require(!kemSuite.isLibrePgp) { "only IETF v6 ML-KEM subkeys can be added to a composite v6 primary" }
+        val ctx = primaryContext(ring, passphrase)
+        val ctime = (creationTime.time / 1000L).toInt()
+
+        val (eccPub, eccSec) = when (kemSuite.curve) {
+            EccCurve.X25519 -> {
+                val kp = X25519KeyPairGenerator()
+                    .apply { init(X25519KeyGenerationParameters(random)) }.generateKeyPair()
+                (kp.public as X25519PublicKeyParameters).encoded to (kp.private as X25519PrivateKeyParameters).encoded
+            }
+            EccCurve.X448 -> {
+                val kp = X448KeyPairGenerator()
+                    .apply { init(X448KeyGenerationParameters(random)) }.generateKeyPair()
+                (kp.public as X448PublicKeyParameters).encoded to (kp.private as X448PrivateKeyParameters).encoded
+            }
+            else -> throw ClassicalSubkeyGen.SubkeyAddError("unsupported KEM curve ${kemSuite.curve}")
+        }
+        val mkp = MLKEMKeyPairGenerator()
+            .apply { init(MLKEMKeyGenerationParameters(random, kemSuite.mlkem.params)) }.generateKeyPair()
+        val mPub = (mkp.public as MLKEMPublicKeyParameters).encoded
+        val mSeed = (mkp.private as MLKEMPrivateKeyParameters).seed ?: error("BC ML-KEM keypair missing seed")
+
+        val pubBody = v6PubBody(ctime, kemSuite.ietfAlgId, eccPub + mPub)
+        val secBody = pubBody + byteArrayOf(0) + eccSec + mSeed
+        val hashed = bindingHashed(
+            ctime, KEY_FLAG_ENCRYPT_COMMS or KEY_FLAG_ENCRYPT_STORAGE,
+            ctx.fingerprint, expirationSeconds, embeddedBackSig = null
+        )
+        return bindAndAppend(ring, ctx, pubBody, secBody, hashed, random)
+    }
+
+    /**
+     * Add a composite ML-DSA + EdDSA signing subkey (algo 30/31) to a composite
+     * ML-DSA primary: a composite 0x19 back-signature made by the new subkey,
+     * carried inside a composite 0x18 binding made by the primary.
+     */
+    fun addCompositeSigningSubkey(
+        ring: ByteArray,
+        signSuite: CompositeSignSuite = CompositeSignSuite.MLDSA65_ED25519,
+        expirationSeconds: Long? = null,
+        passphrase: CharArray? = null,
+        random: SecureRandom = SecureRandom(),
+        creationTime: Date = Date()
+    ): ByteArray {
+        val ctx = primaryContext(ring, passphrase)
+        val ctime = (creationTime.time / 1000L).toInt()
+
+        val (edPub, edSec) = when (signSuite.eddsa) {
+            EdDsaCurve.ED25519 -> {
+                val sk = Ed25519PrivateKeyParameters(random)
+                sk.generatePublicKey().encoded to sk.encoded
+            }
+            EdDsaCurve.ED448 -> {
+                val sk = Ed448PrivateKeyParameters(random)
+                sk.generatePublicKey().encoded to sk.encoded
+            }
+        }
+        val mldsaSeed = ByteArray(signSuite.mldsa.seedLen).also { random.nextBytes(it) }
+        val mldsaPub = MLDSAPrivateKeyParameters(signSuite.mldsa.params, mldsaSeed).publicKeyParameters.encoded
+        val subSecret = signSuite.join(edSec, mldsaSeed)
+        val pubBody = v6PubBody(ctime, signSuite.algId, signSuite.join(edPub, mldsaPub))
+        val secBody = pubBody + byteArrayOf(0) + subSecret
+        val subFp = v6Fingerprint(pubBody)
+        val bindingData = keyFrame(ctx.pubBody) + keyFrame(pubBody)
+
+        val backHashed = ByteArrayOutputStream().apply {
+            write(subpacket(SUBPKT_CREATION_TIME or 0x80, uint32(ctime)))
+            write(issuerFingerprintSubpacket(subFp))
+        }.toByteArray()
+        val backSigBody = compositeSigBody(signSuite, subSecret, SIGTYPE_PRIMARY_BINDING, bindingData, backHashed, random)
+
+        val hashed = bindingHashed(ctime, KEY_FLAG_SIGN, ctx.fingerprint, expirationSeconds, backSigBody)
+        return bindAndAppend(ring, ctx, pubBody, secBody, hashed, random)
+    }
+
+    /**
+     * Add a classical v6 Ed25519 / X25519 subkey to a composite ML-DSA primary.
+     * The 0x18 binding is signed by the composite primary; an Ed25519 signing
+     * subkey also carries its own 0x19 back-signature.
+     */
+    fun addClassicalSubkey(
+        ring: ByteArray,
+        type: ClassicalSubkeyGen.ClassicalSubkeyType,
+        expirationSeconds: Long? = null,
+        passphrase: CharArray? = null,
+        random: SecureRandom = SecureRandom(),
+        creationTime: Date = Date()
+    ): ByteArray {
+        val ctx = primaryContext(ring, passphrase)
+        val ctime = (creationTime.time / 1000L).toInt()
+
+        val algId: Int
+        val keyFlags: Int
+        val pub: ByteArray
+        val sec: ByteArray
+        var edSecForBackSig: ByteArray? = null
+        when (type) {
+            ClassicalSubkeyGen.ClassicalSubkeyType.X25519_ENCRYPT -> {
+                val kp = X25519KeyPairGenerator()
+                    .apply { init(X25519KeyGenerationParameters(random)) }.generateKeyPair()
+                pub = (kp.public as X25519PublicKeyParameters).encoded
+                sec = (kp.private as X25519PrivateKeyParameters).encoded
+                algId = PublicKeyAlgorithmTags.X25519
+                keyFlags = KEY_FLAG_ENCRYPT_COMMS or KEY_FLAG_ENCRYPT_STORAGE
+            }
+            ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_SIGN -> {
+                val sk = Ed25519PrivateKeyParameters(random)
+                pub = sk.generatePublicKey().encoded
+                sec = sk.encoded
+                algId = PublicKeyAlgorithmTags.Ed25519
+                keyFlags = KEY_FLAG_SIGN
+                edSecForBackSig = sec
+            }
+            ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_AUTH -> {
+                val sk = Ed25519PrivateKeyParameters(random)
+                pub = sk.generatePublicKey().encoded
+                sec = sk.encoded
+                algId = PublicKeyAlgorithmTags.Ed25519
+                keyFlags = KEY_FLAG_AUTHENTICATE
+            }
+            else -> throw ClassicalSubkeyGen.SubkeyAddError(
+                "Only Ed25519 and X25519 subkeys are supported on a v6 key."
+            )
+        }
+
+        val pubBody = v6PubBody(ctime, algId, pub)
+        val secBody = pubBody + byteArrayOf(0) + sec
+        val bindingData = keyFrame(ctx.pubBody) + keyFrame(pubBody)
+
+        val backSigBody: ByteArray? = if (edSecForBackSig != null) {
+            val subFp = v6Fingerprint(pubBody)
+            val backHashed = ByteArrayOutputStream().apply {
+                write(subpacket(SUBPKT_CREATION_TIME or 0x80, uint32(ctime)))
+                write(issuerFingerprintSubpacket(subFp))
+            }.toByteArray()
+            val salt = ByteArray(SALT_SHA256).also { random.nextBytes(it) }
+            val digest = CompositeSigHash.v6DocumentDigest(
+                hashAlgorithm = HASH_SHA256,
+                salt = salt,
+                data = bindingData,
+                signatureType = SIGTYPE_PRIMARY_BINDING,
+                publicKeyAlgorithm = algId,
+                hashedSubpacketBody = backHashed
+            )
+            v6SigBody(SIGTYPE_PRIMARY_BINDING, algId, backHashed, digest, salt, ed25519Sign(edSecForBackSig, digest))
+        } else null
+
+        val hashed = bindingHashed(ctime, keyFlags, ctx.fingerprint, expirationSeconds, backSigBody)
+        return bindAndAppend(ring, ctx, pubBody, secBody, hashed, random)
+    }
+
+    private fun ed25519Sign(secret: ByteArray, digest: ByteArray): ByteArray {
+        val signer = Ed25519Signer()
+        signer.init(true, Ed25519PrivateKeyParameters(secret, 0))
+        signer.update(digest, 0, digest.size)
+        return signer.generateSignature()
+    }
+
+
     // -- helpers ------------------------------------------------------
 
     private fun compositeSignaturePacket(
+        suite: CompositeSignSuite,
+        compositeSecret: ByteArray,
+        sigType: Int,
+        data: ByteArray,
+        hashed: ByteArray,
+        random: SecureRandom
+    ): ByteArray = packet(TAG_SIGNATURE, compositeSigBody(suite, compositeSecret, sigType, data, hashed, random))
+
+    /** A v6 composite signature packet BODY (no packet header), for embedding. */
+    private fun compositeSigBody(
         suite: CompositeSignSuite,
         compositeSecret: ByteArray,
         sigType: Int,
@@ -538,22 +795,31 @@ object CompositePrimaryKeyGen {
             hashedSubpacketBody = hashed
         )
         val signature = CompositeSigner.sign(suite, compositeSecret, digest, random)
-        val body = ByteArrayOutputStream().apply {
-            write(6)
-            write(sigType)
-            write(suite.algId)
-            write(HASH_SHA256)
-            write(uint32(hashed.size))
-            write(hashed)
-            write(uint32(0)) // no unhashed subpackets
-            write(digest[0].toInt() and 0xFF)
-            write(digest[1].toInt() and 0xFF)
-            write(salt.size)
-            write(salt)
-            write(signature)
-        }.toByteArray()
-        return packet(TAG_SIGNATURE, body)
+        return v6SigBody(sigType, suite.algId, hashed, digest, salt, signature)
     }
+
+    /** A v6 signature packet body with an empty unhashed area. */
+    private fun v6SigBody(
+        sigType: Int,
+        pubAlgo: Int,
+        hashed: ByteArray,
+        digest: ByteArray,
+        salt: ByteArray,
+        signatureMaterial: ByteArray
+    ): ByteArray = ByteArrayOutputStream().apply {
+        write(6)
+        write(sigType)
+        write(pubAlgo)
+        write(HASH_SHA256)
+        write(uint32(hashed.size))
+        write(hashed)
+        write(uint32(0))
+        write(digest[0].toInt() and 0xFF)
+        write(digest[1].toInt() and 0xFF)
+        write(salt.size)
+        write(salt)
+        write(signatureMaterial)
+    }.toByteArray()
 
     /** v6 fingerprint: SHA-256 of 0x9B || 4-octet length || public key body. */
     private fun v6Fingerprint(pubBody: ByteArray): ByteArray =

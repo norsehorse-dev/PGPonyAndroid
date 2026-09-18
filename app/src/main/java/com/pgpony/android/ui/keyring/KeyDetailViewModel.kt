@@ -928,25 +928,43 @@ class KeyDetailViewModel(
      * CompositeKeyFacade metadata rather than a BouncyCastle ring.
      */
     private suspend fun compositeSubkeys(entity: PGPKeyEntity): List<SubkeyDisplayInfo> {
-        val info = withContext(Dispatchers.IO) {
-            repo.loadCompositePublicInfo(entity.fingerprint)
-        } ?: return emptyList()
-        val sub = info.encryptionSubkey ?: return emptyList()
-        val fpHex = sub.fingerprint.joinToString("") { String.format("%02X", it) }
-        val algo = KeyAlgorithm.from(sub.algId, 6)
-        val expiresAtMs = info.expirationSeconds?.let { info.creationTimeMillis + it * 1000L }
-        return listOf(
+        // #55: enumerate ALL subkeys on the composite primary (the original
+        // ML-KEM subkey plus any added ML-KEM / ML-DSA / classical subkeys),
+        // reading each one's capabilities from its 0x18 binding.
+        val descriptors = withContext(Dispatchers.IO) {
+            repo.loadCompositeSubkeys(entity.fingerprint)
+        }
+        return descriptors.map { d ->
+            val fpHex = d.fingerprintHex.uppercase()
+            val algo = KeyAlgorithm.from(d.algId, 6)
+            val capabilities = if (d.keyFlags != 0) {
+                SubkeyCapability.fromBcKeyFlags(d.keyFlags)
+            } else when (d.algId) {
+                35, 36, 25 -> SubkeyCapability.Encrypt.flag
+                30, 31, 27 -> SubkeyCapability.Sign.flag
+                else -> 0
+            }
             SubkeyDisplayInfo(
                 fingerprint = fpHex,
                 keyId = fpHex.take(16),
-                algorithmLabel = algo?.displayName ?: "ML-KEM (v6)",
-                capabilities = SubkeyCapability.Encrypt.flag,
-                createdAt = info.creationTimeMillis,
-                expiresAt = expiresAtMs,
-                isRevoked = sub.isRevoked,
+                algorithmLabel = algo?.displayName ?: compositeSubkeyLabel(d.algId),
+                capabilities = capabilities,
+                createdAt = d.createdAtMillis,
+                expiresAt = d.expirationSeconds?.let { d.createdAtMillis + it * 1000L },
+                isRevoked = d.isRevoked,
                 isCardBacked = entity.isCardBacked
             )
-        )
+        }
+    }
+
+    private fun compositeSubkeyLabel(algId: Int): String = when (algId) {
+        35 -> "ML-KEM-768 + X25519"
+        36 -> "ML-KEM-1024 + X448"
+        30 -> "ML-DSA-65 + Ed25519"
+        31 -> "ML-DSA-87 + Ed448"
+        25 -> "X25519"
+        27 -> "Ed25519"
+        else -> "Subkey (v6)"
     }
 
     private suspend fun deriveSubkeys(entity: PGPKeyEntity): List<SubkeyDisplayInfo> {

@@ -31,6 +31,20 @@ object CompositeKeyFacade {
     )
 
     /**
+     * #55: a display descriptor for EVERY subkey on a composite primary
+     * (ML-KEM, composite ML-DSA, or classical), read from its packet and 0x18
+     * binding. [keyFlags] is the OpenPGP wire key-flags octet from the binding.
+     */
+    data class SubkeyDescriptor(
+        val fingerprintHex: String,
+        val algId: Int,
+        val createdAtMillis: Long,
+        val keyFlags: Int,
+        val expirationSeconds: Long?,
+        val isRevoked: Boolean
+    )
+
+    /**
      * A composite ML-DSA + EdDSA key component that can make signatures: the
      * primary, or any composite (algo 30/31) subkey. Used to verify a signature
      * against whichever component made it (sequoia signs with a dedicated
@@ -290,11 +304,18 @@ object CompositeKeyFacade {
             if (pkt.tag == 7) {
                 val pubBody = publicKeyBody(pkt.body)
                 val algId = pubBody[1 + 4].toInt() and 0xFF
+                // #26 (RC4) + #55: protect every subkey the passphrase should gate:
+                // the ML-KEM encryption subkey (35/36), an added composite ML-DSA
+                // signing subkey (30/31), and an added classical v6 subkey (25/27).
                 val kem = com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(algId)
-                if (kem != null) {
-                    // #26 (RC4): protect the ML-KEM subkey too, so the passphrase
-                    // gates decryption as well as signing.
-                    val len = kem.curve.keyLen + kem.mlkem.seedLen
+                val signSub = CompositeSignSuite.forAlgId(algId)
+                val len: Int? = when {
+                    kem != null -> kem.curve.keyLen + kem.mlkem.seedLen
+                    signSub != null -> signSub.compositeSecretLen
+                    algId == 25 || algId == 27 -> 32 // X25519 / Ed25519 native secret
+                    else -> null
+                }
+                if (len != null) {
                     out.write(packet(7, pubBody + reprotectRegion(
                         pkt.body, pubBody, len, oldPassphrase, newPassphrase
                     )))
@@ -418,6 +439,75 @@ object CompositeKeyFacade {
             }
         }
         return out.toByteArray()
+    }
+
+    /**
+     * #55: enumerate every subkey on a composite primary, in ring order, with
+     * the capability flags, creation time, expiry and revocation state read
+     * from each subkey's 0x18 binding signature. Works on a public or secret
+     * ring. Composite keys are v6-only, so only v6 signatures are parsed.
+     */
+    fun listSubkeys(ring: ByteArray): List<SubkeyDescriptor> {
+        val pkts = walk(ring)
+        val out = ArrayList<SubkeyDescriptor>()
+        for ((idx, pkt) in pkts.withIndex()) {
+            if (pkt.tag != 7 && pkt.tag != 14) continue
+            val pub = publicKeyBody(pkt.body)
+            val algId = pub[1 + 4].toInt() and 0xFF
+            val ctime = beInt(pub, 1).toLong() and 0xFFFFFFFFL
+            var keyFlags = 0
+            var expiry: Long? = null
+            var revoked = false
+            var j = idx + 1
+            while (j < pkts.size && pkts[j].tag == 2) {
+                val body = pkts[j].body
+                if (body.isNotEmpty() && body[0].toInt() == 6) {
+                    when (body[1].toInt() and 0xFF) {
+                        0x18 -> {
+                            val area = v6HashedArea(body)
+                            findSubpacket(area, 27)?.let { if (it.isNotEmpty()) keyFlags = it[0].toInt() and 0xFF }
+                            findSubpacket(area, 9)?.let {
+                                val e = beInt(it, 0).toLong() and 0xFFFFFFFFL
+                                if (e > 0) expiry = e
+                            }
+                        }
+                        0x28 -> revoked = true
+                    }
+                }
+                j++
+            }
+            out.add(
+                SubkeyDescriptor(
+                    v6Fingerprint(pub).joinToString("") { "%02x".format(it) },
+                    algId, ctime * 1000L, keyFlags, expiry, revoked
+                )
+            )
+        }
+        return out
+    }
+
+    /** The hashed subpacket area of a v6 signature packet body. */
+    private fun v6HashedArea(sigBody: ByteArray): ByteArray {
+        val hlen = beInt(sigBody, 4)
+        return sigBody.copyOfRange(8, 8 + hlen)
+    }
+
+    /** The body of the first subpacket of [wantType] in a subpacket [area], if present. */
+    private fun findSubpacket(area: ByteArray, wantType: Int): ByteArray? {
+        var i = 0
+        while (i < area.size) {
+            val l0 = area[i++].toInt() and 0xFF
+            val len = when {
+                l0 < 192 -> l0
+                l0 < 255 -> ((l0 - 192) shl 8) + (area[i++].toInt() and 0xFF) + 192
+                else -> beInt(area, i).also { i += 4 }
+            }
+            if (i >= area.size || i + len > area.size) break
+            val type = area[i].toInt() and 0x7F
+            if (type == wantType) return area.copyOfRange(i + 1, i + len)
+            i += len
+        }
+        return null
     }
 
     // -- parsing helpers ---------------------------------------------

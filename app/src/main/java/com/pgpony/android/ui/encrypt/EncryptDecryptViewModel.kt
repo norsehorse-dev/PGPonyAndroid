@@ -1364,16 +1364,33 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     s.selectedRecipients.mapNotNull { repo.loadEncryptionRecipientRing(it.fingerprint) }
                 }
                 val v4Recipients = v4RecipientsFor(s.selectedRecipients)
-                val signingRing = withContext(Dispatchers.IO) {
-                    if (s.signMessage && s.signingKey != null) {
-                        // RC3 §N (#34): PQC/classical-recipient default.
-                        val effective = resolveEffectiveSigner(
+                val effectiveSigner = if (s.signMessage && s.signingKey != null) {
+                    // RC3 §N (#34): PQC/classical-recipient default.
+                    withContext(Dispatchers.IO) {
+                        resolveEffectiveSigner(
                             base = s.signingKey,
                             recipients = s.selectedRecipients,
                             signOnly = false
                         )
-                        repo.loadSecretKeyRing(effective.fingerprint)
-                    } else null
+                    }
+                } else null
+                val signingRing = withContext(Dispatchers.IO) {
+                    if (effectiveSigner != null && !effectiveSigner.algorithm.isCompositeSign)
+                        repo.loadSecretKeyRing(effectiveSigner.fingerprint)
+                    else null
+                }
+                // #30/#31: a composite ML-DSA + EdDSA signer is not a BouncyCastle
+                // ring; load its raw material so crypto.encrypt inline-signs the
+                // message through the composite path instead of dropping the signature.
+                val compositeInfo = withContext(Dispatchers.IO) {
+                    if (effectiveSigner != null && effectiveSigner.algorithm.isCompositeSign)
+                        repo.loadCompositeKeyInfo(effectiveSigner.fingerprint, passphrase?.toCharArray())
+                    else null
+                }
+                if (effectiveSigner != null && effectiveSigner.algorithm.isCompositeSign &&
+                    compositeInfo?.compositeSecret == null
+                ) {
+                    throw com.pgpony.android.crypto.SigningError.PassphraseRequired()
                 }
 
                 val encrypted = withContext(Dispatchers.Default) {
@@ -1386,7 +1403,10 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         armor = s.asciiArmor,
                         signingKeyId = s.selectedSigningKeyId,
                         recipientSubkeyChoices = s.recipientSubkeyChoices,
-                        v4Algo35Recipients = v4Recipients
+                        v4Algo35Recipients = v4Recipients,
+                        compositeSignSuite = compositeInfo?.suite,
+                        compositeSignSecret = compositeInfo?.compositeSecret,
+                        compositeSignerFingerprint = compositeInfo?.fingerprint
                     )
                 }
                 if (!s.asciiArmor) {
@@ -3387,6 +3407,41 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     private suspend fun buildVerificationResultForEncrypted(
         result: com.pgpony.android.crypto.DecryptResult
     ): VerificationResult {
+        // #30/#31: the decrypt path extracted an inline composite (ML-DSA + EdDSA)
+        // signature that BouncyCastle cannot parse. Verify it against the stored
+        // composite public key here, mirroring verifyCompositeInlinePath.
+        if (result.compositeInline && result.compositeInlineBytes != null) {
+            val claimedFp = result.compositeClaimedSignerFp
+            val matched = resolveCompositeSigner(claimedFp)
+            if (matched != null) {
+                val (entity, component) = matched
+                val ok = withContext(Dispatchers.Default) {
+                    CompositeDocumentVerifier.verifyInline(
+                        component.publicMaterial, result.compositeInlineBytes
+                    ).valid
+                }
+                return if (ok) {
+                    VerificationResult.Verified(
+                        signerKeyID = claimedFp?.take(16) ?: entity.longKeyId,
+                        signerFingerprint = entity.fingerprint,
+                        signerName = entity.userName.ifBlank { null },
+                        signerEmail = entity.userEmail.ifBlank { null },
+                        signedContent = null
+                    )
+                } else {
+                    VerificationResult.Invalid(
+                        reason = "Composite signature did not verify",
+                        signerKeyID = claimedFp?.take(16),
+                        signedContent = null
+                    )
+                }
+            }
+            return VerificationResult.UnknownSigner(
+                signerKeyID = claimedFp?.take(16) ?: "",
+                claimedFingerprint = claimedFp,
+                signedContent = null
+            )
+        }
         val signerKeyId = result.signerKeyID
         if (signerKeyId == null) {
             // 4.1.0 Phase 14b. This returned Unsigned, which is a false

@@ -90,6 +90,57 @@ key's fingerprint and UID for verification before anything is stored, and only w
 explicit confirm. Verified on device with a raw .asc URL and with a key embedded in an HTML page.
 
 
+## 3. Offer ML-DSA-87 as a key-generation algorithm, paired with ML-KEM-1024
+
+Priority: medium. Origin: Scott Lu (email, "PGPony Android Feedback (4.5.0)", Google Pixel 8, Android 17,
+6:39 PM).
+
+Reported: add ML-DSA-87 as an option when choosing the algorithm for key generation, paired with
+ML-KEM-1024 as the default encryption key when generating the key pair.
+
+What already exists: ML-DSA-87+Ed448 (KeyAlgorithm.MLDSA87_ED448_V6, algo 31) is a defined algorithm and is
+already offered as a composite SIGNING SUBKEY (AddSubkeyChoice.PqSigning MLDSA87_ED448), and ML-KEM-1024+X448
+(CompositeSuite.IETF_1024, algo 36) already generates both as an encryption primary and as an encryption
+subkey. Two gaps remain for the primary composite-signing keygen: the picker list generatablePostQuantum in
+KeyAlgorithm only carries MLKEM1024_X448_V6 and MLDSA65_ED25519_V6, so a composite ML-DSA-87 PRIMARY cannot
+be generated from the UI; and CompositePrimaryKeyGen hardcodes the bundled encryption subkey to ML-KEM-768
+(KEM_SUITE = IETF_768) regardless of the signing tier.
+
+Work:
+
+- Add MLDSA87_ED448_V6 to generatablePostQuantum so the primary keygen picker offers an ML-DSA-87 composite
+  key alongside ML-DSA-65.
+- Pair the bundled encryption subkey to the signing tier instead of hardcoding it: an ML-DSA-87 primary ships
+  a ML-KEM-1024+X448 (IETF_1024) encryption subkey, an ML-DSA-65 primary keeps ML-KEM-768+X25519 (IETF_768).
+  CompositePrimaryKeyGen.assemble takes the KEM suite from the chosen signing suite rather than the fixed
+  KEM_SUITE constant.
+- Thread the chosen signing suite from the keygen UI through the repository generate path into assemble.
+
+Research / unknowns:
+
+- Default vs option: Scott suggests ML-DSA-87 + ML-KEM-1024 as the default. These keys are much larger
+  (ML-DSA-87 public material 2592 bytes, ML-KEM-1024 1568) and slower to generate and sign than the 65/768
+  pair. Decide whether ML-DSA-65 + ML-KEM-768 stays the default with 87/1024 as an explicit stronger option,
+  or 87/1024 becomes default. Leaning toward keeping 65 default and adding 87 as an option, since the larger
+  keys cost size and speed for a security margin most users do not need yet.
+- Size knock-on: larger keys affect armored export length and the QR export path (a 1024/87 public key may not
+  fit a single scannable QR). Check the QR and share paths against the larger material.
+
+Delivery: the key-generation picker offers an ML-DSA-87 composite primary, and generating one produces a
+matching ML-KEM-1024 encryption subkey rather than a ML-KEM-768 one.
+
+Refinement (Scott Lu, follow-up, 7:49 PM): frame the choice as two tiers rather than a single option. Keep
+ML-DSA-65 + ML-KEM-768 as the DEFAULT for portability, speed, and already-ample security, and offer
+ML-DSA-87 + ML-KEM-1024 as a max-security option with the larger, slower keys. That settles the default
+question above: 65/768 stays default, 87/1024 is the explicit stronger opt-in.
+
+Out of scope: Scott also suggested an even-lighter ML-DSA-44 + ML-KEM-512 tier. Those NIST levels exist, but
+the OpenPGP PQC draft (draft-ietf-openpgp-pqc, the composite code points PGPony implements) registers
+algorithm IDs only for ML-KEM-768, ML-KEM-1024, ML-DSA-65, and ML-DSA-87. There is no OpenPGP composite code
+point for ML-DSA-44 or ML-KEM-512, so a 44/512 key would have no interoperable on-wire encoding and no other
+OpenPGP tool could read it. Not viable until the spec registers those levels; revisit if it does.
+
+
 ## Delivery note
 
 Android first per the new-feature procedure. iOS mirrors each item once the Android version is verified,
