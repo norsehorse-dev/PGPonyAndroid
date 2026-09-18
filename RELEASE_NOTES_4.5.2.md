@@ -39,13 +39,13 @@ from an external mail app.
 Whole-file SHA-256 (is this download the published file):
 
 ```
-<fill in: shasum -a 256 of the uploaded APK>
+0dd192d4a8768da2cd84df8b61a408f9e3a090252bdcf60b781f40b39235b019
 ```
 
 Content hash (for rebuilders; excludes signature, see REPRODUCIBLE_BUILDS_PLAYBOOK.md):
 
 ```
-<fill in: tools/verify_repro.sh content hash>
+346ecab9c7c05a0831b2c4e240767d3fa57c0f1827dcbfbde3c1fa831a705b0a
 ```
 
 The APK is signed with the NorseHorse release key

@@ -77,13 +77,13 @@ and 4.5.1 added.
 Whole-file SHA-256 (is this download the published file):
 
 ```
-<fill: shasum -a 256 of the uploaded APK>
+166df6e0cc5840b98cbdcea2b55343241a357ea86a47ca7a3159b4b42ecfb3e4
 ```
 
 Content hash (for rebuilders; excludes signature, see REPRODUCIBLE_BUILDS_PLAYBOOK.md):
 
 ```
-<fill: tools/verify_repro.sh rebuild v4.5.1>
+6f0d2c808dc45ab14cf4b3eb06e9f657e2ceef9f239d12f047ae192938a3b8ec
 ```
 
 The APK is signed with the NorseHorse release key
