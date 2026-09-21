@@ -190,7 +190,7 @@ Work:
 Delivery: sharing text to PGPony opens one dialog whose options match the payload (key, ciphertext, signed, or
 plain text). Verified on device.
 
-Also reported (Christian Biere, 4.5.3 RC2 testing), same consolidation:
+Also reported (a tester, 4.5.3 RC2 testing), same consolidation:
 
 - The Quick Action is labeled "Decrypt / Verify" but only handles encrypted and encrypted+signed messages, not
   signed-only messages. Either it verifies signed-only input or the label should not promise it. The
@@ -218,13 +218,6 @@ it can join the sequoia-pgp interop test suite. hko-s confirmed the interop run 
 commands (skip revoke-key, update-key, merge-certs, certify-userid, validate-userid, armor, dearmor) and
 pointed at rsop as a local reference. The value is roundtrip coverage of the composite ML-DSA / ML-KEM paths
 against other implementations. Listed here for visibility; it does not gate the 4.6.0 app release.
-
-
-## Delivery note
-
-Android first per the new-feature procedure. iOS mirrors each item once the Android version is verified,
-tracked separately. This document is seeded from the forum.dark.vegas thread; add further items here as they
-come in before the 4.6.0 scope is locked.
 
 
 ## 9. Key Detail: "Upload to Key Server" disappears after the first upload
@@ -311,3 +304,58 @@ Delivery: fixture pair per case (a local cert with two User IDs and a "server" c
 against a server copy with an extra self-cert; a downgrade expiry), plus the on-device check: add an
 identity, upload, do not confirm the email, Refresh from key server, identity and primary badge intact.
 iOS mirror: 8.3.0 section 3.3(d).
+
+
+## 13. LibrePGP ML-KEM-768 + brainpoolP256r1 keygen, and an "experimental" tag on PQC options
+
+Priority: medium. Origin: Bart (limbodiver), Sep 2026, after cross-app testing against GnuPG/Kleopatra.
+
+Bart asked for the two LibrePGP composite KEM pairings Kleopatra offers. One already ships:
+ML-KEM-1024 + brainpoolP384r1 (LibrePGP), added in 4.3.x (issue #2). The missing one is
+ML-KEM-768 + brainpoolP256r1 (LibrePGP). The LibrePGP algo-8 path, the Brainpool domain handling, and
+the v5 KEM subkey under a v4 Ed25519 primary all already exist for the P-384 variant, so this is the P-256
+sibling of existing code, not new machinery. The pairing is strength-matched (ML-KEM-768 with a ~128-bit
+curve) and matches what Kleopatra generates.
+
+Second half: mark the post-quantum algorithms as experimental in the key generation picker. PQC OpenPGP still
+has two non-interoperating drafts in flight (the IETF composite draft PGPony's ML-DSA keys follow, and the
+LibrePGP/GnuPG variant), and the LibrePGP KEM keys are the ones that interoperate across apps today. A plain
+"experimental" tag on those entries sets expectations and cuts down interop confusion reports.
+
+Note the interop reason the LibrePGP keys work better: they are classical Ed25519 signing plus a PQC encryption
+subkey, so signatures stay classical and verify everywhere; only the key exchange is post-quantum. The IETF
+composite ML-DSA signing keys are the interop liability (their signatures are unreadable to tools without
+composite support). Not proposing to drop them, just to label the whole PQC set experimental.
+
+
+## 14. Composite ML-DSA signature framing when encrypting to a v4-only recipient
+
+Priority: low-medium (interop correctness). Origin: NorseHorse, Sep 2026, during the 4.5.3 composite work.
+
+When a composite ML-DSA signing key signs and encrypts to a recipient whose only key is v4, the container
+falls back to SEIPDv1, but the composite one-pass and signature packets are still v6. A v6 signature nested in
+v4 framing is a shape a strict v4-only parser can choke on. This does not hit the common case (a composite
+recipient forces SEIPDv2), and it was set aside in 4.5.3 in favor of the composite verify fix, so it is still
+open. Options: force SEIPDv2 whenever composite-signing (clean framing, but a v4-only recipient then cannot
+read the message at all), or accept the nesting and document it. Given the direction toward LibrePGP
+classical-signing keys, where signatures stay classical, this may end up low priority. Decide placement and
+approach; not yet scheduled.
+
+
+## 15. Composite signatures not verified through the share-target Quick Action
+
+Priority: low. Origin: surfaced during the 4.5.3 trust/verify work. Do this alongside item 6.
+
+The 4.5.3 work taught the decrypt screen, file decrypt, the OpenPGP provider and the Verify tab to verify
+composite inline signatures and to show signer trust. ShareTargetViewModel.publishDecryptResult still reads
+only result.signatureVerified, so a composite-signed message opened through the Quick Action shows unverified
+even though decryptStream now surfaces the composite fields. Mirror buildVerificationResultForStream's
+composite branch (resolve the signer, verifyInline, set the banner state) in the share-target publish path.
+Fold into the item 6 share rework since both touch the same screens.
+
+
+## Delivery note
+
+Android first per the new-feature procedure. iOS mirrors each item once the Android version is verified,
+tracked separately. This document is seeded from the forum.dark.vegas thread; add further items here as they
+come in before the 4.6.0 scope is locked.

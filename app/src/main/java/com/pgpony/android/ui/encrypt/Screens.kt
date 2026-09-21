@@ -1032,6 +1032,51 @@ private fun RecipientPickerCard(
         }
     }
 
+    // #57: warn before signing with, or encrypting to, an
+    // expired key. Previously only decrypt/verify flagged expiry, so an expired
+    // key could be used to produce output with no notice.
+    run {
+        val signingExpired = (state.signMessage || state.mode == EncryptMode.SIGN) &&
+            state.signingKey?.isExpired == true
+        val expiredRecipients = state.selectedRecipients.filter { it.isExpired }
+        if (signingExpired || expiredRecipients.isNotEmpty()) {
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            ) {
+                Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.Top) {
+                    Icon(
+                        Icons.Filled.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        if (signingExpired) {
+                            Text(
+                                stringResource(R.string.encrypt_expired_signing_warning),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                        if (expiredRecipients.isNotEmpty()) {
+                            val names = expiredRecipients.joinToString(", ") {
+                                it.userName.ifBlank { it.userEmail.ifBlank { it.shortFingerprint } }
+                            }
+                            Text(
+                                stringResource(R.string.encrypt_expired_recipient_warning, names),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // item 13 (#36): per-recipient encryption-subkey picker. Only shown for a
     // recipient whose key offers more than one encryption target; the first
     // option is the automatic pick.

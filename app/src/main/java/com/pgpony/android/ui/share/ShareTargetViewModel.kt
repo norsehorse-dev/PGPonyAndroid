@@ -490,6 +490,7 @@ class ShareTargetViewModel(
                             } else remaining -= skipped
                         }
                     }
+                    val verifyRings = allVerificationRings()
                     val r = input.use { source ->
                         dest.outputStream().buffered().use { sink ->
                             PGPCryptoService.shared.decryptStream(
@@ -497,7 +498,7 @@ class ShareTargetViewModel(
                                 output = sink,
                                 secretKeyRings = tryRings,
                                 passphrase = current.passphrase.ifEmpty { null },
-                                verificationKeys = null,
+                                verificationKeys = verifyRings,
                             )
                         }
                     }
@@ -768,6 +769,7 @@ class ShareTargetViewModel(
                     }
                     return@launch
                 }
+                val verifyRings = allVerificationRings()
                 val result = withContext(Dispatchers.Default) {
                     PGPCryptoService.shared.decryptArmored(
                         // 3.1.0 Phase 6 (J6/J2): a shared .eml carries the
@@ -777,7 +779,7 @@ class ShareTargetViewModel(
                             .pgpMimeEncryptedPayload(armored) ?: armored,
                         secretKeyRings = tryRings,
                         passphrase = current.passphrase.ifEmpty { null },
-                        verificationKeys = null,
+                        verificationKeys = verifyRings,
                     )
                 }
                 publishDecryptResult(
@@ -797,6 +799,18 @@ class ShareTargetViewModel(
             }
         }
     }
+
+    /**
+     * #57: the Quick Action decrypt paths passed a null
+     * verification set, so a signed message decrypted through the share target
+     * could never be verified even though the share-decrypt screen and file
+     * decrypt (which pass the real rings) verified the same message fine. Every
+     * stored public key is a candidate signer, mirroring the other paths.
+     */
+    private suspend fun allVerificationRings(): List<org.bouncycastle.openpgp.PGPPublicKeyRing> =
+        withContext(Dispatchers.IO) {
+            repository.getAllKeys().mapNotNull { repository.loadPublicKeyRing(it.fingerprint) }
+        }
 
     // ── Binary decrypt (file-mode PGP) ─────────────────────────────────
 
@@ -830,6 +844,7 @@ class ShareTargetViewModel(
                     }
                     return@launch
                 }
+                val verifyRings = allVerificationRings()
                 val result = withContext(Dispatchers.Default) {
                     PGPCryptoService.shared.decrypt(
                         // 3.1.0 Phase 6 (J6/J2): an .eml opened as bytes — unwrap the
@@ -837,7 +852,7 @@ class ShareTargetViewModel(
                         encryptedData = unwrapEnvelopeBytes(data),
                         secretKeyRings = tryRings,
                         passphrase = current.passphrase.ifEmpty { null },
-                        verificationKeys = null,
+                        verificationKeys = verifyRings,
                     )
                 }
                 publishDecryptResult(result, sourceFilename = sourceFilename)

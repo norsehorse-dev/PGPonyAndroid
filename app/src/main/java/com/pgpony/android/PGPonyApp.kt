@@ -37,6 +37,9 @@ class PGPonyApp : Application() {
     lateinit var secureKeyStore: SecureKeyStore
         private set
 
+    // 4.5.3 (#57): serializes background recovery-wrap writes off the UI thread.
+    private val recoveryExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+
     lateinit var keyRepository: KeyRepository
     lateinit var autocryptPeerStore: AutocryptPeerStore
         private set
@@ -73,6 +76,16 @@ class PGPonyApp : Application() {
 
         // Initialize secure key storage
         secureKeyStore = SecureKeyStore.getInstance(applicationContext)
+
+        // 4.5.3 (#57): when an in-app unlock proves a passphrase good, add the
+        // key's SecureKeyStore recovery wrap in the background so it survives a
+        // hardware-keystore wipe. Runs in both processes; harmless in either.
+        com.pgpony.android.session.InAppPassphraseCache.onVerifiedUnlock = { fp, pass ->
+            recoveryExecutor.execute {
+                val chars = pass.toCharArray()
+                try { secureKeyStore.ensureRecoveryWrap(fp, chars) } catch (_: Exception) {} finally { chars.fill('\u0000') }
+            }
+        }
 
         // Initialize repository (bridges crypto + storage + database)
         keyRepository = KeyRepository(

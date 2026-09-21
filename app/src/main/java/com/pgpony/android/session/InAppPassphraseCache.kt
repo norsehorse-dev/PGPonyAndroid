@@ -26,8 +26,15 @@ object InAppPassphraseCache {
         return (expiresAt - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
     }
 
+    // 4.5.3 (#57): fired when a passphrase is cached after a SUCCESSFUL in-app
+    // unlock (decrypt/sign). PGPonyApp wires this to add the key's SecureKeyStore
+    // recovery wrap on a background thread. Left null in tests/other processes.
+    @Volatile
+    var onVerifiedUnlock: ((fingerprint: String, passphrase: String) -> Unit)? = null
+
     fun put(fingerprint: String, passphrase: String) {
         entries[key(fingerprint)] = Entry(passphrase, SystemClock.elapsedRealtime())
+        try { onVerifiedUnlock?.invoke(fingerprint, passphrase) } catch (_: Exception) {}
     }
 
     fun get(fingerprint: String): String? {

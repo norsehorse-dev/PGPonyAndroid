@@ -248,8 +248,8 @@ android {
         // surface (#36 Araaf), contacts ANR fix, R8 keep-rule narrowing, privacy
         // link to pgpony.app, and a full translations pass for the six active
         // locales. versionCode 445 so it installs over 4.5.0.
-        versionCode = 447
-        versionName = "4.5.2"
+        versionCode = 448
+        versionName = "4.5.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

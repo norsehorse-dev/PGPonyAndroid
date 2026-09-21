@@ -80,7 +80,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import com.pgpony.android.saf.findDocumentCreatorHost
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -180,6 +184,19 @@ fun KeyDetailScreen(
         val msg = state.errorMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)
         viewModel.clearError()
+    }
+
+    // 4.5.3 (#57): offer to restore a key whose secure storage the OS wiped.
+    // Re-offered each time the screen is opened while the key still needs it.
+    LaunchedEffect(state.needsRecovery, state.showRecoveryDialog) {
+        if (state.needsRecovery && !state.showRecoveryDialog) {
+            val res = snackbarHostState.showSnackbar(
+                message = "This key's secure storage was reset by the device. Restore access?",
+                actionLabel = "Restore",
+                duration = SnackbarDuration.Long
+            )
+            if (res == SnackbarResult.ActionPerformed) viewModel.showRecoveryDialog()
+        }
     }
 
     // Phase A4b — central action dispatcher. The section composables
@@ -924,6 +941,47 @@ fun KeyDetailScreen(
     // forcing the user to set up biometric in Android Settings just to
     // export a key they already own.
     val keyForExport = state.key
+    if (state.showRecoveryDialog) {
+        val recoveryPass = remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { if (!state.isRecovering) viewModel.dismissRecoveryDialog() },
+            title = { Text("Restore key access") },
+            text = {
+                Column {
+                    Text(
+                        "This key's secure storage was reset by the device, so the app " +
+                            "can't read the key right now. Enter the key's passphrase to " +
+                            "restore access. This does not change your key."
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = recoveryPass.value,
+                        onValueChange = { recoveryPass.value = it },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        label = { Text("Passphrase") }
+                    )
+                    state.recoveryError?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = recoveryPass.value.isNotEmpty() && !state.isRecovering,
+                    onClick = { viewModel.submitRecovery(recoveryPass.value) }
+                ) { Text(if (state.isRecovering) "Restoring\u2026" else "Restore") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.dismissRecoveryDialog() },
+                    enabled = !state.isRecovering
+                ) { Text(stringResource(R.string.common_button_cancel)) }
+            }
+        )
+    }
+
     if (state.showExportPrivateConfirm && keyForExport != null) {
         // Compute the owner label outside the callbacks so both the
         // dialog body and the share Intent use the same string.

@@ -220,6 +220,20 @@ class ArmorCommentStore private constructor(context: Context) {
      * Phase 9b: refreshes BOTH the message cache and the pubkey-export
      * cache — they share the text, differ on the toggle.
      */
+    /**
+     * #57: one-shot, read-only refresh for the :remote_api
+     * provider process, which deliberately does NOT run [startCaching] (no
+     * long-lived DataStore collector in a second process). Without this the
+     * provider's [ArmorCommentHeader.current] stayed frozen at the seeded
+     * default, so every message encrypted through the OpenPGP API carried the
+     * default comment regardless of the user's setting. A read-only one-shot
+     * avoids the concurrent-writer hazard the collector was avoiding. The
+     * provider calls this before building armored output; since Android
+     * recycles the bound provider process often, the value is fresh in
+     * practice (a change mid-process-life is picked up on the next cold start).
+     */
+    suspend fun refreshFromDisk() = recache()
+
     private suspend fun recache() {
         val prefs = ds.data.first()
         val include = prefs[KEY_INCLUDE] ?: true

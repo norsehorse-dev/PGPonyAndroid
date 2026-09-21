@@ -468,6 +468,16 @@ class PGPonyOpenPgpService : Service() {
     // retries and the operation finds it. Wrong passphrase clears the
     // cached entry first so a stale value can't loop.
 
+    // #57: expired keys are blocked from producing output
+    // unless the user opts in. This runs in the :remote_api process, so read the
+    // pref cross-process (MODE_MULTI_PROCESS re-reads the backing file) the way
+    // ApiClientsScreen already does, to pick up a change made in main-process
+    // Settings.
+    private fun allowExpiredKeys(): Boolean =
+        applicationContext
+            .getSharedPreferences("pgpony_prefs", android.content.Context.MODE_MULTI_PROCESS)
+            .getBoolean("allow_expired_keys", false)
+
     /** ACTION_ENCRYPT / ACTION_SIGN_AND_ENCRYPT. */
     private fun encryptOp(
         data: Intent,
@@ -483,6 +493,23 @@ class PGPonyOpenPgpService : Service() {
         }
         val armor = data.getBooleanExtra(OpenPgpApi.EXTRA_REQUEST_ASCII_ARMOR, false)
         val filename = data.getStringExtra(OpenPgpApi.EXTRA_ORIGINAL_FILENAME)
+
+        // #57: this runs in the :remote_api process, which
+        // skips ArmorCommentStore.startCaching (no long-lived DataStore
+        // collector in a second process), so ArmorCommentHeader.current was
+        // stuck on the seeded default and every armored message from the
+        // OpenPGP API carried the default comment regardless of the user's
+        // setting. Refresh it once from disk before building armored output.
+        // Read-only and only when armor is requested (the comment applies to
+        // armored output only).
+        if (armor) {
+            runBlocking {
+                runCatching {
+                    com.pgpony.android.data.ArmorCommentStore.get(applicationContext)
+                        .refreshFromDisk()
+                }
+            }
+        }
 
         // Recipients: EXTRA_KEY_IDS (already-resolved ids) and/or
         // EXTRA_USER_IDS (email addresses), deduped by fingerprint.
@@ -541,6 +568,8 @@ class PGPonyOpenPgpService : Service() {
                     OpenPgpError.OPPORTUNISTIC_MISSING_KEYS,
                     "Missing keys for: ${missing.joinToString()}"
                 )
+            } else if (storageFailureMessage() != null) {
+                errorResult(OpenPgpError.GENERIC_ERROR, storageFailureMessage()!!)
             } else {
                 errorResult(
                     OpenPgpError.GENERIC_ERROR,
@@ -550,9 +579,28 @@ class PGPonyOpenPgpService : Service() {
             }
         }
 
+        // #57: refuse expired recipients unless the user opted in.
+        if (!allowExpiredKeys()) {
+            val expiredRecipients = runBlocking {
+                val all = repo.getAllKeys()
+                rings.keys.mapNotNull { fp ->
+                    all.firstOrNull { it.fingerprint.equals(fp, ignoreCase = true) && it.isExpired }
+                        ?.let { it.userName.ifBlank { it.userEmail.ifBlank { fp } } }
+                }
+            }
+            if (expiredRecipients.isNotEmpty()) {
+                return errorResult(
+                    OpenPgpError.GENERIC_ERROR,
+                    "Recipient key has expired: ${expiredRecipients.joinToString(", ")}. " +
+                        "Enable \"Allow expired keys\" in PGPony settings to encrypt to it."
+                )
+            }
+        }
+
         // Signing leg (SIGN_AND_ENCRYPT only).
         var signingRing: org.bouncycastle.openpgp.PGPSecretKeyRing? = null
         var signPassphrase: String? = null
+        var signerFingerprint: String? = null
         var signKeyId = 0L
         var signKeyLabel = ""
         var compositeSign: SignResolve.Composite? = null
@@ -560,11 +608,23 @@ class PGPonyOpenPgpService : Service() {
             when (val resolved = resolveSigningMaterial(data, rings.values)) {
                 is SignResolve.Fail -> return resolved.response
                 is SignResolve.Composite -> {
+                    if (!allowExpiredKeys() && resolved.entity.isExpired) {
+                        return errorResult(
+                            OpenPgpError.GENERIC_ERROR,
+                            "Signing key has expired. Enable \"Allow expired keys\" in PGPony settings to sign with it."
+                        )
+                    }
                     compositeSign = resolved
                     signKeyId = resolved.keyId
                     signKeyLabel = resolved.label
                 }
                 is SignResolve.Card -> {
+                    if (!allowExpiredKeys() && resolved.entity.isExpired) {
+                        return errorResult(
+                            OpenPgpError.GENERIC_ERROR,
+                            "Signing key has expired. Enable \"Allow expired keys\" in PGPony settings to sign with it."
+                        )
+                    }
                     // P2c: the entire sign+encrypt runs during the NFC
                     // tap (the card must be present while BC signs), so
                     // park the request and round-trip via the card
@@ -603,8 +663,15 @@ class PGPonyOpenPgpService : Service() {
                     return cardInteractionResult(opKey, data)
                 }
                 is SignResolve.Ok -> {
+                    if (!allowExpiredKeys() && resolved.entity.isExpired) {
+                        return errorResult(
+                            OpenPgpError.GENERIC_ERROR,
+                            "Signing key has expired. Enable \"Allow expired keys\" in PGPony settings to sign with it."
+                        )
+                    }
                     signingRing = resolved.ring
                     signPassphrase = resolved.passphrase
+                    signerFingerprint = resolved.entity.fingerprint
                     signKeyId = resolved.keyId
                     signKeyLabel = resolved.label
                     // RC5 P1 (#34, EmanuelLoos — his diagnosis): the
@@ -665,6 +732,7 @@ class PGPonyOpenPgpService : Service() {
                     compositeSignerFingerprint = info.fingerprint
                 )
                 ParcelFileDescriptor.AutoCloseOutputStream(output).use { it.write(encrypted) }
+                rememberProviderUnlock(compSigner.entity.fingerprint, compSigner.passphrase)
                 successResult()
             } catch (e: Exception) {
                 errorResult(OpenPgpError.GENERIC_ERROR, e.message ?: "Encryption failed")
@@ -684,6 +752,7 @@ class PGPonyOpenPgpService : Service() {
                     )
                 }
             }
+            rememberProviderUnlock(signerFingerprint ?: "", signPassphrase)
             successResult()
         } catch (e: SigningError.PassphraseRequired) {
             passphraseRequiredResult(data, signKeyId, signKeyLabel, wasWrong = false)
@@ -705,6 +774,20 @@ class PGPonyOpenPgpService : Service() {
             ?: return errorResult(OpenPgpError.GENERIC_ERROR, "No input data provided")
         val resolved = resolveSigningMaterial(data)
         if (resolved is SignResolve.Fail) return resolved.response
+        run {
+            val signerEntity = when (resolved) {
+                is SignResolve.Card -> resolved.entity
+                is SignResolve.Composite -> resolved.entity
+                is SignResolve.Ok -> resolved.entity
+                else -> null
+            }
+            if (!allowExpiredKeys() && signerEntity?.isExpired == true) {
+                return errorResult(
+                    OpenPgpError.GENERIC_ERROR,
+                    "Signing key has expired. Enable \"Allow expired keys\" in PGPony settings to sign with it."
+                )
+            }
+        }
         if (resolved is SignResolve.Card) {
             return cardOpRoundTrip(
                 data = data,
@@ -743,6 +826,7 @@ class PGPonyOpenPgpService : Service() {
                 passphrase = ok.passphrase
             )
             writeAll(output, signed.toByteArray(Charsets.UTF_8))
+            rememberProviderUnlock(ok.entity.fingerprint, ok.passphrase)
             successResult()
         } catch (e: SigningError.PassphraseRequired) {
             passphraseRequiredResult(data, ok.keyId, ok.label, wasWrong = false)
@@ -769,6 +853,20 @@ class PGPonyOpenPgpService : Service() {
         val armor = data.getBooleanExtra(OpenPgpApi.EXTRA_REQUEST_ASCII_ARMOR, false)
         val resolved = resolveSigningMaterial(data)
         if (resolved is SignResolve.Fail) return resolved.response
+        run {
+            val signerEntity = when (resolved) {
+                is SignResolve.Card -> resolved.entity
+                is SignResolve.Composite -> resolved.entity
+                is SignResolve.Ok -> resolved.entity
+                else -> null
+            }
+            if (!allowExpiredKeys() && signerEntity?.isExpired == true) {
+                return errorResult(
+                    OpenPgpError.GENERIC_ERROR,
+                    "Signing key has expired. Enable \"Allow expired keys\" in PGPony settings to sign with it."
+                )
+            }
+        }
         if (resolved is SignResolve.Card) {
             // Card path buffers by design (P2c op store).
             val payload = readAll(input)
@@ -841,6 +939,7 @@ class PGPonyOpenPgpService : Service() {
                     armor = armor
                 )
             }
+            rememberProviderUnlock(ok.entity.fingerprint, ok.passphrase)
             successResult().apply {
                 putExtra(OpenPgpApi.RESULT_DETACHED_SIGNATURE, signature)
                 putExtra(OpenPgpApi.RESULT_SIGNATURE_MICALG, "pgp-sha256")
@@ -1228,6 +1327,7 @@ class PGPonyOpenPgpService : Service() {
         }
 
         runBlocking { repo.incrementDecryptUseCount(matchedEntity.fingerprint) }
+        rememberProviderUnlock(matchedEntity.fingerprint, passphrase)
 
         return successResult().apply {
             putExtra(
@@ -1263,6 +1363,33 @@ class PGPonyOpenPgpService : Service() {
     ): OpenPgpSignatureResult {
         if (!result.hasSignature) {
             return OpenPgpSignatureResult.createWithNoSignature()
+        }
+        // #30/#31: an inline COMPOSITE (ML-DSA + EdDSA) signature that
+        // BouncyCastle cannot parse. decryptStream extracted the payload and
+        // the claimed signer fingerprint; verify it against the stored composite
+        // public key here, mirroring EncryptDecryptViewModel's composite path.
+        // Without this the composite signerKeyID is null and the message would
+        // be reported unsigned even though it carries a valid signature.
+        if (result.compositeInline && result.compositeInlineBytes != null) {
+            val claimedFp = result.compositeClaimedSignerFp
+            val match = runBlocking {
+                repo.getAllKeys()
+                    .filter { it.algorithm.isCompositeSign }
+                    .mapNotNull { e -> repo.loadCompositePublicInfo(e.fingerprint)?.let { e to it } }
+                    .firstNotNullOfOrNull { (e, info) ->
+                        info.compositeSigners
+                            .firstOrNull { c -> c.fingerprintHex.equals(claimedFp, ignoreCase = true) }
+                            ?.let { e to it }
+                    }
+            } ?: return OpenPgpSignatureResult.createWithKeyMissing(0L, null)
+            val (entity, component) = match
+            val ok = com.pgpony.android.crypto.pqc.CompositeDocumentVerifier
+                .verifyInline(component.publicMaterial, result.compositeInlineBytes).valid
+            if (!ok) return OpenPgpSignatureResult.createWithInvalidSignature()
+            val compKeyIdRaw = runCatching {
+                java.lang.Long.parseUnsignedLong(claimedFp!!.take(16), 16)
+            }.getOrDefault(0L)
+            return buildValidSignatureResult(entity, compKeyIdRaw, senderAddress)
         }
         val keyIdRaw = result.signatureKeyIDRaw ?: 0L
         if (result.signerKeyID == null) {
@@ -1541,6 +1668,40 @@ class PGPonyOpenPgpService : Service() {
      * with the Phase 5a multi-server directory — until then a missing
      * key is a readable error.
      */
+    // 4.5.3 (#57): a stored key that the SecureKeyStore can no longer decrypt
+    // (Android Keystore master key invalidated on some OEM/OS builds) looks
+    // exactly like a normal export miss to the old code. Distinguish the two so
+    // the user is told to re-import rather than left with a dead-end error.
+    // 4.5.3 (#57): after a provider unlock is proven good (a decrypt/sign that
+    // succeeded with the passphrase), ensure the key has a passphrase recovery
+    // wrap so it survives a future hardware-keystore wipe. Fire-and-forget off
+    // the binder thread.
+    private fun rememberProviderUnlock(fingerprint: String, passphrase: String?) {
+        if (passphrase.isNullOrEmpty()) return
+        Thread {
+            try { repo.ensureKeyRecoverable(fingerprint, passphrase) } catch (_: Exception) {}
+        }.start()
+    }
+
+    private val storageRecoverableMessage =
+        "PGPony's secure key storage on this device was invalidated by the OS. " +
+            "Open PGPony and unlock this key with its passphrase once to restore " +
+            "access, then try again."
+
+    private val storageUnreadableMessage =
+        "PGPony's secure key storage on this device was invalidated by the OS and " +
+            "this key has no passphrase to recover it from, so the stored material " +
+            "is gone. Open PGPony and re-import the key."
+
+    private fun storageFailureMessage(): String? = when {
+        repo.keyMaterialRecoverable() -> storageRecoverableMessage
+        repo.keyMaterialUnreadable() -> storageUnreadableMessage
+        else -> null
+    }
+
+    private fun exportFailureMessage(email: String): String =
+        storageFailureMessage() ?: "Could not export key material for $email"
+
     private fun getKey(data: Intent, output: ParcelFileDescriptor?): Intent {
         val entity = runBlocking {
             when {
@@ -1577,7 +1738,7 @@ class PGPonyOpenPgpService : Service() {
                 ?.toByteArray(Charsets.UTF_8)
                 ?: return errorResult(
                     OpenPgpError.GENERIC_ERROR,
-                    "Could not export key material for ${entity.userEmail}"
+                    exportFailureMessage(entity.userEmail)
                 )
         } else {
             // #55: composite ML-DSA primaries are not BouncyCastle rings, so use
@@ -1585,7 +1746,7 @@ class PGPonyOpenPgpService : Service() {
             repo.exportPublicKeyBytes(entity.fingerprint)
                 ?: return errorResult(
                     OpenPgpError.GENERIC_ERROR,
-                    "Could not export key material for ${entity.userEmail}"
+                    exportFailureMessage(entity.userEmail)
                 )
         }
         writeAll(output, keyBytes)

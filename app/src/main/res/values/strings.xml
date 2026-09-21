@@ -353,6 +353,12 @@
     <!-- ── Recipients section ───────────────────────────────────────── -->
     <string name="encrypt_recipients_label">Recipients</string>
     <!-- item 2 (#36): mixed-recipient post-quantum warning -->
+    <string name="encrypt_expired_signing_warning">This signing key has expired.</string>
+    <string name="encrypt_expired_recipient_warning">You are encrypting to an expired key: %1$s.</string>
+    <string name="encrypt_expired_signing_blocked">This signing key has expired. Turn on \"Allow expired keys\" in Settings to sign with it.</string>
+    <string name="encrypt_expired_recipient_blocked">An expired recipient key is selected: %1$s. Turn on \"Allow expired keys\" in Settings to encrypt to it.</string>
+    <string name="settings_allow_expired_title">Allow expired keys</string>
+    <string name="settings_allow_expired_subtitle">Let expired keys be used for signing and encryption. Off by default.</string>
     <string name="encrypt_pq_mixed_warning">Post-quantum weak link: %1$s will receive this message under classical encryption, so the whole message is not post-quantum secure. Every recipient needs a post-quantum key for full protection.</string>
     <!-- item 13 (#36): per-recipient encryption-subkey picker -->
     <string name="encrypt_subkey_label">%1$s: encryption subkey</string>
@@ -1320,6 +1326,7 @@
          VerificationBanner (decrypt-side signature outcome banner)
          ════════════════════════════════════════════════════════════════ -->
     <string name="verify_banner_verified_title">Verified</string>
+    <string name="verify_banner_verified_unconfirmed_title">Signed, key not verified</string>
     <string name="verify_banner_invalid_title">Signature invalid</string>
     <string name="verify_banner_unknown_signer_title">Unknown signer</string>
     <string name="verify_banner_unknown_signer_lookup_cd">Look up signer</string>

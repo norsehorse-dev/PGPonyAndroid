@@ -27,6 +27,8 @@
 
 package com.pgpony.android.crypto
 
+import com.pgpony.android.data.TrustLevel
+
 import org.bouncycastle.bcpg.ArmoredInputStream
 import org.bouncycastle.openpgp.PGPPublicKey
 import org.bouncycastle.openpgp.PGPPublicKeyRing
@@ -74,7 +76,13 @@ sealed class VerificationResult {
         /** Best-effort email parsed from the signer's user ID. */
         val signerEmail: String?,
         /** For clear-signed input: the verified plaintext (dash-unescaped). */
-        val signedContent: String?
+        val signedContent: String?,
+        /** #57: the signer key's local trust level, so the
+         *  banner can distinguish a signature from a verified key from one made
+         *  by an unconfirmed/rogue import (the crypto check passes for both).
+         *  Null means the caller did not resolve trust; the banner then keeps
+         *  the plain "Verified" state, so untouched callers do not regress. */
+        val signerTrust: TrustLevel? = null
     ) : VerificationResult()
 
     /** Signature present, signer in keyring, but verification failed. */

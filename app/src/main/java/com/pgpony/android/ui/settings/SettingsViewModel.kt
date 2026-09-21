@@ -113,6 +113,7 @@ data class SettingsUiState(
     // darkvegas interop: passphrase encryption uses gpg-friendly S2K type 3 by
     // default; this opts back into Argon2id (needs GnuPG 2.4+). Default off.
     val useArgon2: Boolean = false,
+    val allowExpiredKeys: Boolean = false,
     // item 8 (#request): offer the post-keygen publish prompt (default on).
     val offerPublishAfterKeygen: Boolean = true,
     // ── Phase A4: default / remembered recipient ────────────────────────
@@ -204,6 +205,11 @@ class SettingsViewModel(
         _state.value = _state.value.copy(useArgon2 = enabled)
     }
 
+    fun setAllowExpiredKeys(enabled: Boolean) {
+        prefs.edit().putBoolean("allow_expired_keys", enabled).apply()
+        _state.value = _state.value.copy(allowExpiredKeys = enabled)
+    }
+
     /** item 8 (#request): toggle the post-keygen "offer to publish" suggestion,
      *  which points at key servers (keys.pgpony.app included). Persisted. */
     fun setOfferPublishAfterKeygen(enabled: Boolean) {
@@ -237,6 +243,7 @@ class SettingsViewModel(
             // 3.1.0 always-on behavior.
             clearInputsAfterEncrypt = prefs.getBoolean("clear_inputs_after_encrypt", true),
             useArgon2 = prefs.getBoolean("use_argon2", false),
+            allowExpiredKeys = prefs.getBoolean("allow_expired_keys", false),
             offerPublishAfterKeygen = prefs.getBoolean("offer_publish_after_keygen", true),
             // ── Phase A12: theme + reminders persisted prefs ────
             selectedTheme = AppTheme.fromStorage(prefs.getString("selected_theme", null)),

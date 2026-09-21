@@ -39,6 +39,7 @@ package com.pgpony.android.ui.encrypt
 
 import androidx.lifecycle.ViewModel
 import com.pgpony.android.ui.util.ProgressInputStream
+import com.pgpony.android.data.TrustLevel
 import com.pgpony.android.ui.util.ScratchFiles
 import androidx.lifecycle.viewModelScope
 import com.pgpony.android.PGPonyApp
@@ -574,6 +575,30 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     // SHA-256 (S2K type 3) so any gpg on Linux can read it. Argon2id (type 4,
     // needs GnuPG 2.4+ / libgcrypt 1.10+) is opt-in via Settings.
     private val useArgon2Pref: Boolean get() = appPrefs.getBoolean("use_argon2", false)
+
+    // #57: expired keys are blocked from producing output
+    // unless the user opts in (Settings -> Allow expired keys). Decrypt/verify
+    // already flagged expiry; this closes the produce side. Returns the block
+    // message, or null to proceed.
+    private val allowExpiredKeys: Boolean get() = appPrefs.getBoolean("allow_expired_keys", false)
+
+    private fun expiredKeyBlock(
+        signingKey: PGPKeyEntity?,
+        recipients: List<PGPKeyEntity>
+    ): String? {
+        if (allowExpiredKeys) return null
+        if (signingKey?.isExpired == true)
+            return PGPonyApp.instance.getString(R.string.encrypt_expired_signing_blocked)
+        val expired = recipients.filter { it.isExpired }
+        if (expired.isNotEmpty())
+            return PGPonyApp.instance.getString(
+                R.string.encrypt_expired_recipient_blocked,
+                expired.joinToString(", ") {
+                    it.userName.ifBlank { it.userEmail.ifBlank { it.shortFingerprint } }
+                }
+            )
+        return null
+    }
     // Phase A3: verification service for clear-signed input. Encrypted-
     // and-signed messages still go through PGPCryptoService.decryptArmored
     // (which parses one-pass-signature packets inline); the VerifyService
@@ -1187,6 +1212,10 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
 
     fun signOnly(passphrase: String? = null) {
         val s = _encryptState.value
+        expiredKeyBlock(s.signingKey, emptyList())?.let {
+            _encryptState.value = _encryptState.value.copy(errorMessage = it, isProcessing = false)
+            return
+        }
         if (s.inputText.isBlank()) {
             _encryptState.value = s.copy(errorMessage = PGPonyApp.instance.getString(R.string.encdec_error_sign_no_input))
             return
@@ -1324,6 +1353,10 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
 
     fun encrypt(passphrase: String? = null) {
         val s = _encryptState.value
+        expiredKeyBlock(if (s.signMessage) s.signingKey else null, s.selectedRecipients)?.let {
+            _encryptState.value = _encryptState.value.copy(errorMessage = it, isProcessing = false)
+            return
+        }
         if (s.inputText.isBlank()) {
             _encryptState.value = s.copy(errorMessage = PGPonyApp.instance.getString(R.string.encdec_error_encrypt_no_input))
             return
@@ -1678,6 +1711,10 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      */
     fun encryptFile(passphrase: String? = null) {
         val s = _encryptState.value
+        expiredKeyBlock(if (s.signMessage) s.signingKey else null, s.selectedRecipients)?.let {
+            _encryptState.value = _encryptState.value.copy(errorMessage = it, isProcessing = false)
+            return
+        }
         // 4.0.4 — one file operation at a time. Nothing stopped a second
         // tap from launching another job: each got its own
         // ProgressInputStream writing to the same processedBytes, so the
@@ -1725,20 +1762,42 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     s.selectedRecipients.mapNotNull { repo.loadEncryptionRecipientRing(it.fingerprint) }
                 }
                 val v4Recipients = v4RecipientsFor(s.selectedRecipients)
-                val signingRing = withContext(Dispatchers.IO) {
-                    if (s.signMessage && s.signingKey != null) {
-                        // RC3 §N (#34): PQC/classical-recipient default.
-                        val effective = resolveEffectiveSigner(
+                val effectiveSigner = if (s.signMessage && s.signingKey != null) {
+                    // RC3 §N (#34): PQC/classical-recipient default.
+                    withContext(Dispatchers.IO) {
+                        resolveEffectiveSigner(
                             base = s.signingKey,
                             recipients = s.selectedRecipients,
                             signOnly = false
                         )
-                        repo.loadSecretKeyRing(effective.fingerprint)
-                    } else null
+                    }
+                } else null
+                val signingRing = withContext(Dispatchers.IO) {
+                    if (effectiveSigner != null && !effectiveSigner.algorithm.isCompositeSign)
+                        repo.loadSecretKeyRing(effectiveSigner.fingerprint)
+                    else null
+                }
+                // #65: a composite ML-DSA signer is not a BouncyCastle ring, so
+                // loadSecretKeyRing returns null and the file used to encrypt
+                // UNSIGNED with no error. Load the raw composite material and
+                // inline-sign through crypto.encrypt, the same path text encrypt
+                // and the provider already use.
+                val compositeInfo = withContext(Dispatchers.IO) {
+                    if (effectiveSigner != null && effectiveSigner.algorithm.isCompositeSign)
+                        repo.loadCompositeKeyInfo(effectiveSigner.fingerprint, passphrase?.toCharArray())
+                    else null
+                }
+                if (effectiveSigner != null && effectiveSigner.algorithm.isCompositeSign &&
+                    compositeInfo?.compositeSecret == null
+                ) {
+                    throw SigningError.PassphraseRequired()
                 }
 
                 // 4.0.4 — buffered below INLINE_FILE_LIMIT (unchanged),
-                // streamed above it (issue #6).
+                // streamed above it (issue #6). #65: a composite signature covers
+                // the whole document and cannot stream, so a composite signer
+                // buffers the file and takes the crypto.encrypt path even above
+                // the streaming threshold.
                 val encrypted = if (bytes != null) {
                     withContext(Dispatchers.Default) {
                         crypto.encrypt(
@@ -1750,11 +1809,36 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             armor = false,
                             signingKeyId = s.selectedSigningKeyId,
                             recipientSubkeyChoices = s.recipientSubkeyChoices,
-                            v4Algo35Recipients = v4Recipients
+                            v4Algo35Recipients = v4Recipients,
+                            compositeSignSuite = compositeInfo?.suite,
+                            compositeSignSecret = compositeInfo?.compositeSecret,
+                            compositeSignerFingerprint = compositeInfo?.fingerprint
+                        )
+                    }
+                } else if (compositeInfo != null) {
+                    val fileBytes = withContext(Dispatchers.IO) {
+                        PGPonyApp.instance.contentResolver.openInputStream(srcUri!!)?.use { it.readBytes() }
+                    } ?: throw SigningError.SigningFailed(
+                        PGPonyApp.instance.getString(R.string.sign_verify_error_file_unreadable)
+                    )
+                    withContext(Dispatchers.Default) {
+                        crypto.encrypt(
+                            data = fileBytes,
+                            recipientPublicKeys = recipientRings,
+                            signingSecretKey = null,
+                            passphrase = passphrase,
+                            filename = s.selectedFileName,
+                            armor = false,
+                            signingKeyId = s.selectedSigningKeyId,
+                            recipientSubkeyChoices = s.recipientSubkeyChoices,
+                            v4Algo35Recipients = v4Recipients,
+                            compositeSignSuite = compositeInfo.suite,
+                            compositeSignSecret = compositeInfo.compositeSecret,
+                            compositeSignerFingerprint = compositeInfo.fingerprint
                         )
                     }
                 } else null
-                val streamedOut = if (bytes == null) {
+                val streamedOut = if (bytes == null && compositeInfo == null) {
                     streamEncryptToScratch(
                         uri = srcUri!!,
                         outName = "${s.selectedFileName ?: "file"}.gpg",
@@ -2158,6 +2242,10 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      */
     fun encryptBundle(passphrase: String? = null) {
         val s = _encryptState.value
+        expiredKeyBlock(if (s.signMessage) s.signingKey else null, s.selectedRecipients)?.let {
+            _encryptState.value = _encryptState.value.copy(errorMessage = it, isProcessing = false)
+            return
+        }
         // 4.1.0 Phase 14: one file operation at a time, same rule the
         // file paths have had since 4.0.4. Bundle encrypt was the last
         // long running operation still launching a bare coroutine: a
@@ -2774,6 +2862,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             signerFingerprint = signer?.fingerprint ?: "",
             signerName = signer?.userName?.ifBlank { null },
             signerEmail = signer?.userEmail?.ifBlank { null },
+            signerTrust = signer?.trustLevel,
             signedContent = null
         )
     }
@@ -2923,6 +3012,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     signerFingerprint = entity.fingerprint,
                     signerName = entity.userName.ifBlank { null },
                     signerEmail = entity.userEmail.ifBlank { null },
+                    signerTrust = entity.trustLevel,
                     signedContent = content
                 )
             } else {
@@ -2990,6 +3080,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     signerFingerprint = entity.fingerprint,
                     signerName = entity.userName.ifBlank { null },
                     signerEmail = entity.userEmail.ifBlank { null },
+                    signerTrust = entity.trustLevel,
                     signedContent = null
                 )
             } else {
@@ -3030,6 +3121,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         signerFingerprint = entity.fingerprint,
                         signerName = entity.userName.ifBlank { null },
                         signerEmail = entity.userEmail.ifBlank { null },
+                        signerTrust = entity.trustLevel,
                         signedContent = content
                     )
                 } else {
@@ -3049,7 +3141,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             _decryptState.value = _decryptState.value.copy(
                 outputText = content.orEmpty(),
                 isProcessing = false,
-                verificationResult = result,
+                verificationResult = withSignerTrust(result),
                 signatureVerified = result is VerificationResult.Verified,
                 pendingUnknownClaimedFingerprint =
                     (result as? VerificationResult.UnknownSigner)?.claimedFingerprint,
@@ -3088,7 +3180,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             _decryptState.value = _decryptState.value.copy(
                 outputText = outputText,
                 isProcessing = false,
-                verificationResult = result,
+                verificationResult = withSignerTrust(result),
                 pendingUnknownClaimedFingerprint = pendingFp,
                 // For clear-signed there's no signer-keyID-via-decrypt path
                 // to surface; the verificationResult holds everything.
@@ -3393,6 +3485,25 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      * subkey signer the same way detached verification already does. Returns
      * null when the signer isn't local (caller then shows the key ID alone).
      */
+    /**
+     * #57: fill [VerificationResult.Verified.signerTrust] for a
+     * VerifyService-produced result, which has no DB access, by looking up the
+     * signer key's local trust level. Idempotent and total: a non-Verified
+     * result, an already-resolved one, or a blank fingerprint passes through
+     * unchanged, so it is safe to wrap any result.
+     */
+    private suspend fun withSignerTrust(r: VerificationResult): VerificationResult {
+        if (r !is VerificationResult.Verified || r.signerTrust != null) return r
+        val fp = r.signerFingerprint
+        if (fp.isBlank()) return r
+        val trust = withContext(Dispatchers.IO) {
+            repo.getAllKeys()
+                .firstOrNull { it.fingerprint.equals(fp, ignoreCase = true) }
+                ?.trustLevel
+        }
+        return r.copy(signerTrust = trust)
+    }
+
     private suspend fun resolveSignerEntity(signerKeyId: String): PGPKeyEntity? {
         val all = repo.getAllKeys()
         all.firstOrNull { it.longKeyId.equals(signerKeyId, ignoreCase = true) }?.let { return it }
@@ -3426,6 +3537,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         signerFingerprint = entity.fingerprint,
                         signerName = entity.userName.ifBlank { null },
                         signerEmail = entity.userEmail.ifBlank { null },
+                        signerTrust = entity.trustLevel,
                         signedContent = null
                     )
                 } else {
@@ -3490,6 +3602,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             signerFingerprint = signer?.fingerprint ?: "",
             signerName = signer?.userName?.ifBlank { null },
             signerEmail = signer?.userEmail?.ifBlank { null },
+            signerTrust = signer?.trustLevel,
             signedContent = null
         )
     }
@@ -3504,6 +3617,43 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     private suspend fun buildVerificationResultForStream(
         result: com.pgpony.android.crypto.DecryptStreamResult
     ): VerificationResult {
+        // #30/#31: the streamed decrypt extracted an inline composite
+        // (ML-DSA + EdDSA) signature BouncyCastle cannot parse. Verify it
+        // against the stored composite public key here, mirroring
+        // buildVerificationResultForEncrypted (the text path).
+        if (result.compositeInline && result.compositeInlineBytes != null) {
+            val claimedFp = result.compositeClaimedSignerFp
+            val matched = resolveCompositeSigner(claimedFp)
+            if (matched != null) {
+                val (entity, component) = matched
+                val ok = withContext(Dispatchers.Default) {
+                    CompositeDocumentVerifier.verifyInline(
+                        component.publicMaterial, result.compositeInlineBytes
+                    ).valid
+                }
+                return if (ok) {
+                    VerificationResult.Verified(
+                        signerKeyID = claimedFp?.take(16) ?: entity.longKeyId,
+                        signerFingerprint = entity.fingerprint,
+                        signerName = entity.userName.ifBlank { null },
+                        signerEmail = entity.userEmail.ifBlank { null },
+                        signerTrust = entity.trustLevel,
+                        signedContent = null
+                    )
+                } else {
+                    VerificationResult.Invalid(
+                        reason = "Composite signature did not verify",
+                        signerKeyID = claimedFp?.take(16),
+                        signedContent = null
+                    )
+                }
+            }
+            return VerificationResult.UnknownSigner(
+                signerKeyID = claimedFp?.take(16) ?: "",
+                claimedFingerprint = claimedFp,
+                signedContent = null
+            )
+        }
         val signerKeyId = result.signerKeyID
         if (signerKeyId == null) {
             // 4.1.0 Phase 14b. This returned Unsigned, which is a false
@@ -3550,6 +3700,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             signerFingerprint = signer?.fingerprint ?: "",
             signerName = signer?.userName?.ifBlank { null },
             signerEmail = signer?.userEmail?.ifBlank { null },
+            signerTrust = signer?.trustLevel,
             signedContent = null
         )
     }
@@ -4310,8 +4461,18 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     isProcessing = false,
                     processedBytes = 0L,
                     totalBytes = 0L,
-                    signatureVerified = result.signatureVerified,
-                    signerKeyID = result.signerKeyID,
+                    // #30/#31: for a composite inline signature the raw stream
+                    // result carries signatureVerified=false / signerKeyID=null
+                    // (BC never parsed it); the real state lives in verResult,
+                    // so derive the banner fields from it to avoid an "unsigned"
+                    // display over a valid composite signature.
+                    signatureVerified = if (result.compositeInline)
+                        verResult is VerificationResult.Verified
+                    else result.signatureVerified,
+                    signerKeyID = if (result.compositeInline)
+                        (verResult as? VerificationResult.Verified)?.signerKeyID
+                            ?: result.compositeClaimedSignerFp?.take(16)
+                    else result.signerKeyID,
                     decryptedFilename = result.filename,
                     showPassphraseDialog = false,
                     verificationResult = verResult,
@@ -4879,7 +5040,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             val claimedFp = (result as? VerificationResult.UnknownSigner)?.claimedFingerprint
             _decryptState.value = _decryptState.value.copy(
                 verifyFileProcessing = false,
-                verifyFileResult = result,
+                verifyFileResult = withSignerTrust(result),
                 pendingUnknownClaimedFingerprint = claimedFp
                     ?: _decryptState.value.pendingUnknownClaimedFingerprint,
             )
@@ -4992,28 +5153,61 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             )
             return
         }
+        expiredKeyBlock(key, emptyList())?.let {
+            _encryptState.value = s.copy(errorMessage = it, signFileProcessing = false)
+            return
+        }
         _encryptState.value = s.copy(signFileProcessing = true, errorMessage = null)
         viewModelScope.launch {
             try {
-                val secRing = withContext(Dispatchers.IO) {
-                    repo.loadSecretKeyRing(key.fingerprint)
-                } ?: throw SigningError.NoSigningKey()
-                // RC3 §J (#16): stream from the picked Uri — hashes in
-                // 64 KiB chunks, no whole-file buffer, no size ceiling
-                // (iOS 8.1.0 §3a parity; see SIGNATURE_FILE_BUFFER_LIMIT's
-                // doc for the history). Dispatchers.IO because this is
-                // now disk-bound, not CPU-bound.
-                val sig = withContext(Dispatchers.IO) {
-                    PGPonyApp.instance.contentResolver.openInputStream(uri)?.use { input ->
-                        signing.signDetachedStream(
-                            input = input,
-                            secretKeyRing = secRing,
-                            passphrase = s.signFilePassphrase.ifEmpty { null },
-                            armor = s.signFileArmor,
+                // #65: a composite ML-DSA signing key is not a BouncyCastle
+                // ring, so the classical detached signer threw "no
+                // signing-capable key found." Route composite keys through
+                // CompositeDocumentSigner over the buffered file (the composite
+                // signature covers the whole document, so it cannot stream).
+                // Classical keys keep the streaming path.
+                val sig: ByteArray = if (key.algorithm.isCompositeSign) {
+                    val info = withContext(Dispatchers.IO) {
+                        repo.loadCompositeKeyInfo(
+                            key.fingerprint, s.signFilePassphrase.ifEmpty { null }?.toCharArray()
                         )
+                    }
+                    val secret = info?.compositeSecret ?: throw SigningError.PassphraseRequired()
+                    val fileBytes = withContext(Dispatchers.IO) {
+                        PGPonyApp.instance.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                     } ?: throw SigningError.SigningFailed(
                         PGPonyApp.instance.getString(R.string.sign_verify_error_file_unreadable)
                     )
+                    withContext(Dispatchers.Default) {
+                        if (s.signFileArmor)
+                            CompositeDocumentSigner.signDetachedArmored(
+                                info.suite, secret, info.fingerprint, fileBytes
+                            ).toByteArray(Charsets.UTF_8)
+                        else
+                            CompositeDocumentSigner.signDetached(
+                                info.suite, secret, info.fingerprint, fileBytes
+                            )
+                    }
+                } else {
+                    val secRing = withContext(Dispatchers.IO) {
+                        repo.loadSecretKeyRing(key.fingerprint)
+                    } ?: throw SigningError.NoSigningKey()
+                    // RC3 §J (#16): stream from the picked Uri — hashes in
+                    // 64 KiB chunks, no whole-file buffer, no size ceiling
+                    // (iOS 8.1.0 §3a parity). Dispatchers.IO because this is
+                    // disk-bound, not CPU-bound.
+                    withContext(Dispatchers.IO) {
+                        PGPonyApp.instance.contentResolver.openInputStream(uri)?.use { input ->
+                            signing.signDetachedStream(
+                                input = input,
+                                secretKeyRing = secRing,
+                                passphrase = s.signFilePassphrase.ifEmpty { null },
+                                armor = s.signFileArmor,
+                            )
+                        } ?: throw SigningError.SigningFailed(
+                            PGPonyApp.instance.getString(R.string.sign_verify_error_file_unreadable)
+                        )
+                    }
                 }
                 val ext = if (s.signFileArmor) ".asc" else ".sig"
                 val outName = (s.signFileName ?: "file") + ext

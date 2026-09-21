@@ -174,6 +174,9 @@ class KeyRepository(
         // Store key material in encrypted storage
         store.storePublicKey(result.fingerprint, result.publicKeyData)
         store.storePrivateKey(result.fingerprint, result.privateKeyData)
+        // 4.5.3 (#57): add the passphrase recovery wrap so the key survives a
+        // hardware-keystore wipe on OEMs that invalidate it.
+        attachRecovery(result.fingerprint, passphrase)
 
         // Determine expiration from the generated key
         val importResult = crypto.importKeyData(result.publicKeyData)
@@ -283,6 +286,7 @@ class KeyRepository(
 
         store.storePublicKey(fingerprintHex, publicRing)
         store.storePrivateKey(fingerprintHex, secretRing)
+        attachRecovery(fingerprintHex, passphrase)
 
         val expiresAtMs = info.expirationSeconds?.let { info.creationTimeMillis + it * 1000 }
         val armoredPublic = CompositeSigPacket.armor(
@@ -340,6 +344,7 @@ class KeyRepository(
 
         store.storePublicKey(fingerprintHex, rings.publicRaw)
         store.storePrivateKey(fingerprintHex, rings.secretRaw)
+        attachRecovery(fingerprintHex, passphrase)
 
         val parsed = PGPKeyEntity.parseUserID(uid)
         val expiresAtMs = expirationSeconds?.let { System.currentTimeMillis() + it * 1000 }
@@ -1196,6 +1201,15 @@ class KeyRepository(
      * not BouncyCastle rings, so take their raw public bytes; classical keys
      * fall back to the BouncyCastle-encoded ring. Mirrors exportArmoredPublicKey.
      */
+    /**
+     * 4.5.3 (#57): true when SecureKeyStore found stored key material that
+     * would not decrypt this session, meaning the device's Android Keystore
+     * master key was invalidated and the bytes are unrecoverable. Callers use
+     * this to tell the user to re-import instead of showing a generic export
+     * failure.
+     */
+    fun keyMaterialUnreadable(): Boolean = store.hasUnreadableMaterial()
+
     fun exportPublicKeyBytes(fingerprint: String): ByteArray? {
         val raw = store.loadPublicKey(fingerprint) ?: store.loadPrivateKey(fingerprint)
         if (raw != null) {
@@ -2576,13 +2590,66 @@ class KeyRepository(
                 throw org.bouncycastle.openpgp.PGPException("composite passphrase change failed", e)
             }
             store.storePrivateKey(fingerprint, reprotected)
+            refreshRecovery(fingerprint, newPassphrase)
             invalidateCachedPassphrases(fingerprint)
             return true
         }
         val ring = loadSecretKeyRing(fingerprint) ?: return false
         val changed = crypto.changePassphrase(ring, oldPassphrase, newPassphrase)
         store.storePrivateKey(fingerprint, changed.encoded)
+        refreshRecovery(fingerprint, newPassphrase)
         invalidateCachedPassphrases(fingerprint)
         return true
+    }
+
+    // 4.5.3 (#57): keystore-wipe recovery plumbing.
+
+    /** Add/refresh the passphrase recovery wrap when a passphrase is in hand. */
+    private fun attachRecovery(fingerprint: String, passphrase: String?) {
+        if (passphrase.isNullOrEmpty()) return
+        val pass = passphrase.toCharArray()
+        try { store.attachRecoveryPassphrase(fingerprint, pass) } finally { pass.fill('\u0000') }
+    }
+
+    /** On a passphrase change: refresh the wrap, or drop it if the passphrase
+     *  was removed. */
+    private fun refreshRecovery(fingerprint: String, newPassphrase: String?) {
+        if (newPassphrase.isNullOrEmpty()) store.clearRecoveryPassphrase(fingerprint)
+        else attachRecovery(fingerprint, newPassphrase)
+    }
+
+    /** True when some stored material failed the hardware read this session but
+     *  can be recovered with its passphrase. */
+    fun keyMaterialRecoverable(): Boolean = store.hasRecoverableMaterial()
+
+    /** True when [fingerprint] specifically needs passphrase recovery. */
+    fun needsPassphraseRecovery(fingerprint: String): Boolean =
+        store.needsPassphraseRecovery(fingerprint)
+
+    /** Re-derive [fingerprint]'s key material from its passphrase after a
+     *  hardware-keystore wipe. Also records the passphrase recovery wrap for
+     *  keys that never had one (e.g. imported keys unlocked for the first
+     *  time). Returns true on success. */
+    suspend fun recoverKeyWithPassphrase(fingerprint: String, passphrase: String): Boolean =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            ensureKeyRecoverable(fingerprint, passphrase)
+        }
+
+    /**
+     * Verified-unlock hook (see SecureKeyStore.ensureRecoveryWrap). Called from
+     * paths that just proved [passphrase] good for [fingerprint] (in-app decrypt
+     * or sign, the provider decrypt/sign success points) so the key gains a
+     * recovery wrap the first time it is used, and from the explicit recovery
+     * prompt. Callers must be off the main thread. Cheap when a wrap already
+     * exists. Returns true when the key ends up recoverable.
+     */
+    fun ensureKeyRecoverable(fingerprint: String, passphrase: String?): Boolean {
+        if (passphrase.isNullOrEmpty()) return false
+        val pass = passphrase.toCharArray()
+        return try {
+            store.ensureRecoveryWrap(fingerprint, pass)
+        } finally {
+            pass.fill('\u0000')
+        }
     }
 }

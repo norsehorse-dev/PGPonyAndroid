@@ -230,7 +230,15 @@ data class DecryptStreamResult(
     val signerKeyID: String?,
     val hasSignature: Boolean,
     val signatureKeyIDRaw: Long?,
-    val signerStatus: SignerStatus = SignerStatus.NONE
+    val signerStatus: SignerStatus = SignerStatus.NONE,
+    /** #30/#31: set when the decrypted inner payload is an inline one-pass
+     *  COMPOSITE (ML-DSA + EdDSA) signed message. BouncyCastle cannot parse
+     *  those, so the streaming path (like [DecryptResult]) hands the extracted
+     *  literal to [output] and the caller verifies the signature over
+     *  [compositeInlineBytes] via CompositeDocumentVerifier. */
+    val compositeInline: Boolean = false,
+    val compositeInlineBytes: ByteArray? = null,
+    val compositeClaimedSignerFp: String? = null
 )
 
 data class VerifyResult(
@@ -2161,9 +2169,9 @@ class PGPCryptoService private constructor() {
             val integrityProtected = integrityObj?.let { it.isIntegrityProtected() || it.isAEAD() } ?: false
             val result = if (integrityProtected && !usedSymmetric) {
                 try {
-                    streamDecryptedContent(
-                        JcaPGPObjectFactory(decryptedStream), verificationKeys, output
-                    )
+                    streamOrCompositeContent(
+                    decryptedStream!!, verificationKeys, output
+                )
                 } catch (rle: PGPCryptoError.ResourceLimitExceeded) {
                     throw rle
                 } catch (any: Exception) {
@@ -2172,8 +2180,8 @@ class PGPCryptoService private constructor() {
                     )
                 }
             } else {
-                streamDecryptedContent(
-                    JcaPGPObjectFactory(decryptedStream), verificationKeys, output
+                streamOrCompositeContent(
+                    decryptedStream!!, verificationKeys, output
                 )
             }
 
@@ -2421,6 +2429,83 @@ class PGPCryptoService private constructor() {
     /**
      * Decrypt an armored message.
      */
+    /**
+     * #30/#31: the streaming counterpart of [decrypt]'s composite handling.
+     * The classical streaming parse ([streamDecryptedContent]) hands packets
+     * to BouncyCastle, which THROWS on an algo-30/31 one-pass/signature packet,
+     * so a composite inline signed message would fail to verify (or fail to
+     * open) on the file-decrypt and OpenPGP-API paths even though [decrypt]
+     * (text) handles it. This sniffs a bounded head: if the inner content is a
+     * composite inline message it is buffered (composite payloads are produced
+     * buffered and bounded by [SecurityLimits.MAX_MESSAGE_PLAINTEXT_BYTES]), the
+     * literal is written to [output], and the composite fields are surfaced for
+     * the caller to verify against the stored composite public key. A classical
+     * message keeps the true streaming path untouched: the head is read from a
+     * mark/reset buffer and, on a miss, streaming continues from the same bytes
+     * with no full-message buffering.
+     */
+    private fun streamOrCompositeContent(
+        decryptedStream: java.io.InputStream,
+        verificationKeys: List<PGPPublicKeyRing>?,
+        output: java.io.OutputStream
+    ): DecryptStreamResult {
+        val V = com.pgpony.android.crypto.pqc.CompositeDocumentVerifier
+        val headLimit = 1 shl 16
+        val bin = java.io.BufferedInputStream(decryptedStream, headLimit)
+        bin.mark(headLimit)
+        val head = readHead(bin, headLimit)
+        bin.reset()
+        val looksComposite = try {
+            head.isNotEmpty() && V.isCompositeSignature(V.decompress(head))
+        } catch (_: Exception) {
+            false
+        }
+        if (!looksComposite) {
+            return streamDecryptedContent(JcaPGPObjectFactory(bin), verificationKeys, output)
+        }
+        // Composite inline: buffer the whole inner content (bounded), then route
+        // to the composite verifier, mirroring [decrypt]'s parsePlain.
+        val cap = SecurityLimits.MAX_MESSAGE_PLAINTEXT_BYTES
+        val bufOut = java.io.ByteArrayOutputStream()
+        val chunk = ByteArray(1 shl 16)
+        var total = 0L
+        var n = bin.read(chunk)
+        while (n >= 0) {
+            total += n
+            if (total > cap)
+                throw PGPCryptoError.ResourceLimitExceeded("decrypted message exceeds size cap")
+            bufOut.write(chunk, 0, n)
+            n = bin.read(chunk)
+        }
+        val plainBytes = bufOut.toByteArray()
+        if (!V.isCompositeInline(plainBytes)) {
+            // Head matched a composite one-pass packet but the full message is
+            // not a valid composite inline (e.g. truncated): fall back to the
+            // classical parse over the buffered bytes so content is never
+            // silently dropped.
+            return streamDecryptedContent(
+                JcaPGPObjectFactory(java.io.ByteArrayInputStream(plainBytes)),
+                verificationKeys, output
+            )
+        }
+        val content = V.inlineContent(plainBytes)
+            ?: throw PGPCryptoError.DecryptionFailed("No literal data in composite inline message")
+        output.write(content)
+        val claimedFp = V.claimedSignerOfInline(plainBytes)
+        return DecryptStreamResult(
+            bytesWritten = content.size.toLong(),
+            filename = null,
+            signatureVerified = false,
+            signerKeyID = null,
+            hasSignature = true,
+            signatureKeyIDRaw = null,
+            signerStatus = SignerStatus.NONE,
+            compositeInline = true,
+            compositeInlineBytes = plainBytes,
+            compositeClaimedSignerFp = claimedFp
+        )
+    }
+
     fun decryptArmored(
         armoredMessage: String,
         secretKeyRings: List<PGPSecretKeyRing>,
@@ -3412,10 +3497,19 @@ internal fun enforceArgon2Policy(s2k: org.bouncycastle.bcpg.S2K?) {
 // does not run the KDF; only getSessionKey / getDataStream does. Fails open on
 // a parse hiccup (a message BC can actually run, BC parses the same way).
 internal fun enforceSkeskArgon2Policy(message: ByteArray) {
-    val binary = if (message.isNotEmpty() && message[0].toInt() == '-'.code)
-        org.bouncycastle.bcpg.ArmoredInputStream(java.io.ByteArrayInputStream(message)).use { it.readBytes() }
-    else message
+    // #66: [message] is a bounded head (the leading sniffLimit bytes of the real
+    // ciphertext), so on a message larger than that limit it is truncated. For an
+    // armored message that means the de-armor and the packet scan can both hit a
+    // truncated tail. That is not a decrypt failure, so ALL of it, the de-armor
+    // included, must be best-effort. Before this fix the de-armor sat outside the
+    // try, so a >64 KiB armored message (e.g. mail with attachments) threw
+    // "unexpected end" here and surfaced as "message incomplete". An SKESK, when
+    // present, sits at the very front and is always within the head, so a
+    // truncated tail never hides one.
     try {
+        val binary = if (message.isNotEmpty() && message[0].toInt() == '-'.code)
+            org.bouncycastle.bcpg.ArmoredInputStream(java.io.ByteArrayInputStream(message)).use { it.readBytes() }
+        else message
         val bcpgIn = org.bouncycastle.bcpg.BCPGInputStream(java.io.ByteArrayInputStream(binary))
         scan@ while (true) {
             val pkt = bcpgIn.readPacket() ?: break@scan

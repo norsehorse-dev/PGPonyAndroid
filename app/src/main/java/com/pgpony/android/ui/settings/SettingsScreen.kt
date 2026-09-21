@@ -388,6 +388,14 @@ fun SettingsScreen(
                 checked = state.useArgon2,
                 onCheckedChange = { viewModel.setUseArgon2(it) }
             )
+            SettingsToggle(
+                title = stringResource(R.string.settings_allow_expired_title),
+                subtitle = stringResource(R.string.settings_allow_expired_subtitle),
+                icon = Icons.Filled.Lock,
+                iconTint = Color(0xFF8B5CF6),
+                checked = state.allowExpiredKeys,
+                onCheckedChange = { viewModel.setAllowExpiredKeys(it) }
+            )
             Spacer(modifier = Modifier.height(16.dp))
             SectionHeader(stringResource(R.string.settings_section_pass_store))
             SettingsToggle(

@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
 import com.pgpony.android.crypto.VerificationResult
+import com.pgpony.android.data.TrustLevel
 
 /**
  * Render a 4-state verification banner. `onTapUnknownSigner` is called
@@ -73,12 +74,23 @@ fun VerificationBanner(
     when (result) {
         is VerificationResult.Verified -> {
             val subtitle = formatVerifiedSubtitle(result)
+            // #57: the signature is cryptographically valid,
+            // but if the signer's key is not confirmed locally (UNKNOWN /
+            // UNVERIFIED) say so instead of a flat green "Verified" — anyone
+            // can publish a key for any address, so an unconfirmed signer is a
+            // meaningfully weaker statement. A resolved VERIFIED / ULTIMATE key,
+            // or a null trust (caller did not resolve it), keeps the green state.
+            val unconfirmed = result.signerTrust == TrustLevel.UNKNOWN ||
+                result.signerTrust == TrustLevel.UNVERIFIED
             BannerRow(
                 modifier = modifier,
                 icon = Icons.Filled.VerifiedUser,
-                iconTint = GreenTint,
-                bg = GreenBg,
-                title = stringResource(R.string.verify_banner_verified_title),
+                iconTint = if (unconfirmed) YellowTint else GreenTint,
+                bg = if (unconfirmed) YellowBg else GreenBg,
+                title = stringResource(
+                    if (unconfirmed) R.string.verify_banner_verified_unconfirmed_title
+                    else R.string.verify_banner_verified_title
+                ),
                 subtitle = subtitle
             )
         }

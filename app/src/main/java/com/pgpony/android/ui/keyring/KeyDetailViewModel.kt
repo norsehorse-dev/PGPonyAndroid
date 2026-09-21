@@ -283,6 +283,15 @@ data class KeyDetailUiState(
      *  available) and only then surfaces the share Intent. */
     val showExportPrivateConfirm: Boolean = false,
 
+    // 4.5.3 (#57): key-storage recovery. needsRecovery is set at load time when
+    // this key's material can't be read via the hardware keystore (the OS wiped
+    // it) but a passphrase recovery wrap exists. The banner offers to restore
+    // access; the dialog takes the passphrase.
+    val needsRecovery: Boolean = false,
+    val showRecoveryDialog: Boolean = false,
+    val isRecovering: Boolean = false,
+    val recoveryError: String? = null,
+
     // ── Phase A7 Fix4: Export private key result sheet ────────────────
     /** Drives the result bottom sheet shown after a successful
      *  biometric-gated export. Hosts Copy + Save-As-File + Done
@@ -382,8 +391,50 @@ class KeyDetailViewModel(
                 // §5.6.7 — human-readable notations on the primary self-cert.
                 notations = loaded?.let {
                     withContext(Dispatchers.IO) { repo.readNotations(it.fingerprint) }
-                } ?: emptyList()
+                } ?: emptyList(),
+                needsRecovery = loaded?.takeIf { it.isKeyPair }?.let {
+                    withContext(Dispatchers.IO) { repo.needsPassphraseRecovery(it.fingerprint) }
+                } ?: false
             )
+        }
+    }
+
+    // ── 4.5.3 (#57): storage recovery ──────────────────────────────────
+
+    fun showRecoveryDialog() {
+        _state.value = _state.value.copy(showRecoveryDialog = true, recoveryError = null)
+    }
+
+    fun dismissRecoveryDialog() {
+        _state.value = _state.value.copy(showRecoveryDialog = false, recoveryError = null)
+    }
+
+    /**
+     * Restore access to a key whose stored material the hardware keystore can
+     * no longer open, by re-deriving it from [passphrase]. On success the
+     * hardware wrap is re-established and the key works again everywhere
+     * (in-app and the OpenPGP provider); on a wrong passphrase we surface an
+     * inline error and leave the dialog open.
+     */
+    fun submitRecovery(passphrase: String) {
+        val fp = _state.value.key?.fingerprint ?: return
+        if (passphrase.isEmpty()) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isRecovering = true, recoveryError = null)
+            val ok = repo.recoverKeyWithPassphrase(fp, passphrase)
+            if (ok) {
+                _state.value = _state.value.copy(
+                    isRecovering = false,
+                    showRecoveryDialog = false,
+                    needsRecovery = false,
+                    recoveryError = null
+                )
+            } else {
+                _state.value = _state.value.copy(
+                    isRecovering = false,
+                    recoveryError = "That passphrase didn't unlock the stored key. Try again."
+                )
+            }
         }
     }
 
