@@ -141,8 +141,173 @@ point for ML-DSA-44 or ML-KEM-512, so a 44/512 key would have no interoperable o
 OpenPGP tool could read it. Not viable until the spec registers those levels; revisit if it does.
 
 
+## 4. File signing with composite ML-DSA keys (MOVED TO 4.5.3)
+
+GitHub #65 (elnardosa). Implemented in the 4.5.3 tree, no longer 4.6.0 work. In-app file detached sign and file
+encrypt-and-sign now route a composite ML-DSA signer through CompositeDocumentSigner / crypto.encrypt (buffered,
+since a composite signature covers the whole document and cannot stream), instead of the classical BouncyCastle
+signer that could not see an algo-30/31 key. See RELEASE_NOTES_4.5.3.md.
+
+## 5. Key Detail avatar shortcut fix, additive encrypt recipients, and Default Key polish
+
+Priority: medium (one bug, rest polish). Origin: CertainBot (GitHub #63), tested on 4.5.1.
+
+Reported and confirmed:
+
+- Bug: the Key Detail header-avatar shortcut works on a public key (opens Encrypt with that key preset as
+  recipient) but on a KEY PAIR it opens Decrypt without setting the key, leaving the default in "Decrypt with."
+  The key-pair side must preset the decrypt key the way the public side presets the recipient.
+- Encrypt shortcut should be ADDITIVE: add the tapped key to the current recipient selection rather than
+  replacing it. Clearing one recipient with the x is easy; rebuilding a whole set is not.
+- Default Key (Settings > Keys & Servers): the picker lost the star visual cue and moved to the left under the
+  title; restore the star and move it back to the right of the title. Consider dropping the oval control
+  background if it reads cleaner.
+
+Work: fix the key-pair avatar navigation to carry the key into the Decrypt screen's selection; make the encrypt
+avatar append to the recipient set; restore the star and right-alignment on the Default Key picker.
+
+Delivery: the avatar shortcut sets the key on both Encrypt (added to current recipients) and Decrypt; the
+Default Key picker shows the star and sits to the right of the title. Verified on device.
+
+
+## 6. One payload-aware share dialog (consolidate the share actions)
+
+Priority: medium. Origin: CertainBot (GitHub #58), after the share-to-PGPony work shipped across 4.5.0 to 4.5.1.
+
+Reported: the share paths that shipped separately (Import, Import and encrypt to key, Encrypt text) should live
+in the single "What would you like to do?" dialog, so the user chooses in one place instead of picking among
+share targets. Extend the same treatment to shared ciphertext or signed text.
+
+Work:
+
+- When shared text contains a public key, offer Import, Import and encrypt to key, and Encrypt text in the one
+  dialog.
+- When shared text contains an encrypted or signed PGP payload, offer Decrypt text (isolating the payload from
+  any surrounding text), and offer Encrypt text as well when there is extra text alongside the payload.
+- Show each option only when it applies to what was actually shared. This turns the sheet into a small
+  payload-aware wizard for users who are not deep in PGP.
+
+Delivery: sharing text to PGPony opens one dialog whose options match the payload (key, ciphertext, signed, or
+plain text). Verified on device.
+
+Also reported (Christian Biere, 4.5.3 RC2 testing), same consolidation:
+
+- The Quick Action is labeled "Decrypt / Verify" but only handles encrypted and encrypted+signed messages, not
+  signed-only messages. Either it verifies signed-only input or the label should not promise it. The
+  signed-only-verify piece is the one part worth pulling earlier, so the button stops advertising something it
+  cannot do.
+- The Quick Action encrypt direction offers only Encrypt, never Sign or Encrypt+Sign, for text or files.
+- Sharing text into PGPony offers encryption only, not decrypt or verify. OpenKeychain offers both directions
+  and handles signed-only, with a clear indication of whether the message was encrypted.
+
+
+## 7. Open UX decision: trust-level colors and shield symbols
+
+Priority: low (decision, not yet scheduled). Origin: AraafRoyall and CertainBot (GitHub #36).
+
+Two users want opposite trust-ladder colorings (green at the top for Ultimate vs green for verified public keys
+with blue for Ultimate), and CertainBot also proposed swapping the X and ! shield symbols (X for unknown/grey,
+! for caution/yellow). Left unchanged across 4.4 to 4.5 rather than flipped mid-thread. Plan: split this into
+its own GitHub issue where each side's reasoning is laid out, decide once, then apply. Not blocking 4.6.0.
+
+
+## 8. Parallel effort (not release-gated): SOP interoperability wrapper
+
+Tracked in GitHub #64, decoupled from the app release cadence. A Stateless OpenPGP CLI over PGPony's crypto so
+it can join the sequoia-pgp interop test suite. hko-s confirmed the interop run needs only the core roundtrip
+commands (skip revoke-key, update-key, merge-certs, certify-userid, validate-userid, armor, dearmor) and
+pointed at rsop as a local reference. The value is roundtrip coverage of the composite ML-DSA / ML-KEM paths
+against other implementations. Listed here for visibility; it does not gate the 4.6.0 app release.
+
+
 ## Delivery note
 
 Android first per the new-feature procedure. iOS mirrors each item once the Android version is verified,
 tracked separately. This document is seeded from the forum.dark.vegas thread; add further items here as they
 come in before the 4.6.0 scope is locked.
+
+
+## 9. Key Detail: "Upload to Key Server" disappears after the first upload
+
+Priority: medium. Origin: NorseHorse, from the iOS 8.3.0 planning pass (Sep 21 2026), which compared both
+Key Detail screens.
+
+The overflow menu (KeyDetailScreen.kt) and the legacy ActionRow (KeyDetailSections.kt) both gate "Upload to
+Key Server" on `!keyServerUploaded`, and nothing ever clears that flag (KeyRepository.markKeyServerUploaded is
+the only writer; KeyDeduplicationService.merge copies it forward). So once a key has been uploaded, adding a
+subkey or an identity, changing the primary, editing expiry or revoking a subkey leaves no way to publish the
+change from Key Detail; the Exchange tab is the only path.
+
+Work:
+
+- Drop the `!keyServerUploaded` gate on both surfaces. Label reads "Upload to Key Server" before any upload
+  and "Update on Key Servers" once `keyServerUploaded` is set or KeyPublicationStore has a record.
+- PublishSheet on an update pre-checks only the servers the key was published to before (a first upload keeps
+  every publish-enabled server checked), shows "Last uploaded <date>" per server, and lists per-address
+  verification state so a newly added identity's confirmation is visible.
+- Build the payload from the stored ring at upload time (exportArmoredPublicKey already does) and assert,
+  before enabling Publish, that exactly one live User ID carries the primary flag and it is the one the entity
+  shows; refuse with a local repair hint otherwise. Same builder for the Exchange upload.
+
+Delivery: add a subkey to an already-published key, open Key Detail, "Update on Key Servers" is offered,
+publishes to the servers used before, and a fresh lookup on each server shows the subkey. iOS mirror: 8.3.0
+sections 2 and 3.
+
+
+## 10. Key Detail overflow menu ignores offline mode
+
+Priority: low (consistency). Origin: same planning pass.
+
+The RC1 offline switch hid the keyserver check / refresh ActionRows while offline, but the 4.3.0 overflow
+menu that replaced them (KeyDetailScreen.kt around line 340) shows Check key server, Refresh from key server
+and Upload regardless of OfflineMode.enabled, so an offline user can trigger a request that then fails at the
+client. Gate the three menu items on `!OfflineMode.enabled`, matching the ActionRows and the iOS rule that
+every network action is hidden while offline.
+
+Delivery: with offline mode on, the Key Detail overflow shows no keyserver items; off, all three return.
+
+
+## 11. "Your published copy is out of date" marker
+
+Priority: medium. Origin: same planning pass; the counterpart of item 9.
+
+Neither app tells the user that a local key edit has not reached the servers. Add `lastLocalEditAt` to
+PGPKeyEntity, set it on add / revoke / delete User ID, make-primary, add / revoke / remove subkey, expiry edit,
+notation edit and key revocation, and compare it to `lastUploadedAt`. When newer on a published key: the
+DetailsSection "Key server" row reads "Published (local changes not uploaded)", the overflow item reads
+"Update on Key Servers", and an inline row under the header offers the update in one tap, reusing
+PublishSheet the way the post-keygen prompt does. Key revocation gets the same offer right after the
+certificate is produced, since a revocation that never reaches the servers protects nobody.
+
+Delivery: edit a published key, see the marker and the one-tap update, update, marker clears; revoke a
+published key, the publish offer appears in the revocation result.
+
+
+## 12. Key-server refresh: union merge, and the local copy authoritative for key pairs
+
+Priority: medium-high (correctness). Origin: same planning pass, following the lukascomer expiry-downgrade
+fix (4.5.0 item 24) and the 4.5.1 deleted-UID tombstones.
+
+KeyDeduplicationService.merge still replaces the stored public material with the fetched copy when they
+differ. keys.openpgp.org and keys.pgpony.app both serve a key with every unverified User ID stripped (and no
+User IDs at all when none is verified), and keys.openpgp.org strips third-party certifications, so a
+background refresh of a key with an unconfirmed new address can drop that identity locally, and the
+primary flag with it, on both apps. The expiry guard and the tombstones close two instances of this; the
+general rule is missing.
+
+Work:
+
+- Public-only keys: a certificate union merge. Keep every local packet (User IDs, subkeys, self-certs,
+  third-party certs, notations) and add from the fetched copy only what is new (a subkey, a User ID that is
+  not tombstoned, a signature, a revocation). Packet identity: key packets by fingerprint, User IDs by bytes,
+  signatures by type, issuer, creation time and digest prefix.
+- Key pairs: the local copy is authoritative. A refresh imports only revocation signatures (0x20 on the
+  primary, 0x28 on subkeys, 0x30 on User IDs) and third-party certifications; it never touches self-certs,
+  User IDs, subkeys or expiry.
+- The 4.5.0 isExpiryDowngrade guard and the 4.5.1 RemovedUserIdStore tombstones stay as they are and sit
+  inside these rules.
+
+Delivery: fixture pair per case (a local cert with two User IDs and a "server" cert with one; a key pair
+against a server copy with an extra self-cert; a downgrade expiry), plus the on-device check: add an
+identity, upload, do not confirm the email, Refresh from key server, identity and primary badge intact.
+iOS mirror: 8.3.0 section 3.3(d).
