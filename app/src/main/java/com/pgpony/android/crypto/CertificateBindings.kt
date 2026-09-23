@@ -79,6 +79,7 @@ object CertificateBindings {
     // Signature subpacket types.
     private const val SP_CREATION_TIME = 2
     private const val SP_KEY_EXPIRATION = 9
+    private const val SP_KEY_FLAGS = 27
     private const val SP_ISSUER_KEY_ID = 16
     private const val SP_EMBEDDED_SIGNATURE = 32
     private const val SP_ISSUER_FINGERPRINT = 33
@@ -113,7 +114,16 @@ object CertificateBindings {
         /** A 0x28 revocation from the primary verifies. */
         val revoked: Boolean,
         /** Expiry from the newest verified 0x18, epoch ms; null = none. */
-        val expiresAtMs: Long? = null
+        val expiresAtMs: Long? = null,
+        /** Key flags (first octet) from the newest verified 0x18; null = none. */
+        val keyFlags: Int? = null,
+        /** Key creation time, epoch ms. */
+        val createdAtMs: Long = 0L,
+        /** Key packet version (4, 5 or 6). */
+        val version: Int = 4,
+        /** The subkey's public key packet body, for callers that need to read
+         *  its material (a LibrePGP composite's curve, say). */
+        val publicBody: ByteArray = ByteArray(0)
     )
 
     data class Report(
@@ -378,6 +388,10 @@ object CertificateBindings {
             return id
         }
 
+        /** Key flags (hashed subpacket 27), first octet, or null. */
+        val keyFlags: Int? = subpackets(hashed).firstOrNull { it.first == SP_KEY_FLAGS }?.second
+            ?.takeIf { it.isNotEmpty() }?.let { it[0].toInt() and 0xFF }
+
         /** Key expiration (hashed subpacket 9), seconds after key creation, or null. */
         val keyExpirySeconds: Long? = subpackets(hashed).firstOrNull { it.first == SP_KEY_EXPIRATION }?.second
             ?.takeIf { it.size == 4 }?.let { be32(it, 0).toLong() and 0xFFFFFFFFL }
@@ -630,7 +644,11 @@ object CertificateBindings {
                 subkeys.add(
                     SubkeyState(
                         sub.fingerprintHex, sub.keyId, sub.algorithm, bound, backSigned, revoked,
-                        expiresAtMs = expiryOf(keyCreatedMs(sub), newestBinding)
+                        expiresAtMs = expiryOf(keyCreatedMs(sub), newestBinding),
+                        keyFlags = newestBinding?.keyFlags,
+                        createdAtMs = keyCreatedMs(sub),
+                        version = sub.version,
+                        publicBody = pub
                     )
                 )
             } else {

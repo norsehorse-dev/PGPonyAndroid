@@ -135,16 +135,15 @@ class KeyServerRepository {
      * answer with none left is a miss. Returns the kept certificates armored.
      */
     private fun keepHolding(armored: String, email: String): String? = runCatching {
-        val binary = com.pgpony.android.crypto.pqc.CompositeSigPacket.dearmor(armored)
+        // 4.6.0 (item 18): parse through KeyResponse, so only public key
+        // material is considered and the result is always a PUBLIC KEY BLOCK.
+        val certs = KeyResponse.certificates(armored.toByteArray(Charsets.UTF_8)) ?: return@runCatching null
         val want = com.pgpony.android.crypto.CertificateBindings.mailboxOf(email)
-        val kept = com.pgpony.android.crypto.CertificateBindings.splitCertificates(binary).filter { cert ->
+        val kept = certs.filter { cert ->
             com.pgpony.android.crypto.CertificateBindings.analyze(cert)?.certifiedUserIds
                 ?.any { com.pgpony.android.crypto.CertificateBindings.mailboxOf(it) == want } == true
         }
-        if (kept.isEmpty()) return@runCatching null
-        val out = java.io.ByteArrayOutputStream()
-        org.bouncycastle.bcpg.ArmoredOutputStream(out).use { a -> kept.forEach { a.write(it) } }
-        out.toString(Charsets.UTF_8.name())
+        if (kept.isEmpty()) null else KeyResponse.armor(kept)
     }.getOrNull()
 
     suspend fun findByEmail(email: String): KeyLookupResult? {
@@ -308,7 +307,7 @@ class KeyServerRepository {
                 accept(ContentType.Application.OctetStream)
             }
             if (response.status == HttpStatusCode.OK) {
-                response.textCapped()
+                response.publicKeyOrNull() // 4.6.0 (item 18)
             } else {
                 null
             }
@@ -328,7 +327,7 @@ class KeyServerRepository {
                 accept(ContentType.Application.OctetStream)
             }
             if (response.status == HttpStatusCode.OK) {
-                response.textCapped()
+                response.publicKeyOrNull(KeyResponse.Query.Fingerprint(fp)) // 4.6.0 (item 18)
             } else {
                 null
             }
@@ -365,7 +364,7 @@ class KeyServerRepository {
                 accept(ContentType.Application.OctetStream)
             }
             if (response.status == HttpStatusCode.OK) {
-                response.textCapped()
+                response.publicKeyOrNull(KeyResponse.Query.KeyId(id)) // 4.6.0 (item 18)
             } else {
                 null
             }
@@ -390,7 +389,9 @@ class KeyServerRepository {
         val response = client.get("$BASE_URL/vks/v1/by-fingerprint/$fp") {
             accept(ContentType.Application.OctetStream)
         }
-        if (response.status == HttpStatusCode.OK) response.textCapped() else null
+        // 4.6.0 (item 18): only public key material holding [fingerprint].
+        if (response.status == HttpStatusCode.OK)
+            response.publicKeyOrNull(KeyResponse.Query.Fingerprint(fp)) else null
     }
 
     /**

@@ -1020,6 +1020,16 @@ class KeyDetailViewModel(
 
     private suspend fun deriveSubkeys(entity: PGPKeyEntity): List<SubkeyDisplayInfo> {
         if (entity.algorithm.isCompositeSign) return compositeSubkeys(entity)
+        // 4.6.0 (item 19): a classical primary with a composite ML-KEM subkey
+        // (algo 35 / 36, or a LibrePGP v5 algo 8) is listed from its
+        // certificate; the Bouncy Castle mapping below cannot read those
+        // subkeys and used to drop every one of them. See SubkeyRows.
+        val certRows = withContext(Dispatchers.IO) {
+            repo.exportPublicKeyBytes(entity.fingerprint)
+                ?.takeIf { SubkeyRows.hasCompositeSubkey(it) }
+                ?.let { SubkeyRows.fromCertificate(it, entity.isCardBacked) }
+        }
+        if (certRows != null) return certRows
         val ring = withContext(Dispatchers.IO) { repo.loadPublicKeyRing(entity.fingerprint) }
             ?: return emptyList()
         val keys = ring.publicKeys.asSequence().toList()

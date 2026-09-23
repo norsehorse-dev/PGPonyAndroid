@@ -21,7 +21,9 @@
 // use) before handing the result to the existing armored-key import
 // flow. Earlier versions hand-rolled the armor here; that mis-framed
 // some keys and broke import (issue #41), so the hand-rolled base64 and
-// CRC24 wrap was removed.
+// CRC24 wrap was removed. Since 4.6.0 (item 18) the body is armored only
+// after KeyResponse has confirmed it is public key material; a body that
+// is not (an HTML page, a message) is a miss.
 
 package com.pgpony.android.network
 
@@ -34,8 +36,6 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.bouncycastle.bcpg.ArmoredOutputStream
-import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 
 // ── Result types ───────────────────────────────────────────────────────
@@ -210,7 +210,10 @@ class WkdService {
                         ) 20_000L else REQUEST_TIMEOUT_MS
                 }
             }
-            if (response.status == HttpStatusCode.OK) {
+            if (response.status == HttpStatusCode.OK &&
+                // 4.6.0 (item 18): a web page is never a key.
+                !com.pgpony.android.network.KeyResponse.isHtml(response.headers["Content-Type"])
+            ) {
                 // 4.6.0 (item 17.8): bounded read (see ResponseLimits).
                 val bytes = response.bytesCapped()
                 Fetch(if (bytes.isNotEmpty()) bytes else null, hostMissing = false)
@@ -251,30 +254,16 @@ class WkdService {
      * refused. Returns the surviving certificates armored, or null.
      */
     internal fun filterToAddress(bytes: ByteArray, address: String): String? {
-        val binary = runCatching {
-            val head = String(bytes, 0, minOf(15, bytes.size), Charsets.US_ASCII)
-            if (head.trimStart().startsWith("-----BEGIN PGP")) {
-                org.bouncycastle.bcpg.ArmoredInputStream(bytes.inputStream()).readBytes()
-            } else bytes
-        }.getOrNull() ?: return null
+        // 4.6.0 (item 18): only public key material (binary or PUBLIC KEY
+        // BLOCK armor) is considered; anything else is a miss, never re-armored.
+        val certs = com.pgpony.android.network.KeyResponse.certificates(bytes) ?: return null
         val want = com.pgpony.android.crypto.CertificateBindings.mailboxOf(address)
-        val kept = com.pgpony.android.crypto.CertificateBindings.splitCertificates(binary).mapNotNull { cert ->
+        val kept = certs.mapNotNull { cert ->
             com.pgpony.android.crypto.CertificateBindings.keepUserIds(cert) {
                 com.pgpony.android.crypto.CertificateBindings.mailboxOf(it) == want
             }
         }
         if (kept.isEmpty()) return null
-        val joined = java.io.ByteArrayOutputStream().apply { kept.forEach { write(it) } }.toByteArray()
-        return armorFetchedKey(joined)
-    }
-
-    private fun armorFetchedKey(bytes: ByteArray): String {
-        val head = String(bytes, 0, minOf(15, bytes.size), Charsets.US_ASCII)
-        if (head.trimStart().startsWith("-----BEGIN PGP")) {
-            return bytes.toString(Charsets.UTF_8)
-        }
-        val out = ByteArrayOutputStream()
-        ArmoredOutputStream(out).use { it.write(bytes) }
-        return out.toString(Charsets.UTF_8.name())
+        return com.pgpony.android.network.KeyResponse.armor(kept)
     }
 }

@@ -1157,6 +1157,32 @@ class KeyRepository(
         )
     }
 
+    /**
+     * 4.6.0 (item 19): store edited key octets without losing a v4 ML-KEM
+     * (algo 35) subkey. Bouncy Castle loads such a key without that subkey, so
+     * a ring it re-encodes after an edit no longer holds it; V4Algo35Carry
+     * appends it back from what was stored before. A no-op for other keys.
+     */
+    private fun storeEditedPublicKey(fingerprint: String, bytes: ByteArray) =
+        store.storePublicKey(
+            fingerprint,
+            com.pgpony.android.crypto.pqc.V4Algo35Carry.carry(store.loadPublicKey(fingerprint), bytes)
+        )
+
+    private fun storeEditedPrivateKey(
+        fingerprint: String,
+        bytes: ByteArray,
+        reprotect: ((ByteArray) -> ByteArray)? = null
+    ) = store.storePrivateKey(
+        fingerprint,
+        com.pgpony.android.crypto.pqc.V4Algo35Carry.carry(store.loadPrivateKey(fingerprint), bytes, reprotect)
+    )
+
+    /** 4.6.0 (item 19): the armored public key as now stored (raw-aware, so a
+     *  carried v4 ML-KEM subkey is included), else [fallback]. */
+    private fun armoredAsStored(fingerprint: String, fallback: String?): String? =
+        runCatching { exportArmoredPublicKey(fingerprint) }.getOrNull() ?: fallback
+
     fun loadSecretKeyRing(fingerprint: String): PGPSecretKeyRing? {
         val data = store.loadPrivateKey(fingerprint) ?: return null
         try {
@@ -1716,8 +1742,8 @@ class KeyRepository(
         // round-tripped through importKeyData() but ImportResult exposes
         // `publicKeyRing` not `publicKeyData` — same bytes either way,
         // just less work.
-        val updatedArmored = revocation.armorPublicKeyRing(revokedRing)
-        store.storePublicKey(fingerprint, revokedRing.encoded)
+        storeEditedPublicKey(fingerprint, revokedRing.encoded) // 4.6.0 (item 19)
+        val updatedArmored = armoredAsStored(fingerprint, revocation.armorPublicKeyRing(revokedRing))
 
         // 4. Stamp entity
         dao.update(
@@ -1803,8 +1829,8 @@ class KeyRepository(
 
         val cert = revocation.generateSubkeyRevocation(secRing, target.keyID, reason, comment, passphrase)
         val updatedPub = revocation.applySubkeyRevocation(pubRing, target.keyID, cert)
-        store.storePublicKey(fingerprint, updatedPub.encoded)
-        dao.update(entity.copy(armoredPublicKey = crypto.exportArmoredPublicKey(updatedPub)))
+        storeEditedPublicKey(fingerprint, updatedPub.encoded) // 4.6.0 (item 19)
+        dao.update(entity.copy(armoredPublicKey = armoredAsStored(fingerprint, crypto.exportArmoredPublicKey(updatedPub))))
     }
 
     /**
@@ -1860,9 +1886,9 @@ class KeyRepository(
 
         val updatedSec = ClassicalSubkeyGen.removeSubkey(secRing, target.keyID)
         val updatedPub = PGPPublicKeyRing(updatedSec.publicKeys.asSequence().toList())
-        store.storePrivateKey(fingerprint, updatedSec.encoded)
-        store.storePublicKey(fingerprint, updatedPub.encoded)
-        dao.update(entity.copy(armoredPublicKey = crypto.exportArmoredPublicKey(updatedPub)))
+        storeEditedPrivateKey(fingerprint, updatedSec.encoded) // 4.6.0 (item 19)
+        storeEditedPublicKey(fingerprint, updatedPub.encoded)
+        dao.update(entity.copy(armoredPublicKey = armoredAsStored(fingerprint, crypto.exportArmoredPublicKey(updatedPub))))
     }
 
     /** Uppercase hex fingerprint of a BC public (sub)key, matching SubkeyDisplayInfo.fingerprint. */
@@ -1951,11 +1977,11 @@ class KeyRepository(
         secretRing: org.bouncycastle.openpgp.PGPSecretKeyRing?,
         expiresAtEpochSeconds: Long?
     ) {
-        store.storePublicKey(entity.fingerprint, publicRing.encoded)
-        secretRing?.let { store.storePrivateKey(entity.fingerprint, it.encoded) }
+        storeEditedPublicKey(entity.fingerprint, publicRing.encoded) // 4.6.0 (item 19)
+        secretRing?.let { storeEditedPrivateKey(entity.fingerprint, it.encoded) }
         dao.update(
             entity.copy(
-                armoredPublicKey = crypto.exportArmoredPublicKey(publicRing),
+                armoredPublicKey = armoredAsStored(entity.fingerprint, crypto.exportArmoredPublicKey(publicRing)),
                 expiresAt = expiresAtEpochSeconds?.let { it * 1000L }
             )
         )
@@ -2060,11 +2086,11 @@ class KeyRepository(
         }
         val updatedPublicRing = PGPPublicKeyRing(updatedSecretRing.publicKeys.asSequence().toList())
 
-        store.storePublicKey(fingerprint, updatedPublicRing.encoded)
-        store.storePrivateKey(fingerprint, updatedSecretRing.encoded)
+        storeEditedPublicKey(fingerprint, updatedPublicRing.encoded) // 4.6.0 (item 19)
+        storeEditedPrivateKey(fingerprint, updatedSecretRing.encoded)
         dao.update(
             entity.copy(
-                armoredPublicKey = crypto.exportArmoredPublicKey(updatedPublicRing)
+                armoredPublicKey = armoredAsStored(fingerprint, crypto.exportArmoredPublicKey(updatedPublicRing))
             )
         )
     }
@@ -2135,11 +2161,11 @@ class KeyRepository(
                 expirationSeconds = expirationSeconds
             )
             val updatedPublicRing = PGPPublicKeyRing(updatedSecretRing.publicKeys.asSequence().toList())
-            store.storePublicKey(fingerprint, updatedPublicRing.encoded)
-            store.storePrivateKey(fingerprint, updatedSecretRing.encoded)
+            storeEditedPublicKey(fingerprint, updatedPublicRing.encoded) // 4.6.0 (item 19)
+            storeEditedPrivateKey(fingerprint, updatedSecretRing.encoded)
             dao.update(
                 entity.copy(
-                    armoredPublicKey = crypto.exportArmoredPublicKey(updatedPublicRing)
+                    armoredPublicKey = armoredAsStored(fingerprint, crypto.exportArmoredPublicKey(updatedPublicRing))
                 )
             )
             return
@@ -2159,15 +2185,19 @@ class KeyRepository(
             passphrase = passphrase,
             expirationSeconds = expirationSeconds
         )
-        store.storePublicKey(fingerprint, rings.publicRaw)
-        store.storePrivateKey(fingerprint, rings.secretRaw)
+        // 4.6.0 (item 19): a second ML-KEM subkey used to replace the first.
+        storeEditedPublicKey(fingerprint, rings.publicRaw)
+        storeEditedPrivateKey(fingerprint, rings.secretRaw)
         dao.update(
             entity.copy(
                 algorithm = KeyAlgorithm.MLKEM768_X25519_V4,
-                armoredPublicKey = CompositeSigPacket.armor(
-                    "-----BEGIN PGP PUBLIC KEY BLOCK-----",
-                    "-----END PGP PUBLIC KEY BLOCK-----",
-                    rings.publicRaw
+                armoredPublicKey = armoredAsStored(
+                    fingerprint,
+                    CompositeSigPacket.armor(
+                        "-----BEGIN PGP PUBLIC KEY BLOCK-----",
+                        "-----END PGP PUBLIC KEY BLOCK-----",
+                        rings.publicRaw
+                    )
                 )
             )
         )
@@ -2237,11 +2267,11 @@ class KeyRepository(
             expirationSeconds = expirationSeconds
         )
         val updatedPublicRing = PGPPublicKeyRing(updatedSecretRing.publicKeys.asSequence().toList())
-        store.storePublicKey(fingerprint, updatedPublicRing.encoded)
-        store.storePrivateKey(fingerprint, updatedSecretRing.encoded)
+        storeEditedPublicKey(fingerprint, updatedPublicRing.encoded) // 4.6.0 (item 19)
+        storeEditedPrivateKey(fingerprint, updatedSecretRing.encoded)
         dao.update(
             entity.copy(
-                armoredPublicKey = crypto.exportArmoredPublicKey(updatedPublicRing)
+                armoredPublicKey = armoredAsStored(fingerprint, crypto.exportArmoredPublicKey(updatedPublicRing))
             )
         )
     }
@@ -2462,12 +2492,12 @@ class KeyRepository(
         updated: UserIdService.UpdatedRings,
         newPrimaryUserId: String?
     ) {
-        store.storePublicKey(entity.fingerprint, updated.publicRing.encoded)
-        store.storePrivateKey(entity.fingerprint, updated.secretRing.encoded)
+        storeEditedPublicKey(entity.fingerprint, updated.publicRing.encoded) // 4.6.0 (item 19)
+        storeEditedPrivateKey(entity.fingerprint, updated.secretRing.encoded)
         val parsed = newPrimaryUserId?.let { PGPKeyEntity.parseUserID(it) }
         dao.update(
             entity.copy(
-                armoredPublicKey = crypto.exportArmoredPublicKey(updated.publicRing),
+                armoredPublicKey = armoredAsStored(entity.fingerprint, crypto.exportArmoredPublicKey(updated.publicRing)),
                 userID = newPrimaryUserId ?: entity.userID,
                 userName = parsed?.first ?: entity.userName,
                 userEmail = parsed?.second ?: entity.userEmail
@@ -2656,7 +2686,15 @@ class KeyRepository(
         }
         val ring = loadSecretKeyRing(fingerprint) ?: return false
         val changed = crypto.changePassphrase(ring, oldPassphrase, newPassphrase)
-        store.storePrivateKey(fingerprint, changed.encoded)
+        // 4.6.0 (item 19): a v4 ML-KEM subkey is carried over and re-protected
+        // under the new passphrase with the rest of the key.
+        storeEditedPrivateKey(fingerprint, changed.encoded) { body ->
+            com.pgpony.android.crypto.pqc.V4Algo35Carry.reprotectBody(
+                body,
+                oldPassphrase.ifEmpty { null }?.toCharArray(),
+                newPassphrase.ifEmpty { null }?.toCharArray()
+            )
+        }
         refreshRecovery(fingerprint, newPassphrase)
         invalidateCachedPassphrases(fingerprint)
         return true

@@ -249,8 +249,41 @@ object CompositeDecryptor {
         if (suite.ietfAlgId != 35) {
             throw NoMatchingKey("v4 interop subkey is ML-KEM-768 (algo 35) only")
         }
-        val subBody = CompositeKeyFacade.v4Algo35SubkeyBody(rawRing)
-            ?: throw NoMatchingKey("v4 algo-35 subkey not found")
+        // 4.6.0 (item 19): a key can hold more than one v4 algo-35 subkey. Use
+        // the one the PKESK names; an anonymous PKESK tries each in turn.
+        val bodies = CompositeKeyFacade.v4Algo35SubkeyBodies(rawRing)
+        if (bodies.isEmpty()) throw NoMatchingKey("v4 algo-35 subkey not found")
+        val named = bodies.filter { body ->
+            val fp = CompositeKeyFacade.v4Algo35SubkeyFingerprint(body)
+            when {
+                parsed.recipientFingerprint.isNotEmpty() -> fp.contentEquals(parsed.recipientFingerprint)
+                parsed.recipientKeyId.size == 8 ->
+                    fp.copyOfRange(fp.size - 8, fp.size).contentEquals(parsed.recipientKeyId)
+                else -> true
+            }
+        }
+        if (named.isEmpty()) throw NoMatchingKey("v4 algo-35 subkey not found")
+        var last: Exception? = null
+        for (body in named) {
+            try {
+                return openV4Algo35Body(body, parsed, passphrase)
+            } catch (e: CompositeSecretKeyMaterial.ProtectedKeyException) {
+                throw e
+            } catch (e: V4Algo35Protection.ProtectedKeyException) {
+                throw e
+            } catch (e: Exception) {
+                last = e
+            }
+        }
+        throw last ?: NoMatchingKey("v4 algo-35 subkey not found")
+    }
+
+    private fun openV4Algo35Body(
+        subBody: ByteArray,
+        parsed: CompositePkesk.Parsed,
+        passphrase: String?
+    ): ByteArray {
+        val suite = parsed.suite
         val pubMat = CompositeKeyFacade.v4Algo35PublicMaterial(subBody)
         val secret = CompositeKeyFacade.v4Algo35SecretMaterial(subBody, passphrase?.toCharArray())
             ?: throw CompositeSecretKeyMaterial.ProtectedKeyException(
@@ -277,8 +310,10 @@ object CompositeDecryptor {
         rawRings.firstOrNull { ring ->
             runCatching {
                 if (CompositeKeyFacade.hasV4Algo35Subkey(ring)) {
-                    val sub = CompositeKeyFacade.v4Algo35SubkeyBody(ring)
-                    sub != null && CompositeKeyFacade.v4Algo35SubkeyFingerprint(sub).contentEquals(fp)
+                    // 4.6.0 (item 19): any of the ring's v4 algo-35 subkeys.
+                    CompositeKeyFacade.v4Algo35SubkeyBodies(ring).any {
+                        CompositeKeyFacade.v4Algo35SubkeyFingerprint(it).contentEquals(fp)
+                    }
                 } else {
                     CompositeKeyFacade.parse(ring).encryptionSubkey?.fingerprint?.contentEquals(fp) == true
                 }
@@ -482,14 +517,16 @@ object CompositeDecryptor {
     private fun findRawCompositeByKeyId(keyId: ByteArray, rawRings: List<ByteArray>): ByteArray? =
         rawRings.firstOrNull { ring ->
             runCatching {
-                val fp = if (CompositeKeyFacade.hasV4Algo35Subkey(ring)) {
-                    CompositeKeyFacade.v4Algo35SubkeyBody(ring)
-                        ?.let { CompositeKeyFacade.v4Algo35SubkeyFingerprint(it) }
+                // 4.6.0 (item 19): any of the ring's v4 algo-35 subkeys.
+                val fps = if (CompositeKeyFacade.hasV4Algo35Subkey(ring)) {
+                    CompositeKeyFacade.v4Algo35SubkeyBodies(ring)
+                        .map { CompositeKeyFacade.v4Algo35SubkeyFingerprint(it) }
                 } else {
-                    CompositeKeyFacade.parse(ring).encryptionSubkey?.fingerprint
+                    listOfNotNull(CompositeKeyFacade.parse(ring).encryptionSubkey?.fingerprint)
                 }
-                fp != null && fp.size >= 8 &&
-                    fp.copyOfRange(fp.size - 8, fp.size).contentEquals(keyId)
+                fps.any { fp ->
+                    fp.size >= 8 && fp.copyOfRange(fp.size - 8, fp.size).contentEquals(keyId)
+                }
             }.getOrDefault(false)
         }
 

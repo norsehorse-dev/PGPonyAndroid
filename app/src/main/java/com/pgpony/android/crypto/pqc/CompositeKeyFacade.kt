@@ -189,7 +189,20 @@ object CompositeKeyFacade {
         val material = V4Algo35Protection.unlock(subPkt.body, null)
             ?: error("v4 algo-35 subkey carries no secret material")
         out.write(packet(7, pubBody + V4Algo35Protection.protect(material, newPass)))
-        for (k in subIdx + 1 until pkts.size) out.write(packet(pkts[k].tag, pkts[k].body))
+        for (k in subIdx + 1 until pkts.size) {
+            val p = pkts[k]
+            // 4.6.0 (item 19): a key can hold more than one v4 algo-35 subkey;
+            // every one is protected, not only the first.
+            if (p.tag == 7 && isV4Algo35SecretBody(p.body) && !V4Algo35Protection.isProtected(p.body)) {
+                val more = V4Algo35Protection.unlock(p.body, null)
+                if (more != null) {
+                    out.write(packet(7, p.body.copyOfRange(0, 1 + 4 + 1 + 1216) +
+                        V4Algo35Protection.protect(more, newPass)))
+                    continue
+                }
+            }
+            out.write(packet(p.tag, p.body))
+        }
         return out.toByteArray()
     }
 

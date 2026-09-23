@@ -20,6 +20,8 @@
 package com.pgpony.android.keyserver
 
 import com.pgpony.android.network.textCapped
+import com.pgpony.android.network.KeyResponse
+import com.pgpony.android.network.publicKeyOrNull
 import com.pgpony.android.PGPonyApp
 import com.pgpony.android.network.HttpClientFactory
 import com.pgpony.android.network.ProxyPrefs
@@ -74,7 +76,9 @@ class MultiKeyServerService {
             val response = client.get("${base(server)}/vks/v1/by-fingerprint/$fp") {
                 accept(ContentType.Application.OctetStream)
             }
-            if (response.status == HttpStatusCode.OK) response.textCapped() else null
+            // 4.6.0 (item 18): only public key material holding [fingerprint].
+            if (response.status == HttpStatusCode.OK)
+                response.publicKeyOrNull(KeyResponse.Query.Fingerprint(fp)) else null
         }
 
     /**
@@ -95,7 +99,9 @@ class MultiKeyServerService {
             val response = client.get("${base(server)}/vks/v1/by-keyid/$id") {
                 accept(ContentType.Application.OctetStream)
             }
-            if (response.status == HttpStatusCode.OK) response.textCapped() else null
+            // 4.6.0 (item 18): only public key material holding [keyId].
+            if (response.status == HttpStatusCode.OK)
+                response.publicKeyOrNull(KeyResponse.Query.KeyId(id)) else null
         }
 
     /**
@@ -115,7 +121,9 @@ class MultiKeyServerService {
             val response = client.get("${base(server)}/vks/v1/by-email/${email.trim()}") {
                 accept(ContentType.Application.OctetStream)
             }
-            if (response.status == HttpStatusCode.OK) response.textCapped() else null
+            // 4.6.0 (item 18): only public key material; the address filter
+            // (KeyServerRepository.keepHolding) runs on top.
+            if (response.status == HttpStatusCode.OK) response.publicKeyOrNull() else null
         }
 
     /**
