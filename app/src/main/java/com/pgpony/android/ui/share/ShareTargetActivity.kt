@@ -55,6 +55,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import com.pgpony.android.PGPonyApp
 import com.pgpony.android.PGPonyTheme
 import com.pgpony.android.crypto.card.OpenPgpCardSession
@@ -130,8 +132,29 @@ class ShareTargetActivity : AppCompatActivity(), DocumentCreatorHost {
         return true
     }
 
+    // 4.6.0 (item 17.7): the Quick Action honours the app lock. Locked at
+    // entry when the lock is on, and again whenever the activity stops,
+    // except while our own save-file picker has it in the background.
+    private var locked by androidx.compose.runtime.mutableStateOf(false)
+    private var pickerInFlight = false
+
+    private fun lockEnabled(): Boolean =
+        getSharedPreferences("pgpony_prefs", MODE_PRIVATE).getBoolean("biometric_lock", false)
+
+    override fun onStop() {
+        super.onStop()
+        if (!pickerInFlight && lockEnabled()) locked = true
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 4.6.0 (item 17.7): this task shows decrypted Quick Action output and
+        // has its own Recents entry, which MainActivity's protection never
+        // covered. Same scope as MainActivity: API 33+ blanks the snapshot.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            setRecentsScreenshotEnabled(false)
+        }
+        locked = lockEnabled()
 
         if (forwardEncryptTextIfNeeded(intent)) return
         val content = IntentHandler.classifyShareIntent(intent, contentResolver)
@@ -150,6 +173,10 @@ class ShareTargetActivity : AppCompatActivity(), DocumentCreatorHost {
                         vm = vm,
                         onDismiss = { finish() },
                     )
+                    // Rendered over the still-composed screen, as in MainActivity.
+                    if (locked) {
+                        com.pgpony.android.ui.components.LockScreen(onUnlock = { locked = false })
+                    }
                 }
             }
         }
@@ -248,7 +275,11 @@ class ShareTargetActivity : AppCompatActivity(), DocumentCreatorHost {
         suggestedName: String,
         callback: (android.net.Uri?) -> Unit,
     ) {
-        documentCreator.launch(this, mimeType, suggestedName, callback)
+        pickerInFlight = true
+        documentCreator.launch(this, mimeType, suggestedName) { uri ->
+            pickerInFlight = false
+            callback(uri)
+        }
     }
 
     @Deprecated("Matches MainActivity's picker plumbing; see SafDocumentCreator.")

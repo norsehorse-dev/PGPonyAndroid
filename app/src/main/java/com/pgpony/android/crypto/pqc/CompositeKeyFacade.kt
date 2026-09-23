@@ -107,6 +107,16 @@ object CompositeKeyFacade {
                 (pkt.body[1 + 4].toInt() and 0xFF) == 35
         }?.body
 
+    /** 4.6.0 (item 17.1): every v4 algo-35 subkey packet body in [ring], in
+     *  ring order, so a caller can pick the one the primary actually bound. */
+    fun v4Algo35SubkeyBodies(ring: ByteArray): List<ByteArray> =
+        walk(ring).filter { pkt ->
+            (pkt.tag == 7 || pkt.tag == 14) &&
+                pkt.body.size > 5 &&
+                (pkt.body[0].toInt() and 0xFF) == 4 &&
+                (pkt.body[1 + 4].toInt() and 0xFF) == 35
+        }.map { it.body }
+
     /**
      * item 14 (#56): the 1216-byte public material (X25519 32 || ML-KEM-768
      * 1184) of a v4 algo-35 subkey body. A v4 key packet carries NO 4-octet
@@ -167,9 +177,7 @@ object CompositeKeyFacade {
         var rebuilt = baseRing
         for (sk in baseRing.secretKeys) {
             // Fresh encryptor per key: distinct salt + IV, never reused.
-            val enc = org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyEncryptorBuilder(
-                org.bouncycastle.bcpg.SymmetricKeyAlgorithmTags.AES_256
-            ).build(newPass)
+            val enc = com.pgpony.android.crypto.S2kPolicy.v4EncryptorBuilder().build(newPass) // 4.6.0 (item 17.6)
             val protectedKey = org.bouncycastle.openpgp.PGPSecretKey.copyWithNewPassword(sk, null, enc, sha1)
             rebuilt = org.bouncycastle.openpgp.PGPSecretKeyRing.insertSecretKey(rebuilt, protectedKey)
         }
@@ -346,12 +354,27 @@ object CompositeKeyFacade {
         val userIds = packets.filter { it.tag == 13 }.map { String(it.body, Charsets.UTF_8) }
         val expirationSeconds = directKeyExpiration(packets)
 
+        // 4.6.0 (item 17.1): which subkeys the primary actually bound. A
+        // subkey counts as a signer only with a verified 0x18 binding and a
+        // verified 0x19 back-signature, and as an encryption target only with a
+        // verified, unrevoked binding. Everything else in the packet stream is
+        // ignored, whatever its tag and algorithm say.
+        val bindings = runCatching { com.pgpony.android.crypto.CertificateBindings.analyze(ring) }.getOrNull()
+        fun subState(fpHex: String) = bindings?.subkeys?.firstOrNull { it.fingerprintHex.equals(fpHex, ignoreCase = true) }
+        fun checked() = bindings != null && bindings.supported
+        val primaryFpHex = fingerprint.joinToString("") { "%02x".format(it) }
+
         // Every key packet (primary + subkeys), classified by algorithm.
         val keyPackets = packets.filter { it.tag == 5 || it.tag == 6 || it.tag == 7 || it.tag == 14 }
         val compositeSigners = keyPackets.mapNotNull { pkt ->
             val pb = publicKeyBody(pkt.body)
             val algId = pb[1 + 4].toInt() and 0xFF
             val compSuite = CompositeSignSuite.forAlgId(algId) ?: return@mapNotNull null
+            val fpHex = v6Fingerprint(pb).joinToString("") { "%02x".format(it) }
+            if (checked() && !fpHex.equals(primaryFpHex, ignoreCase = true)) {
+                val st = subState(fpHex) ?: return@mapNotNull null
+                if (!st.bound || !st.backSigned || st.revoked) return@mapNotNull null
+            }
             CompositeComponent(
                 fingerprintHex = v6Fingerprint(pb).joinToString("") { "%02x".format(it) },
                 algId = algId,
@@ -360,21 +383,31 @@ object CompositeKeyFacade {
             )
         }
 
-        // The ML-KEM encryption subkey (algo 35/36), if any.
+        // The ML-KEM encryption subkey (algo 35/36), if any: the first one the
+        // primary bound with a verified 0x18 (4.6.0 item 17.1).
         val subIdx = packets.indexOfFirst { pkt ->
             if (pkt.tag != 7 && pkt.tag != 14) return@indexOfFirst false
-            val a = publicKeyBody(pkt.body)[1 + 4].toInt() and 0xFF
-            a == 35 || a == 36
+            val pb = publicKeyBody(pkt.body)
+            val a = pb[1 + 4].toInt() and 0xFF
+            if (a != 35 && a != 36) return@indexOfFirst false
+            if (!checked()) return@indexOfFirst true
+            val st = subState(v6Fingerprint(pb).joinToString("") { "%02x".format(it) })
+            st != null && st.bound
         }
         val subkey = if (subIdx < 0) null else {
             val pkt = packets[subIdx]
             val subPublicBody = publicKeyBody(pkt.body)
             val subAlgId = subPublicBody[1 + 4].toInt() and 0xFF
             val subSecret = if (pkt.tag == 7) subkeySecret(pkt.body, subAlgId, passphrase) else null
-            // A 0x28 revocation sits among the signatures immediately after the subkey.
-            val revoked = (subIdx + 1 until packets.size).asSequence()
-                .takeWhile { packets[it].tag == 2 }
-                .any { (packets[it].body[1].toInt() and 0xFF) == 0x28 }
+            // A 0x28 revocation sits among the signatures immediately after the
+            // subkey; 4.6.0 (item 17.1) counts it only when it verifies.
+            val revoked = if (checked()) {
+                subState(v6Fingerprint(subPublicBody).joinToString("") { "%02x".format(it) })?.revoked == true
+            } else {
+                (subIdx + 1 until packets.size).asSequence()
+                    .takeWhile { packets[it].tag == 2 }
+                    .any { (packets[it].body[1].toInt() and 0xFF) == 0x28 }
+            }
             SubkeyInfo(subAlgId, v6Fingerprint(subPublicBody), publicMaterial(subPublicBody), subSecret, revoked)
         }
 
@@ -405,11 +438,21 @@ object CompositeKeyFacade {
      * subkey to receive a message.
      */
     fun encryptionSubkeyRing(publicRing: ByteArray): org.bouncycastle.openpgp.PGPPublicKeyRing? {
+        // 4.6.0 (item 17.1): only a subkey the primary bound with a verified,
+        // unrevoked 0x18 may receive a message. (A bare ML-KEM primary, which
+        // has no binding to check, is its own key.)
+        val bindings = runCatching { com.pgpony.android.crypto.CertificateBindings.analyze(publicRing) }.getOrNull()
         val sub = walk(publicRing).firstOrNull { pkt ->
             if (pkt.tag != 6 && pkt.tag != 14 && pkt.tag != 5 && pkt.tag != 7) return@firstOrNull false
             val pb = publicKeyBody(pkt.body)
             val alg = pb[1 + 4].toInt() and 0xFF
-            alg == 35 || alg == 36
+            if (alg != 35 && alg != 36) return@firstOrNull false
+            if (pkt.tag == 6 || pkt.tag == 5) return@firstOrNull true
+            if (bindings == null) return@firstOrNull false
+            if (!bindings.supported) return@firstOrNull true
+            // Bound, unrevoked, unexpired, under a usable primary.
+            val fpHex = v6Fingerprint(pb).joinToString("") { "%02x".format(it) }
+            bindings.isUsableEncryptionKey(fpHex, System.currentTimeMillis())
         } ?: return null
         val bare = packet(6, publicKeyBody(sub.body))
         return try {

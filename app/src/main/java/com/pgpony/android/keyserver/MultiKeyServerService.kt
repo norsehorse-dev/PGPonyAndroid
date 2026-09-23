@@ -19,6 +19,7 @@
 
 package com.pgpony.android.keyserver
 
+import com.pgpony.android.network.textCapped
 import com.pgpony.android.PGPonyApp
 import com.pgpony.android.network.HttpClientFactory
 import com.pgpony.android.network.ProxyPrefs
@@ -73,7 +74,7 @@ class MultiKeyServerService {
             val response = client.get("${base(server)}/vks/v1/by-fingerprint/$fp") {
                 accept(ContentType.Application.OctetStream)
             }
-            if (response.status == HttpStatusCode.OK) response.bodyAsText() else null
+            if (response.status == HttpStatusCode.OK) response.textCapped() else null
         }
 
     /**
@@ -94,7 +95,7 @@ class MultiKeyServerService {
             val response = client.get("${base(server)}/vks/v1/by-keyid/$id") {
                 accept(ContentType.Application.OctetStream)
             }
-            if (response.status == HttpStatusCode.OK) response.bodyAsText() else null
+            if (response.status == HttpStatusCode.OK) response.textCapped() else null
         }
 
     /**
@@ -114,7 +115,7 @@ class MultiKeyServerService {
             val response = client.get("${base(server)}/vks/v1/by-email/${email.trim()}") {
                 accept(ContentType.Application.OctetStream)
             }
-            if (response.status == HttpStatusCode.OK) response.bodyAsText() else null
+            if (response.status == HttpStatusCode.OK) response.textCapped() else null
         }
 
     /**
@@ -183,7 +184,7 @@ class MultiKeyServerService {
         }
         return when (response.status) {
             HttpStatusCode.OK -> {
-                val json = JSONObject(response.bodyAsText())
+                val json = JSONObject(response.textCapped())
                 val token = json.optString("token", "")
                 val statusObj = json.optJSONObject("status")
                 val unpublished = mutableListOf<String>()

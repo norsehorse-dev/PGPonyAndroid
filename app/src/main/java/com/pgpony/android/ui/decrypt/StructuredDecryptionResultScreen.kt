@@ -340,7 +340,7 @@ private fun exportUris(context: Context, attachments: List<AttachmentItem>): Arr
         }
         val exportsDir = File(context.cacheDir, "exports").apply { mkdirs() }
         val safeName = att.filename.replace('/', '_').ifBlank { "attachment" }
-        val outFile = File(exportsDir, safeName)
+        val outFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, safeName, "attachment")
         outFile.outputStream().use { att.writeTo(it) }
         uris.add(
             FileProvider.getUriForFile(

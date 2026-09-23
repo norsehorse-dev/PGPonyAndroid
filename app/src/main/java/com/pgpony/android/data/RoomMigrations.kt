@@ -164,3 +164,26 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
         db.execSQL("ALTER TABLE `pgp_keys` ADD COLUMN `lastBackedUpAt` INTEGER")
     }
 }
+
+// 4.6.0 (item 17.4): Autocrypt-origin marker on pgp_keys. One nullable
+// column, same additive shape as 8_9. Existing public-only rows that an
+// Autocrypt peer record points at are marked as Autocrypt-origin, so a key
+// planted through Autocrypt before this release does not keep counting as
+// user-managed. Key pairs and card-backed keys (the user's own) are never marked; everything
+// else reads as user-managed, and importing a key again clears the mark.
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `pgp_keys` ADD COLUMN `autocryptImportedAt` INTEGER")
+        db.execSQL(
+            """
+            UPDATE `pgp_keys` SET `autocryptImportedAt` = ${System.currentTimeMillis()}
+            WHERE `isKeyPair` = 0 AND `isCardBacked` = 0 AND (
+                lower(`fingerprint`) IN (SELECT lower(`autocryptKeyFingerprint`) FROM `autocrypt_peers`
+                                         WHERE `autocryptKeyFingerprint` IS NOT NULL)
+                OR lower(`fingerprint`) IN (SELECT lower(`gossipKeyFingerprint`) FROM `autocrypt_peers`
+                                            WHERE `gossipKeyFingerprint` IS NOT NULL)
+            )
+            """.trimIndent()
+        )
+    }
+}

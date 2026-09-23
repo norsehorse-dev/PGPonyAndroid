@@ -230,7 +230,7 @@ class VerifyService private constructor() {
 
         // item 11 (Finding C): downgrade a valid signature from a revoked,
         // expired, or non-signing key so it never shows as Verified.
-        SignerEvaluator.evaluate(sig.keyID, sig.creationTime, publicKeyRings).let { st ->
+        SignerEvaluator.evaluate(sig, publicKeyRings).let { st ->
             if (st != SignerStatus.VERIFIED) return VerificationResult.Invalid(
                 reason = SignerEvaluator.reason(st),
                 signerKeyID = keyIdHex,
@@ -357,7 +357,7 @@ class VerifyService private constructor() {
             resolveSignerIdentity(sig.keyID, publicKeyRings)
         // item 11 (Finding C): downgrade a valid signature from a revoked,
         // expired, or non-signing key so it never shows as Verified.
-        SignerEvaluator.evaluate(sig.keyID, sig.creationTime, publicKeyRings).let { st ->
+        SignerEvaluator.evaluate(sig, publicKeyRings).let { st ->
             if (st != SignerStatus.VERIFIED) return VerificationResult.Invalid(
                 reason = SignerEvaluator.reason(st),
                 signerKeyID = keyIdHex,
@@ -432,7 +432,7 @@ class VerifyService private constructor() {
 
         // item 11 (Finding C): downgrade a valid signature from a revoked,
         // expired, or non-signing key so it never shows as Verified.
-        SignerEvaluator.evaluate(sig.keyID, sig.creationTime, publicKeyRings).let { st ->
+        SignerEvaluator.evaluate(sig, publicKeyRings).let { st ->
             if (st != SignerStatus.VERIFIED) return VerificationResult.Invalid(
                 reason = SignerEvaluator.reason(st),
                 signerKeyID = keyIdHex,
@@ -532,7 +532,10 @@ class VerifyService private constructor() {
         keyId: Long,
         rings: List<PGPPublicKeyRing>
     ): Triple<String?, String?, String> {
-        for (ring in rings) {
+        // 4.6.0 (item 17.1): the identity comes from the certificate the key is
+        // validly bound to, not merely the first ring that lists it.
+        val preferred = SignerEvaluator.signerRing(keyId, rings)
+        for (ring in listOfNotNull(preferred) + rings) {
             if (ring.getPublicKey(keyId) == null) continue
             val primary = ring.publicKey
             val userId = primary.userIDs.asSequence().firstOrNull()

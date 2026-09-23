@@ -26,7 +26,7 @@ private class FakeDao : AutocryptPeerDao {
 class AutocryptPeerStoreTest {
 
     private val DAY = 24L * 60 * 60 * 1000
-    private val importer = AutocryptKeyImporter { "IMPORTEDFP" }
+    private val importer = AutocryptKeyImporter { _, _ -> "IMPORTEDFP" }
 
     private fun store(dao: FakeDao) = AutocryptPeerStore(dao, importer)
 

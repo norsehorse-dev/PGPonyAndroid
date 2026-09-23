@@ -206,7 +206,12 @@ class KeyRefreshService(
      * native walk performs by hand.
      */
     private fun findKeyRevocationSignature(ring: PGPPublicKeyRing): PGPSignature? {
-        val primary = ring.publicKey ?: return null
+        // 4.6.0 (item 17.1): only a revocation the primary itself made, and
+        // that verifies, counts. The verified view drops every other 0x20.
+        val view = com.pgpony.android.crypto.CertificateBindings.verified(ring)
+        val report = view.report
+        if (report != null && report.supported && !report.primaryRevoked) return null
+        val primary = view.ring.publicKey ?: return null
         val sigs = primary.getSignaturesOfType(PGPSignature.KEY_REVOCATION) ?: return null
         while (sigs.hasNext()) {
             (sigs.next() as? PGPSignature)?.let { return it }

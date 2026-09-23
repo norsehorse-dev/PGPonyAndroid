@@ -210,7 +210,13 @@ data class PGPKeyEntity(
     /** §4.3 delete-safeguard: when this key was last backed up / exported
      *  (epoch ms), so the delete sheet can say "in a backup from ..." versus
      *  "never backed up". Null = never. */
-    val lastBackedUpAt: Long? = null
+    val lastBackedUpAt: Long? = null,
+    /** 4.6.0 (item 17.4): when non-null, this row was created by an Autocrypt
+     *  header or gossip (OpenPGP API or PGPony's own mail ingest), not by the
+     *  user. Such a key never joins a user-managed key for the same address as
+     *  an extra provider recipient. Cleared when the user imports the key
+     *  themselves. */
+    val autocryptImportedAt: Long? = null
 ) {
     // ── Computed Properties ─────────────────────────────────────────
 
@@ -380,7 +386,7 @@ interface PGPKeyDao {
         PGPKeyEntity::class, ApiClientEntity::class, AutocryptPeerEntity::class,
         FallbackKeyEntity::class, SigningDefaultsEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(

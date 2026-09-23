@@ -187,6 +187,10 @@ class SecureKeyStore(context: Context) {
         }
     }
 
+    private fun deleteLegacy(name: String) {
+        runCatching { legacyPrefs?.edit()?.remove(name)?.apply() }
+    }
+
     // ── Hardware keystore key (stable alias) ────────────────────────────
 
     private fun loadHwKey(): SecretKey? {
@@ -218,6 +222,13 @@ class SecureKeyStore(context: Context) {
             loadHwKey()?.let { return it }
             return createHwKey()
         }
+    }
+
+    /** The current hardware key if it can actually seal and open, else null. */
+    private fun usableHwKey(): SecretKey? = try {
+        loadHwKey()?.takeIf { k -> open(k, seal(k, ByteArray(1))).size == 1 }
+    } catch (_: Exception) {
+        null
     }
 
     // Delete and recreate the hardware key after an invalidation, so recovered
@@ -330,13 +341,26 @@ class SecureKeyStore(context: Context) {
     // For writing new material: reuse the existing hardware-unwrappable DEK so
     // this key's other blob and any passphrase wrap stay valid; otherwise mint a
     // fresh DEK (the old material is being overwritten anyway).
-    private fun dekForWrite(fp: String): SecretKey {
+    //
+    // 4.6.0 (item 17.9): when the existing DEK is not hardware-readable but a
+    // passphrase recovery wrap exists, do NOT mint a fresh DEK. Doing so
+    // rewrote the envelope without the recovery wrap and orphaned this key's
+    // other blob, so a background public-key refresh after a keystore wipe
+    // could turn a recoverable private key into a lost one. Returns null
+    // instead; the caller skips (public) or refuses (private) the write until
+    // recoverWithPassphrase() has re-wrapped the DEK.
+    private fun dekForWrite(fp: String): SecretKey? {
         val env = readEnvelope(fp)
         if (env != null) {
             try {
                 val dek = open(getOrCreateHwKey(), env.hwWrap)
                 return SecretKeySpec(dek, "AES")
             } catch (e: Exception) {
+                if (env.pwPresent) {
+                    sawRecoverable = true
+                    Log.w(TAG, "DEK for $fp needs passphrase recovery before a rewrite")
+                    return null
+                }
                 Log.w(TAG, "Existing DEK for $fp not hardware-readable, minting fresh: ${e.message}")
             }
         }
@@ -383,6 +407,13 @@ class SecureKeyStore(context: Context) {
     private fun writeBlob(fp: String, name: String, data: ByteArray) {
         crossProcess {
             val dek = dekForWrite(fp)
+            if (dek == null) {
+                // 4.6.0 (item 17.9): see dekForWrite. Public material can be
+                // fetched again, so that write is skipped; private material is
+                // refused so the caller surfaces it.
+                if (name == pubName(fp)) return@crossProcess
+                throw IllegalStateException("This key needs its passphrase to recover before it can be changed")
+            }
             atomicWrite(blobFile(name), seal(dek, data))
         }
     }
@@ -409,6 +440,10 @@ class SecureKeyStore(context: Context) {
         val legacy = readLegacy(name) ?: return null
         try {
             writeBlob(fp, name, legacy)
+            // 4.6.0 (item 17.9): once the new store verifiably holds the value,
+            // drop the legacy copy, so a later fallback cannot resurrect a stale
+            // secret or an old passphrase-protected form.
+            if (readBlob(fp, name)?.contentEquals(legacy) == true) deleteLegacy(name)
         } catch (e: Exception) {
             Log.w(TAG, "Lazy migration write failed for $name: ${e.message}")
         }
@@ -419,7 +454,12 @@ class SecureKeyStore(context: Context) {
 
     fun storePublicKey(fingerprint: String, data: ByteArray) {
         val fp = fingerprint.lowercase()
-        writeBlob(fp, pubName(fp), data)
+        // 4.6.0 (item 17.1): every public certificate that reaches storage keeps
+        // only the components its primary verifiably bound (and the signatures
+        // that verify). A certificate whose primary cannot be evaluated, or data
+        // that is not a certificate, is stored as given.
+        val clean = runCatching { com.pgpony.android.crypto.CertificateBindings.sanitized(data) }.getOrDefault(data)
+        writeBlob(fp, pubName(fp), clean)
     }
 
     fun storePrivateKey(fingerprint: String, data: ByteArray) {
@@ -555,7 +595,12 @@ class SecureKeyStore(context: Context) {
                 return@crossProcess false
             }
             val hwWrap = try {
-                seal(regenerateHwKey(), dekBytes)
+                // 4.6.0 (item 17.9): reuse the live hardware key when it works.
+                // Deleting it (the old regenerate-every-time) invalidated every
+                // key written or recovered since the wipe, and a passphrase-less
+                // key among them was lost for good. Regenerate only when there is
+                // no usable key.
+                seal(usableHwKey() ?: regenerateHwKey(), dekBytes)
             } catch (e: Exception) {
                 Log.w(TAG, "Could not re-wrap recovered DEK under hardware for $fp: ${e.message}")
                 // Recovery still succeeded logically; keep the old hw wrap.

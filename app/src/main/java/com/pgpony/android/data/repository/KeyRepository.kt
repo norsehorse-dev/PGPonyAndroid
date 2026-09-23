@@ -69,6 +69,9 @@ data class StoredKey(
  *   • armoredText — original armor, held so the commit re-parses
  *     the exact same input the user previewed.
  */
+/** 4.6.0 (item 17.9): one further key shown in an [ImportPreview]. */
+data class PreviewKey(val fingerprint: String, val userId: String, val hasPrivateKey: Boolean)
+
 data class ImportPreview(
     val fingerprint: String,
     val userId: String,
@@ -84,7 +87,11 @@ data class ImportPreview(
      *  importArmoredKey's card branch) rather than collide. Lets the UI
      *  keep the Import button enabled for the pairing case. */
     val willPairWithCard: Boolean = false,
-    val armoredText: String
+    val armoredText: String,
+    /** 4.6.0 (item 17.9): every OTHER key the same text holds. The commit
+     *  imports all of them, so the preview must show all of them; a noisy
+     *  paste can no longer slip a second key in behind the one reviewed. */
+    val additionalKeys: List<PreviewKey> = emptyList()
 ) {
     /** Last 8 hex chars, uppercased — same convention as PGPKeyEntity.shortFingerprint. */
     val shortFingerprint: String get() = fingerprint.takeLast(8).uppercase()
@@ -457,7 +464,8 @@ class KeyRepository(
 
     private fun compositeFromArmored(armoredText: String): Pair<ByteArray, CompositeKeyFacade.Info>? =
         try {
-            val bytes = CompositeSigPacket.dearmor(armoredText)
+            // 4.6.0 (item 17.1): only components the primary verifiably bound.
+            val bytes = com.pgpony.android.crypto.CertificateBindings.sanitized(CompositeSigPacket.dearmor(armoredText))
             if (CompositeKeyFacade.isCompositePrimary(bytes)) {
                 bytes to CompositeKeyFacade.parse(bytes)
             } else null
@@ -546,7 +554,8 @@ class KeyRepository(
 
     private fun v4Algo35FromArmored(armoredText: String): ByteArray? =
         try {
-            val bytes = CompositeSigPacket.dearmor(armoredText)
+            // 4.6.0 (item 17.1): only components the primary verifiably bound.
+            val bytes = com.pgpony.android.crypto.CertificateBindings.sanitized(CompositeSigPacket.dearmor(armoredText))
             if (CompositeKeyFacade.hasV4Algo35Subkey(bytes) &&
                 !CompositeKeyFacade.isCompositePrimary(bytes)
             ) bytes else null
@@ -645,6 +654,18 @@ class KeyRepository(
     }
 
     suspend fun previewArmoredKey(armoredText: String): ImportPreview? {
+        // 4.6.0 (item 17.9): preview the first ring as before, then list every
+        // further ring the commit would import alongside it.
+        val rings = runCatching { explodePerRing(armoredText) }.getOrDefault(emptyList())
+        val first = previewSingle(if (rings.size > 1) rings.first() else armoredText) ?: return null
+        if (rings.size <= 1) return first
+        val others = rings.drop(1).mapNotNull { ring ->
+            previewSingle(ring)?.let { PreviewKey(it.fingerprint, it.userId, it.hasPrivateKey) }
+        }
+        return first.copy(armoredText = armoredText, additionalKeys = others)
+    }
+
+    private suspend fun previewSingle(armoredText: String): ImportPreview? {
         compositeImportPreview(armoredText)?.let { return it }
         v4Algo35ImportPreview(armoredText)?.let { return it }
         return try {
@@ -697,7 +718,29 @@ class KeyRepository(
      * AlreadyExists now resolves via the dedup service so a re-import
      * doubles as a manual refresh and the UI can say what happened.
      */
-    suspend fun importArmoredKeyDetailed(armoredText: String): ImportOutcome {
+    suspend fun importArmoredKeyDetailed(armoredText: String): ImportOutcome =
+        importArmoredKeyDetailed(armoredText, fromAutocrypt = false)
+
+    /**
+     * 4.6.0 (item 17.4): [fromAutocrypt] marks a row this import CREATES as
+     * Autocrypt-origin (see PGPKeyEntity.autocryptImportedAt). Any other import
+     * of a key that exists as Autocrypt-origin promotes it to user-managed,
+     * because the user has now brought the key in themselves.
+     */
+    suspend fun importArmoredKeyDetailed(armoredText: String, fromAutocrypt: Boolean): ImportOutcome {
+        val outcome = importArmoredKeyDetailedInner(armoredText)
+        val e = outcome.entity
+        val marked = when {
+            fromAutocrypt && outcome.resolution == ImportResolution.INSERTED ->
+                e.copy(autocryptImportedAt = System.currentTimeMillis())
+            !fromAutocrypt && e.autocryptImportedAt != null -> e.copy(autocryptImportedAt = null)
+            else -> null
+        } ?: return outcome
+        dao.update(marked)
+        return outcome.copy(entity = marked)
+    }
+
+    private suspend fun importArmoredKeyDetailedInner(armoredText: String): ImportOutcome {
         compositeFromArmored(armoredText)?.let { (bytes, info) ->
             return importCompositeKey(bytes, info, armoredText)
         }
@@ -1096,7 +1139,18 @@ class KeyRepository(
     ): com.pgpony.android.crypto.pqc.V4Algo35Recipient? {
         val raw = store.loadPublicKey(fingerprint) ?: return null
         if (!CompositeKeyFacade.hasV4Algo35Subkey(raw)) return null
-        val subBody = CompositeKeyFacade.v4Algo35SubkeyBody(raw) ?: return null
+        // 4.6.0 (item 17.1): the newest algo-35 subkey the primary bound with a
+        // verified, unrevoked 0x18. An unbound one is never a recipient.
+        // Also unexpired, under a usable (unrevoked, unexpired) primary.
+        val bindings = com.pgpony.android.crypto.CertificateBindings.analyze(raw) ?: return null
+        val now = System.currentTimeMillis()
+        val subBody = CompositeKeyFacade.v4Algo35SubkeyBodies(raw).lastOrNull { body ->
+            if (!bindings.supported) return@lastOrNull true
+            val fpHex = org.bouncycastle.util.encoders.Hex.toHexString(
+                CompositeKeyFacade.v4Algo35SubkeyFingerprint(body)
+            )
+            bindings.isUsableEncryptionKey(fpHex, now)
+        } ?: return null
         return com.pgpony.android.crypto.pqc.V4Algo35Recipient(
             CompositeKeyFacade.v4Algo35PublicMaterial(subBody),
             CompositeKeyFacade.v4Algo35SubkeyFingerprint(subBody)
@@ -2507,6 +2561,12 @@ class KeyRepository(
      */
     suspend fun runDedupeSweepIfNeeded(prefs: SharedPreferences) {
         dedup.runSweepIfNeeded(prefs)
+    }
+
+    /** 4.6.0 (item 17.1): one-time re-validation of stored certificates; see
+     *  [KeyDeduplicationService.revalidateStoredCertificatesIfNeeded]. */
+    suspend fun revalidateStoredCertificatesIfNeeded(prefs: SharedPreferences) {
+        dedup.revalidateStoredCertificatesIfNeeded(prefs)
     }
 
     // ── RC3 §N (#34): decryption fallbacks + signing defaults ──────────

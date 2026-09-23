@@ -66,12 +66,24 @@ object CompositeDocumentVerifier {
         inflater.setInput(data)
         val out = java.io.ByteArrayOutputStream()
         val buf = ByteArray(8192)
+        var total = 0L
         try {
             while (!inflater.finished()) {
                 val n = inflater.inflate(buf)
                 if (n == 0 && (inflater.needsInput() || inflater.needsDictionary())) break
+                total += n
+                // 4.6.0 (item 17.5): this runs on every decrypted message and on
+                // pasted / opened signed text, before the capped content loop,
+                // so it honours the same in-memory cap.
+                if (total > com.pgpony.android.crypto.SecurityLimits.MAX_MESSAGE_PLAINTEXT_BYTES) {
+                    throw com.pgpony.android.crypto.PGPCryptoError.ResourceLimitExceeded(
+                        "decompressed message exceeds size cap"
+                    )
+                }
                 out.write(buf, 0, n)
             }
+        } catch (e: com.pgpony.android.crypto.PGPCryptoError.ResourceLimitExceeded) {
+            throw e
         } catch (_: Exception) {
         } finally {
             inflater.end()

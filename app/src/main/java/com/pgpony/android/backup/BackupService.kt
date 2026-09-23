@@ -49,7 +49,11 @@ data class MergeReport(
     val updated: List<RestoredKey>,       // merged newer material / card pairing
     val unchanged: List<RestoredKey>,     // already up to date
     val failed: List<RestoredKey>,        // couldn't restore (parse/import error)
-    val settingsApplied: Boolean
+    val settingsApplied: Boolean,
+    /** 4.6.0 (item 17.9): the backup's settings (proxy, key servers), NOT yet
+     *  applied. The UI asks first and calls BackupService.applyBackupSettings
+     *  only when the user agrees. */
+    val pendingSettings: String? = null
 ) {
     val totalRestored: Int get() = added.size + upgraded.size + updated.size
 }
@@ -252,23 +256,25 @@ class BackupService(
                     ImportResolution.PAIRED_WITH_CARD -> updated.add(rk)
                     ImportResolution.ALREADY_IN_KEYRING -> unchanged.add(rk)
                 }
-                // Reapply trust from meta for anything we actually changed
-                // (never clobber the trust on a key that was already
-                // present and unchanged).
-                if (outcome.resolution != ImportResolution.ALREADY_IN_KEYRING) {
-                    metaByFp[fp]?.let { applyTrust(fp, it) }
-                }
+                // 4.6.0 (item 17.9): trust levels are no longer taken from the
+                // file. A crafted backup the user was talked into restoring
+                // could otherwise mark an attacker's key as verified. Trust is
+                // set by the user, in the app, after a fingerprint check.
             } catch (e: Exception) {
                 val label = metaByFp[fpFromName]?.optString("userID")?.ifBlank { null } ?: fpFromName
                 failed.add(RestoredKey(fpFromName, label))
             }
         }
 
-        val settingsApplied = entries.firstOrNull { it.name == SETTINGS_NAME }?.let {
-            runCatching { applySettings(String(it.data, Charsets.UTF_8)) }.getOrDefault(false)
-        } ?: false
+        // 4.6.0 (item 17.9): settings are handed back, not applied. The user is
+        // asked first (see applyBackupSettings), and even then a restore can
+        // never turn a configured proxy off.
+        val pendingSettings = entries.firstOrNull { it.name == SETTINGS_NAME }
+            ?.let { String(it.data, Charsets.UTF_8) }
+            ?.takeIf { hasApplicableSettings(it) }
 
-        return MergeReport(added, upgraded, updated, unchanged, failed, settingsApplied)
+        return MergeReport(added, upgraded, updated, unchanged, failed,
+            settingsApplied = false, pendingSettings = pendingSettings)
     }
 
     // ── OpenKeychain migration (Succession) ──────────────────────────
@@ -353,12 +359,14 @@ class BackupService(
         return MergeReport(added, upgraded, updated, unchanged, emptyList(), settingsApplied = false)
     }
 
-    private suspend fun applyTrust(fingerprint: String, meta: JSONObject) {
-        val display = meta.optString("trustLevel").ifBlank { return }
-        val level = TrustLevel.values().firstOrNull { it.displayName.equals(display, true) }
-            ?: return
-        runCatching { repo.updateTrustLevel(fingerprint, level) }
-    }
+    /** 4.6.0 (item 17.9): the user agreed; apply the backup's settings. */
+    suspend fun applyBackupSettings(json: String): Boolean =
+        runCatching { applySettings(json) }.getOrDefault(false)
+
+    private fun hasApplicableSettings(json: String): Boolean = runCatching {
+        val o = JSONObject(json)
+        o.optJSONObject("proxy") != null || (o.optJSONArray("keyservers")?.length() ?: 0) > 0
+    }.getOrDefault(false)
 
     // ── Settings (additive, Android-only) ────────────────────────────
 
@@ -389,6 +397,15 @@ class BackupService(
 
         obj.optJSONObject("proxy")?.let { p ->
             val mode = p.optString("mode", ProxyPrefs.MODE_OFF)
+            val current = ProxyPrefs.config(ctx)
+            // 4.6.0 (item 17.9): a restore never lowers protection. It cannot
+            // turn a configured proxy off, cannot select Custom without a host
+            // (which would leave no usable proxy), and cannot switch an Orbot
+            // or Custom setup to anything else once one is in place.
+            val downgrade = (current.enabled && mode == ProxyPrefs.MODE_OFF) ||
+                (mode == ProxyPrefs.MODE_CUSTOM && p.optString("customHost", "").isBlank()) ||
+                (current.enabled && mode != current.mode)
+            if (downgrade) return@let
             if (mode == ProxyPrefs.MODE_CUSTOM) {
                 ProxyPrefs.setCustom(
                     ctx,

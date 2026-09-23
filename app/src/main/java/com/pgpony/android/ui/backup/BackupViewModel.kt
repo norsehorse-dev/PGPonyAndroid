@@ -146,6 +146,22 @@ class BackupViewModel : ViewModel() {
         }
     }
 
+    /** 4.6.0 (item 17.9): the user chose to apply the restored backup's settings. */
+    fun applyRestoredSettings() {
+        val json = _state.value.report?.pendingSettings ?: return
+        viewModelScope.launch {
+            val ok = service.applyBackupSettings(json)
+            _state.value = _state.value.copy(
+                report = _state.value.report?.copy(settingsApplied = ok, pendingSettings = null)
+            )
+        }
+    }
+
+    /** 4.6.0 (item 17.9): the user declined; forget the restored settings. */
+    fun skipRestoredSettings() {
+        _state.value = _state.value.copy(report = _state.value.report?.copy(pendingSettings = null))
+    }
+
     fun reset() {
         canonical = ""
         pendingRestoreBytes = null

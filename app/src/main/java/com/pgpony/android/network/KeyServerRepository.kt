@@ -127,6 +127,26 @@ class KeyServerRepository {
      * 2 × WKD-timeout + Hagrid-timeout. Typical hits return in
      * <1s from whichever source is configured.
      */
+    /**
+     * 4.6.0 (item 17.8): a by-email answer is trusted only as far as it holds
+     * the address asked for. Only the certificates that carry a User ID,
+     * certified by their own primary (and not revoked), whose address is
+     * exactly [email] are kept; the rest of the answer is discarded, and an
+     * answer with none left is a miss. Returns the kept certificates armored.
+     */
+    private fun keepHolding(armored: String, email: String): String? = runCatching {
+        val binary = com.pgpony.android.crypto.pqc.CompositeSigPacket.dearmor(armored)
+        val want = com.pgpony.android.crypto.CertificateBindings.mailboxOf(email)
+        val kept = com.pgpony.android.crypto.CertificateBindings.splitCertificates(binary).filter { cert ->
+            com.pgpony.android.crypto.CertificateBindings.analyze(cert)?.certifiedUserIds
+                ?.any { com.pgpony.android.crypto.CertificateBindings.mailboxOf(it) == want } == true
+        }
+        if (kept.isEmpty()) return@runCatching null
+        val out = java.io.ByteArrayOutputStream()
+        org.bouncycastle.bcpg.ArmoredOutputStream(out).use { a -> kept.forEach { a.write(it) } }
+        out.toString(Charsets.UTF_8.name())
+    }.getOrNull()
+
     suspend fun findByEmail(email: String): KeyLookupResult? {
         // WKD attempt — returns null if both advanced and direct fail.
         // item 21 (#request): honor the Settings WKD lookup toggle. Off drops
@@ -150,7 +170,7 @@ class KeyServerRepository {
             val outcome = runCatching {
                 MultiKeyServerService.shared.searchByEmail(server, email)
             }
-            val hit = outcome.getOrNull()
+            val hit = outcome.getOrNull()?.let { keepHolding(it, email) } // 4.6.0 (item 17.8)
             if (!hit.isNullOrBlank()) {
                 Log.d(LOG_TAG, "findByEmail($email) → hit via ${server.label}")
                 return KeyLookupResult(armoredKey = hit, source = KeyLookupSource.KEYSERVER)
@@ -160,7 +180,7 @@ class KeyServerRepository {
 
         // Hagrid fallback (keys.openpgp.org) — always the final source so
         // "keep openpgp" holds even if it's disabled in the directory.
-        val hagrid = hagridSearchByEmail(email)
+        val hagrid = hagridSearchByEmail(email)?.let { keepHolding(it, email) } // 4.6.0 (item 17.8)
         return if (hagrid != null) {
             Log.d(LOG_TAG, "findByEmail($email) → hit via keys.openpgp.org (Hagrid)")
             KeyLookupResult(armoredKey = hagrid, source = KeyLookupSource.HAGRID)
@@ -288,7 +308,7 @@ class KeyServerRepository {
                 accept(ContentType.Application.OctetStream)
             }
             if (response.status == HttpStatusCode.OK) {
-                response.bodyAsText()
+                response.textCapped()
             } else {
                 null
             }
@@ -308,7 +328,7 @@ class KeyServerRepository {
                 accept(ContentType.Application.OctetStream)
             }
             if (response.status == HttpStatusCode.OK) {
-                response.bodyAsText()
+                response.textCapped()
             } else {
                 null
             }
@@ -345,7 +365,7 @@ class KeyServerRepository {
                 accept(ContentType.Application.OctetStream)
             }
             if (response.status == HttpStatusCode.OK) {
-                response.bodyAsText()
+                response.textCapped()
             } else {
                 null
             }
@@ -370,7 +390,7 @@ class KeyServerRepository {
         val response = client.get("$BASE_URL/vks/v1/by-fingerprint/$fp") {
             accept(ContentType.Application.OctetStream)
         }
-        if (response.status == HttpStatusCode.OK) response.bodyAsText() else null
+        if (response.status == HttpStatusCode.OK) response.textCapped() else null
     }
 
     /**
@@ -431,7 +451,7 @@ class KeyServerRepository {
             // Parse the upload response.
             //   { "token": "...", "key_fpr": "...",
             //     "status": { "email@example.com": "unpublished", ... } }
-            val responseText = response.bodyAsText()
+            val responseText = response.textCapped()
             val json = JSONObject(responseText)
             val token = json.optString("token", "")
             val fpr = json.optString("key_fpr", "")

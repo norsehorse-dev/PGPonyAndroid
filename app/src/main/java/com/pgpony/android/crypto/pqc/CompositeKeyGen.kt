@@ -224,7 +224,7 @@ object CompositeKeyGen {
                 // v5 (LibrePGP): CFB, S2K usage 254 (SHA-1) — matches gpg's own
                 // convention for v5 keys. (SHA-1 checksum calculator selects 254
                 // over the default 255.)
-                val encryptor = BcPBESecretKeyEncryptorBuilder(SymmetricKeyAlgorithmTags.AES_256)
+                val encryptor = com.pgpony.android.crypto.S2kPolicy.v4EncryptorBuilder() // 4.6.0 (item 17.6)
                     .setSecureRandom(random)
                     .build(passphrase.toCharArray())
                 val sha1 = BcPGPDigestCalculatorProvider().get(HashAlgorithmTags.SHA1)

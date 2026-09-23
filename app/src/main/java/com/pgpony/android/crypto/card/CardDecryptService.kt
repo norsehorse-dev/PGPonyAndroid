@@ -300,7 +300,7 @@ class CardDecryptService private constructor() {
                     }
                 }
                 is PGPLiteralData -> {
-                    filename = obj.fileName.takeIf { it.isNotEmpty() }
+                    filename = com.pgpony.android.crypto.LiteralFilename.sanitize(obj.fileName) // 4.6.0 (item 17.3)
                     val out = ByteArrayOutputStream()
                     val buf = ByteArray(4096)
                     var len: Int
@@ -317,7 +317,15 @@ class CardDecryptService private constructor() {
                 }
                 is PGPSignatureList -> {
                     if (onePassSig != null && obj.size() > 0) {
-                        signatureVerified = onePassSig.verify(obj[0])
+                        // 4.6.0 (item 17.1): graded like the software path, so a
+                        // valid signature from an unbound, revoked or expired
+                        // signer (or a weak digest) is not reported as verified.
+                        val sig = obj[0]
+                        signatureVerified = sig.keyID == onePassSig.keyID &&
+                            onePassSig.verify(sig) &&
+                            com.pgpony.android.crypto.SignerEvaluator.evaluate(
+                                sig, verificationKeys ?: emptyList()
+                            ) == com.pgpony.android.crypto.SignerStatus.VERIFIED
                     }
                 }
             }

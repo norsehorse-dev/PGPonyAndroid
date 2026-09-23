@@ -65,7 +65,8 @@ object V4Algo35Protection {
         require(passphrase.isNotEmpty()) { "protect requires a non-empty passphrase" }
 
         val s2kDigest = BcPGPDigestCalculatorProvider().get(HashAlgorithmTags.SHA256)
-        val encryptor = BcPBESecretKeyEncryptorBuilder(SymmetricKeyAlgorithmTags.AES_256, s2kDigest)
+        // 4.6.0 (item 17.6): calibrated iteration count (s2kDigest is SHA-256 as before).
+        val encryptor = com.pgpony.android.crypto.S2kPolicy.v4EncryptorBuilder()
             .setSecureRandom(random)
             .build(passphrase)
 
@@ -113,7 +114,10 @@ object V4Algo35Protection {
         val encData = subkeyBody.copyOfRange(i, subkeyBody.size)
 
         val decryptor = BcPBESecretKeyDecryptorBuilder(BcPGPDigestCalculatorProvider()).build(passphrase)
-        val s2kKey = decryptor.makeKeyFromPassPhrase(symAlg, buildS2K(s2kBytes))
+        val s2k = buildS2K(s2kBytes)
+        // 4.6.0 (item 17.5): bound an Argon2 S2K before running the KDF, as the classical unlock sites do.
+        com.pgpony.android.crypto.enforceArgon2Policy(s2k)
+        val s2kKey = decryptor.makeKeyFromPassPhrase(symAlg, s2k)
         val plain = decryptor.recoverKeyData(symAlg, s2kKey, iv, encData, 0, encData.size)
         if (plain.size < MATERIAL_LEN) {
             throw ProtectedKeyException("recovered v4 algo-35 material too short")

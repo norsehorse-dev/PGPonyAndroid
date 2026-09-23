@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  4.6.0 (item 17.7): on Android 12+ android:allowBackup="false" stops cloud
+  backup but not device-to-device transfer. Exclude every domain from both, so
+  the key store (including its passphrase recovery wraps), the key database and
+  the preferences (proxy credentials included) never leave the device that way.
+  PGPony's own encrypted backup is the supported way to move keys.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="." />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="external" path="." />
+    </device-transfer>
+</data-extraction-rules>

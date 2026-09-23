@@ -490,6 +490,8 @@ class SettingsViewModel(
                 // install (the screen consumes clearCompleted below).
                 prefs.edit().clear().apply()
                 com.pgpony.android.provider.ProviderPassphraseCache.clearAll()
+                com.pgpony.android.session.InAppPassphraseCache.clearAll()
+                com.pgpony.android.crypto.card.CardPinCache.clear()
                 // #2.1: clear the provider process's cache too.
                 com.pgpony.android.provider.ProviderCacheClearReceiver.requestClearAll()
                 // Fresh default state, not a patch of the old one: every

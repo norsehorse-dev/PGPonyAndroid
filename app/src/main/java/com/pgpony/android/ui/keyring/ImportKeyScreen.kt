@@ -579,6 +579,32 @@ private fun ImportPreviewCard(
             )
             DetailRow(stringResource(R.string.import_preview_detail_algorithm_label), preview.algorithmShortName)
 
+            // 4.6.0 (item 17.9): every further key the commit will import.
+            if (preview.additionalKeys.isNotEmpty()) {
+                HorizontalDivider()
+                Text(
+                    text = androidx.compose.ui.res.pluralStringResource(
+                        R.plurals.import_preview_more_keys,
+                        preview.additionalKeys.size,
+                        preview.additionalKeys.size
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.error
+                )
+                preview.additionalKeys.forEach { k ->
+                    DetailRow(
+                        stringResource(R.string.import_preview_detail_user_label),
+                        k.userId.ifBlank { stringResource(R.string.import_preview_detail_user_empty) }
+                    )
+                    DetailRow(
+                        stringResource(R.string.import_preview_detail_fingerprint_label),
+                        k.fingerprint.uppercase().chunked(4).joinToString(" "),
+                        mono = true
+                    )
+                }
+            }
+
             // ── Source badges ─────────────────────────────────────────
             //
             // KEY_SERVER imports surface the lookup source with a

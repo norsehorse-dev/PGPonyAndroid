@@ -15,6 +15,14 @@
 // Staleness: only keys not checked in the last 7 days are refreshed
 // (OpenKeychain's cadence). Freshly-checked keys are skipped so a run
 // interrupted partway resumes cheaply next period.
+//
+// 4.6.0 (item 17.8, Parcimonie model): a run no longer sends the whole stale
+// keyring to every server in one burst, which told each server operator the
+// user's full contact list from one address at one moment. Each run takes a
+// small random batch of stale keys (sized so the keyring is still covered
+// about once a week), asks ONE randomly chosen lookup server per key, and
+// waits a random interval between keys. Over successive runs every server is
+// still consulted, so a revocation published on any of them is found.
 
 package com.pgpony.android.sync
 
@@ -44,6 +52,20 @@ class KeyRefreshWorker(
         // Notification ids for upstream-change alerts, offset from the
         // expiration-reminder id space to avoid collisions.
         private const val NOTIF_ID_BASE = 0x5A_0000
+
+        // 4.6.0 (item 17.8): batch and spacing. The batch covers the keyring
+        // roughly once per STALE_AFTER window at the configured interval, and
+        // the spacing keeps a full batch inside WorkManager's ten-minute run.
+        private const val MAX_BATCH = 12
+        private const val MIN_GAP_MS = 5_000L
+        private const val MAX_GAP_MS = 30_000L
+
+        /** How many stale keys one run refreshes. */
+        internal fun batchSize(total: Int, intervalDays: Int): Int {
+            if (total <= 0) return 0
+            val perRun = kotlin.math.ceil(total * intervalDays.coerceAtLeast(1) / 7.0).toInt()
+            return perRun.coerceIn(1, MAX_BATCH).coerceAtMost(total)
+        }
     }
 
     override suspend fun doWork(): Result {
@@ -69,14 +91,22 @@ class KeyRefreshWorker(
         if (keys.isEmpty()) return Result.success()
 
         var anyTransportSuccess = false
+        val rng = java.security.SecureRandom()
+        val batch = keys.shuffled(rng).take(
+            batchSize(keys.size, com.pgpony.android.sync.KeyRefreshScheduler.intervalDays(applicationContext))
+        )
 
-        for (entity in keys) {
+        for ((index, entity) in batch.withIndex()) {
+            if (index > 0) {
+                kotlinx.coroutines.delay(MIN_GAP_MS + (rng.nextDouble() * (MAX_GAP_MS - MIN_GAP_MS)).toLong())
+            }
             var current = repo.getByFingerprint(entity.fingerprint) ?: continue
             val wasRevoked = current.isRevoked
             val oldExpiry = current.expiresAt
             var becameRevoked = false
 
-            for (server in servers) {
+            // One server per key per run, chosen at random.
+            for (server in listOf(servers[rng.nextInt(servers.size)])) {
                 val armored = try {
                     service.fetchByFingerprint(server, current.fingerprint)
                 } catch (e: Exception) {
@@ -130,7 +160,7 @@ class KeyRefreshWorker(
 
         // If every server was unreachable for every key, ask WorkManager
         // to retry with backoff rather than reporting a clean success.
-        return if (anyTransportSuccess || keys.isEmpty()) Result.success() else Result.retry()
+        return if (anyTransportSuccess || batch.isEmpty()) Result.success() else Result.retry()
     }
 
     private fun notify(id: Int, title: String, body: String, fingerprint: String) {

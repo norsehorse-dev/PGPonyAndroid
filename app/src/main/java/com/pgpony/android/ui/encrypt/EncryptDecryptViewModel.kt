@@ -3508,8 +3508,10 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         val all = repo.getAllKeys()
         all.firstOrNull { it.longKeyId.equals(signerKeyId, ignoreCase = true) }?.let { return it }
         val keyIdLong = signerKeyId.toULongOrNull(16)?.toLong() ?: return null
-        val ownerPrimaryKeyId = verifyRingsCache
-            .firstOrNull { ring -> ring.getPublicKey(keyIdLong) != null }
+        // 4.6.0 (item 17.1): the owner is the certificate the signing key is
+        // validly bound to, not merely the first ring that lists it.
+        val ownerPrimaryKeyId = (com.pgpony.android.crypto.SignerEvaluator.signerRing(keyIdLong, verifyRingsCache)
+            ?: verifyRingsCache.firstOrNull { ring -> ring.getPublicKey(keyIdLong) != null })
             ?.let { String.format("%016X", it.publicKey.keyID) }
             ?: return null
         return all.firstOrNull { it.longKeyId.equals(ownerPrimaryKeyId, ignoreCase = true) }
@@ -4122,6 +4124,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     fun clearDecryptFile() {
         // 4.0.4 — also drops any streamed plaintext from cacheDir.
         ScratchFiles.clearScope(PGPonyApp.instance, ScratchFiles.SCOPE_DECRYPT)
+        // 4.6.0 (item 17.3): and the buffered copy a Share wrote to exports/.
+        ScratchFiles.clearExports(PGPonyApp.instance)
         _decryptState.value = _decryptState.value.copy(
             selectedFileName = null,
             selectedFileSize = null,
@@ -4561,6 +4565,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         // before: once the sheet closes, the user has either saved or
         // shared it or they haven't, and we don't keep it around.
         ScratchFiles.clearScope(PGPonyApp.instance, ScratchFiles.SCOPE_DECRYPT)
+        // 4.6.0 (item 17.3): the buffered Share copy in exports/ goes too.
+        ScratchFiles.clearExports(PGPonyApp.instance)
         _decryptState.value = _decryptState.value.copy(
             showFileDecryptResultSheet = false,
             decryptedFileBytes = null,

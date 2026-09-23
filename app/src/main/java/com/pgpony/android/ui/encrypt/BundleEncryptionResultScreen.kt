@@ -456,7 +456,7 @@ private fun shareBundleStream(
     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
         val ok = try {
             val exportsDir = File(context.cacheDir, "exports").apply { mkdirs() }
-            val outFile = File(exportsDir, name)
+            val outFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, name, "bundle.pgp")
             outFile.outputStream().buffered().use(write)
             val uri = FileProvider.getUriForFile(
                 context,

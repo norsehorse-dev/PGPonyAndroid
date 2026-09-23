@@ -174,6 +174,8 @@ object CompositeLibrePGPKeyMaterial {
 
                 val decryptor = BcPBESecretKeyDecryptorBuilder(BcPGPDigestCalculatorProvider()).build(passphrase)
                 val s2k = buildS2K(s2kBytes)
+                // 4.6.0 (item 17.5): bound an Argon2 S2K before running the KDF, as the classical unlock sites do.
+                com.pgpony.android.crypto.enforceArgon2Policy(s2k)
                 val key = decryptor.makeKeyFromPassPhrase(sym, s2k)
                 val plain = decryptor.recoverKeyData(sym, key, iv, enc, 0, enc.size)
                 require(plain.size >= eccLen + KYBER768_SEED_LEN) { "recovered material too short" }

@@ -74,7 +74,9 @@ data class Tlv(val tag: Int, val value: ByteArray) {
                 }
 
                 // ── Value ──
-                if (i + len > bytes.size) {
+                // 4.6.0 (item 17.10): a 4-byte length (0x84) can exceed Int.MAX_VALUE and go
+                // negative, and i + len can overflow; compare without adding.
+                if (len < 0 || len > bytes.size - i) {
                     throw TlvException(
                         "Truncated value for tag 0x%X (need %d, have %d)".format(tag, len, bytes.size - i)
                     )

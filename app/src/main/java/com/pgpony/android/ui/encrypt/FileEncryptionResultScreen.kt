@@ -315,7 +315,7 @@ stringResource(R.string.file_enc_result_badge_can_decrypt),
                         } else if (streamed != null) {
                             ScratchFiles.uriFor(context, streamed)
                         } else {
-                            val outFile = File(exportsDir, encryptedName)
+                            val outFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, encryptedName, "encrypted.pgp")
                             outFile.writeBytes(encryptedBytes ?: ByteArray(0))
                             FileProvider.getUriForFile(
                                 context,

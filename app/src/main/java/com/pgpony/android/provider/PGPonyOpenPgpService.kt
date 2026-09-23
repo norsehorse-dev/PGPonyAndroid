@@ -62,6 +62,10 @@ import org.openintents.openpgp.OpenPgpSignatureResult
 import org.openintents.openpgp.util.OpenPgpApi
 import java.util.concurrent.ConcurrentHashMap
 
+/** 4.6.0 (item 17.2): cacheDir subdirectory where held provider plaintext
+ *  spills until its integrity check passes. Cleared at provider-process start. */
+internal const val HOLD_DIR_NAME = "provider_hold"
+
 class PGPonyOpenPgpService : Service() {
 
     /**
@@ -134,11 +138,29 @@ class PGPonyOpenPgpService : Service() {
      */
     private val outputPipes = ConcurrentHashMap<String, ParcelFileDescriptor>()
 
+    /**
+     * 4.6.0 (item 17.7): createOutputPipe is reachable by any app that binds,
+     * before any consent check, and each call holds two file descriptors until
+     * a matching execute() consumes it. Cap what one caller may hold, close a
+     * write end that a reused pipe id replaces, and when the cap is hit close
+     * that caller's stale write ends so its descriptors are reclaimed. A real
+     * client creates one pipe per execute().
+     */
+    private val maxPipesPerUid = 32
+
     private val binder = object : IOpenPgpService2.Stub() {
 
         override fun createOutputPipe(pipeId: Int): ParcelFileDescriptor {
+            val uid = Binder.getCallingUid()
+            val prefix = "$uid/"
+            if (outputPipes.keys.count { it.startsWith(prefix) } >= maxPipesPerUid) {
+                outputPipes.keys.filter { it.startsWith(prefix) }.forEach { k ->
+                    outputPipes.remove(k)?.let { runCatching { it.close() } }
+                }
+                throw IllegalStateException("Too many open output pipes for this client")
+            }
             val pipe = ParcelFileDescriptor.createReliablePipe()
-            outputPipes["${Binder.getCallingUid()}/$pipeId"] = pipe[1]
+            outputPipes.put("$prefix$pipeId", pipe[1])?.let { runCatching { it.close() } }
             return pipe[0]
         }
 
@@ -361,6 +383,29 @@ class PGPonyOpenPgpService : Service() {
      * key" PendingIntent flows on top (plan Phase 2 + §6 Q7 route the
      * lookups through the Phase 5a multi-server directory).
      */
+    /**
+     * 4.6.0 (item 17.4): the keys an address resolves to for encryption.
+     * P2c Fix2 still holds for the user's own keys: every non-revoked,
+     * user-managed key for the address is used (software and card copies of
+     * the same identity). A key that arrived only through Autocrypt (an email
+     * header, gossip, or this API) never joins them: when any user-managed
+     * key exists, Autocrypt-origin keys are left out entirely; when none
+     * does, only the key Autocrypt designates for the peer is used, never
+     * every key that happens to carry the address.
+     */
+    private suspend fun recipientCandidates(email: String): List<com.pgpony.android.data.PGPKeyEntity> {
+        val all = repo.getByAnyUserEmail(email).filter { !it.isRevoked }
+        val userManaged = all.filter { it.autocryptImportedAt == null }
+        if (userManaged.isNotEmpty()) return userManaged
+        if (all.isEmpty()) return all
+        val designated = runCatching {
+            autocryptStore.designatedKeyFingerprint(email)
+        }.getOrNull()
+        val pick = all.firstOrNull { designated != null && it.fingerprint.equals(designated, ignoreCase = true) }
+            ?: all.maxByOrNull { it.autocryptImportedAt ?: 0L }
+        return listOfNotNull(pick)
+    }
+
     private fun getKeyIds(data: Intent): Intent {
         val userIds = data.getStringArrayExtra(OpenPgpApi.EXTRA_USER_IDS) ?: emptyArray()
         val keyIds = runBlocking {
@@ -371,7 +416,7 @@ class PGPonyOpenPgpService : Service() {
                     // 4.2.1 (#27): match ANY user id, not just the primary,
                     // so a secondary identity (4.2.0 #29) resolves here and
                     // the client is offered encryption to it.
-                    repo.getByAnyUserEmail(email).firstOrNull()
+                    recipientCandidates(email).firstOrNull()
                 }
                 .map { entity -> java.lang.Long.parseUnsignedLong(entity.longKeyId, 16) }
                 .toLongArray()
@@ -546,7 +591,7 @@ class PGPonyOpenPgpService : Service() {
                 // secondary identity actually finds the key — without this,
                 // the getKeyIds fix above would offer encryption that then
                 // failed here at send time.
-                val matches = repo.getByAnyUserEmail(email).filter { !it.isRevoked }
+                val matches = recipientCandidates(email)
                 var added = false
                 matches.forEach { entity ->
                     repo.loadEncryptionRecipientRing(entity.fingerprint)?.let { ring ->
@@ -721,7 +766,7 @@ class PGPonyOpenPgpService : Service() {
                 }
                 val secret = info?.compositeSecret
                     ?: return passphraseRequiredResult(data, compSigner.keyId, compSigner.label, wasWrong = false)
-                val plaintext = ParcelFileDescriptor.AutoCloseInputStream(input).use { it.readBytes() }
+                val plaintext = ParcelFileDescriptor.AutoCloseInputStream(input).use { readBounded(it) }
                 val encrypted = crypto.encrypt(
                     data = plaintext,
                     recipientPublicKeys = rings.values.toList(),
@@ -1314,7 +1359,12 @@ class PGPonyOpenPgpService : Service() {
                     output = outs,
                     secretKeyRings = targeted.map { it.second },
                     passphrase = passphrase,
-                    verificationKeys = publicRings
+                    verificationKeys = publicRings,
+                    // 4.6.0 (item 17.2): the pipe belongs to another app, so a
+                    // non-AEAD message's plaintext is released only after its
+                    // integrity check has passed.
+                    releaseOnlyWhenVerified = !metadataOnly,
+                    holdDir = java.io.File(cacheDir, HOLD_DIR_NAME)
                 )
             }
         } catch (e: PGPCryptoError.PassphraseRequired) {
@@ -1398,11 +1448,13 @@ class PGPonyOpenPgpService : Service() {
         if (!result.signatureVerified) {
             return OpenPgpSignatureResult.createWithInvalidSignature()
         }
-        val entity = allEntities.firstOrNull { candidate ->
-            runCatching {
-                repo.loadPublicKeyRing(candidate.fingerprint)?.getPublicKey(keyIdRaw) != null
-            }.getOrNull() == true
+        // 4.6.0 (item 17.1): attribute the signature to the certificate the
+        // signing key is validly bound to, not the first row whose ring lists it.
+        val candidates = allEntities.mapNotNull { e ->
+            runCatching { repo.loadPublicKeyRing(e.fingerprint) }.getOrNull()?.let { e to it }
         }
+        val owner = com.pgpony.android.crypto.SignerEvaluator.signerRing(keyIdRaw, candidates.map { it.second })
+        val entity = owner?.let { r -> candidates.firstOrNull { it.second.publicKey.keyID == r.publicKey.keyID }?.first }
         return buildValidSignatureResult(entity, keyIdRaw, senderAddress)
     }
 
@@ -2035,11 +2087,35 @@ class PGPonyOpenPgpService : Service() {
     private fun readAll(input: ParcelFileDescriptor?): ByteArray? =
         input?.let { pfd ->
             try {
-                ParcelFileDescriptor.AutoCloseInputStream(pfd).use { it.readBytes() }
+                ParcelFileDescriptor.AutoCloseInputStream(pfd).use { readBounded(it) }
+            } catch (e: com.pgpony.android.crypto.PGPCryptoError.ResourceLimitExceeded) {
+                throw e
             } catch (e: Exception) {
                 null
             }
         }
+
+    /**
+     * 4.6.0 (item 17.7): read a caller's input stream with a ceiling, so an API
+     * client cannot make the :remote_api process buffer an unbounded amount.
+     */
+    private fun readBounded(ins: java.io.InputStream): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(1 shl 16)
+        var total = 0L
+        while (true) {
+            val n = ins.read(buf)
+            if (n < 0) break
+            total += n
+            if (total > com.pgpony.android.crypto.SecurityLimits.MAX_PROVIDER_INPUT_BYTES) {
+                throw com.pgpony.android.crypto.PGPCryptoError.ResourceLimitExceeded(
+                    "Input is larger than the OpenPGP API accepts"
+                )
+            }
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
+    }
 
     private fun writeAll(output: ParcelFileDescriptor?, bytes: ByteArray) {
         output?.let { pfd ->

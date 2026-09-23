@@ -163,6 +163,39 @@ object ScratchFiles {
         if (text.contains('�')) null else text
     }.getOrNull()
 
+    /**
+     * 4.6.0 (item 17.3): the only way to turn a name that may be untrusted (an
+     * OpenPGP literal-data filename, a MIME filename, a User ID) into a file
+     * under [parent]. Strips every path component and control character,
+     * refuses "." and "..", and checks the canonical path really is a direct
+     * child of [parent], so a name can never escape the directory.
+     */
+    fun safeChild(parent: File, untrustedName: String?, fallback: String = "output"): File {
+        val name = com.pgpony.android.crypto.LiteralFilename.sanitize(untrustedName) ?: fallback
+        val child = File(parent, name)
+        require(child.canonicalFile.parentFile == parent.canonicalFile) { "unsafe output name" }
+        return child
+    }
+
+    /** cacheDir/exports, the FileProvider-exposed directory share and export
+     *  actions write into, created on demand. */
+    fun exportsDir(context: Context): File =
+        File(context.cacheDir, EXPORTS_DIR_NAME).apply { mkdirs() }
+
+    /**
+     * 4.6.0 (item 17.3): delete everything in cacheDir/exports. Buffered
+     * plaintext and unprotected key exports used to linger there until the
+     * system trimmed the cache. Called at app start and when a result sheet
+     * that wrote there is dismissed. Never throws.
+     */
+    fun clearExports(context: Context) {
+        runCatching {
+            File(context.cacheDir, EXPORTS_DIR_NAME).listFiles()?.forEach { it.deleteRecursively() }
+        }
+    }
+
+    private const val EXPORTS_DIR_NAME = "exports"
+
     /** True when [file] is small enough to hold in memory for clipboard use. */
     fun isClipboardSized(file: File): Boolean = file.length() in 1..(1L * 1024 * 1024)
 }

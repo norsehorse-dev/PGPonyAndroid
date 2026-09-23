@@ -24,6 +24,9 @@ class ProviderCacheClearReceiver : BroadcastReceiver() {
         val ids = intent.getLongArrayExtra(EXTRA_KEY_IDS)
         if (ids == null) {
             ProviderPassphraseCache.clearAll()
+            // 4.6.0 (item 17.10): a clear-all must reach every secret this process holds.
+            com.pgpony.android.crypto.card.CardPinCache.clear()
+            com.pgpony.android.session.InAppPassphraseCache.clearAll()
         } else {
             ProviderPassphraseCache.clearKeys(ids.toList())
         }

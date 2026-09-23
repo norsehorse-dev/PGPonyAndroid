@@ -56,6 +56,7 @@ class ProviderPassphraseActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ProviderWindowGuard.harden(this) // 4.6.0 (item 17.7)
 
         @Suppress("DEPRECATION")
         val apiData: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -177,5 +178,11 @@ class ProviderPassphraseActivity : ComponentActivity() {
     private fun cancel() {
         setResult(Activity.RESULT_CANCELED)
         finish()
+    }
+
+    /** 4.6.0 (item 17.7): ignore touches delivered through an obscuring overlay. */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ProviderWindowGuard.isObscured(ev)) return false
+        return super.dispatchTouchEvent(ev)
     }
 }

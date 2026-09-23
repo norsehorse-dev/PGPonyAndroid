@@ -80,7 +80,7 @@ object KeyShareIntents {
 
         val uri = try {
             val exportsDir = File(context.cacheDir, "exports").apply { mkdirs() }
-            val file = File(exportsDir, filename)
+            val file = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, filename, "key.asc")
             file.writeText(armored, Charsets.UTF_8)
             FileProvider.getUriForFile(
                 context,
@@ -160,7 +160,7 @@ object KeyShareIntents {
 
         val uri = try {
             val exportsDir = File(context.cacheDir, "exports").apply { mkdirs() }
-            val file = File(exportsDir, filename)
+            val file = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, filename, "key.asc")
             file.writeText(armoredCert, Charsets.UTF_8)
             FileProvider.getUriForFile(
                 context,
@@ -243,7 +243,7 @@ object KeyShareIntents {
         // "false" return instead of a crash.
         val uri = try {
             val exportsDir = File(context.cacheDir, "exports").apply { mkdirs() }
-            val file = File(exportsDir, filename)
+            val file = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, filename, "key.asc")
             file.writeText(armoredPrivate, Charsets.UTF_8)
             FileProvider.getUriForFile(
                 context,

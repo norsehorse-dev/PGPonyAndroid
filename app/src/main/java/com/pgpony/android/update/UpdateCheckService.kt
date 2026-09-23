@@ -24,6 +24,7 @@
 
 package com.pgpony.android.update
 
+import com.pgpony.android.network.textCapped
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -130,7 +131,7 @@ object UpdateCheckService {
         val body = try {
             HttpClientFactory.client(context).get(RELEASES_API) {
                 header("Accept", "application/vnd.github+json")
-            }.bodyAsText()
+            }.textCapped(com.pgpony.android.network.ResponseLimits.MAX_METADATA_RESPONSE_BYTES) // 4.6.0 (item 17.8)
         } catch (e: Exception) {
             return CheckResult.Failed
         }

@@ -47,6 +47,7 @@ class ApiConsentActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ProviderWindowGuard.harden(this) // 4.6.0 (item 17.7)
 
         val clientPackage = intent.getStringExtra(EXTRA_PACKAGE_NAME)
         if (clientPackage.isNullOrEmpty()) {
@@ -116,5 +117,11 @@ class ApiConsentActivity : ComponentActivity() {
     private fun deny() {
         setResult(Activity.RESULT_CANCELED)
         finish()
+    }
+
+    /** 4.6.0 (item 17.7): ignore touches delivered through an obscuring overlay. */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ProviderWindowGuard.isObscured(ev)) return false
+        return super.dispatchTouchEvent(ev)
     }
 }

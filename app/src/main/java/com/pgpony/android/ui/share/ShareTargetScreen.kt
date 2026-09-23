@@ -1054,7 +1054,7 @@ private fun shareFile(
             ScratchFiles.uriFor(context, scratch)
         } else {
             val exportsDir = File(context.cacheDir, "exports").apply { mkdirs() }
-            val outFile = File(exportsDir, filename)
+            val outFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, filename, "decrypted_file")
             outFile.writeBytes(bytes ?: ByteArray(0))
             FileProvider.getUriForFile(
                 context,

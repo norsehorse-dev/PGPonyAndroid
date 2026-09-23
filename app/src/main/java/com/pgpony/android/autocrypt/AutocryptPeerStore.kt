@@ -31,7 +31,8 @@ enum class AutocryptRecommendation { DISCOURAGE, AVAILABLE, MUTUAL }
 
 /** Imports Autocrypt keydata into the keyring, returning the fingerprint. */
 fun interface AutocryptKeyImporter {
-    suspend fun import(keyData: ByteArray): String?
+    /** Import [keyData] only as a key FOR [addr]; return its fingerprint or null. */
+    suspend fun import(addr: String, keyData: ByteArray): String?
 }
 
 class AutocryptPeerStore(
@@ -48,17 +49,45 @@ class AutocryptPeerStore(
             dao: AutocryptPeerDao,
             repo: KeyRepository,
             crypto: PGPCryptoService = PGPCryptoService.shared
-        ): AutocryptPeerStore = AutocryptPeerStore(dao) { keyData ->
+        ): AutocryptPeerStore = AutocryptPeerStore(dao) { addr, keyData ->
             // Autocrypt keydata is raw OpenPGP key packets; explode handles
             // binary or armored and yields one re-armored ring per key.
-            var fp: String? = null
+            //
+            // 4.6.0 (item 17.4): the keydata is supplied by whoever sent the
+            // mail (or wrote the gossip line, or called the API). Import at
+            // most ONE ring, and only when every User ID on it is exactly
+            // [addr], so a header cannot plant a key that carries someone
+            // else's address. The row is marked Autocrypt-origin, which keeps
+            // it from ever joining a user-managed key for the same address as
+            // an extra recipient (see PGPonyOpenPgpService.encryptOp).
             for (ring in crypto.explodeToArmoredKeys(keyData)) {
-                runCatching { repo.importArmoredKeyDetailed(ring) }.getOrNull()?.let {
-                    if (fp == null) fp = it.entity.fingerprint
-                }
+                if (!isKeyFor(addr, ring)) continue
+                return@AutocryptPeerStore runCatching {
+                    repo.importArmoredKeyDetailed(ring, fromAutocrypt = true)
+                }.getOrNull()?.entity?.fingerprint
             }
-            fp
+            null
         }
+
+        /**
+         * 4.6.0 (item 17.4): may [armoredRing] be taken as [addr]'s key? A
+         * public key only, with at least one User ID its primary certified,
+         * and every certified User ID exactly [addr] (works for composite
+         * keys too, since the check reads raw packets).
+         */
+        internal fun isKeyFor(addr: String, armoredRing: String): Boolean {
+            val raw = runCatching { com.pgpony.android.crypto.pqc.CompositeSigPacket.dearmor(armoredRing) }
+                .getOrNull() ?: return false
+            if (com.pgpony.android.crypto.CertificateBindings.packets(raw).any { it.tag == 5 || it.tag == 7 }) return false
+            val report = com.pgpony.android.crypto.CertificateBindings.analyze(raw) ?: return false
+            val uids = report.certifiedUserIds
+            val want = normAddr(addr)
+            return uids.isNotEmpty() && uids.all { normAddr(it) == want }
+        }
+
+        /** The bare, lowercased address in a User ID or peer id. */
+        internal fun normAddr(id: String): String =
+            id.substringAfterLast('<').substringBefore('>').trim().ifEmpty { id.trim() }.lowercase()
     }
 
     private fun norm(id: String): String =
@@ -83,7 +112,7 @@ class AutocryptPeerStore(
             if (lastSeen != cur.lastSeen) dao.upsert(cur.copy(lastSeen = lastSeen))
             return
         }
-        val fp = importer.import(keyData)
+        val fp = importer.import(id, keyData)
         dao.upsert(
             cur.copy(
                 lastSeen = lastSeen,
@@ -99,13 +128,23 @@ class AutocryptPeerStore(
         val id = norm(peerId)
         val cur = dao.get(id) ?: AutocryptPeerEntity(id)
         if (effectiveMs < cur.gossipTimestamp) return
-        val fp = importer.import(keyData)
+        val fp = importer.import(id, keyData)
         dao.upsert(
             cur.copy(
                 gossipTimestamp = effectiveMs,
                 gossipKeyFingerprint = fp ?: cur.gossipKeyFingerprint
             )
         )
+    }
+
+    /**
+     * 4.6.0 (item 17.4): the key Autocrypt designates for [peerId], the one an
+     * Autocrypt-origin recipient is encrypted to: the header key when there is
+     * one, otherwise the gossip key. Null when nothing is recorded.
+     */
+    suspend fun designatedKeyFingerprint(peerId: String): String? {
+        val cur = dao.get(norm(peerId)) ?: return null
+        return cur.autocryptKeyFingerprint ?: cur.gossipKeyFingerprint
     }
 
     // ── Ingest from PGPony's own decrypt ─────────────────────────────

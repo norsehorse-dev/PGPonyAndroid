@@ -1870,6 +1870,9 @@ private fun PassphraseCacheSection() {
                     )
                     TextButton(onClick = {
                         com.pgpony.android.provider.ProviderPassphraseCache.clearAll()
+                        // 4.6.0 (item 17.10): the in-app prompt cache shares this duration and
+                        // this button; it was never cleared here.
+                        com.pgpony.android.session.InAppPassphraseCache.clearAll()
                         com.pgpony.android.provider.ProviderCacheClearReceiver.requestClearAll()
                         remainingMs = 0
                     }) {
@@ -1895,6 +1898,9 @@ private fun PassphraseCacheSection() {
                     )
                     TextButton(onClick = {
                         com.pgpony.android.provider.ProviderPassphraseCache.clearAll()
+                        // 4.6.0 (item 17.10): the in-app prompt cache shares this duration and
+                        // this button; it was never cleared here.
+                        com.pgpony.android.session.InAppPassphraseCache.clearAll()
                         com.pgpony.android.provider.ProviderCacheClearReceiver.requestClearAll()
                         remainingMs = 0
                     }) {
@@ -2005,6 +2011,9 @@ private fun CardPinCacheSection() {
                         )
                         TextButton(onClick = {
                             com.pgpony.android.crypto.card.CardPinCache.clear()
+                            // 4.6.0 (item 17.10): also drop the PIN held by the :remote_api
+                            // process (ProviderCardOpActivity caches it there).
+                            com.pgpony.android.provider.ProviderCacheClearReceiver.requestClearAll()
                             remainingMs = 0
                         }) {
                             Text(stringResource(R.string.settings_card_pin_cache_clear))
@@ -2029,6 +2038,9 @@ private fun CardPinCacheSection() {
                         )
                         TextButton(onClick = {
                             com.pgpony.android.crypto.card.CardPinCache.clear()
+                            // 4.6.0 (item 17.10): also drop the PIN held by the :remote_api
+                            // process (ProviderCardOpActivity caches it there).
+                            com.pgpony.android.provider.ProviderCacheClearReceiver.requestClearAll()
                             remainingMs = 0
                         }) {
                             Text(stringResource(R.string.settings_card_pin_cache_clear))

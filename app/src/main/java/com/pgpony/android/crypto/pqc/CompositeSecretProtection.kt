@@ -178,6 +178,8 @@ object CompositeSecretProtection {
 
         val decryptor = BcPBESecretKeyDecryptorBuilder(BcPGPDigestCalculatorProvider()).build(passphrase)
         val s2k = buildS2K(s2kBytes)
+        // 4.6.0 (item 17.5): bound an Argon2 S2K before running the KDF, as the classical unlock sites do.
+        com.pgpony.android.crypto.enforceArgon2Policy(s2k)
         val s2kKey = decryptor.makeKeyFromPassPhrase(symAlg, s2k)
 
         if (s2kUsage == USAGE_AEAD) {

@@ -104,6 +104,7 @@ class ProviderCardOpActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ProviderWindowGuard.harden(this) // 4.6.0 (item 17.7)
 
         opKey = intent.getStringExtra(EXTRA_OP_KEY) ?: ""
         @Suppress("DEPRECATION")
@@ -449,4 +450,10 @@ class ProviderCardOpActivity : ComponentActivity() {
         finish()
     }
 
+
+    /** 4.6.0 (item 17.7): ignore touches delivered through an obscuring overlay. */
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        if (ProviderWindowGuard.isObscured(ev)) return false
+        return super.dispatchTouchEvent(ev)
+    }
 }

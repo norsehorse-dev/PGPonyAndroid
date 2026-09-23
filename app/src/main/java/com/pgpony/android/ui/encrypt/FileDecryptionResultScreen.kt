@@ -271,7 +271,7 @@ fun FileDecryptionResultScreen(state: DecryptUiState, onDismiss: () -> Unit) {
                             ScratchFiles.uriFor(context, streamed)
                         } else {
                             val exportsDir = File(context.cacheDir, "exports").apply { mkdirs() }
-                            val outFile = File(exportsDir, outName)
+                            val outFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, outName, "decrypted_output")
                             outFile.writeBytes(bytes ?: ByteArray(0))
                             FileProvider.getUriForFile(
                                 context,

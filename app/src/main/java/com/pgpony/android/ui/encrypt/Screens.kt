@@ -3282,7 +3282,7 @@ private fun SignFileModeBody(state: EncryptUiState, viewModel: EncryptDecryptVie
 private fun shareSignatureFile(context: Context, bytes: ByteArray, filename: String) {
     try {
         val exportsDir = File(context.cacheDir, "exports").apply { mkdirs() }
-        val outFile = File(exportsDir, filename)
+        val outFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, filename, "output")
         outFile.writeBytes(bytes)
         val shareUri = FileProvider.getUriForFile(
             context,

@@ -35,4 +35,9 @@ object SecurityLimits {
     // Total decrypted plaintext written by the STREAMING path (files). Generous;
     // stops a runaway zlib bomb without rejecting a real large attachment.
     const val MAX_STREAM_PLAINTEXT_BYTES = 8L * 1024 * 1024 * 1024
+
+    // 4.6.0 (item 17.7): the most an OpenPGP API caller may hand the provider
+    // as input in one call. The provider buffers input whole (it sniffs the
+    // message shape first), so this bounds the :remote_api process's memory.
+    const val MAX_PROVIDER_INPUT_BYTES = 256L * 1024 * 1024
 }

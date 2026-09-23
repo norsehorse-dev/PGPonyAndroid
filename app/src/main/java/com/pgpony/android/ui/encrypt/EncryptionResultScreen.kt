@@ -297,7 +297,7 @@ fun EncryptionResultScreen(state: EncryptUiState, onDismiss: () -> Unit) {
                                 signOnly -> "signed-message.asc"
                                 else -> "message.asc"
                             }
-                            val outFile = java.io.File(exportsDir, shareName)
+                            val outFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, shareName, "message.asc")
                             outFile.writeBytes(output.toByteArray(Charsets.UTF_8))
                             val uri = androidx.core.content.FileProvider.getUriForFile(
                                 context, "${context.packageName}.fileprovider", outFile
@@ -355,7 +355,7 @@ fun EncryptionResultScreen(state: EncryptUiState, onDismiss: () -> Unit) {
                                     signOnly -> "signed-message.asc"
                                     else -> "message.asc"
                                 }
-                                val outFile = java.io.File(exportsDir, attachName)
+                                val outFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, attachName, "message.asc")
                                 outFile.writeBytes(output.toByteArray(Charsets.UTF_8))
                                 val uri = androidx.core.content.FileProvider.getUriForFile(
                                     context, "${context.packageName}.fileprovider", outFile

@@ -71,7 +71,12 @@ object HttpClientFactory {
         @Volatile var auth: java.net.PasswordAuthentication? = null
         override fun getPasswordAuthentication(): java.net.PasswordAuthentication? {
             val a = auth ?: return null
-            if (requestorType != RequestorType.PROXY) return null
+            // 4.6.0 (item 17.8): java.net.SocksSocketImpl asks through the
+            // requestPasswordAuthentication overload that leaves requestorType
+            // at SERVER, so filtering on PROXY dropped the pair every time and
+            // stream isolation silently did nothing. Match the SOCKS5 protocol
+            // string and the proxy's port instead.
+            if (!"SOCKS5".equals(requestingProtocol, ignoreCase = true)) return null
             if (requestingPort != port) return null
             return a
         }
@@ -113,7 +118,32 @@ object HttpClientFactory {
         return built
     }
 
+    // 4.6.0 (item 17.8): ask every server for an unencoded body. The platform
+    // HTTP stack otherwise requests gzip and inflates it transparently, which
+    // lets a hostile key server or WKD host turn a small response into a large
+    // one before any size cap sees it.
+    private val identityEncoding = createClientPlugin("PGPonyIdentityEncoding") {
+        onRequest { request, _ ->
+            request.headers.remove("Accept-Encoding")
+            request.headers.append("Accept-Encoding", "identity")
+        }
+    }
+
     private fun build(cfg: ProxyPrefs.Config): HttpClient {
+        // 4.6.0 (item 17.8): a proxy mode with no usable host (Custom picked
+        // before a host was typed, the host cleared, or a restored backup with
+        // a blank host) used to build a DIRECT client while Settings showed a
+        // proxy. Fail closed instead: every request errors, nothing leaves.
+        if (cfg.enabled && cfg.host.isNullOrBlank()) {
+            applyProxyAuth(cfg.copy(mode = ProxyPrefs.MODE_OFF))
+            return HttpClient(Android) {
+                install(createClientPlugin("PGPonyProxyMissing") {
+                    onRequest { _, _ ->
+                        throw java.io.IOException("A proxy is turned on but no proxy host is set, so nothing was sent")
+                    }
+                })
+            }
+        }
         val proxied = cfg.enabled && cfg.host != null
         // Scope the SOCKS Authenticator to this config before the client makes
         // its first connection (fail-closed: bad auth fails the SOCKS handshake).
@@ -122,6 +152,7 @@ object HttpClientFactory {
             // RC1 offline switch: block outright when offline mode is on,
             // before any other plugin or the socket.
             install(offlineGuard)
+            install(identityEncoding)
             // A hard request ceiling so a stalled lookup (common over Tor)
             // can never leave the search spinner running forever. Per-call
             // sites (WKD) tighten this with a request-scoped timeout {}.

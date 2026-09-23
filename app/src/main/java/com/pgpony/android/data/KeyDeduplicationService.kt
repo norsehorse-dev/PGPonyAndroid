@@ -67,6 +67,8 @@ class KeyDeduplicationService(
     companion object {
         /** Run-once flag for the duplicate-collapse sweep. */
         const val SWEEP_FLAG_KEY = "pgpony_4_0_dedupe_sweep_done_r2"
+        /** Run-once flag for the 4.6.0 stored-certificate re-validation. */
+        const val REVALIDATE_FLAG_KEY = "pgpony_4_6_cert_binding_revalidated"
         private const val TAG = "KeyringDedup"
 
         /**
@@ -129,9 +131,24 @@ class KeyDeduplicationService(
         newArmoredPublicKey: String?,
         newExpiresAtMs: Long?
     ): Pair<PGPKeyEntity, DuplicateResolution> {
-        val newBytes = newPublicRing.encoded
+        val fetchedBytes = newPublicRing.encoded
         val stored = store.loadPublicKey(existing.fingerprint)
-        if (stored != null && stored.isNotEmpty() && newBytes.contentEquals(stored)) {
+        // 4.6.0 (items 17.1 and 12): a verified union of the stored and fetched
+        // copies, not a replacement. See CertificateMerge.
+        val newBytes = if (stored != null && stored.isNotEmpty()) {
+            com.pgpony.android.crypto.CertificateMerge.merge(
+                stored = stored,
+                fetched = fetchedBytes,
+                isKeyPair = existing.isKeyPair,
+                removedUserIds = RemovedUserIdStore.removed(existing.fingerprint)
+            )
+        } else {
+            com.pgpony.android.crypto.CertificateBindings.sanitized(fetchedBytes)
+        }
+        if (stored != null && stored.isNotEmpty() &&
+            (newBytes.contentEquals(stored) ||
+                newBytes.contentEquals(com.pgpony.android.crypto.CertificateBindings.sanitized(stored)))
+        ) {
             return existing to DuplicateResolution.ALREADY_IN_KEYRING
         }
         // item 24 guard: never let a fetched copy strip or shorten a primary
@@ -140,11 +157,28 @@ class KeyDeduplicationService(
         if (isExpiryDowngrade(existing.expiresAt, newExpiresAtMs)) {
             return existing to DuplicateResolution.ALREADY_IN_KEYRING
         }
+        // The cached armor and expiry follow the merged certificate, not the
+        // fetched copy. Key pairs keep their own expiry (local is authoritative).
+        val unionRing = runCatching {
+            org.bouncycastle.openpgp.PGPPublicKeyRing(
+                newBytes, org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator()
+            )
+        }.getOrNull()
+        val unionArmored = unionRing?.let {
+            runCatching { com.pgpony.android.crypto.PGPCryptoService.shared.exportArmoredPublicKey(it) }.getOrNull()
+        } ?: newArmoredPublicKey
+        val unionExpiresAt = when {
+            existing.isKeyPair -> existing.expiresAt
+            unionRing != null -> unionRing.publicKey.validSeconds.takeIf { it > 0 }?.let {
+                unionRing.publicKey.creationTime.time + it * 1000L
+            }
+            else -> newExpiresAtMs
+        }
         val merged = merge(
             existing = existing,
             publicKeyBytes = newBytes,
-            armoredPublicKey = newArmoredPublicKey,
-            expiresAtMs = newExpiresAtMs
+            armoredPublicKey = unionArmored,
+            expiresAtMs = unionExpiresAt
         )
         return merged to DuplicateResolution.MERGED_NEW_MATERIAL
     }
@@ -182,6 +216,46 @@ class KeyDeduplicationService(
         dao.update(merged)
         return merged
     }
+
+    // ── One-time certificate re-validation (4.6.0 item 17.1) ──────────
+
+    /**
+     * Stored public certificates written before 4.6.0 were never checked for
+     * binding signatures, so a subkey, User ID or revocation that its primary
+     * never made may already be on disk. Rewrite each stored certificate in
+     * its verified form (CertificateBindings.sanitize) when that removes
+     * anything, and refresh the cached armor to match. Selection paths already
+     * ignore unbound components at use time; this makes storage and display
+     * agree. Run-once via [REVALIDATE_FLAG_KEY]; only certificates that change
+     * are rewritten, so an untouched keyring causes no writes at all.
+     */
+    suspend fun revalidateStoredCertificatesIfNeeded(prefs: SharedPreferences) {
+        if (prefs.getBoolean(REVALIDATE_FLAG_KEY, false)) return
+        var rewritten = 0
+        for (entity in dao.getAllKeys()) {
+            val raw = store.loadPublicKey(entity.fingerprint) ?: continue
+            val clean = com.pgpony.android.crypto.CertificateBindings.sanitized(raw)
+            if (packetCount(clean) == packetCount(raw)) continue
+            store.storePublicKey(entity.fingerprint, clean)
+            val armored = runCatching {
+                com.pgpony.android.crypto.PGPCryptoService.shared.exportArmoredPublicKey(
+                    org.bouncycastle.openpgp.PGPPublicKeyRing(
+                        clean, org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator()
+                    )
+                )
+            }.getOrNull()
+            if (armored != null && !entity.armoredPublicKey.isNullOrEmpty()) {
+                dao.update(entity.copy(armoredPublicKey = armored))
+            }
+            rewritten++
+        }
+        if (rewritten > 0) Log.d(TAG, "re-validation rewrote $rewritten certificate(s)")
+        prefs.edit().putBoolean(REVALIDATE_FLAG_KEY, true).apply()
+    }
+
+    /** Packets other than local trust packets, which never carry meaning here. */
+    private fun packetCount(raw: ByteArray): Int =
+        com.pgpony.android.crypto.CertificateBindings.packets(raw).count { it.tag != 12 }
 
     // ── One-time duplicate sweep ───────────────────────────────────────
 

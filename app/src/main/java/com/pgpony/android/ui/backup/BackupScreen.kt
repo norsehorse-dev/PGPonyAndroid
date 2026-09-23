@@ -155,7 +155,9 @@ fun BackupScreen(
 
                     BackupViewModel.Phase.RestoreDone -> RestoreReportBody(
                         report = state.report,
-                        onDone = onDismiss
+                        onDone = onDismiss,
+                        onApplySettings = { vm.applyRestoredSettings() },
+                        onSkipSettings = { vm.skipRestoredSettings() }
                     )
                 }
 
@@ -306,7 +308,12 @@ private fun EnterCodeBody(
 }
 
 @Composable
-private fun RestoreReportBody(report: MergeReport?, onDone: () -> Unit) {
+private fun RestoreReportBody(
+    report: MergeReport?,
+    onDone: () -> Unit,
+    onApplySettings: () -> Unit = {},
+    onSkipSettings: () -> Unit = {}
+) {
     Text(stringResource(R.string.restore_done_title), style = MaterialTheme.typography.titleMedium)
     Spacer(Modifier.height(12.dp))
     if (report == null) {
@@ -324,6 +331,22 @@ private fun RestoreReportBody(report: MergeReport?, onDone: () -> Unit) {
             Text(stringResource(R.string.restore_settings_applied),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        // 4.6.0 (item 17.9): the backup's proxy and key-server settings are
+        // only applied when the user says so here.
+        if (report.pendingSettings != null) {
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(R.string.restore_settings_ask),
+                style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = onSkipSettings, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.restore_settings_skip))
+                }
+                Button(onClick = onApplySettings, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.restore_settings_apply))
+                }
+            }
         }
     }
     Spacer(Modifier.height(20.dp))

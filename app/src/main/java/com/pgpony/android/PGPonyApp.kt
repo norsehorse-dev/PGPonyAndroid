@@ -15,6 +15,7 @@ import com.pgpony.android.data.MIGRATION_5_6
 import com.pgpony.android.data.MIGRATION_6_7
 import com.pgpony.android.data.MIGRATION_7_8
 import com.pgpony.android.data.MIGRATION_8_9
+import com.pgpony.android.data.MIGRATION_9_10
 import com.pgpony.android.autocrypt.AutocryptPeerStore
 import com.pgpony.android.data.PGPDatabase
 import com.pgpony.android.data.SecureKeyStore
@@ -66,7 +67,7 @@ class PGPonyApp : Application() {
             PGPDatabase::class.java,
             "pgpony.db"
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
             // #2.1: the :remote_api provider process opens this same DB, so
             // invalidations must cross processes to keep both views coherent
             // (e.g. a consent revocation in the main app reaching a running
@@ -114,6 +115,11 @@ class PGPonyApp : Application() {
         // (not multi-process safe), and double-register receivers and
         // re-schedule alarms.
         if (isRemoteApiProcess()) {
+            // 4.6.0 (item 17.2): plaintext held for an integrity check that a
+            // crash or kill interrupted is debris; drop it before serving.
+            runCatching {
+                java.io.File(cacheDir, com.pgpony.android.provider.HOLD_DIR_NAME).listFiles()?.forEach { it.delete() }
+            }
             // This process holds API passphrases (ProviderPassphraseCache) and
             // card PINs. Clear them the way the main process does: on an
             // explicit clear/invalidation broadcast, and on device lock.
@@ -141,6 +147,9 @@ class PGPonyApp : Application() {
         // from a crash or a kill, and for a decrypt it is plaintext, so drop
         // it before the first screen opens. Main process only (see above).
         ScratchFiles.clearAll(applicationContext)
+        // 4.6.0 (item 17.3): exports/ holds buffered decrypted files and
+        // unprotected key exports written for a share; none outlives a launch.
+        ScratchFiles.clearExports(applicationContext)
 
         // ── Armor comment header: seed + keep the crypto cache fresh ───
         //
@@ -246,6 +255,7 @@ class PGPonyApp : Application() {
         applicationScope.launch {
             try {
                 keyRepository.runDedupeSweepIfNeeded(prefs)
+                keyRepository.revalidateStoredCertificatesIfNeeded(prefs)
             } catch (e: Exception) {
                 // best-effort; the run-once flag is only set on a clean
                 // pass, so a failed sweep retries on the next launch

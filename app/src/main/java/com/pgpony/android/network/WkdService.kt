@@ -128,8 +128,10 @@ class WkdService {
         // localpart side. The `?l=` query param preserves the user's
         // original capitalization for the server to disambiguate
         // sub-addressing if it wants — most don't care.
+        // 4.6.0 (item 17.8): lowercase ASCII only, as GnuPG does; Unicode
+        // lowercasing produced a different hash for non-ASCII local parts.
         val sha1 = MessageDigest.getInstance("SHA-1")
-            .digest(localpart.lowercase().toByteArray(Charsets.UTF_8))
+            .digest(com.pgpony.android.crypto.CertificateBindings.asciiLower(localpart).toByteArray(Charsets.UTF_8))
         val hash = ZBase32.encode(sha1)
 
         // URL-encode the original localpart for the `l=` query
@@ -145,23 +147,24 @@ class WkdService {
         // domain has set up a dedicated openpgpkey subdomain.
         val advancedUrl =
             "https://openpgpkey.$domain/.well-known/openpgpkey/$domain/hu/$hash?l=$encodedLocalpart"
-        tryFetch(advancedUrl)?.let { binary ->
-            return@withContext KeyLookupResult(
-                armoredKey = armorFetchedKey(binary),
-                source = KeyLookupSource.WKD_ADVANCED
-            )
+        // 4.6.0 (item 17.8): the direct method is tried only when the advanced
+        // host does not exist (the draft's rule), not after any failure, and a
+        // response counts only when it holds a key for exactly this address.
+        val advanced = tryFetch(advancedUrl)
+        advanced.bytes?.let { binary ->
+            filterToAddress(binary, trimmedAddress(email))?.let {
+                return@withContext KeyLookupResult(armoredKey = it, source = KeyLookupSource.WKD_ADVANCED)
+            }
+            return@withContext null
         }
+        if (!advanced.hostMissing) return@withContext null
 
-        // Direct fallback: same path under the apex domain. Slightly
-        // more common for self-hosted mail; Gmail uses this since
-        // 2024 (no openpgpkey.gmail.com subdomain).
         val directUrl =
             "https://$domain/.well-known/openpgpkey/hu/$hash?l=$encodedLocalpart"
-        tryFetch(directUrl)?.let { binary ->
-            return@withContext KeyLookupResult(
-                armoredKey = armorFetchedKey(binary),
-                source = KeyLookupSource.WKD_DIRECT
-            )
+        tryFetch(directUrl).bytes?.let { binary ->
+            filterToAddress(binary, trimmedAddress(email))?.let {
+                return@withContext KeyLookupResult(armoredKey = it, source = KeyLookupSource.WKD_DIRECT)
+            }
         }
 
         null
@@ -193,17 +196,13 @@ class WkdService {
      * failure (DNS, timeout, non-200). Suppresses all exceptions so
      * the caller can rapidly fall through.
      */
-    private suspend fun tryFetch(urlString: String): ByteArray? {
+    /** 4.6.0 (item 17.8): a fetch outcome that tells "no such host" apart. */
+    private class Fetch(val bytes: ByteArray?, val hostMissing: Boolean)
+
+    private suspend fun tryFetch(urlString: String): Fetch {
         return try {
             val response = client.get(urlString) {
-                // WKD spec recommends accepting application/octet-stream;
-                // most servers serve a fixed binary blob regardless.
                 accept(ContentType.Application.OctetStream)
-                // Fast-fail: WKD serves a tiny static file. If it's not
-                // answering quickly the domain likely doesn't run WKD, so
-                // cap the wait and fall through to the next source instead
-                // of eating the client's full request ceiling. (Tor gets
-                // more slack than a direct connection.)
                 timeout {
                     requestTimeoutMillis =
                         if (com.pgpony.android.network.ProxyPrefs
@@ -212,39 +211,63 @@ class WkdService {
                 }
             }
             if (response.status == HttpStatusCode.OK) {
-                // Ktor 2.x: response.body<ByteArray>() is the canonical
-                // way to read a binary response. bodyAsBytes() doesn't
-                // exist in Ktor 2.3.12 (it's a JVM-only API in some
-                // forks but not in the published artifact PGPony uses).
-                val bytes = response.body<ByteArray>()
-                if (bytes.isNotEmpty()) bytes else null
+                // 4.6.0 (item 17.8): bounded read (see ResponseLimits).
+                val bytes = response.bytesCapped()
+                Fetch(if (bytes.isNotEmpty()) bytes else null, hostMissing = false)
             } else {
-                null
+                Fetch(null, hostMissing = false)
             }
         } catch (e: Exception) {
-            // DNS-not-found / connection-refused / SSL handshake fail /
-            // request timeout / read timeout / etc. All normal in the
-            // "this domain doesn't run WKD" path; absorb and let the
-            // caller try the next source.
-            null
+            Fetch(null, hostMissing = isHostMissing(e))
         }
     }
 
     /**
-     * Armor a public key fetched from WKD so the result can flow into the
-     * same armored-import and preview path the keyserver sources use.
-     *
-     * WKD serves BINARY OpenPGP key data. Earlier versions hand-rolled the
-     * base64 and CRC24 wrap here, which mis-framed some keys and made them
-     * fail to import with "Couldn't parse key" (issue #41). We now wrap the
-     * bytes with BouncyCastle's ArmoredOutputStream, the same path exports
-     * already use: it derives the correct BEGIN and END header from the
-     * leading packet tag and computes the CRC24 itself.
-     *
-     * If an endpoint serves ASCII armor directly (rare, but some do) the
-     * bytes already start with an armor header, so pass them through
-     * untouched rather than double-wrapping, which was one way #41 failed.
+     * True when [e] means the host name does not resolve: a local DNS miss,
+     * or, through a SOCKS proxy (which resolves names itself), the proxy's
+     * "host unreachable" reply. Anything else (TLS, timeout, refused) is not
+     * a missing host, so it does not trigger the direct-method fallback.
      */
+    private fun isHostMissing(e: Throwable): Boolean {
+        var cur: Throwable? = e
+        while (cur != null) {
+            if (cur is java.net.UnknownHostException) return true
+            val m = cur.message?.lowercase() ?: ""
+            if (m.contains("host unreachable") || m.contains("unable to resolve host") ||
+                m.contains("no address associated")
+            ) return true
+            cur = cur.cause
+        }
+        return false
+    }
+
+    private fun trimmedAddress(email: String): String = email.trim()
+
+    /**
+     * 4.6.0 (item 17.8): what a WKD host returns is only trusted as far as it
+     * matches the query. Each certificate in [bytes] keeps only the User IDs
+     * (certified by its primary) whose address is exactly [address]; a
+     * certificate with none is dropped, and a response with none left is
+     * refused. Returns the surviving certificates armored, or null.
+     */
+    internal fun filterToAddress(bytes: ByteArray, address: String): String? {
+        val binary = runCatching {
+            val head = String(bytes, 0, minOf(15, bytes.size), Charsets.US_ASCII)
+            if (head.trimStart().startsWith("-----BEGIN PGP")) {
+                org.bouncycastle.bcpg.ArmoredInputStream(bytes.inputStream()).readBytes()
+            } else bytes
+        }.getOrNull() ?: return null
+        val want = com.pgpony.android.crypto.CertificateBindings.mailboxOf(address)
+        val kept = com.pgpony.android.crypto.CertificateBindings.splitCertificates(binary).mapNotNull { cert ->
+            com.pgpony.android.crypto.CertificateBindings.keepUserIds(cert) {
+                com.pgpony.android.crypto.CertificateBindings.mailboxOf(it) == want
+            }
+        }
+        if (kept.isEmpty()) return null
+        val joined = java.io.ByteArrayOutputStream().apply { kept.forEach { write(it) } }.toByteArray()
+        return armorFetchedKey(joined)
+    }
+
     private fun armorFetchedKey(bytes: ByteArray): String {
         val head = String(bytes, 0, minOf(15, bytes.size), Charsets.US_ASCII)
         if (head.trimStart().startsWith("-----BEGIN PGP")) {

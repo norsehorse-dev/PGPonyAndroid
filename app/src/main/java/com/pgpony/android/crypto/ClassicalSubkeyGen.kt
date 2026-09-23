@@ -119,7 +119,7 @@ object ClassicalSubkeyGen {
         val checksumCalc = BcPGPDigestCalculatorProvider().get(HashAlgorithmTags.SHA1)
         val certSigGen = BcPGPContentSignerBuilder(primarySec.publicKey.algorithm, HashAlgorithmTags.SHA256)
         val encryptor = passphrase?.takeIf { it.isNotEmpty() }?.let {
-            BcPBESecretKeyEncryptorBuilder(SymmetricKeyAlgorithmTags.AES_256)
+            S2kPolicy.v4EncryptorBuilder() // 4.6.0 (item 17.6)
                 .setSecureRandom(random)
                 .build(it.toCharArray())
         }

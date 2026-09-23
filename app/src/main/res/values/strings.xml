@@ -698,6 +698,11 @@
     <string name="import_preview_detail_user_empty">(none)</string>
     <string name="import_preview_detail_fingerprint_label">Fingerprint</string>
     <string name="import_preview_detail_algorithm_label">Algorithm</string>
+    <!-- 4.6.0 (item 17.9): the preview lists every key a paste or file holds. -->
+    <plurals name="import_preview_more_keys">
+        <item quantity="one">This also holds %1$d more key. It will be imported too:</item>
+        <item quantity="other">This also holds %1$d more keys. They will be imported too:</item>
+    </plurals>
     <string name="import_preview_source_file_format">From file: %1$s</string>
     <string name="import_preview_source_wkd_advanced">Found via WKD (advanced)</string>
     <string name="import_preview_source_wkd_direct">Found via WKD (direct)</string>
@@ -2016,6 +2021,9 @@
     <string name="restore_unchanged">Already up to date</string>
     <string name="restore_failed">Couldn\'t restore</string>
     <string name="restore_settings_applied">Settings restored</string>
+    <string name="restore_settings_ask">This backup also holds proxy and key server settings. Apply them? A restore never turns an existing proxy off, and trust levels are not restored.</string>
+    <string name="restore_settings_apply">Apply settings</string>
+    <string name="restore_settings_skip">Keep mine</string>
     <string name="restore_nothing">No keys were found in this backup.</string>
     <string name="backup_done">Done</string>
     <!-- 4.0.0 Phase 3 — onboarding: three paths (create / import / restore) -->

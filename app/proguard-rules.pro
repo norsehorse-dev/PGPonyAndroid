@@ -125,3 +125,13 @@
 -dontwarn javax.annotation.**
 -dontwarn javax.annotation.concurrent.**
 -dontwarn org.slf4j.impl.**
+
+# ── 4.6.0 (item 17.11): no debug or verbose logging in release ────────
+# Release logcat carried looked-up email addresses from the key-server and
+# WKD lookups (never key material or plaintext). Debug and verbose logging
+# is compiled out of release builds; warnings and errors stay, and none of
+# those carry an address.
+-assumenosideeffects class android.util.Log {
+    public static int d(...);
+    public static int v(...);
+}
