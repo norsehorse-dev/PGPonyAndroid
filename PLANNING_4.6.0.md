@@ -497,6 +497,32 @@ Status: done, verified on device.
   (OpenKeychain stays the default), plus the matching <queries> entries. It also gives Termux gpg through
   PGPony's OpenPGP API. To be submitted upstream.
 
+## 16b. SSH agent bridge inside PGPony, and SSHPony for Termux
+
+Origin: item 16 device testing. OkcAgent has had no commits in five years and its Termux tool is hardcoded to
+OkcAgent's package, so instead of a PR, PGPony carries the bridge itself and a small Termux tool, SSHPony,
+talks to it. No third app in the middle; PGPony shows its own passphrase and card prompts.
+
+Status: done in code, awaiting on-device check.
+- PGPony (provider/agent, :remote_api): AgentBridgeReceiver takes the broadcast sshpony-agent sends per ssh
+  connection and starts AgentBridgeService (specialUse foreground service) with the localhost port.
+  The service calls back, runs the pairing handshake (HMAC-SHA-256 both ways over a 32-octet secret, so a
+  random app that sends the broadcast gets nothing), then answers the ssh-agent protocol (SshAgentSession:
+  REQUEST_IDENTITIES and SIGN_REQUEST, FAILURE for everything else). Passphrase and card prompts arrive as
+  PGPony notifications and reuse the provider's passphrase and card activities and unlock session.
+- Settings, SSH agent for Termux: on switch (off by default), Pair Termux (copyable "sshpony pair <code>"),
+  Unpair, the two Android permissions it needs (start in the background, which Android 12+ only allows when
+  battery use is Unrestricted, and notifications), and which auth-subkey keys are offered.
+- SSHPony (~/Apps/SSHPony, Rust, MIT, derived from okc-agents): sshpony-agent (ssh-agent options -a -c -s
+  -D -d -k, or a command) and sshpony pair / unpair / status. Builds in Termux with cargo.
+- Verified off device: host-built SSHPony plus the PGPony bridge code, with a fake am, against real
+  OpenSSH: an unpaired or wrongly paired agent is refused, ssh-add -l lists the keys, sshd logins pass
+  with Ed25519 and RSA (rsa-sha2-512), and ssh-keygen -Y signing through the agent verifies.
+  AgentBridgeTest shares the handshake vectors with SSHPony's own tests.
+- Open: distribution of SSHPony (GitHub release, then termux-packages), and the item 16 SSH authentication
+  service stays for other apps that speak the OpenKeychain SSH API.
+
+
 ## 17. Security review remediation (preliminary review, September 2026)
 
 Priority: HIGH (the first two sub-items are the highest-severity work in this cycle). Origin: an internal
