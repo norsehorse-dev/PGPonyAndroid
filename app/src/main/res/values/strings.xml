@@ -509,6 +509,11 @@
     <string name="result_encrypt_header_signed">Message Signed</string>
     <string name="result_encrypt_header_encrypted">Message Encrypted</string>
     <string name="result_encrypt_badge_signed">Signed</string>
+    <string name="result_encrypt_unsigned_pqc_note">Sent unsigned: you left out the post-quantum signature because a recipient has an older v4 key. The message is still encrypted to everyone.</string>
+    <string name="pqc_v4_sign_title">Some recipients may not read this signature</string>
+    <string name="pqc_v4_sign_message">Your signing key is post-quantum (ML-DSA) and at least one recipient has an older v4 key. PGPony reads the signature, but GnuPG shows the message with an error and Thunderbird cannot open it at all.</string>
+    <string name="pqc_v4_sign_anyway">Sign anyway</string>
+    <string name="pqc_v4_send_unsigned">Send unsigned</string>
     <string name="result_encrypt_output_signed">Signed Output</string>
     <string name="result_encrypt_output_encrypted">Encrypted Output</string>
     <string name="result_encrypt_password_note">Only someone with the password can decrypt this message.</string>

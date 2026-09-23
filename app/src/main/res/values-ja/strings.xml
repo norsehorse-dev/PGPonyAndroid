@@ -402,6 +402,11 @@ pgpony.app</string>
     <string name="result_encrypt_header_signed">メッセージに署名しました</string>
     <string name="result_encrypt_header_encrypted">メッセージを暗号化しました</string>
     <string name="result_encrypt_badge_signed">署名済み</string>
+    <string name="result_encrypt_unsigned_pqc_note">署名なしで送信しました: 受信者が古い v4 鍵を使っているため、耐量子署名を省きました。メッセージはすべての受信者に対して暗号化されています。</string>
+    <string name="pqc_v4_sign_title">一部の受信者はこの署名を読み取れない可能性があります</string>
+    <string name="pqc_v4_sign_message">署名鍵は耐量子 (ML-DSA) 鍵で、少なくとも 1 人の受信者が古い v4 鍵を使っています。PGPony は署名を読み取れますが、GnuPG ではエラー付きでメッセージが表示され、Thunderbird ではメッセージを開けません。</string>
+    <string name="pqc_v4_sign_anyway">それでも署名</string>
+    <string name="pqc_v4_send_unsigned">署名なしで送信</string>
     <string name="result_encrypt_output_signed">署名された出力</string>
     <string name="result_encrypt_output_encrypted">暗号化された出力</string>
     <string name="result_encrypt_can_decrypt_label">復号できる相手</string>

@@ -1046,6 +1046,49 @@ class PGPCryptoService private constructor() {
     // ── Encrypt ────────────────────────────────────────────────────────
 
     /**
+     * 4.6.0 (item 14): the container [encrypt] picks for these recipients.
+     * True means SEIPDv2 (every recipient is v6, composite, or a v4 algo-35
+     * interop key); false means SEIPDv1, because some recipient is v4.
+     */
+    fun usesSeipdV2(
+        recipientPublicKeys: List<PGPPublicKeyRing>,
+        recipientSubkeyChoices: Map<String, Long> = emptyMap(),
+        v4Algo35Recipients: List<com.pgpony.android.crypto.pqc.V4Algo35Recipient> = emptyList()
+    ): Boolean {
+        // Capability is keyed off the primary key version (v6 => SEIPDv2-capable).
+        // This is deliberately conservative: a v4 key that advertises SEIPDv2
+        // support via its Features subpacket still gets SEIPDv1 here, which it
+        // can read fine. 4.6.0 (item 17.1): decided by the key that will
+        // actually be used, so a composite subkey that fails its binding
+        // check cannot force the container choice.
+        val anyCompositeRecipient = recipientPublicKeys.any { r ->
+            findEncryptionKey(r, recipientSubkeyChoices[fingerprintHex(r.publicKey)])?.let {
+                com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(it.algorithm) != null
+            } == true
+        }
+        // item 14 (#56): a v4 algo-35 recipient uses a v6 PKESK, which MUST
+        // pair with SEIPDv2 (RFC 9580 5.1), so it forces AEAD as well.
+        // Composite (ML-KEM+X25519) recipients mandate v6 framing (SEIPDv2).
+        return anyCompositeRecipient || v4Algo35Recipients.isNotEmpty() ||
+            (recipientPublicKeys.isNotEmpty() &&
+                recipientPublicKeys.all {
+                    it.publicKey.version == org.bouncycastle.bcpg.PublicKeyPacket.VERSION_6
+                })
+    }
+
+    /**
+     * 4.6.0 (item 14): true when a composite ML-DSA signature on a message to
+     * these recipients would sit inside a SEIPDv1 container (some recipient is
+     * v4). PGPony reads that shape, but GnuPG shows the message with an error
+     * and RNP (Thunderbird) refuses it, so the Encrypt screen asks first.
+     */
+    fun compositeSignatureInSeipdV1(
+        recipientPublicKeys: List<PGPPublicKeyRing>,
+        recipientSubkeyChoices: Map<String, Long> = emptyMap(),
+        v4Algo35Recipients: List<com.pgpony.android.crypto.pqc.V4Algo35Recipient> = emptyList()
+    ): Boolean = !usesSeipdV2(recipientPublicKeys, recipientSubkeyChoices, v4Algo35Recipients)
+
+    /**
      * Encrypt data to one or more recipients.
      *
      * Bouncy Castle handles RSA, Ed25519+Cv25519 (v4 ECDH), and v6 X25519
@@ -1080,7 +1123,13 @@ class PGPCryptoService private constructor() {
         // signingSecretKey is ignored in that case.
         compositeSignSuite: com.pgpony.android.crypto.pqc.CompositeSignSuite? = null,
         compositeSignSecret: ByteArray? = null,
-        compositeSignerFingerprint: ByteArray? = null
+        compositeSignerFingerprint: ByteArray? = null,
+        // 4.6.0 (item 14): false leaves a composite signature out when the
+        // container is SEIPDv1 (a v4 recipient), the "Send unsigned" answer
+        // to the Encrypt screen's prompt. True (the default, and the OpenPGP
+        // provider's behavior, since the calling app asked for a signature)
+        // keeps it.
+        compositeSignInSeipdV1: Boolean = true
     ): ByteArray {
         val outputStream = ByteArrayOutputStream()
         val armoredOut = if (armor) ArmoredOutputStream(outputStream).stripVersion() else null
@@ -1106,21 +1155,19 @@ class PGPCryptoService private constructor() {
             // 4.6.0 (item 17.1): decided by the key that will actually be used,
             // so a composite subkey that fails its binding check cannot force
             // the container choice.
-            val anyCompositeRecipient = recipientPublicKeys.any { r ->
-                findEncryptionKey(r, recipientSubkeyChoices[fingerprintHex(r.publicKey)])?.let {
-                    com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(it.algorithm) != null
-                } == true
-            }
-            // item 14 (#56): a v4 algo-35 recipient uses a v6 PKESK, which MUST
-            // pair with SEIPDv2 (RFC 9580 5.1), so it forces AEAD as well.
-            val hasV4Algo35Recipient = v4Algo35Recipients.isNotEmpty()
-            // Composite (ML-KEM+X25519) recipients mandate v6 framing (SEIPDv2),
-            // so a composite recipient forces AEAD regardless of the version scan.
-            val allRecipientsV6 = anyCompositeRecipient || hasV4Algo35Recipient ||
-                (recipientPublicKeys.isNotEmpty() &&
-                    recipientPublicKeys.all {
-                        it.publicKey.version == org.bouncycastle.bcpg.PublicKeyPacket.VERSION_6
-                    })
+            val allRecipientsV6 = usesSeipdV2(recipientPublicKeys, recipientSubkeyChoices, v4Algo35Recipients)
+            // 4.6.0 (item 14): a composite ML-DSA signature is v6 framed (v6
+            // one-pass signature and v6 signature packets). Inside a SEIPDv1
+            // container, which only happens when some recipient is v4, PGPony
+            // still reads it, but GnuPG prints the text and fails with
+            // "unknown version 6", and RNP (Thunderbird) refuses the whole
+            // message. The Encrypt screen asks first
+            // ([compositeSignatureInSeipdV1]); on "Send unsigned" the caller
+            // passes compositeSignInSeipdV1 = false and the signature is left
+            // out, the message still encrypted to every recipient.
+            val compositeRequested = compositeSignSecret != null && compositeSignSuite != null &&
+                compositeSignerFingerprint != null
+            val signComposite = compositeRequested && (allRecipientsV6 || compositeSignInSeipdV1)
             val encBuilder = org.bouncycastle.openpgp.operator.bc.BcPGPDataEncryptorBuilder(
                 SymmetricKeyAlgorithmTags.AES_256
             )
@@ -1177,10 +1224,10 @@ class PGPCryptoService private constructor() {
             // When a composite signer is supplied, write the whole inline one-pass
             // signed payload (OPS + Literal + Signature) through the raw-bytes
             // composite path and skip the BC signing block entirely.
-            if (compositeSignSecret != null && compositeSignSuite != null && compositeSignerFingerprint != null) {
+            if (signComposite) {
                 compOut.write(
                     com.pgpony.android.crypto.pqc.CompositeDocumentSigner.signInline(
-                        compositeSignSuite, compositeSignSecret, compositeSignerFingerprint,
+                        compositeSignSuite!!, compositeSignSecret!!, compositeSignerFingerprint!!,
                         data, fileName = filename ?: ""
                     )
                 )
@@ -1211,7 +1258,10 @@ class PGPCryptoService private constructor() {
             // The outer `catch (e: SigningError)` clause below the
             // body lets these typed errors bubble past the generic
             // EncryptionFailed wrap.
-            if (cardSession != null && cardSigningPublicKey != null && cardPin != null) {
+            if (compositeRequested) {
+                // item 14: composite signature left out by request (see
+                // above); no other signer stands in for it.
+            } else if (cardSession != null && cardSigningPublicKey != null && cardPin != null) {
                 // Card-backed signature. The content signer taps the card to
                 // sign the SHA-256 digest; BC assembles the one-pass-sig +
                 // signature packets around the literal data exactly as for a

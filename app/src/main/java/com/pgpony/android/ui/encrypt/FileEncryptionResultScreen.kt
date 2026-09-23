@@ -61,7 +61,7 @@ fun FileEncryptionResultScreen(state: EncryptUiState, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val activity = context.findFileResultMainActivity()
-    val signed = state.signMessage && state.signingKey != null
+    val signed = state.signMessage && state.signingKey != null && !state.sentUnsignedPqc
     val origName = state.selectedFileName ?: "file"
     // 3.1.0 Phase 1 (C2) — binary ciphertext is a real .gpg file, matching
     // iOS 7.1.0 and what gpg itself produces (was "$origName.pgp").
@@ -134,6 +134,35 @@ stringResource(R.string.file_enc_result_title),
                         tint = Color(0xFF22C55E)
                     )
                 }
+                }
+            }
+
+            // 4.6.0 (item 14): a composite ML-DSA signature was dropped
+            // because a recipient's key is v4; say so instead of implying the
+            // message is signed.
+            if (state.sentUnsignedPqc) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Filled.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            stringResource(R.string.result_encrypt_unsigned_pqc_note),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
                 }
             }
 

@@ -482,6 +482,11 @@
     <string name="result_encrypt_header_signed">메시지 서명됨</string>
     <string name="result_encrypt_header_encrypted">메시지 암호화됨</string>
     <string name="result_encrypt_badge_signed">서명됨</string>
+    <string name="result_encrypt_unsigned_pqc_note">서명 없이 전송됨: 수신자가 이전 v4 키를 사용하므로 양자 내성 서명을 제외했습니다. 메시지는 모든 수신자에게 암호화되어 있습니다.</string>
+    <string name="pqc_v4_sign_title">일부 수신자는 이 서명을 읽지 못할 수 있습니다</string>
+    <string name="pqc_v4_sign_message">서명 키가 양자 내성(ML-DSA) 키이고 수신자 중 한 명 이상이 이전 v4 키를 사용합니다. PGPony는 서명을 읽지만, GnuPG는 오류와 함께 메시지를 표시하고 Thunderbird는 메시지를 전혀 열 수 없습니다.</string>
+    <string name="pqc_v4_sign_anyway">그래도 서명</string>
+    <string name="pqc_v4_send_unsigned">서명 없이 보내기</string>
     <string name="result_encrypt_output_signed">서명된 출력</string>
     <string name="result_encrypt_output_encrypted">암호화된 출력</string>
     <string name="result_encrypt_can_decrypt_label">복호화할 수 있음</string>

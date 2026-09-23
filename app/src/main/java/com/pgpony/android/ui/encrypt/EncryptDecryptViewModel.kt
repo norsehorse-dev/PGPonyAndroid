@@ -259,6 +259,14 @@ data class EncryptUiState(
     // signal. Only the text password path sets this true; every other text-result
     // path clears it.
     val textEncryptedWithPassword: Boolean = false,
+    // 4.6.0 (item 14): the last encrypt was asked to sign with a composite
+    // ML-DSA key, a recipient's key is v4, and the user chose "Send
+    // unsigned" at the prompt. The result sheets show a note and no Signed
+    // badge. Every result path sets it.
+    val sentUnsignedPqc: Boolean = false,
+    // 4.6.0 (item 14): the Sign anyway / Send unsigned / Cancel prompt for
+    // an ML-DSA signer encrypting to a v4 recipient.
+    val showPqcV4SignPrompt: Boolean = false,
     // ── 3.1.0 Phase 5 (J3/J4): Bundle compose ──────────────────────────
     val bundleBody: String = "",
     // 4.2.0 RC6 (#32): refs, not bytes. A picker add stores only the
@@ -988,6 +996,32 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         _encryptState.value = _encryptState.value.copy(signPassphrase = passphrase)
     }
 
+    // ── 4.6.0 (item 14): ML-DSA signer, v4 recipient ──────────────────
+    //
+    // The answer to the prompt, consumed by the next encrypt() or
+    // encryptFile(): true = sign anyway, false = send unsigned. The
+    // passphrase that unlocked the signer is held only until the re-dispatch.
+    private var pqcV4Decision: Boolean? = null
+    private var pqcV4PendingPassphrase: String? = null
+
+    fun answerPqcV4SignPrompt(signAnyway: Boolean) {
+        val pass = pqcV4PendingPassphrase
+        pqcV4PendingPassphrase = null
+        _encryptState.value = _encryptState.value.copy(showPqcV4SignPrompt = false)
+        pqcV4Decision = signAnyway
+        when (_encryptState.value.mode) {
+            EncryptMode.FILE -> encryptFile(pass)
+            EncryptMode.TEXT -> encrypt(pass)
+            else -> pqcV4Decision = null
+        }
+    }
+
+    fun dismissPqcV4SignPrompt() {
+        pqcV4Decision = null
+        pqcV4PendingPassphrase = null
+        _encryptState.value = _encryptState.value.copy(showPqcV4SignPrompt = false)
+    }
+
     fun dismissSignPassphraseDialog() {
         _encryptState.value = _encryptState.value.copy(
             showSignPassphraseDialog = false,
@@ -1060,6 +1094,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             outputText = signed,
             isProcessing = false,
             textEncryptedWithPassword = false,
+            sentUnsignedPqc = false,
             showEncryptResultSheet = true
         )
         _events.tryEmit(Event.SignSuccess)
@@ -1336,6 +1371,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     showSignPassphraseDialog = false,
                     signPassphrase = "",
                     textEncryptedWithPassword = false,
+                    sentUnsignedPqc = false,
                     // Phase A10b: same result-sheet flow as the text
                     // encrypt path. EncryptionResultScreen's title
                     // and badges adapt via the mode field passed
@@ -1451,6 +1487,23 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     throw com.pgpony.android.crypto.SigningError.PassphraseRequired()
                 }
 
+                // 4.6.0 (item 14): an ML-DSA signature to a v4 recipient reads
+                // in PGPony but not in GnuPG or Thunderbird; ask first.
+                val pqcInV1 = compositeInfo != null &&
+                    crypto.compositeSignatureInSeipdV1(recipientRings, s.recipientSubkeyChoices, v4Recipients)
+                val pqcDecision = pqcV4Decision.also { pqcV4Decision = null }
+                if (pqcInV1 && pqcDecision == null) {
+                    pqcV4PendingPassphrase = passphrase
+                    _encryptState.value = _encryptState.value.copy(
+                        isProcessing = false,
+                        processedBytes = 0L,
+                        totalBytes = 0L,
+                        showSignPassphraseDialog = false,
+                        showPqcV4SignPrompt = true
+                    )
+                    return@launch
+                }
+                val droppedPqcSignature = pqcInV1 && pqcDecision == false
                 val encrypted = withContext(Dispatchers.Default) {
                     crypto.encrypt(
                         data = s.inputText.toByteArray(Charsets.UTF_8),
@@ -1464,7 +1517,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         v4Algo35Recipients = v4Recipients,
                         compositeSignSuite = compositeInfo?.suite,
                         compositeSignSecret = compositeInfo?.compositeSecret,
-                        compositeSignerFingerprint = compositeInfo?.fingerprint
+                        compositeSignerFingerprint = compositeInfo?.fingerprint,
+                        compositeSignInSeipdV1 = !droppedPqcSignature
                     )
                 }
                 if (!s.asciiArmor) {
@@ -1485,6 +1539,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         showSignPassphraseDialog = false,
                         signPassphrase = "",
                         fileEncryptedWithPassword = false,
+                        sentUnsignedPqc = droppedPqcSignature,
                         showFileEncryptResultSheet = true
                     )
                     _events.tryEmit(Event.EncryptSuccess)
@@ -1512,6 +1567,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     encryptedFileBytes = null,
                     showFileEncryptResultSheet = false,
                     textEncryptedWithPassword = false,
+                    sentUnsignedPqc = droppedPqcSignature,
                     showEncryptResultSheet = true
                 )
                 _events.tryEmit(Event.EncryptSuccess)
@@ -1823,6 +1879,23 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // the whole document and cannot stream, so a composite signer
                 // buffers the file and takes the crypto.encrypt path even above
                 // the streaming threshold.
+                // 4.6.0 (item 14): an ML-DSA signature to a v4 recipient reads
+                // in PGPony but not in GnuPG or Thunderbird; ask first.
+                val pqcInV1 = compositeInfo != null &&
+                    crypto.compositeSignatureInSeipdV1(recipientRings, s.recipientSubkeyChoices, v4Recipients)
+                val pqcDecision = pqcV4Decision.also { pqcV4Decision = null }
+                if (pqcInV1 && pqcDecision == null) {
+                    pqcV4PendingPassphrase = passphrase
+                    _encryptState.value = _encryptState.value.copy(
+                        isProcessing = false,
+                        processedBytes = 0L,
+                        totalBytes = 0L,
+                        showSignPassphraseDialog = false,
+                        showPqcV4SignPrompt = true
+                    )
+                    return@launch
+                }
+                val droppedPqcSignature = pqcInV1 && pqcDecision == false
                 val encrypted = if (bytes != null) {
                     withContext(Dispatchers.Default) {
                         crypto.encrypt(
@@ -1837,7 +1910,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             v4Algo35Recipients = v4Recipients,
                             compositeSignSuite = compositeInfo?.suite,
                             compositeSignSecret = compositeInfo?.compositeSecret,
-                            compositeSignerFingerprint = compositeInfo?.fingerprint
+                            compositeSignerFingerprint = compositeInfo?.fingerprint,
+                            compositeSignInSeipdV1 = !droppedPqcSignature
                         )
                     }
                 } else if (compositeInfo != null) {
@@ -1859,7 +1933,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             v4Algo35Recipients = v4Recipients,
                             compositeSignSuite = compositeInfo.suite,
                             compositeSignSecret = compositeInfo.compositeSecret,
-                            compositeSignerFingerprint = compositeInfo.fingerprint
+                            compositeSignerFingerprint = compositeInfo.fingerprint,
+                            compositeSignInSeipdV1 = !droppedPqcSignature
                         )
                     }
                 } else null
@@ -1896,6 +1971,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     // 3.1.0 Phase 2 (C4): recipient encrypt resets the
                     // password badge on the result sheet.
                     fileEncryptedWithPassword = false,
+                    sentUnsignedPqc = droppedPqcSignature,
                     showFileEncryptResultSheet = true
                 )
                 _events.tryEmit(Event.EncryptSuccess)
@@ -2006,6 +2082,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     passwordConfirm = "",
                     passwordVisible = false,
                     textEncryptedWithPassword = true,
+                    sentUnsignedPqc = false,
                     showEncryptResultSheet = true
                 )
                 _events.tryEmit(Event.EncryptSuccess)
@@ -2120,6 +2197,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     processedBytes = 0L,
                     totalBytes = 0L,
                     fileEncryptedWithPassword = true,
+                    sentUnsignedPqc = false,
                     // Clear the secret from state once it has done its job.
                     passwordPassphrase = "",
                     passwordConfirm = "",

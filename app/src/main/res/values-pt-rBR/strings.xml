@@ -402,6 +402,11 @@ pgpony.app</string>
     <string name="result_encrypt_header_signed">Mensagem assinada</string>
     <string name="result_encrypt_header_encrypted">Mensagem cifrada</string>
     <string name="result_encrypt_badge_signed">Assinado</string>
+    <string name="result_encrypt_unsigned_pqc_note">Enviado sem assinatura: você deixou de fora a assinatura pós-quântica porque um destinatário tem uma chave v4 mais antiga. A mensagem continua criptografada para todos.</string>
+    <string name="pqc_v4_sign_title">Alguns destinatários talvez não consigam ler esta assinatura</string>
+    <string name="pqc_v4_sign_message">Sua chave de assinatura é pós-quântica (ML-DSA) e pelo menos um destinatário tem uma chave v4 mais antiga. O PGPony lê a assinatura, mas o GnuPG mostra a mensagem com um erro e o Thunderbird não consegue abri-la.</string>
+    <string name="pqc_v4_sign_anyway">Assinar mesmo assim</string>
+    <string name="pqc_v4_send_unsigned">Enviar sem assinatura</string>
     <string name="result_encrypt_output_signed">Saída assinada</string>
     <string name="result_encrypt_output_encrypted">Saída cifrada</string>
     <string name="result_encrypt_can_decrypt_label">Pode decifrar</string>

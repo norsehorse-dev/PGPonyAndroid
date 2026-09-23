@@ -402,6 +402,11 @@ pgpony.app</string>
     <string name="result_encrypt_header_signed">Mensaje firmado</string>
     <string name="result_encrypt_header_encrypted">Mensaje cifrado</string>
     <string name="result_encrypt_badge_signed">Firmado</string>
+    <string name="result_encrypt_unsigned_pqc_note">Enviado sin firmar: omitiste la firma poscuántica porque un destinatario tiene una clave v4 más antigua. El mensaje sigue cifrado para todos.</string>
+    <string name="pqc_v4_sign_title">Es posible que algunos destinatarios no puedan leer esta firma</string>
+    <string name="pqc_v4_sign_message">Tu clave de firma es poscuántica (ML-DSA) y al menos un destinatario tiene una clave v4 más antigua. PGPony lee la firma, pero GnuPG muestra el mensaje con un error y Thunderbird no puede abrirlo.</string>
+    <string name="pqc_v4_sign_anyway">Firmar de todos modos</string>
+    <string name="pqc_v4_send_unsigned">Enviar sin firmar</string>
     <string name="result_encrypt_output_signed">Salida firmada</string>
     <string name="result_encrypt_output_encrypted">Salida cifrada</string>
     <string name="result_encrypt_can_decrypt_label">Puede descifrar</string>

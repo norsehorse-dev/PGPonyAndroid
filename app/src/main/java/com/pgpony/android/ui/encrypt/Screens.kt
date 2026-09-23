@@ -609,6 +609,30 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
         SignPassphraseDialog(state = state, viewModel = viewModel)
     }
 
+    // 4.6.0 (item 14): an ML-DSA signer encrypting to a v4 recipient. PGPony
+    // reads the signature; GnuPG and Thunderbird do not. Let the user choose.
+    if (state.showPqcV4SignPrompt) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissPqcV4SignPrompt() },
+            icon = { Icon(Icons.Filled.Info, contentDescription = null) },
+            title = { Text(stringResource(R.string.pqc_v4_sign_title)) },
+            text = { Text(stringResource(R.string.pqc_v4_sign_message)) },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = { viewModel.answerPqcV4SignPrompt(signAnyway = true) }) {
+                        Text(stringResource(R.string.pqc_v4_sign_anyway))
+                    }
+                    TextButton(onClick = { viewModel.answerPqcV4SignPrompt(signAnyway = false) }) {
+                        Text(stringResource(R.string.pqc_v4_send_unsigned))
+                    }
+                    TextButton(onClick = { viewModel.dismissPqcV4SignPrompt() }) {
+                        Text(stringResource(R.string.common_button_cancel))
+                    }
+                }
+            }
+        )
+    }
+
     // ── HW Phase 2b-step2: card-sign PIN prompt + tap ──────────────────
     //
     // Strings captured here (composable scope) because the NFC operation

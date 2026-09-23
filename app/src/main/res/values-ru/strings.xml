@@ -475,6 +475,11 @@
     <string name="result_encrypt_header_signed">Сообщение подписано</string>
     <string name="result_encrypt_header_encrypted">Сообщение зашифровано</string>
     <string name="result_encrypt_badge_signed">Подписано</string>
+    <string name="result_encrypt_unsigned_pqc_note">Отправлено без подписи: вы не добавили постквантовую подпись, так как у получателя старый ключ v4. Сообщение по-прежнему зашифровано для всех.</string>
+    <string name="pqc_v4_sign_title">Некоторые получатели могут не прочитать эту подпись</string>
+    <string name="pqc_v4_sign_message">Ваш ключ подписи постквантовый (ML-DSA), а у одного или нескольких получателей старый ключ v4. PGPony читает такую подпись, но GnuPG показывает сообщение с ошибкой, а Thunderbird вообще не может его открыть.</string>
+    <string name="pqc_v4_sign_anyway">Всё равно подписать</string>
+    <string name="pqc_v4_send_unsigned">Отправить без подписи</string>
     <string name="result_encrypt_output_signed">Подписанный вывод</string>
     <string name="result_encrypt_output_encrypted">Зашифрованный результат</string>
     <string name="result_encrypt_can_decrypt_label">Может расшифровывать</string>

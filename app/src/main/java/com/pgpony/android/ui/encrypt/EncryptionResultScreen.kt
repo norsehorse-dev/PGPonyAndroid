@@ -58,7 +58,7 @@ fun EncryptionResultScreen(state: EncryptUiState, onDismiss: () -> Unit) {
     // the Sign result. textEncryptedWithPassword is the honest per-operation
     // signal: set only by the text password path, cleared by every other one.
     val passwordMode = state.textEncryptedWithPassword
-    val signed = signOnly || (state.signMessage && state.signingKey != null)
+    val signed = signOnly || (state.signMessage && state.signingKey != null && !state.sentUnsignedPqc)
     val output = state.outputText
     val detached = signOnly && state.detachedSignature
     val activity = context.findResultMainActivity()
@@ -127,6 +127,35 @@ fun EncryptionResultScreen(state: EncryptUiState, onDismiss: () -> Unit) {
                         label = stringResource(R.string.result_encrypt_badge_signed),
                         tint = Color(0xFF22C55E)
                     )
+                }
+            }
+
+            // 4.6.0 (item 14): a composite ML-DSA signature was dropped
+            // because a recipient's key is v4; say so instead of implying the
+            // message is signed.
+            if (state.sentUnsignedPqc) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Filled.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            stringResource(R.string.result_encrypt_unsigned_pqc_note),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
                 }
             }
 

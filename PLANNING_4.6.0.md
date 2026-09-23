@@ -374,6 +374,15 @@ with Kleopatra should import it and encrypt both ways. Every post-quantum picker
 "Limited app support" line (not "experimental": the keys are complete, other apps are the limit), and a
 note under the caption says so.
 
+Release gate (added Sep 23 2026, tester follow-up): the same tester reports the GnuPG Kyber + Brainpool
+keys are the only hybrid keys that work cleanly between PGPony and Kleopatra today, and asked that both
+Brainpool pairings be tested against Kleopatra before 4.6.0 ships. Before tagging 4.6.0, in the Windows
+VMware VM with a current Gpg4win (GnuPG 2.5): generate ky768_bp256 and ky1024_bp384 in Kleopatra, import
+into PGPony, encrypt and decrypt both directions; then the reverse with PGPony-generated keys imported into
+Kleopatra. Also from the same report, for context only: ky1024_cv448 (ML-KEM-1024 + X448) exists in GnuPG
+but Kleopatra does not offer it in its UI yet, and keys generated in GPGFrontend do not work correctly in
+Kleopatra, so neither is a PGPony regression to chase.
+
 ## 14. Composite ML-DSA signature framing when encrypting to a v4-only recipient
 
 Priority: low-medium (interop correctness). Origin: NorseHorse, Sep 2026, during the 4.5.3 composite work.
@@ -386,6 +395,22 @@ open. Options: force SEIPDv2 whenever composite-signing (clean framing, but a v4
 read the message at all), or accept the nesting and document it. Given the direction toward LibrePGP
 classical-signing keys, where signatures stay classical, this may end up low priority. Decide placement and
 approach; not yet scheduled.
+
+Tested in 4.6.0 against gpg 2.4.4 and rnp 0.17 (Thunderbird's library): gpg prints the text but warns
+"unknown version 6" and exits 2; rnp refuses the message outright ("no signatures", no plaintext). The
+classical-signed control decrypts cleanly in both.
+
+Decision: ask each time. PGPony itself reads that shape, signature included (decrypts, finds the composite
+signer, verifies), so dropping the signature outright would cost PGPony-to-PGPony users for no reason. Status:
+done in code, awaiting on-device check. When a composite ML-DSA signer encrypts text or a file to any v4
+recipient (the SEIPDv1 case), the Encrypt screen shows a prompt: PGPony reads the signature, GnuPG shows the
+message with an error, Thunderbird cannot open it. Buttons: Sign anyway, Send unsigned, Cancel. Send unsigned
+leaves the composite one-pass and signature packets out (still encrypted to everyone); the result sheet then
+drops the Signed badge and shows a note. All-v6 and composite recipient sets never prompt and stay signed. The
+OpenPGP provider path (sign+encrypt from a mail app) keeps the signature, since the calling app asked for one
+and has no prompt. Re-checked with Send unsigned: gpg and rnp decrypt the v4 case with exit 0.
+CompositeSignV4RecipientTest covers: v4 signed by default and verified in PGPony, Send unsigned for v4 and for
+mixed v6 + v4, and all-v6 staying signed. Strings in all 8 locales.
 
 
 ## 15. Composite signatures not verified through the share-target Quick Action
@@ -776,6 +801,11 @@ too ("Invalid packet"), because the primary is a v6 key; the subkey type does no
 email summit, Thunderbird is working toward v4 PQC, not v6. For Thunderbird today the working path is a separate
 v4 key, or an mlkem-768v4 key once Thunderbird ships v4 PQC. Decision: shipped, with a one-line note in the add-subkey
 sheet on composite keys that Thunderbird and GnuPG cannot read v6 keys yet.
+
+## 22. Considered, not taken: app icon redesign
+
+A tester sent a redesigned icon with "PGP" lettered under the lock. Not adopting: the current icon is
+the one users already recognize across iOS, Android and desktop. Recorded so it is not re-raised as new.
 
 ## Delivery note
 

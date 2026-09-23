@@ -402,6 +402,11 @@ pgpony.app</string>
     <string name="result_encrypt_header_signed">Nachricht signiert</string>
     <string name="result_encrypt_header_encrypted">Nachricht verschlüsselt</string>
     <string name="result_encrypt_badge_signed">Signiert</string>
+    <string name="result_encrypt_unsigned_pqc_note">Unsigniert gesendet: Du hast die Post-Quanten-Signatur weggelassen, weil ein Empfänger einen älteren v4-Schlüssel hat. Die Nachricht ist trotzdem für alle verschlüsselt.</string>
+    <string name="pqc_v4_sign_title">Manche Empfänger können diese Signatur eventuell nicht lesen</string>
+    <string name="pqc_v4_sign_message">Dein Signaturschlüssel ist ein Post-Quanten-Schlüssel (ML-DSA), und mindestens ein Empfänger hat einen älteren v4-Schlüssel. PGPony liest die Signatur, aber GnuPG zeigt die Nachricht mit einem Fehler an und Thunderbird kann sie gar nicht öffnen.</string>
+    <string name="pqc_v4_sign_anyway">Trotzdem signieren</string>
+    <string name="pqc_v4_send_unsigned">Unsigniert senden</string>
     <string name="result_encrypt_output_signed">Signierte Ausgabe</string>
     <string name="result_encrypt_output_encrypted">Verschlüsselte Ausgabe</string>
     <string name="result_encrypt_can_decrypt_label">Kann entschlüsseln</string>
