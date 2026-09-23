@@ -151,7 +151,8 @@ fun KeygenAlgorithmPicker(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        // 4.6.0 (item 13): set expectations for every post-quantum choice.
+        // 4.6.0 (item 13): set expectations for every post-quantum choice: the
+        // keys are complete, other apps are the limit.
         if (selected.isPostQuantum) {
             Spacer(Modifier.height(4.dp))
             Text(
@@ -163,7 +164,7 @@ fun KeygenAlgorithmPicker(
     }
 }
 
-/** 4.6.0 (item 13): the chip text, with an "Experimental" line on post-quantum keys. */
+/** 4.6.0 (item 13): the chip text, with a "Limited app support" line on post-quantum keys. */
 @Composable
 private fun AlgorithmChipLabel(algo: KeyAlgorithm) {
     if (!algo.isPostQuantum) {

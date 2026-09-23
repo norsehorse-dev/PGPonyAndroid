@@ -1989,8 +1989,8 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="key_detail_unpublished_changes_body">Dieser Schlüssel wurde seit dem letzten Hochladen geändert. Die Schlüsselserver haben noch die alte Kopie.</string>
     <string name="key_detail_unpublished_changes_action">Aktualisieren</string>
     <string name="revocation_result_publish_button">Widerruf auf Schlüsselservern veröffentlichen</string>
-    <string name="keyring_generate_algorithm_experimental">Experimentell</string>
-    <string name="keyring_generate_algorithm_experimental_note">Post-Quanten-OpenPGP wird noch standardisiert. Zwei Formate, die nicht miteinander funktionieren, sind im Umlauf, und viele Apps können diese Schlüssel noch nicht lesen.</string>
+    <string name="keyring_generate_algorithm_experimental">Eingeschränkte App-Unterstützung</string>
+    <string name="keyring_generate_algorithm_experimental_note">Diese Schlüssel funktionieren in PGPony vollständig. Viele andere Apps können Post-Quanten-Schlüssel noch nicht lesen, und zwei Post-Quanten-Formate sind im Umlauf, die nicht miteinander funktionieren.</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign_87">Die Stufe mit maximaler Sicherheit: eine ML-DSA-87-Signaturidentität mit einem ML-KEM-1024-Verschlüsselungsunterschlüssel auf einem v6-Schlüssel (RFC 9980). Die Schlüssel sind größer und langsamer als ML-DSA-65 mit ML-KEM-768, das die empfohlene Wahl bleibt. Nur aktuelle OpenPGP-Software kann ihn nutzen.</string>
     <string name="key_detail_label_add">Label hinzufügen</string>
     <string name="keyring_same_identity_body">Vergleiche die Fingerabdrücke, bevor du an einen davon verschlüsselst oder ihm vertraust.</string>
@@ -2018,4 +2018,5 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="import_url_error_http_format">Der Server antwortete mit HTTP %1$d.</string>
     <string name="import_url_error_failed_format">Link konnte nicht abgerufen werden: %1$s</string>
     <string name="import_preview_source_url_format">Von Link: %1$s</string>
+    <string name="key_detail_add_subkey_v6_note">Thunderbird und GnuPG können v6-Schlüssel noch nicht lesen, daher funktioniert ein hier hinzugefügter Unterschlüssel dort nicht.</string>
 </resources>

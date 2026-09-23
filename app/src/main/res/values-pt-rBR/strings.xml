@@ -1989,8 +1989,8 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="key_detail_unpublished_changes_body">Esta chave mudou desde o último envio. Os servidores de chaves ainda têm a cópia antiga.</string>
     <string name="key_detail_unpublished_changes_action">Atualizar</string>
     <string name="revocation_result_publish_button">Publicar revogação nos servidores de chaves</string>
-    <string name="keyring_generate_algorithm_experimental">Experimental</string>
-    <string name="keyring_generate_algorithm_experimental_note">O OpenPGP pós-quântico ainda está sendo padronizado. Dois formatos que não funcionam entre si estão em uso, e muitos apps ainda não leem essas chaves.</string>
+    <string name="keyring_generate_algorithm_experimental">Suporte limitado em apps</string>
+    <string name="keyring_generate_algorithm_experimental_note">Estas chaves funcionam por completo no PGPony. Muitos outros apps ainda não leem chaves pós-quânticas, e dois formatos pós-quânticos que não funcionam entre si estão em uso.</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign_87">O nível de segurança máxima: uma identidade de assinatura ML-DSA-87 com uma subchave de criptografia ML-KEM-1024 em uma chave v6 (RFC 9980). As chaves são maiores e mais lentas que ML-DSA-65 com ML-KEM-768, que continua sendo a escolha recomendada. Só softwares OpenPGP atualizados conseguem usá-la.</string>
     <string name="key_detail_label_add">Adicionar rótulo</string>
     <string name="keyring_same_identity_body">Compare as impressões digitais antes de criptografar para uma delas ou confiar nela.</string>
@@ -2018,4 +2018,5 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="import_url_error_http_format">O servidor respondeu com HTTP %1$d.</string>
     <string name="import_url_error_failed_format">Não foi possível buscar o link: %1$s</string>
     <string name="import_preview_source_url_format">Do link: %1$s</string>
+    <string name="key_detail_add_subkey_v6_note">O Thunderbird e o GnuPG ainda não leem chaves v6, então uma subchave adicionada aqui não funcionará neles.</string>
 </resources>

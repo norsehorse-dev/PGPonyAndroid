@@ -2064,8 +2064,8 @@
     <string name="key_detail_unpublished_changes_body">마지막 업로드 이후 이 키가 변경되었습니다. 키 서버에는 아직 이전 사본이 있습니다.</string>
     <string name="key_detail_unpublished_changes_action">업데이트</string>
     <string name="revocation_result_publish_button">키 서버에 폐기 게시</string>
-    <string name="keyring_generate_algorithm_experimental">실험적</string>
-    <string name="keyring_generate_algorithm_experimental_note">양자 내성 OpenPGP는 아직 표준화 중입니다. 서로 호환되지 않는 두 형식이 쓰이고 있으며, 많은 앱이 아직 이 키를 읽지 못합니다.</string>
+    <string name="keyring_generate_algorithm_experimental">지원 앱 제한적</string>
+    <string name="keyring_generate_algorithm_experimental_note">이 키는 PGPony에서 완전히 작동합니다. 많은 다른 앱은 아직 양자 내성 키를 읽지 못하며, 서로 호환되지 않는 두 가지 양자 내성 형식이 쓰이고 있습니다.</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign_87">최고 보안 등급: v6 키(RFC 9980)의 ML-DSA-87 서명 ID와 ML-KEM-1024 암호화 하위 키입니다. 권장 선택인 ML-DSA-65 + ML-KEM-768보다 키가 크고 느립니다. 최신 OpenPGP 소프트웨어에서만 사용할 수 있습니다.</string>
     <string name="key_detail_label_add">라벨 추가</string>
     <string name="keyring_same_identity_body">이 중 하나로 암호화하거나 신뢰하기 전에 지문을 비교하세요.</string>
@@ -2090,4 +2090,5 @@
     <string name="import_url_error_http_format">서버 응답: HTTP %1$d</string>
     <string name="import_url_error_failed_format">링크를 가져오지 못했습니다: %1$s</string>
     <string name="import_preview_source_url_format">링크: %1$s</string>
+    <string name="key_detail_add_subkey_v6_note">Thunderbird와 GnuPG는 아직 v6 키를 읽지 못하므로 여기서 추가한 하위 키는 거기서 작동하지 않습니다.</string>
 </resources>

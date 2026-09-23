@@ -1989,8 +1989,8 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="key_detail_unpublished_changes_body">Cette clé a changé depuis le dernier envoi. Les serveurs de clés ont encore l\'ancienne copie.</string>
     <string name="key_detail_unpublished_changes_action">Mettre à jour</string>
     <string name="revocation_result_publish_button">Publier la révocation sur les serveurs de clés</string>
-    <string name="keyring_generate_algorithm_experimental">Expérimental</string>
-    <string name="keyring_generate_algorithm_experimental_note">L\'OpenPGP post-quantique est encore en cours de normalisation. Deux formats incompatibles entre eux sont utilisés, et beaucoup d\'applications ne savent pas encore lire ces clés.</string>
+    <string name="keyring_generate_algorithm_experimental">Prise en charge limitée</string>
+    <string name="keyring_generate_algorithm_experimental_note">Ces clés fonctionnent pleinement dans PGPony. Beaucoup d\'autres applications ne lisent pas encore les clés post-quantiques, et deux formats post-quantiques incompatibles entre eux sont utilisés.</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign_87">Le niveau de sécurité maximal : une identité de signature ML-DSA-87 avec une sous-clé de chiffrement ML-KEM-1024 sur une clé v6 (RFC 9980). Les clés sont plus grandes et plus lentes que ML-DSA-65 avec ML-KEM-768, qui reste le choix recommandé. Seuls les logiciels OpenPGP à jour peuvent l\'utiliser.</string>
     <string name="key_detail_label_add">Ajouter une étiquette</string>
     <string name="keyring_same_identity_body">Comparez les empreintes avant de chiffrer pour l\'une d\'elles ou de lui faire confiance.</string>
@@ -2018,4 +2018,5 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="import_url_error_http_format">Le serveur a répondu HTTP %1$d.</string>
     <string name="import_url_error_failed_format">Impossible de récupérer le lien : %1$s</string>
     <string name="import_preview_source_url_format">Depuis le lien : %1$s</string>
+    <string name="key_detail_add_subkey_v6_note">Thunderbird et GnuPG ne lisent pas encore les clés v6, une sous-clé ajoutée ici n\'y fonctionnera donc pas.</string>
 </resources>

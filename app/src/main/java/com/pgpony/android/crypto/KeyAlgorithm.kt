@@ -128,7 +128,7 @@ enum class KeyAlgorithm(
             this == MLKEM1024_BP384_LIBREPGP || this == MLKEM768_BP256_LIBREPGP
 
     /** 4.6.0 (item 13): any post-quantum key (ML-KEM encryption or ML-DSA
-     *  signing), labeled experimental in the keygen picker. */
+     *  signing), marked "Limited app support" in the keygen picker. */
     val isPostQuantum: Boolean
         get() = isComposite || isCompositeSign
 

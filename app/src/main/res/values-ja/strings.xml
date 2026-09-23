@@ -1988,8 +1988,8 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="key_detail_unpublished_changes_body">このキーは前回のアップロード後に変更されています。キーサーバーには古いコピーがあります。</string>
     <string name="key_detail_unpublished_changes_action">更新</string>
     <string name="revocation_result_publish_button">失効をキーサーバーに公開</string>
-    <string name="keyring_generate_algorithm_experimental">試験的</string>
-    <string name="keyring_generate_algorithm_experimental_note">耐量子 OpenPGP はまだ標準化の途中です。互いに互換性のない 2 つの形式が使われており、多くのアプリはまだこれらのキーを読めません。</string>
+    <string name="keyring_generate_algorithm_experimental">対応アプリが限定的</string>
+    <string name="keyring_generate_algorithm_experimental_note">これらのキーは PGPony では完全に動作します。多くの他のアプリはまだ耐量子キーを読めず、互いに互換性のない 2 つの耐量子形式が使われています。</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign_87">最高セキュリティの階層: v6 キー (RFC 9980) 上の ML-DSA-87 署名 ID と ML-KEM-1024 暗号化サブキー。推奨の ML-DSA-65 + ML-KEM-768 より大きく低速です。最新の OpenPGP ソフトウェアでのみ使えます。</string>
     <string name="key_detail_label_add">ラベルを追加</string>
     <string name="keyring_same_identity_body">どれかに暗号化したり信頼したりする前に、フィンガープリントを比べてください。</string>
@@ -2014,4 +2014,5 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="import_url_error_http_format">サーバーの応答は HTTP %1$d でした。</string>
     <string name="import_url_error_failed_format">リンクを取得できませんでした: %1$s</string>
     <string name="import_preview_source_url_format">リンクから: %1$s</string>
+    <string name="key_detail_add_subkey_v6_note">Thunderbird と GnuPG はまだ v6 キーを読めないため、ここで追加したサブキーはそれらでは使えません。</string>
 </resources>

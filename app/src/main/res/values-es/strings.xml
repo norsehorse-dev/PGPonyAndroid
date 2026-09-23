@@ -1989,8 +1989,8 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="key_detail_unpublished_changes_body">Esta clave cambió desde la última subida. Los servidores de claves aún tienen la copia anterior.</string>
     <string name="key_detail_unpublished_changes_action">Actualizar</string>
     <string name="revocation_result_publish_button">Publicar revocación en servidores de claves</string>
-    <string name="keyring_generate_algorithm_experimental">Experimental</string>
-    <string name="keyring_generate_algorithm_experimental_note">OpenPGP poscuántico aún se está estandarizando. Hay dos formatos en uso que no funcionan entre sí, y muchas apps todavía no pueden leer estas claves.</string>
+    <string name="keyring_generate_algorithm_experimental">Compatibilidad limitada</string>
+    <string name="keyring_generate_algorithm_experimental_note">Estas claves funcionan por completo en PGPony. Muchas otras apps aún no leen claves poscuánticas, y hay dos formatos poscuánticos en uso que no funcionan entre sí.</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign_87">El nivel de máxima seguridad: una identidad de firma ML-DSA-87 con una subclave de cifrado ML-KEM-1024 en una clave v6 (RFC 9980). Las claves son más grandes y lentas que ML-DSA-65 con ML-KEM-768, que sigue siendo la opción recomendada. Solo el software OpenPGP actualizado puede usarla.</string>
     <string name="key_detail_label_add">Añadir etiqueta</string>
     <string name="keyring_same_identity_body">Compara las huellas antes de cifrar para una de ellas o confiar en ella.</string>
@@ -2018,4 +2018,5 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="import_url_error_http_format">El servidor respondió con HTTP %1$d.</string>
     <string name="import_url_error_failed_format">No se pudo obtener el enlace: %1$s</string>
     <string name="import_preview_source_url_format">Desde enlace: %1$s</string>
+    <string name="key_detail_add_subkey_v6_note">Thunderbird y GnuPG aún no leen claves v6, así que una subclave añadida aquí no funcionará allí.</string>
 </resources>

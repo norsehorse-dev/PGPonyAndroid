@@ -265,6 +265,15 @@ private fun AddSubkeyTypeChips(
                 )
             }
         }
+        // 4.6.0 (item 21): a classical subkey here still sits on a v6 key,
+        // which Thunderbird and GnuPG cannot read yet.
+        if (isCompositeSign) {
+            Text(
+                text = stringResource(R.string.key_detail_add_subkey_v6_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.tertiary
+            )
+        }
         Text(
             text = stringResource(R.string.key_detail_add_subkey_group_pq),
             style = MaterialTheme.typography.labelSmall,

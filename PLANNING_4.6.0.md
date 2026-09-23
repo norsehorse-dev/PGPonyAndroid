@@ -361,8 +361,9 @@ composite support). Not proposing to drop them, just to label the whole PQC set 
 Status: done in code, awaiting on-device check. ML-KEM-768 + brainpoolP256r1 (LibrePGP, gpg ky768_bp256)
 generates from the Advanced group: v4 Ed25519 primary plus a v5 algo-8 subkey, SHA3-256 in the ECC KEM KDF,
 round-trips in PGPony. Not yet checked against gpg 2.5 / Kleopatra (no gpg 2.5 available here); a tester
-with Kleopatra should import it and encrypt both ways. Every post-quantum picker entry now shows an
-"Experimental" line, and a note under the caption explains why.
+with Kleopatra should import it and encrypt both ways. Every post-quantum picker entry now shows a
+"Limited app support" line (not "experimental": the keys are complete, other apps are the limit), and a
+note under the caption says so.
 
 ## 14. Composite ML-DSA signature framing when encrypting to a v4-only recipient
 
@@ -761,8 +762,8 @@ fixes decryption to an X25519 subkey added to a composite key; that never worked
 0.17 (Thunderbird's library) rejects the certificate outright ("wrong key packet version") and GnuPG 2.4 does
 too ("Invalid packet"), because the primary is a v6 key; the subkey type does not matter. Per the 2026 OpenPGP
 email summit, Thunderbird is working toward v4 PQC, not v6. For Thunderbird today the working path is a separate
-v4 key, or an mlkem-768v4 key once Thunderbird ships v4 PQC. Decision pending: ship the RSA option (useful with
-v6-capable clients) with a note in the add-subkey sheet, or hold it.
+v4 key, or an mlkem-768v4 key once Thunderbird ships v4 PQC. Decision: shipped, with a one-line note in the add-subkey
+sheet on composite keys that Thunderbird and GnuPG cannot read v6 keys yet.
 
 ## Delivery note
 
