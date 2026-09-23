@@ -104,7 +104,7 @@ class RevocationService private constructor() {
         /** Map our enum to BC's RFC-4880 numeric code. BC's
          *  RevocationReasonTags constants happen to match RFC §5.2.3.23 so
          *  this is a direct conversion. */
-        private fun reasonToTag(reason: RevocationReason): Byte = when (reason) {
+        internal fun reasonToTag(reason: RevocationReason): Byte = when (reason) {
             RevocationReason.NO_REASON       -> RevocationReasonTags.NO_REASON
             RevocationReason.SUPERSEDED      -> RevocationReasonTags.KEY_SUPERSEDED
             RevocationReason.COMPROMISED     -> RevocationReasonTags.KEY_COMPROMISED

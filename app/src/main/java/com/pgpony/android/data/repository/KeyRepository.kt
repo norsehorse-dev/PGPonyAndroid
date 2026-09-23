@@ -1818,12 +1818,33 @@ class KeyRepository(
 
         val secRing = loadSecretKeyRing(fingerprint)
             ?: throw KeyRepoError.InvalidSubkey("Secret key ring could not be loaded for $fingerprint")
+
+        // 4.6.0 (item 19 follow-up): a v4 ML-KEM subkey is not in the Bouncy
+        // Castle ring; revoke it on the stored octets.
+        val v4Body = store.loadPublicKey(fingerprint)
+            ?.let { com.pgpony.android.crypto.pqc.V4Algo35Edit.find(it, targetHex) }
+        if (v4Body != null) {
+            if (!allowLastEncryptionSubkey && isLastEncryptionSubkeyStored(fingerprint, targetHex) == true) {
+                throw KeyRepoError.LastEncryptionSubkey(targetHex)
+            }
+            val priv = unlockPrimary(secRing, passphrase) { missing ->
+                if (missing) RevocationError.PassphraseRequired() else RevocationError.InvalidPassphrase()
+            }
+            val sig = com.pgpony.android.crypto.pqc.V4Algo35Edit.revocation(secRing, priv, v4Body, reason, comment)
+            applyV4Algo35Edits(fingerprint) {
+                com.pgpony.android.crypto.pqc.V4Algo35Edit.edit(it, v4Body, addSignature = sig)
+            }
+            return
+        }
+
         val pubRing = loadPublicKeyRing(fingerprint)
             ?: throw KeyRepoError.InvalidSubkey("Public key ring could not be loaded for $fingerprint")
         val target = secRing.publicKeys.asSequence()
             .firstOrNull { !it.isMasterKey && subkeyFpHex(it) == targetHex }
             ?: throw KeyRepoError.InvalidSubkey("Subkey $targetHex not found on this key")
-        if (!allowLastEncryptionSubkey && isLastEncryptionSubkey(pubRing, target.keyID)) {
+        val lastRevoke = isLastEncryptionSubkeyStored(fingerprint, targetHex)
+            ?: isLastEncryptionSubkey(pubRing, target.keyID)
+        if (!allowLastEncryptionSubkey && lastRevoke) {
             throw KeyRepoError.LastEncryptionSubkey(targetHex)
         }
 
@@ -1875,12 +1896,35 @@ class KeyRepository(
             return
         }
 
+        // 4.6.0 (item 19 follow-up): a v4 ML-KEM subkey is not in the Bouncy
+        // Castle ring; remove it from the stored octets.
+        val v4Body = store.loadPublicKey(fingerprint)
+            ?.let { com.pgpony.android.crypto.pqc.V4Algo35Edit.find(it, targetHex) }
+        if (v4Body != null) {
+            if (!allowLastEncryptionSubkey && isLastEncryptionSubkeyStored(fingerprint, targetHex) == true) {
+                throw KeyRepoError.LastEncryptionSubkey(targetHex)
+            }
+            applyV4Algo35Edits(fingerprint) {
+                com.pgpony.android.crypto.pqc.V4Algo35Edit.edit(it, v4Body, remove = true)
+            }
+            // The last ML-KEM subkey gone: the key is an ordinary v4 key again.
+            val left = store.loadPublicKey(fingerprint)
+            if (left != null && com.pgpony.android.crypto.pqc.V4Algo35Edit.publicBodies(left).isEmpty()) {
+                runCatching { crypto.importKeyData(left).algorithm }.getOrNull()?.let { algo ->
+                    dao.getByFingerprint(fingerprint)?.let { dao.update(it.copy(algorithm = algo)) }
+                }
+            }
+            return
+        }
+
         val secRing = loadSecretKeyRing(fingerprint)
             ?: throw KeyRepoError.InvalidSubkey("Secret key ring could not be loaded for $fingerprint")
         val target = secRing.publicKeys.asSequence()
             .firstOrNull { !it.isMasterKey && subkeyFpHex(it) == targetHex }
             ?: throw KeyRepoError.InvalidSubkey("Subkey $targetHex not found on this key")
-        if (!allowLastEncryptionSubkey && isLastEncryptionSubkey(secRing.let { PGPPublicKeyRing(it.publicKeys.asSequence().toList()) }, target.keyID)) {
+        val lastRemove = isLastEncryptionSubkeyStored(fingerprint, targetHex)
+            ?: isLastEncryptionSubkey(secRing.let { PGPPublicKeyRing(it.publicKeys.asSequence().toList()) }, target.keyID)
+        if (!allowLastEncryptionSubkey && lastRemove) {
             throw KeyRepoError.LastEncryptionSubkey(targetHex)
         }
 
@@ -1953,7 +1997,87 @@ class KeyRepository(
             expiresAtEpochSeconds = expiresAtEpochSeconds,
             passphrase = passphrase
         )
+        // 4.6.0 (item 19 follow-up): the ML-KEM bindings Bouncy Castle cannot
+        // see are made first, so a failure leaves the stored key untouched.
+        val v4Bindings = v4Algo35Bindings(fingerprint, secRing, passphrase, expiresAtEpochSeconds)
         persistExpiration(entity, updated.publicRing, updated.secretRing, expiresAtEpochSeconds)
+        if (v4Bindings.isNotEmpty()) {
+            applyV4Algo35Edits(fingerprint) { raw ->
+                v4Bindings.fold(raw) { acc, (body, sig) ->
+                    com.pgpony.android.crypto.pqc.V4Algo35Edit.edit(acc, body, replaceBinding = sig)
+                }
+            }
+        }
+    }
+
+    /** 4.6.0 (item 19 follow-up): the primary's private key for a hand-built
+     *  v4 ML-KEM signature, or the same passphrase errors the caller's flow uses. */
+    private fun unlockPrimary(
+        secRing: PGPSecretKeyRing,
+        passphrase: String?,
+        onFailure: (Boolean) -> Exception
+    ): org.bouncycastle.openpgp.PGPPrivateKey = try {
+        secRing.secretKey.extractPrivateKey(
+            org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyDecryptorBuilder(
+                org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider()
+            ).build((passphrase ?: "").toCharArray())
+        )
+    } catch (e: org.bouncycastle.openpgp.PGPException) {
+        throw onFailure(passphrase.isNullOrEmpty())
+    }
+
+    /** New 0x18 bindings, carrying [expiresAtEpochSeconds], for every v4 ML-KEM
+     *  subkey stored for [fingerprint], paired with that subkey's public body. */
+    private fun v4Algo35Bindings(
+        fingerprint: String,
+        secRing: PGPSecretKeyRing,
+        passphrase: String?,
+        expiresAtEpochSeconds: Long?
+    ): List<Pair<ByteArray, ByteArray>> {
+        val raw = store.loadPublicKey(fingerprint) ?: return emptyList()
+        val bodies = com.pgpony.android.crypto.pqc.V4Algo35Edit.publicBodies(raw)
+        if (bodies.isEmpty()) return emptyList()
+        val priv = unlockPrimary(secRing, passphrase) { missing ->
+            if (missing) KeyExpirationService.ExpirationError.PassphraseRequired()
+            else KeyExpirationService.ExpirationError.InvalidPassphrase()
+        }
+        return bodies.map { body ->
+            val sig = try {
+                com.pgpony.android.crypto.pqc.V4Algo35Edit.binding(secRing, priv, body, expiresAtEpochSeconds)
+            } catch (e: IllegalArgumentException) {
+                throw KeyExpirationService.ExpirationError.UnsupportedKey(e.message ?: "Invalid expiration date")
+            }
+            body to sig
+        }
+    }
+
+    /** Apply [transform] to the stored public and secret octets of [fingerprint]
+     *  and refresh the entity's armored public key. */
+    private suspend fun applyV4Algo35Edits(fingerprint: String, transform: (ByteArray) -> ByteArray) {
+        store.loadPublicKey(fingerprint)?.let { store.storePublicKey(fingerprint, transform(it)) }
+        store.loadPrivateKey(fingerprint)?.let { store.storePrivateKey(fingerprint, transform(it)) }
+        dao.getByFingerprint(fingerprint)?.let { e ->
+            dao.update(e.copy(armoredPublicKey = armoredAsStored(fingerprint, e.armoredPublicKey)))
+        }
+    }
+
+    /** 4.6.0 (item 19 follow-up): would taking [targetHex] out leave the key
+     *  with no usable encryption subkey? Read from the stored certificate, so
+     *  v4 ML-KEM subkeys count. Null (use the Bouncy Castle check) for keys
+     *  without a v4 ML-KEM subkey, or when the certificate cannot be evaluated. */
+    private val ENCRYPTION_ALGORITHMS = setOf(1, 2, 8, 16, 18, 25, 26, 35, 36)
+
+    private fun isLastEncryptionSubkeyStored(fingerprint: String, targetHex: String): Boolean? {
+        val raw = store.loadPublicKey(fingerprint) ?: return null
+        if (com.pgpony.android.crypto.pqc.V4Algo35Edit.publicBodies(raw).isEmpty()) return null
+        val report = com.pgpony.android.crypto.CertificateBindings.analyze(raw) ?: return null
+        if (!report.supported) return null
+        val now = System.currentTimeMillis()
+        val usable = report.subkeys.filter { s ->
+            s.bound && !s.revoked && (s.expiresAtMs == null || now < s.expiresAtMs) &&
+                (s.keyFlags?.let { (it and 0x0C) != 0 } ?: (s.algorithm in ENCRYPTION_ALGORITHMS))
+        }.map { it.fingerprintHex.uppercase() }
+        return usable.isNotEmpty() && usable.all { it == targetHex }
     }
 
     /**

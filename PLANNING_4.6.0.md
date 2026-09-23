@@ -672,8 +672,9 @@ algo 8) subkey from its certificate, with capabilities from the verified binding
 loads an mlkem-768v4 key WITHOUT its ML-KEM subkey, so every BC-based edit (add subkey, User ID changes,
 expiry, revoke, passphrase change) stored a ring with the ML-KEM subkey and its secret gone, and a second
 ML-KEM add replaced the first. V4Algo35Carry now carries them through every such edit (re-protected on a
-passphrase change); the decryptor and export handle more than one ML-KEM subkey. Follow-ups: expiry edits do
-not re-sign the ML-KEM binding; revoke/remove of the ML-KEM row on a v4 key reports "not found".
+passphrase change); the decryptor and export handle more than one ML-KEM subkey. Follow-ups closed:
+expiry edits re-sign the ML-KEM binding, and revoke/remove work on the ML-KEM row (V4Algo35Edit). The
+last-encryption-subkey warning counts ML-KEM subkeys on these keys.
 
 ## 20. Show how many keys exist under a User ID
 
