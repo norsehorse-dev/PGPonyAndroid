@@ -1989,4 +1989,33 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="key_detail_unpublished_changes_body">Cette clé a changé depuis le dernier envoi. Les serveurs de clés ont encore l\'ancienne copie.</string>
     <string name="key_detail_unpublished_changes_action">Mettre à jour</string>
     <string name="revocation_result_publish_button">Publier la révocation sur les serveurs de clés</string>
+    <string name="keyring_generate_algorithm_experimental">Expérimental</string>
+    <string name="keyring_generate_algorithm_experimental_note">L\'OpenPGP post-quantique est encore en cours de normalisation. Deux formats incompatibles entre eux sont utilisés, et beaucoup d\'applications ne savent pas encore lire ces clés.</string>
+    <string name="keyring_generate_algorithm_caption_pqc_sign_87">Le niveau de sécurité maximal : une identité de signature ML-DSA-87 avec une sous-clé de chiffrement ML-KEM-1024 sur une clé v6 (RFC 9980). Les clés sont plus grandes et plus lentes que ML-DSA-65 avec ML-KEM-768, qui reste le choix recommandé. Seuls les logiciels OpenPGP à jour peuvent l\'utiliser.</string>
+    <string name="key_detail_label_add">Ajouter une étiquette</string>
+    <string name="keyring_same_identity_body">Comparez les empreintes avant de chiffrer pour l\'une d\'elles ou de lui faire confiance.</string>
+    <string name="keyring_same_identity_created_format">créée le %1$s</string>
+    <plurals name="key_card_same_identity_count">
+        <item quantity="one">%1$d clé</item>
+        <item quantity="other">%1$d clés</item>
+    </plurals>
+    <plurals name="keyring_same_identity_title">
+        <item quantity="one">%1$d clé pour %2$s</item>
+        <item quantity="other">%1$d clés pour %2$s</item>
+    </plurals>
+    <plurals name="exchange_keyserver_found_count">
+        <item quantity="one">%1$d clé trouvée pour cette adresse.</item>
+        <item quantity="other">%1$d clés trouvées pour cette adresse. Comparez les empreintes après l\'import.</item>
+    </plurals>
+    <string name="import_method_url">Lien</string>
+    <string name="import_url_label">Lien vers une clé publique</string>
+    <string name="import_url_fetch_button">Récupérer la clé</string>
+    <string name="import_url_help">Un fichier .asc brut ou une page qui affiche une clé conviennent. La clé est récupérée via votre réglage de proxy, et rien n\'est ajouté avant que vous vérifiiez l\'empreinte et touchiez Importer.</string>
+    <string name="import_url_error_https">Seuls les liens https peuvent être récupérés (ou http pour une adresse .onion).</string>
+    <string name="import_url_error_offline">Le mode hors ligne est activé, le lien n\'a donc pas été récupéré.</string>
+    <string name="import_url_error_no_key">Aucune clé publique trouvée à ce lien.</string>
+    <string name="import_url_error_redirects">Ce lien a été redirigé trop de fois.</string>
+    <string name="import_url_error_http_format">Le serveur a répondu HTTP %1$d.</string>
+    <string name="import_url_error_failed_format">Impossible de récupérer le lien : %1$s</string>
+    <string name="import_preview_source_url_format">Depuis le lien : %1$s</string>
 </resources>

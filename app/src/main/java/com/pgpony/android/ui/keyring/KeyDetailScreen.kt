@@ -1471,7 +1471,16 @@ private fun LoadedBody(
         contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item { KeyHeaderSection(key = key, onCopyEmail = onCopyEmail, onAvatarClick = { if (key.isKeyPair) onDecryptWithKey(key.fingerprint) else onEncryptToKey(key.fingerprint) }) }
+        item {
+            KeyHeaderSection(
+                key = key,
+                onCopyEmail = onCopyEmail,
+                onAvatarClick = { if (key.isKeyPair) onDecryptWithKey(key.fingerprint) else onEncryptToKey(key.fingerprint) },
+                onEditLabel = {
+                    onComingSoon(if (key.notes.isNullOrBlank()) KeyDetailActionIds.ADD_NOTES else KeyDetailActionIds.EDIT_NOTES)
+                }
+            )
+        }
         // Phase A6 — Revoked banner directly under the header so it's
         // the first thing the user sees on a revoked key without having
         // to scroll to Danger Zone. RevokedBanner internally no-ops when

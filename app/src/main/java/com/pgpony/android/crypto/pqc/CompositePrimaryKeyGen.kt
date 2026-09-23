@@ -71,7 +71,15 @@ object CompositePrimaryKeyGen {
     private const val SIGTYPE_SUBKEY_REVOCATION = 0x28
 
     /** The composite primary's encryption subkey: IETF ML-KEM-768 + X25519 (algo 35). */
-    private val KEM_SUITE = CompositeSuite.IETF_768
+    /**
+     * 4.6.0 (item 3): the bundled encryption subkey matches the signing tier:
+     * ML-DSA-65 + Ed25519 ships ML-KEM-768 + X25519, ML-DSA-87 + Ed448 ships
+     * ML-KEM-1024 + X448.
+     */
+    fun kemSuiteFor(suite: CompositeSignSuite): CompositeSuite = when (suite) {
+        CompositeSignSuite.MLDSA87_ED448 -> CompositeSuite.IETF_1024
+        else -> CompositeSuite.IETF_768
+    }
 
     private const val HASH_SHA256 = 8
     private const val SALT_SHA256 = 16
@@ -168,25 +176,34 @@ object CompositePrimaryKeyGen {
             suite, compositeSecret, SIGTYPE_POSITIVE_CERT, certData, certHashed, random
         )
 
-        // 5. ML-KEM-768 + X25519 encryption subkey (algo 35), bound to the
-        //    composite primary with a composite 0x18 binding (no back-signature,
-        //    an encryption subkey does not make one).
-        val xkp = X25519KeyPairGenerator()
-            .apply { init(X25519KeyGenerationParameters(random)) }.generateKeyPair()
-        val xPub = (xkp.public as X25519PublicKeyParameters).encoded
-        val xSec = (xkp.private as X25519PrivateKeyParameters).encoded
+        // 5. ML-KEM encryption subkey (algo 35 or 36, see kemSuiteFor), bound to
+        //    the composite primary with a composite 0x18 binding (no back-
+        //    signature, an encryption subkey does not make one).
+        val kemSuite = kemSuiteFor(suite)
+        val (xPub, xSec) = when (kemSuite.curve) {
+            EccCurve.X448 -> {
+                val kp = X448KeyPairGenerator()
+                    .apply { init(X448KeyGenerationParameters(random)) }.generateKeyPair()
+                (kp.public as X448PublicKeyParameters).encoded to (kp.private as X448PrivateKeyParameters).encoded
+            }
+            else -> {
+                val kp = X25519KeyPairGenerator()
+                    .apply { init(X25519KeyGenerationParameters(random)) }.generateKeyPair()
+                (kp.public as X25519PublicKeyParameters).encoded to (kp.private as X25519PrivateKeyParameters).encoded
+            }
+        }
         val mkp = MLKEMKeyPairGenerator()
-            .apply { init(MLKEMKeyGenerationParameters(random, KEM_SUITE.mlkem.params)) }
+            .apply { init(MLKEMKeyGenerationParameters(random, kemSuite.mlkem.params)) }
             .generateKeyPair()
         val mPub = (mkp.public as MLKEMPublicKeyParameters).encoded
         val mSeed = (mkp.private as MLKEMPrivateKeyParameters).seed
             ?: error("BC ML-KEM keypair missing seed")
 
-        val kemPubMat = xPub + mPub // 1216
+        val kemPubMat = xPub + mPub // 1216 (768) or 1624 (1024)
         val kemPubBody = ByteArrayOutputStream().apply {
             write(6)
             write(uint32(ctime))
-            write(KEM_SUITE.ietfAlgId) // 35
+            write(kemSuite.ietfAlgId) // 35 or 36
             write(uint32(kemPubMat.size))
             write(kemPubMat)
         }.toByteArray()

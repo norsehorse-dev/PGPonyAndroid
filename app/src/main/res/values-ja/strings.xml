@@ -1988,4 +1988,30 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="key_detail_unpublished_changes_body">このキーは前回のアップロード後に変更されています。キーサーバーには古いコピーがあります。</string>
     <string name="key_detail_unpublished_changes_action">更新</string>
     <string name="revocation_result_publish_button">失効をキーサーバーに公開</string>
+    <string name="keyring_generate_algorithm_experimental">試験的</string>
+    <string name="keyring_generate_algorithm_experimental_note">耐量子 OpenPGP はまだ標準化の途中です。互いに互換性のない 2 つの形式が使われており、多くのアプリはまだこれらのキーを読めません。</string>
+    <string name="keyring_generate_algorithm_caption_pqc_sign_87">最高セキュリティの階層: v6 キー (RFC 9980) 上の ML-DSA-87 署名 ID と ML-KEM-1024 暗号化サブキー。推奨の ML-DSA-65 + ML-KEM-768 より大きく低速です。最新の OpenPGP ソフトウェアでのみ使えます。</string>
+    <string name="key_detail_label_add">ラベルを追加</string>
+    <string name="keyring_same_identity_body">どれかに暗号化したり信頼したりする前に、フィンガープリントを比べてください。</string>
+    <string name="keyring_same_identity_created_format">作成 %1$s</string>
+    <plurals name="key_card_same_identity_count">
+        <item quantity="other">%1$d 個のキー</item>
+    </plurals>
+    <plurals name="keyring_same_identity_title">
+        <item quantity="other">%2$s のキー %1$d 個</item>
+    </plurals>
+    <plurals name="exchange_keyserver_found_count">
+        <item quantity="other">このアドレスのキーが %1$d 個見つかりました。インポート後にフィンガープリントを比べてください。</item>
+    </plurals>
+    <string name="import_method_url">リンク</string>
+    <string name="import_url_label">公開鍵へのリンク</string>
+    <string name="import_url_fetch_button">キーを取得</string>
+    <string name="import_url_help">.asc ファイルでもキーを表示するページでも使えます。キーはプロキシ設定を通して取得され、フィンガープリントを確認して「インポート」をタップするまで何も追加されません。</string>
+    <string name="import_url_error_https">取得できるのは https のリンクだけです(.onion アドレスは http も可)。</string>
+    <string name="import_url_error_offline">オフラインモードがオンのため、リンクは取得されませんでした。</string>
+    <string name="import_url_error_no_key">そのリンクに公開鍵は見つかりませんでした。</string>
+    <string name="import_url_error_redirects">そのリンクはリダイレクトが多すぎます。</string>
+    <string name="import_url_error_http_format">サーバーの応答は HTTP %1$d でした。</string>
+    <string name="import_url_error_failed_format">リンクを取得できませんでした: %1$s</string>
+    <string name="import_preview_source_url_format">リンクから: %1$s</string>
 </resources>

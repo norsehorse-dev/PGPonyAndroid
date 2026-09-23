@@ -131,6 +131,10 @@ fun ImportKeyScreen(state: KeyringUiState, viewModel: KeyringViewModel) {
                     if (!com.pgpony.android.network.OfflineMode.enabled) {
                         KeyServerSection(state, viewModel)
                     }
+                ImportMethod.URL ->
+                    if (!com.pgpony.android.network.OfflineMode.enabled) {
+                        UrlSection(state, viewModel)
+                    }
             }
 
             // ── Error banner ──────────────────────────────────────────
@@ -154,7 +158,8 @@ fun ImportKeyScreen(state: KeyringUiState, viewModel: KeyringViewModel) {
                 ImportPreviewCard(
                     preview = preview,
                     lookupSource = state.importLookupSource,
-                    sourceFilename = state.importSourceFilename
+                    sourceFilename = state.importSourceFilename,
+                    sourceUrl = state.importSourceUrl
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -234,7 +239,7 @@ private fun ImportMethodPicker(
 ) {
     val methods = ImportMethod.entries.filterNot {
         // RC1 offline switch: no keyserver import method while offline.
-        it == ImportMethod.KEY_SERVER && com.pgpony.android.network.OfflineMode.enabled
+        (it == ImportMethod.KEY_SERVER || it == ImportMethod.URL) && com.pgpony.android.network.OfflineMode.enabled
     }
     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
         methods.forEachIndexed { index, method ->
@@ -259,6 +264,7 @@ private fun ImportMethodPicker(
                             ImportMethod.FILE -> stringResource(R.string.import_method_file)
                             ImportMethod.QR_CODE -> stringResource(R.string.import_method_qr_code)
                             ImportMethod.KEY_SERVER -> stringResource(R.string.import_method_key_server)
+                            ImportMethod.URL -> stringResource(R.string.import_method_url)
                         },
                         style = MaterialTheme.typography.labelMedium,
                         maxLines = 1,
@@ -275,6 +281,7 @@ private fun iconForMethod(method: ImportMethod) = when (method) {
     ImportMethod.FILE       -> Icons.Filled.FolderOpen
     ImportMethod.QR_CODE    -> Icons.Filled.QrCodeScanner
     ImportMethod.KEY_SERVER -> Icons.Filled.Public
+    ImportMethod.URL        -> Icons.Filled.Link
 }
 
 // ── Per-method sections ────────────────────────────────────────────────
@@ -525,13 +532,56 @@ private fun KeyServerSection(state: KeyringUiState, viewModel: KeyringViewModel)
     }
 }
 
+/** 4.6.0 (item 2): fetch a public key from a link, then check it below. */
+@Composable
+private fun UrlSection(state: KeyringUiState, viewModel: KeyringViewModel) {
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = state.importUrl,
+            onValueChange = { viewModel.updateImportUrl(it) },
+            label = { Text(stringResource(R.string.import_url_label)) },
+            placeholder = { Text("https://") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri
+            ),
+            leadingIcon = { Icon(Icons.Filled.Link, null, modifier = Modifier.size(18.dp)) },
+            trailingIcon = {
+                if (state.isFetchingUrl) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp).padding(end = 4.dp),
+                        strokeWidth = 2.dp
+                    )
+                }
+            }
+        )
+        Button(
+            onClick = { keyboard?.hide(); viewModel.fetchKeyFromUrl() },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !state.isFetchingUrl && !state.isPreviewing && state.importUrl.isNotBlank()
+        ) {
+            Icon(Icons.Filled.Download, null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.import_url_fetch_button))
+        }
+        Text(
+            stringResource(R.string.import_url_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 // ── Preview card ───────────────────────────────────────────────────────
 
 @Composable
 private fun ImportPreviewCard(
     preview: com.pgpony.android.data.repository.ImportPreview,
     lookupSource: KeyLookupSource?,
-    sourceFilename: String?
+    sourceFilename: String?,
+    sourceUrl: String? = null
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
@@ -618,6 +668,25 @@ private fun ImportPreviewCard(
             lookupSource?.let { src ->
                 HorizontalDivider()
                 LookupSourceBadge(src)
+            }
+            // 4.6.0 (item 2): the address the key came from, in full, so the
+            // user can check it is the page they meant.
+            sourceUrl?.let { url ->
+                HorizontalDivider()
+                Row(verticalAlignment = Alignment.Top) {
+                    Icon(
+                        Icons.Filled.Link,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.import_preview_source_url_format, url),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             sourceFilename?.let { name ->
                 HorizontalDivider()

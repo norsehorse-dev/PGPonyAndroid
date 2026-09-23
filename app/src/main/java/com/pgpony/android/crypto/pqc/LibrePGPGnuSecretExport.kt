@@ -58,6 +58,9 @@ object LibrePGPGnuSecretExport {
     private fun curveName(curve: EccCurve): String = when (curve) {
         EccCurve.X448 -> "X448"
         EccCurve.X25519 -> "Curve25519"
+        // 4.6.0 (item 13): libgcrypt's names; q is the uncompressed point.
+        EccCurve.BRAINPOOL_P256R1 -> "brainpoolP256r1"
+        EccCurve.BRAINPOOL_P384R1 -> "brainpoolP384r1"
         else -> throw IllegalArgumentException("no gpg curve name for $curve")
     }
 

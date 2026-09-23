@@ -595,6 +595,7 @@ object CompositeKeyGen {
     private fun brainpoolDomain(curve: EccCurve): ECDomainParameters {
         val name = when (curve) {
             EccCurve.BRAINPOOL_P384R1 -> "brainpoolP384r1"
+            EccCurve.BRAINPOOL_P256R1 -> "brainpoolP256r1"
             else -> throw IllegalArgumentException("no Weierstrass domain for $curve")
         }
         val x9 = TeleTrusTNamedCurves.getByName(name)

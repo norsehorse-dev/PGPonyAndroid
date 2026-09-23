@@ -135,7 +135,8 @@ enum class SubkeyCapability(val flag: Int, val displayName: String) {
                     if (isPrimary) Certify.flag else Encrypt.flag
                 KeyAlgorithm.MLKEM1024_X448_LIBREPGP ->
                     if (isPrimary) Certify.flag else Encrypt.flag
-                KeyAlgorithm.MLKEM1024_BP384_LIBREPGP ->
+                KeyAlgorithm.MLKEM1024_BP384_LIBREPGP,
+                KeyAlgorithm.MLKEM768_BP256_LIBREPGP ->
                     if (isPrimary) Certify.flag else Encrypt.flag
 
                 // issue #2: an ECDSA primary (gpg LibrePGP PQC keys) is a signing

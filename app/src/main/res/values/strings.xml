@@ -2086,4 +2086,33 @@
     <string name="key_detail_unpublished_changes_body">This key changed since it was last uploaded. Key servers still have the old copy.</string>
     <string name="key_detail_unpublished_changes_action">Update</string>
     <string name="revocation_result_publish_button">Publish revocation to key servers</string>
+    <string name="keyring_generate_algorithm_experimental">Experimental</string>
+    <string name="keyring_generate_algorithm_experimental_note">Post-quantum OpenPGP is still being standardized. Two formats that do not work with each other are in use, and many apps cannot read these keys yet.</string>
+    <string name="keyring_generate_algorithm_caption_pqc_sign_87">The maximum-security tier: an ML-DSA-87 signing identity with an ML-KEM-1024 encryption subkey on a v6 key (RFC 9980). The keys are larger and slower than ML-DSA-65 with ML-KEM-768, which stays the recommended choice. Only up-to-date OpenPGP software can use it.</string>
+    <string name="key_detail_label_add">Add a label</string>
+    <string name="keyring_same_identity_body">Compare fingerprints before you encrypt to or trust one of these.</string>
+    <string name="keyring_same_identity_created_format">created %1$s</string>
+    <plurals name="key_card_same_identity_count">
+        <item quantity="one">%1$d key</item>
+        <item quantity="other">%1$d keys</item>
+    </plurals>
+    <plurals name="keyring_same_identity_title">
+        <item quantity="one">%1$d key for %2$s</item>
+        <item quantity="other">%1$d keys for %2$s</item>
+    </plurals>
+    <plurals name="exchange_keyserver_found_count">
+        <item quantity="one">%1$d key found for this address.</item>
+        <item quantity="other">%1$d keys found for this address. Compare fingerprints after importing.</item>
+    </plurals>
+    <string name="import_method_url">Link</string>
+    <string name="import_url_label">Link to a public key</string>
+    <string name="import_url_fetch_button">Fetch key</string>
+    <string name="import_url_help">A raw .asc file or a page that shows a key both work. The key is fetched through your proxy setting, and nothing is added until you check its fingerprint and tap Import.</string>
+    <string name="import_url_error_https">Only https links can be fetched (or http for a .onion address).</string>
+    <string name="import_url_error_offline">Offline mode is on, so the link was not fetched.</string>
+    <string name="import_url_error_no_key">No public key was found at that link.</string>
+    <string name="import_url_error_redirects">That link redirected too many times.</string>
+    <string name="import_url_error_http_format">The server answered with HTTP %1$d.</string>
+    <string name="import_url_error_failed_format">Could not fetch the link: %1$s</string>
+    <string name="import_preview_source_url_format">From link: %1$s</string>
 </resources>

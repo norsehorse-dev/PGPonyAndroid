@@ -222,6 +222,16 @@ data class PGPKeyEntity(
      *  a published key means the server copy is behind. */
     val lastLocalEditAt: Long? = null
 ) {
+    /** 4.6.0 (item 1): the note's first non-blank line, shown as the key's
+     *  label on the keyring list and under the Key Detail header. */
+    val noteLabel: String?
+        get() = notes?.lineSequence()?.map { it.trim() }?.firstOrNull { it.isNotEmpty() }
+
+    /** 4.6.0 (item 20): what "the same identity" means when counting keys that
+     *  share one: the email, else the whole User ID, case-insensitive. */
+    val identityKey: String
+        get() = (userEmail.ifBlank { userID }).trim().lowercase()
+
     /** 4.6.0 (item 11): published before, edited here since the last upload. */
     val hasUnpublishedChanges: Boolean
         get() {

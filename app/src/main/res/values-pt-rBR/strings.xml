@@ -1989,4 +1989,33 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="key_detail_unpublished_changes_body">Esta chave mudou desde o último envio. Os servidores de chaves ainda têm a cópia antiga.</string>
     <string name="key_detail_unpublished_changes_action">Atualizar</string>
     <string name="revocation_result_publish_button">Publicar revogação nos servidores de chaves</string>
+    <string name="keyring_generate_algorithm_experimental">Experimental</string>
+    <string name="keyring_generate_algorithm_experimental_note">O OpenPGP pós-quântico ainda está sendo padronizado. Dois formatos que não funcionam entre si estão em uso, e muitos apps ainda não leem essas chaves.</string>
+    <string name="keyring_generate_algorithm_caption_pqc_sign_87">O nível de segurança máxima: uma identidade de assinatura ML-DSA-87 com uma subchave de criptografia ML-KEM-1024 em uma chave v6 (RFC 9980). As chaves são maiores e mais lentas que ML-DSA-65 com ML-KEM-768, que continua sendo a escolha recomendada. Só softwares OpenPGP atualizados conseguem usá-la.</string>
+    <string name="key_detail_label_add">Adicionar rótulo</string>
+    <string name="keyring_same_identity_body">Compare as impressões digitais antes de criptografar para uma delas ou confiar nela.</string>
+    <string name="keyring_same_identity_created_format">criada em %1$s</string>
+    <plurals name="key_card_same_identity_count">
+        <item quantity="one">%1$d chave</item>
+        <item quantity="other">%1$d chaves</item>
+    </plurals>
+    <plurals name="keyring_same_identity_title">
+        <item quantity="one">%1$d chave para %2$s</item>
+        <item quantity="other">%1$d chaves para %2$s</item>
+    </plurals>
+    <plurals name="exchange_keyserver_found_count">
+        <item quantity="one">%1$d chave encontrada para este endereço.</item>
+        <item quantity="other">%1$d chaves encontradas para este endereço. Compare as impressões digitais depois de importar.</item>
+    </plurals>
+    <string name="import_method_url">Link</string>
+    <string name="import_url_label">Link para uma chave pública</string>
+    <string name="import_url_fetch_button">Buscar chave</string>
+    <string name="import_url_help">Serve um arquivo .asc ou uma página que mostre uma chave. A chave é buscada pela sua configuração de proxy, e nada é adicionado até você conferir a impressão digital e tocar em Importar.</string>
+    <string name="import_url_error_https">Só é possível buscar links https (ou http para um endereço .onion).</string>
+    <string name="import_url_error_offline">O modo offline está ativado, então o link não foi buscado.</string>
+    <string name="import_url_error_no_key">Nenhuma chave pública foi encontrada nesse link.</string>
+    <string name="import_url_error_redirects">Esse link redirecionou vezes demais.</string>
+    <string name="import_url_error_http_format">O servidor respondeu com HTTP %1$d.</string>
+    <string name="import_url_error_failed_format">Não foi possível buscar o link: %1$s</string>
+    <string name="import_preview_source_url_format">Do link: %1$s</string>
 </resources>

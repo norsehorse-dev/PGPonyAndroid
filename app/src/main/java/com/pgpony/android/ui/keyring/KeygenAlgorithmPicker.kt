@@ -102,7 +102,7 @@ fun KeygenAlgorithmPicker(
                     FilterChip(
                         selected = selected == algo,
                         onClick = { onSelect(algo) },
-                        label = { Text(algo.shortName) }
+                        label = { AlgorithmChipLabel(algo) }
                     )
                 }
             }
@@ -139,7 +139,7 @@ fun KeygenAlgorithmPicker(
                     FilterChip(
                         selected = selected == algo,
                         onClick = { onSelect(algo) },
-                        label = { Text(algo.shortName) }
+                        label = { AlgorithmChipLabel(algo) }
                     )
                 }
             }
@@ -150,6 +150,32 @@ fun KeygenAlgorithmPicker(
             text = captionFor(selected),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        // 4.6.0 (item 13): set expectations for every post-quantum choice.
+        if (selected.isPostQuantum) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.keyring_generate_algorithm_experimental_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.tertiary
+            )
+        }
+    }
+}
+
+/** 4.6.0 (item 13): the chip text, with an "Experimental" line on post-quantum keys. */
+@Composable
+private fun AlgorithmChipLabel(algo: KeyAlgorithm) {
+    if (!algo.isPostQuantum) {
+        Text(algo.shortName)
+        return
+    }
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        Text(algo.shortName)
+        Text(
+            stringResource(R.string.keyring_generate_algorithm_experimental),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.tertiary
         )
     }
 }
@@ -173,7 +199,7 @@ private fun AlgorithmGroup(
             FilterChip(
                 selected = selected == algo,
                 onClick = { onSelect(algo) },
-                label = { Text(algo.shortName) }
+                label = { AlgorithmChipLabel(algo) }
             )
         }
     }
@@ -181,6 +207,8 @@ private fun AlgorithmGroup(
 
 @Composable
 private fun captionFor(algorithm: KeyAlgorithm): String = when {
+    algorithm == KeyAlgorithm.MLDSA87_ED448_V6 ->
+        stringResource(R.string.keyring_generate_algorithm_caption_pqc_sign_87)
     algorithm.isCompositeSign ->
         stringResource(R.string.keyring_generate_algorithm_caption_pqc_sign)
     algorithm == KeyAlgorithm.MLKEM768_X25519_V4 ->

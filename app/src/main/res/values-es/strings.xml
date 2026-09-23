@@ -1989,4 +1989,33 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="key_detail_unpublished_changes_body">Esta clave cambió desde la última subida. Los servidores de claves aún tienen la copia anterior.</string>
     <string name="key_detail_unpublished_changes_action">Actualizar</string>
     <string name="revocation_result_publish_button">Publicar revocación en servidores de claves</string>
+    <string name="keyring_generate_algorithm_experimental">Experimental</string>
+    <string name="keyring_generate_algorithm_experimental_note">OpenPGP poscuántico aún se está estandarizando. Hay dos formatos en uso que no funcionan entre sí, y muchas apps todavía no pueden leer estas claves.</string>
+    <string name="keyring_generate_algorithm_caption_pqc_sign_87">El nivel de máxima seguridad: una identidad de firma ML-DSA-87 con una subclave de cifrado ML-KEM-1024 en una clave v6 (RFC 9980). Las claves son más grandes y lentas que ML-DSA-65 con ML-KEM-768, que sigue siendo la opción recomendada. Solo el software OpenPGP actualizado puede usarla.</string>
+    <string name="key_detail_label_add">Añadir etiqueta</string>
+    <string name="keyring_same_identity_body">Compara las huellas antes de cifrar para una de ellas o confiar en ella.</string>
+    <string name="keyring_same_identity_created_format">creada %1$s</string>
+    <plurals name="key_card_same_identity_count">
+        <item quantity="one">%1$d clave</item>
+        <item quantity="other">%1$d claves</item>
+    </plurals>
+    <plurals name="keyring_same_identity_title">
+        <item quantity="one">%1$d clave para %2$s</item>
+        <item quantity="other">%1$d claves para %2$s</item>
+    </plurals>
+    <plurals name="exchange_keyserver_found_count">
+        <item quantity="one">Se encontró %1$d clave para esta dirección.</item>
+        <item quantity="other">Se encontraron %1$d claves para esta dirección. Compara las huellas después de importar.</item>
+    </plurals>
+    <string name="import_method_url">Enlace</string>
+    <string name="import_url_label">Enlace a una clave pública</string>
+    <string name="import_url_fetch_button">Obtener clave</string>
+    <string name="import_url_help">Sirven un archivo .asc o una página que muestre una clave. La clave se obtiene a través de tu proxy y no se añade nada hasta que compruebes la huella y toques Importar.</string>
+    <string name="import_url_error_https">Solo se pueden obtener enlaces https (o http para una dirección .onion).</string>
+    <string name="import_url_error_offline">El modo sin conexión está activado, así que no se obtuvo el enlace.</string>
+    <string name="import_url_error_no_key">No se encontró ninguna clave pública en ese enlace.</string>
+    <string name="import_url_error_redirects">Ese enlace redirigió demasiadas veces.</string>
+    <string name="import_url_error_http_format">El servidor respondió con HTTP %1$d.</string>
+    <string name="import_url_error_failed_format">No se pudo obtener el enlace: %1$s</string>
+    <string name="import_preview_source_url_format">Desde enlace: %1$s</string>
 </resources>

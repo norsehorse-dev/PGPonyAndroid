@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
@@ -40,7 +41,10 @@ fun KeyCard(
     key: PGPKeyEntity,
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier,
-    trailing: (@Composable () -> Unit)? = null
+    trailing: (@Composable () -> Unit)? = null,
+    /** 4.6.0 (item 20): how many stored keys share this key's identity. */
+    sameIdentityCount: Int = 1,
+    onSameIdentityClick: (() -> Unit)? = null
 ) {
     Card(
         modifier = modifier
@@ -112,6 +116,27 @@ fun KeyCard(
                     )
                 }
 
+                // 4.6.0 (item 1): the user's own label for the key (the first
+                // line of its note), set apart from the key's own User ID.
+                key.noteLabel?.let { label ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Label, null,
+                            modifier = Modifier.size(12.dp),
+                            tint = MaterialTheme.colorScheme.tertiary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.tertiary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -143,6 +168,11 @@ fun KeyCard(
                     if (key.isRevoked) {
                         Spacer(modifier = Modifier.width(6.dp))
                         RevokedPill()
+                    }
+                    // 4.6.0 (item 20): other stored keys carry the same identity.
+                    if (sameIdentityCount > 1) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        SameIdentityPill(sameIdentityCount, onSameIdentityClick)
                     }
                 }
             }
@@ -176,6 +206,24 @@ fun RevokedPill() {
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onError,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+        )
+    }
+}
+
+/** 4.6.0 (item 20): "N keys" for an identity held by more than one stored key. */
+@Composable
+fun SameIdentityPill(count: Int, onClick: (() -> Unit)?) {
+    Surface(
+        shape = RoundedCornerShape(4.dp),
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        modifier = Modifier.height(18.dp).let { if (onClick != null) it.clickable(onClick = onClick) else it }
+    ) {
+        Text(
+            text = androidx.compose.ui.res.pluralStringResource(R.plurals.key_card_same_identity_count, count, count),
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
         )
     }

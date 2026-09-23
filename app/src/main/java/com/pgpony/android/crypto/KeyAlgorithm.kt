@@ -98,6 +98,11 @@ enum class KeyAlgorithm(
     // verification. Not offered for generation.
     MLKEM1024_BP384_LIBREPGP("ML-KEM-1024+brainpoolP384r1 (LibrePGP)", "ML-KEM-1024 bp384 v5", 0),
 
+    // 4.6.0 (item 13): LibrePGP ML-KEM-768 + brainpoolP256r1 (gpg ky768_bp256),
+    // the pairing Kleopatra offers. Generated like the other LibrePGP keys: a
+    // v4 Ed25519 primary with a v5 algo-8 composite encryption subkey.
+    MLKEM768_BP256_LIBREPGP("ML-KEM-768+brainpoolP256r1 (LibrePGP)", "ML-KEM-768 bp256 v5", 0),
+
     // 4.4.0 RC3 (#30/#31) - RFC 9980 composite ML-DSA + EdDSA SIGNING keys.
     // Unlike the ML-KEM composites (encryption subkeys), these are v6 signing
     // keys: a composite ML-DSA + EdDSA primary (algo 30/31) that self-certifies
@@ -120,7 +125,12 @@ enum class KeyAlgorithm(
         get() = this == MLKEM768_X25519_V6 || this == MLKEM1024_X448_V6 ||
             this == MLKEM768_X25519_V4 ||
             this == MLKEM768_X25519_LIBREPGP || this == MLKEM1024_X448_LIBREPGP ||
-            this == MLKEM1024_BP384_LIBREPGP
+            this == MLKEM1024_BP384_LIBREPGP || this == MLKEM768_BP256_LIBREPGP
+
+    /** 4.6.0 (item 13): any post-quantum key (ML-KEM encryption or ML-DSA
+     *  signing), labeled experimental in the keygen picker. */
+    val isPostQuantum: Boolean
+        get() = isComposite || isCompositeSign
 
     /** The two RFC 9980 composite ML-DSA + EdDSA signing keys (algo 30/31). */
     val isCompositeSign: Boolean
@@ -138,7 +148,9 @@ enum class KeyAlgorithm(
             // (v6 / v4 / v5) live in [generatableInterop] instead, since they are
             // the same KEM in different formats, a compatibility choice, not a
             // security one.
-            MLKEM1024_X448_V6, MLDSA65_ED25519_V6
+            // 4.6.0 (item 3): ML-DSA-87 + ML-KEM-1024 as the max-security tier;
+            // ML-DSA-65 + ML-KEM-768 stays the default composite signing key.
+            MLKEM1024_X448_V6, MLDSA65_ED25519_V6, MLDSA87_ED448_V6
         )
         // item 14 (#56): the interop tier — the three encodings of the SAME
         // ML-KEM-768 + X25519 key, one per target tool's expectations:
@@ -151,7 +163,7 @@ enum class KeyAlgorithm(
         )
         val generatableAdvanced = listOf(
             RSA_4096, RSA_2048,
-            MLKEM1024_X448_LIBREPGP
+            MLKEM1024_X448_LIBREPGP, MLKEM768_BP256_LIBREPGP
         )
 
         /** Every generatable algorithm (the union of the picker groups). */

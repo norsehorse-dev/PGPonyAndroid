@@ -241,6 +241,11 @@ object CompositeKemLibrePGP {
             out
         }
 
+    private val bp256: ECDomainParameters by lazy {
+        val x9 = TeleTrusTNamedCurves.getByName("brainpoolP256r1")
+        ECDomainParameters(x9.curve, x9.g, x9.n, x9.h)
+    }
+
     private val bp384: ECDomainParameters by lazy {
         val x9 = TeleTrusTNamedCurves.getByName("brainpoolP384r1")
         ECDomainParameters(x9.curve, x9.g, x9.n, x9.h)
@@ -249,6 +254,7 @@ object CompositeKemLibrePGP {
     /** Weierstrass domain parameters for a supported composite curve. */
     private fun domainOf(curve: EccCurve): ECDomainParameters = when (curve) {
         EccCurve.BRAINPOOL_P384R1 -> bp384
+        EccCurve.BRAINPOOL_P256R1 -> bp256
         else -> throw IllegalArgumentException("no Weierstrass domain for $curve")
     }
 

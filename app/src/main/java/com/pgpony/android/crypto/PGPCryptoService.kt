@@ -372,6 +372,16 @@ class PGPCryptoService private constructor() {
                 )
                 ring to com.pgpony.android.crypto.pqc.CompositeKeyGen.publicRingOf(ring)
             }
+            KeyAlgorithm.MLKEM768_BP256_LIBREPGP -> {
+                // 4.6.0 (item 13): LibrePGP ML-KEM-768 + brainpoolP256r1.
+                val baseSec = buildEd25519KeyRingGenerator(userID, passphrase, creationDate, expirationSeconds)
+                    .generateSecretKeyRing()
+                val ring = com.pgpony.android.crypto.pqc.CompositeKeyGen.addCompositeSubkey(
+                    baseSec, com.pgpony.android.crypto.pqc.CompositeSuite.LIBREPGP_768_BP256,
+                    passphrase, creationTime = creationDate
+                )
+                ring to com.pgpony.android.crypto.pqc.CompositeKeyGen.publicRingOf(ring)
+            }
             KeyAlgorithm.MLKEM1024_X448_LIBREPGP -> {
                 // LibrePGP composite (v5), Kyber-1024 + X448, driven by the
                 // LIBREPGP_1024 suite (v4 EdDSA primary + v5 composite subkey).
@@ -3019,6 +3029,8 @@ class PGPCryptoService private constructor() {
                     return KeyAlgorithm.MLKEM1024_X448_LIBREPGP
                 com.pgpony.android.crypto.pqc.EccCurve.BRAINPOOL_P384R1 ->
                     return KeyAlgorithm.MLKEM1024_BP384_LIBREPGP
+                com.pgpony.android.crypto.pqc.EccCurve.BRAINPOOL_P256R1 ->
+                    return KeyAlgorithm.MLKEM768_BP256_LIBREPGP
                 com.pgpony.android.crypto.pqc.EccCurve.X25519 ->
                     return KeyAlgorithm.MLKEM768_X25519_LIBREPGP
                 else -> {}
@@ -3080,6 +3092,8 @@ class PGPCryptoService private constructor() {
                         return KeyAlgorithm.MLKEM1024_X448_LIBREPGP
                     com.pgpony.android.crypto.pqc.EccCurve.BRAINPOOL_P384R1 ->
                         return KeyAlgorithm.MLKEM1024_BP384_LIBREPGP
+                    com.pgpony.android.crypto.pqc.EccCurve.BRAINPOOL_P256R1 ->
+                        return KeyAlgorithm.MLKEM768_BP256_LIBREPGP
                     com.pgpony.android.crypto.pqc.EccCurve.X25519 ->
                         return KeyAlgorithm.MLKEM768_X25519_LIBREPGP
                     else -> {}

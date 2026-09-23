@@ -359,6 +359,17 @@ private fun KeyServerSection(state: ExchangeUiState, viewModel: ExchangeViewMode
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("Key Found", style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary)
+                    // 4.6.0 (item 20): more than one key answered for this address.
+                    val found = remember(armored) {
+                        com.pgpony.android.network.KeyResponse.certificates(armored.toByteArray())?.size ?: 1
+                    }
+                    if (found > 1) {
+                        Text(
+                            androidx.compose.ui.res.pluralStringResource(R.plurals.exchange_keyserver_found_count, found, found),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         armored.take(120) + "...",

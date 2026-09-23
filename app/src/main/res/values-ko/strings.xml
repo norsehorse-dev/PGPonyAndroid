@@ -2064,4 +2064,30 @@
     <string name="key_detail_unpublished_changes_body">마지막 업로드 이후 이 키가 변경되었습니다. 키 서버에는 아직 이전 사본이 있습니다.</string>
     <string name="key_detail_unpublished_changes_action">업데이트</string>
     <string name="revocation_result_publish_button">키 서버에 폐기 게시</string>
+    <string name="keyring_generate_algorithm_experimental">실험적</string>
+    <string name="keyring_generate_algorithm_experimental_note">양자 내성 OpenPGP는 아직 표준화 중입니다. 서로 호환되지 않는 두 형식이 쓰이고 있으며, 많은 앱이 아직 이 키를 읽지 못합니다.</string>
+    <string name="keyring_generate_algorithm_caption_pqc_sign_87">최고 보안 등급: v6 키(RFC 9980)의 ML-DSA-87 서명 ID와 ML-KEM-1024 암호화 하위 키입니다. 권장 선택인 ML-DSA-65 + ML-KEM-768보다 키가 크고 느립니다. 최신 OpenPGP 소프트웨어에서만 사용할 수 있습니다.</string>
+    <string name="key_detail_label_add">라벨 추가</string>
+    <string name="keyring_same_identity_body">이 중 하나로 암호화하거나 신뢰하기 전에 지문을 비교하세요.</string>
+    <string name="keyring_same_identity_created_format">생성 %1$s</string>
+    <plurals name="key_card_same_identity_count">
+        <item quantity="other">키 %1$d개</item>
+    </plurals>
+    <plurals name="keyring_same_identity_title">
+        <item quantity="other">%2$s의 키 %1$d개</item>
+    </plurals>
+    <plurals name="exchange_keyserver_found_count">
+        <item quantity="other">이 주소의 키 %1$d개를 찾았습니다. 가져온 뒤 지문을 비교하세요.</item>
+    </plurals>
+    <string name="import_method_url">링크</string>
+    <string name="import_url_label">공개 키 링크</string>
+    <string name="import_url_fetch_button">키 가져오기</string>
+    <string name="import_url_help">.asc 파일이나 키를 보여 주는 페이지 모두 됩니다. 키는 프록시 설정을 거쳐 가져오며, 지문을 확인하고 가져오기를 누르기 전에는 아무것도 추가되지 않습니다.</string>
+    <string name="import_url_error_https">https 링크만 가져올 수 있습니다(.onion 주소는 http도 가능).</string>
+    <string name="import_url_error_offline">오프라인 모드가 켜져 있어 링크를 가져오지 않았습니다.</string>
+    <string name="import_url_error_no_key">해당 링크에서 공개 키를 찾지 못했습니다.</string>
+    <string name="import_url_error_redirects">해당 링크의 리디렉션이 너무 많습니다.</string>
+    <string name="import_url_error_http_format">서버 응답: HTTP %1$d</string>
+    <string name="import_url_error_failed_format">링크를 가져오지 못했습니다: %1$s</string>
+    <string name="import_preview_source_url_format">링크: %1$s</string>
 </resources>

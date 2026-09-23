@@ -70,6 +70,8 @@ fun KeyringScreen(
     onOpenRecycleBin: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
+    // 4.6.0 (item 20): the key whose shared identity is being listed.
+    var identityDialogFor by remember { mutableStateOf<PGPKeyEntity?>(null) }
 
     // CertainBot (RC4): a delete or trust change made on the Key Detail
     // screen left this list stale until an app reload. The Keyring leaves
@@ -334,6 +336,8 @@ fun KeyringScreen(
                             )
                         }
                     }
+                    // 4.6.0 (item 20): how many stored keys share each identity.
+                    val identityCounts = state.allKeys.groupingBy { it.identityKey }.eachCount()
                     // 4.1.0 Phase 12b — three sections through one builder.
                     // The first two were already identical apart from the
                     // list, the heading and the colour; a third copy is not
@@ -348,6 +352,8 @@ fun KeyringScreen(
                         reorderableState = reorderableState,
                         manualMode = manualMode,
                         onKeyClick = onKeyClick,
+                        identityCounts = identityCounts,
+                        onIdentityClick = { identityDialogFor = it },
                     )
                     keySection(
                         keys = state.contactKeys,
@@ -359,6 +365,8 @@ fun KeyringScreen(
                         reorderableState = reorderableState,
                         manualMode = manualMode,
                         onKeyClick = onKeyClick,
+                        identityCounts = identityCounts,
+                        onIdentityClick = { identityDialogFor = it },
                     )
                     keySection(
                         keys = state.publicKeys,
@@ -370,6 +378,8 @@ fun KeyringScreen(
                         reorderableState = reorderableState,
                         manualMode = manualMode,
                         onKeyClick = onKeyClick,
+                        identityCounts = identityCounts,
+                        onIdentityClick = { identityDialogFor = it },
                     )
                 }
             }
@@ -391,6 +401,67 @@ fun KeyringScreen(
         com.pgpony.android.ui.keydetail.PublishSheet(
             fingerprint = fp,
             onDismiss = { viewModel.dismissPublishPrompt() }
+        )
+    }
+
+    // ── 4.6.0 (item 20): every stored key sharing an identity ──────────
+    identityDialogFor?.let { picked ->
+        val matches = state.allKeys.filter { it.identityKey == picked.identityKey }
+        AlertDialog(
+            onDismissRequest = { identityDialogFor = null },
+            title = {
+                Text(androidx.compose.ui.res.pluralStringResource(
+                    R.plurals.keyring_same_identity_title, matches.size, matches.size,
+                    picked.userEmail.ifBlank { picked.userID }
+                ))
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        stringResource(R.string.keyring_same_identity_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    matches.forEach { k ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { identityDialogFor = null; onKeyClick(k.fingerprint) }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                listOfNotNull(
+                                    k.userName.ifBlank { k.userEmail },
+                                    k.noteLabel,
+                                    if (k.isKeyPair) stringResource(R.string.key_detail_type_key_pair) else null
+                                ).joinToString(" · "),
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                k.fingerprint.uppercase().chunked(4).joinToString(" "),
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                listOfNotNull(
+                                    k.algorithm.shortName,
+                                    stringResource(R.string.keyring_same_identity_created_format,
+                                        java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(k.createdAt))),
+                                    if (k.isRevoked) stringResource(R.string.key_card_revoked_badge) else null,
+                                    if (k.isExpired) stringResource(R.string.key_card_expired_badge) else null
+                                ).joinToString(" · "),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { identityDialogFor = null }) { Text(stringResource(R.string.common_button_done)) }
+            }
         )
     }
 
@@ -571,6 +642,8 @@ private fun LazyListScope.keySection(
     reorderableState: ReorderableLazyListState,
     manualMode: Boolean,
     onKeyClick: (String) -> Unit,
+    identityCounts: Map<String, Int> = emptyMap(),
+    onIdentityClick: (PGPKeyEntity) -> Unit = {},
 ) {
     if (keys.isEmpty()) return
     // #45: header shows the count and toggles the section. A collapsed
@@ -604,6 +677,8 @@ private fun LazyListScope.keySection(
             KeyCard(
                 key = key,
                 onClick = { onKeyClick(key.fingerprint) },
+                sameIdentityCount = identityCounts[key.identityKey] ?: 1,
+                onSameIdentityClick = { onIdentityClick(key) },
                 trailing = if (manualMode) {
                     {
                         Icon(

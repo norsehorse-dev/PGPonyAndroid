@@ -48,7 +48,12 @@ enum class EccCurve(
     // an uncompressed 0x04 || X(48) || Y(48) = 97-octet point, and SHA3-512 in
     // the ECC KEM KDF (gpg common/kem.c ecc_table). keyLen is the scalar length;
     // pointLen is the uncompressed point on the wire.
-    BRAINPOOL_P384R1(48, byteArrayOf(0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0b), 97, 512, true);
+    BRAINPOOL_P384R1(48, byteArrayOf(0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x0b), 97, 512, true),
+
+    // 4.6.0 (item 13): brainpoolP256r1 (OID 1.3.36.3.3.2.8.1.1.7), which gpg
+    // pairs with ML-KEM-768 (ky768_bp256). 32-octet scalar, 65-octet
+    // uncompressed point, SHA3-256 in the ECC KEM KDF (a <=256-bit curve).
+    BRAINPOOL_P256R1(32, byteArrayOf(0x2b, 0x24, 0x03, 0x03, 0x02, 0x08, 0x01, 0x01, 0x07), 65, 256, true);
 
     /**
      * Adjust a raw ECC point value to exactly [keyLen] octets. A LibrePGP
@@ -111,7 +116,10 @@ enum class CompositeSuite(
 
     // issue #2: gpg also pairs ML-KEM-1024 with brainpoolP384r1 in a v5 algo-8
     // composite (homehsu's key). Same algo id, told apart by the curve OID.
-    LIBREPGP_1024_BP384(8, EccCurve.BRAINPOOL_P384R1, MlkemLevel.MLKEM1024);
+    LIBREPGP_1024_BP384(8, EccCurve.BRAINPOOL_P384R1, MlkemLevel.MLKEM1024),
+
+    // 4.6.0 (item 13): the strength-matched sibling, ML-KEM-768 + brainpoolP256r1.
+    LIBREPGP_768_BP256(8, EccCurve.BRAINPOOL_P256R1, MlkemLevel.MLKEM768);
 
     /** Composite public-key material length: ECC point || ML-KEM public. */
     val compositePubLen: Int get() = curve.keyLen + mlkem.pubLen
@@ -120,7 +128,8 @@ enum class CompositeSuite(
     val secretLen: Int get() = curve.keyLen + mlkem.seedLen
 
     val isLibrePgp: Boolean get() =
-        this == LIBREPGP_768 || this == LIBREPGP_1024 || this == LIBREPGP_1024_BP384
+        this == LIBREPGP_768 || this == LIBREPGP_1024 || this == LIBREPGP_1024_BP384 ||
+            this == LIBREPGP_768_BP256
 
     companion object {
         /** The IETF (v6) suite for algorithm id 35 or 36, if either. */
@@ -134,6 +143,7 @@ enum class CompositeSuite(
         fun librePgpFor(curve: EccCurve): CompositeSuite = when (curve) {
             EccCurve.X448 -> LIBREPGP_1024
             EccCurve.BRAINPOOL_P384R1 -> LIBREPGP_1024_BP384
+            EccCurve.BRAINPOOL_P256R1 -> LIBREPGP_768_BP256
             else -> LIBREPGP_768
         }
     }

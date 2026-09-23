@@ -94,6 +94,7 @@ internal object SubkeyRows {
             com.pgpony.android.crypto.pqc.EccCurve.X25519 -> "ML-KEM-768 + X25519"
             com.pgpony.android.crypto.pqc.EccCurve.X448 -> "ML-KEM-1024 + X448"
             com.pgpony.android.crypto.pqc.EccCurve.BRAINPOOL_P384R1 -> "ML-KEM-1024 + brainpoolP384r1"
+            com.pgpony.android.crypto.pqc.EccCurve.BRAINPOOL_P256R1 -> "ML-KEM-768 + brainpoolP256r1"
             else -> "ML-KEM (LibrePGP)"
         }
     }

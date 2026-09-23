@@ -44,6 +44,9 @@ Research / unknowns:
 Delivery: a key with a note shows that note as a label on the keyring list, and the note editor is reachable
 near the top of Key Details without scrolling to the bottom. Verified on device.
 
+Status: done in code, awaiting on-device check. The first line of a key's note shows on its keyring row as a
+label (tag icon, one line), and under the Key Detail header as a tappable label (or "Add a label") that opens
+the note editor. The single notes field is kept; notes were already searchable.
 
 ## 2. Import a public key from a URL, with a fingerprint check before it is added
 
@@ -89,6 +92,12 @@ Delivery: the user enters a URL, PGPony fetches it through the offline/proxy-awa
 key's fingerprint and UID for verification before anything is stored, and only writes it to the keyring on
 explicit confirm. Verified on device with a raw .asc URL and with a key embedded in an HTML page.
 
+Status: done in code, awaiting on-device check. New "Link" import method: https only (http for .onion),
+through the proxy-aware client, hidden in offline mode, redirects followed by hand (at most 5, each hop
+https), body capped at 8 MiB. Public key blocks are pulled out of a raw .asc, a binary key or an HTML page and
+validated like a key-server answer (KeyResponse); private keys and messages are a miss. The key shows in the
+usual import preview (fingerprint, User IDs, extra-key count, and the full source link) and is only added on
+Import, through the normal dedup/merge path.
 
 ## 3. Offer ML-DSA-87 as a key-generation algorithm, paired with ML-KEM-1024
 
@@ -140,6 +149,9 @@ algorithm IDs only for ML-KEM-768, ML-KEM-1024, ML-DSA-65, and ML-DSA-87. There 
 point for ML-DSA-44 or ML-KEM-512, so a 44/512 key would have no interoperable on-wire encoding and no other
 OpenPGP tool could read it. Not viable until the spec registers those levels; revisit if it does.
 
+Status: done in code, awaiting on-device check. ML-DSA-87 + Ed448 is in the Post-Quantum picker group with
+its own caption; ML-DSA-65 stays first. CompositePrimaryKeyGen pairs the bundled encryption subkey with the
+signing tier (87 gets ML-KEM-1024 + X448, algo 36; 65 keeps ML-KEM-768 + X25519).
 
 ## 4. File signing with composite ML-DSA keys (MOVED TO 4.5.3)
 
@@ -169,7 +181,7 @@ avatar append to the recipient set; restore the star and right-alignment on the 
 Delivery: the avatar shortcut sets the key on both Encrypt (added to current recipients) and Decrypt; the
 Default Key picker shows the star and sits to the right of the title. Verified on device.
 
-Status: done in code, awaiting on-device check. The key-pair avatar carries its key into "Decrypt with" (a
+Status: done, verified on device. The key-pair avatar carries its key into "Decrypt with" (a
 card key takes the PIN + tap path); the public-key avatar adds the key to the recipients already chosen; the
 Default Key picker is a row again with the star on the left and the choice as a plain text button on the right.
 
@@ -250,7 +262,7 @@ Delivery: add a subkey to an already-published key, open Key Detail, "Update on 
 publishes to the servers used before, and a fresh lookup on each server shows the subkey. iOS mirror: 8.3.0
 sections 2 and 3.
 
-Status: done in code, awaiting on-device check. Upload stays on the menu and ActionRow after the first upload,
+Status: done, verified on device. Upload stays on the menu and ActionRow after the first upload,
 labelled "Update on Key Servers". KeyPublicationStore records each server a key went to; PublishSheet
 pre-checks those, shows "Last uploaded" per server and each address's confirmation state (read from the
 served copy's certified User IDs; the old check searched the armor text and never matched). Publishing from
@@ -271,7 +283,7 @@ every network action is hidden while offline.
 
 Delivery: with offline mode on, the Key Detail overflow shows no keyserver items; off, all three return.
 
-Status: done in code, awaiting on-device check. The upload/update, check and refresh menu items are hidden
+Status: done, verified on device. The upload/update, check and refresh menu items are hidden
 while offline.
 
 
@@ -290,7 +302,7 @@ certificate is produced, since a revocation that never reaches the servers prote
 Delivery: edit a published key, see the marker and the one-tap update, update, marker clears; revoke a
 published key, the publish offer appears in the revocation result.
 
-Status: done in code, awaiting on-device check. PGPKeyEntity.lastLocalEditAt (DB v11, MIGRATION_10_11) is
+Status: done, verified on device. PGPKeyEntity.lastLocalEditAt (DB v11, MIGRATION_10_11) is
 stamped by every key-editing repository call; hasUnpublishedChanges drives the Key server row, the menu label
 and an Update row under the header. The revocation result sheet offers "Publish revocation to key servers".
 
@@ -346,6 +358,11 @@ subkey, so signatures stay classical and verify everywhere; only the key exchang
 composite ML-DSA signing keys are the interop liability (their signatures are unreadable to tools without
 composite support). Not proposing to drop them, just to label the whole PQC set experimental.
 
+Status: done in code, awaiting on-device check. ML-KEM-768 + brainpoolP256r1 (LibrePGP, gpg ky768_bp256)
+generates from the Advanced group: v4 Ed25519 primary plus a v5 algo-8 subkey, SHA3-256 in the ECC KEM KDF,
+round-trips in PGPony. Not yet checked against gpg 2.5 / Kleopatra (no gpg 2.5 available here); a tester
+with Kleopatra should import it and encrypt both ways. Every post-quantum picker entry now shows an
+"Experimental" line, and a note under the caption explains why.
 
 ## 14. Composite ML-DSA signature framing when encrypting to a v4-only recipient
 
@@ -657,7 +674,7 @@ Apply the same guard across all three lookup steps, since any of them can return
 back-porting the guard to a point release if the timing works, since today it shows users junk plus an import
 button that cannot succeed. iOS mirrors once verified on Android.
 
-Status: done in code, awaiting on-device check. network/KeyResponse.kt validates every lookup body (WKD,
+Status: done, verified on device. network/KeyResponse.kt validates every lookup body (WKD,
 directory servers, keys.openpgp.org): text/html refused, armor must be PUBLIC KEY BLOCK only, binary must be
 public-key packets only, by-fingerprint and by-key-ID answers must hold the key asked for (primary or subkey).
 Output is re-armored from parsed packets, so a non-key body is a miss ("no key found"), never an import offer.
@@ -686,7 +703,7 @@ loadCompositeSubkeys enumerator, or teach the generic per-subkey mapping to reco
 Verify with an mlkem-768v4 key: the existing ML-KEM subkey shows, an added subkey shows, and capabilities and
 labels are right. iOS mirrors once verified on Android.
 
-Status: done in code, awaiting on-device check. Display: SubkeyRows lists any key with an algo 35/36 (or v5
+Status: done, verified on device. Display: SubkeyRows lists any key with an algo 35/36 (or v5
 algo 8) subkey from its certificate, with capabilities from the verified binding. Worse than the report: BC
 loads an mlkem-768v4 key WITHOUT its ML-KEM subkey, so every BC-based edit (add subkey, User ID changes,
 expiry, revoke, passphrase change) stored a ring with the ML-KEM subkey and its secret gone, and a second
@@ -707,6 +724,11 @@ same count in key server search results when a lookup returns multiple keys for 
 it lists the matching keys so the user can compare fingerprints and pick. Touches the same surfaces as the
 keyring-list work (item 1) and the union-merge work (item 12); keep it as its own additive item so it can ship
 independently. iOS mirrors once verified on Android.
+
+Status: done in code, awaiting on-device check. A keyring row whose identity (email, else the User ID) is
+shared by other stored keys shows an "N keys" pill; tapping it lists them with fingerprint, label, algorithm,
+creation date and revoked/expired state, and a row opens that key. The Exchange "Key Found" card says how many
+keys a lookup returned when more than one answered; the Keyring import preview already lists extra keys.
 
 ## 21. Allow RSA subkeys on composite ML-DSA keys
 
@@ -731,7 +753,7 @@ support does not yet handle either. If verification shows Thunderbird still cann
 subkey, the reliable interop path is a separate classical key rather than a subkey graft; decide during
 implementation and document whichever holds.
 
-Status: done in code, awaiting on-device check; Thunderbird verification failed, as the note above feared.
+Status: done, verified on device; Thunderbird verification failed, as the note above feared.
 RSA 2048/4096 (encrypt, sign with a 0x19 back-signature, auth) can be added to a composite ML-DSA key,
 v6-framed, bound by the composite primary and protected with the key's passphrase. A message a classical
 client encrypts to that subkey decrypts in PGPony (CompositeKeyFacade.classicalDecryptionRing), which also

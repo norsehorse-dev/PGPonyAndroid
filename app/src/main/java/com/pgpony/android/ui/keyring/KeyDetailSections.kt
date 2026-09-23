@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Cancel
@@ -305,7 +306,13 @@ private fun CopyableEmailRow(
 }
 
 @Composable
-fun KeyHeaderSection(key: PGPKeyEntity, onCopyEmail: ((String) -> Unit)? = null, onAvatarClick: (() -> Unit)? = null) {
+fun KeyHeaderSection(
+    key: PGPKeyEntity,
+    onCopyEmail: ((String) -> Unit)? = null,
+    onAvatarClick: (() -> Unit)? = null,
+    /** 4.6.0 (item 1): open the note editor from the header. */
+    onEditLabel: (() -> Unit)? = null
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -351,6 +358,34 @@ fun KeyHeaderSection(key: PGPKeyEntity, onCopyEmail: ((String) -> Unit)? = null,
                 KeyTypeChip(isKeyPair = key.isKeyPair)
                 if (key.isDefault) {
                     DefaultChip()
+                }
+            }
+            // 4.6.0 (item 1): the key's label (the note's first line), or a way
+            // to add one, right under the identity instead of only at the bottom.
+            if (onEditLabel != null) {
+                val label = key.noteLabel
+                Row(
+                    modifier = Modifier
+                        .padding(top = 2.dp)
+                        .clip(RoundedCornerShape(50))
+                        .clickable { onEditLabel() }
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = if (label != null) Icons.AutoMirrored.Filled.Label else Icons.Filled.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.tertiary
+                    )
+                    Text(
+                        text = label ?: stringResource(R.string.key_detail_label_add),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
                 }
             }
         }

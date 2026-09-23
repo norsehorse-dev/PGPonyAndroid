@@ -2058,4 +2058,39 @@
     <string name="key_detail_unpublished_changes_body">Ключ изменился после последней загрузки. На серверах ключей всё ещё старая копия.</string>
     <string name="key_detail_unpublished_changes_action">Обновить</string>
     <string name="revocation_result_publish_button">Опубликовать отзыв на серверах ключей</string>
+    <string name="keyring_generate_algorithm_experimental">Экспериментально</string>
+    <string name="keyring_generate_algorithm_experimental_note">Постквантовый OpenPGP ещё стандартизируется. Используются два несовместимых между собой формата, и многие приложения пока не читают такие ключи.</string>
+    <string name="keyring_generate_algorithm_caption_pqc_sign_87">Уровень максимальной защиты: подпись ML-DSA-87 и подключ шифрования ML-KEM-1024 на ключе v6 (RFC 9980). Ключи больше и медленнее, чем ML-DSA-65 с ML-KEM-768, который остаётся рекомендуемым выбором. Использовать его может только актуальное ПО OpenPGP.</string>
+    <string name="key_detail_label_add">Добавить метку</string>
+    <string name="keyring_same_identity_body">Сравните отпечатки, прежде чем шифровать для одного из них или доверять ему.</string>
+    <string name="keyring_same_identity_created_format">создан %1$s</string>
+    <plurals name="key_card_same_identity_count">
+        <item quantity="one">%1$d ключ</item>
+        <item quantity="few">%1$d ключа</item>
+        <item quantity="many">%1$d ключей</item>
+        <item quantity="other">%1$d ключа</item>
+    </plurals>
+    <plurals name="keyring_same_identity_title">
+        <item quantity="one">%1$d ключ для %2$s</item>
+        <item quantity="few">%1$d ключа для %2$s</item>
+        <item quantity="many">%1$d ключей для %2$s</item>
+        <item quantity="other">%1$d ключа для %2$s</item>
+    </plurals>
+    <plurals name="exchange_keyserver_found_count">
+        <item quantity="one">Найден %1$d ключ для этого адреса.</item>
+        <item quantity="few">Найдено %1$d ключа для этого адреса. Сравните отпечатки после импорта.</item>
+        <item quantity="many">Найдено %1$d ключей для этого адреса. Сравните отпечатки после импорта.</item>
+        <item quantity="other">Найдено %1$d ключа для этого адреса. Сравните отпечатки после импорта.</item>
+    </plurals>
+    <string name="import_method_url">Ссылка</string>
+    <string name="import_url_label">Ссылка на открытый ключ</string>
+    <string name="import_url_fetch_button">Получить ключ</string>
+    <string name="import_url_help">Подойдёт файл .asc или страница с ключом. Ключ загружается через ваш прокси, и ничего не добавляется, пока вы не проверите отпечаток и не нажмёте «Импорт».</string>
+    <string name="import_url_error_https">Можно загружать только ссылки https (или http для адреса .onion).</string>
+    <string name="import_url_error_offline">Включён автономный режим, поэтому ссылка не загружена.</string>
+    <string name="import_url_error_no_key">По этой ссылке открытый ключ не найден.</string>
+    <string name="import_url_error_redirects">Слишком много перенаправлений по этой ссылке.</string>
+    <string name="import_url_error_http_format">Сервер ответил HTTP %1$d.</string>
+    <string name="import_url_error_failed_format">Не удалось загрузить ссылку: %1$s</string>
+    <string name="import_preview_source_url_format">По ссылке: %1$s</string>
 </resources>

@@ -47,7 +47,9 @@ enum class ImportMethod(val displayName: String) {
     PASTE("Paste"),
     FILE("File"),
     QR_CODE("QR Code"),
-    KEY_SERVER("Key Server")
+    KEY_SERVER("Key Server"),
+    /** 4.6.0 (item 2): fetch a public key from a link. */
+    URL("Link")
 }
 
 /**
@@ -130,6 +132,11 @@ data class KeyringUiState(
     /** Source filename surfaced on the preview card when the key
      *  arrived via the File method. Null for other methods. */
     val importSourceFilename: String? = null,
+    /** 4.6.0 (item 2): the link typed on the Link tab, whether a fetch is
+     *  running, and the address the previewed key finally came from. */
+    val importUrl: String = "",
+    val isFetchingUrl: Boolean = false,
+    val importSourceUrl: String? = null,
     /** Populated by previewArmoredKey when the parse succeeds.
      *  Triggers the inline preview section + Import confirm button.
      *  Cleared by [clearImportPreview] when the user backs out or
@@ -696,6 +703,9 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             importSearchQuery = "",
             importLookupSource = null,
             importSourceFilename = null,
+            importUrl = "",
+            importSourceUrl = null,
+            isFetchingUrl = false,
             importPreview = null,
             isSearchingKeyServer = false,
             isPreviewing = false,
@@ -721,6 +731,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             importPreview = null,
             importLookupSource = null,
             importSourceFilename = null,
+            importSourceUrl = null,
             errorMessage = null
         )
     }
@@ -730,6 +741,43 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
     }
 
     /** A10a — Key Server search field text. */
+    fun updateImportUrl(url: String) {
+        _state.value = _state.value.copy(importUrl = url)
+    }
+
+    /**
+     * 4.6.0 (item 2): fetch the link on the Link tab through the proxy-aware
+     * client (UrlKeyFetcher) and, when it holds public key material, show it
+     * in the preview card for a fingerprint check. Nothing is stored until the
+     * user confirms, through the same import path as every other method.
+     */
+    fun fetchKeyFromUrl() {
+        val url = _state.value.importUrl.trim()
+        if (url.isBlank() || _state.value.isFetchingUrl) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isFetchingUrl = true, errorMessage = null, importPreview = null)
+            val app = PGPonyApp.instance
+            val result = com.pgpony.android.network.UrlKeyFetcher.fetch(url)
+            _state.value = _state.value.copy(isFetchingUrl = false)
+            when (result) {
+                is com.pgpony.android.network.UrlKeyFetcher.Result.Keys ->
+                    previewArmoredKey(result.armored, sourceUrl = result.finalUrl)
+                com.pgpony.android.network.UrlKeyFetcher.Result.NotHttps ->
+                    _state.value = _state.value.copy(errorMessage = app.getString(R.string.import_url_error_https))
+                com.pgpony.android.network.UrlKeyFetcher.Result.Offline ->
+                    _state.value = _state.value.copy(errorMessage = app.getString(R.string.import_url_error_offline))
+                com.pgpony.android.network.UrlKeyFetcher.Result.NoKey ->
+                    _state.value = _state.value.copy(errorMessage = app.getString(R.string.import_url_error_no_key))
+                com.pgpony.android.network.UrlKeyFetcher.Result.TooManyRedirects ->
+                    _state.value = _state.value.copy(errorMessage = app.getString(R.string.import_url_error_redirects))
+                is com.pgpony.android.network.UrlKeyFetcher.Result.HttpError ->
+                    _state.value = _state.value.copy(errorMessage = app.getString(R.string.import_url_error_http_format, result.status))
+                is com.pgpony.android.network.UrlKeyFetcher.Result.Failed ->
+                    _state.value = _state.value.copy(errorMessage = app.getString(R.string.import_url_error_failed_format, result.message))
+            }
+        }
+    }
+
     fun updateImportSearchQuery(query: String) {
         _state.value = _state.value.copy(importSearchQuery = query)
     }
@@ -838,7 +886,8 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
     fun previewArmoredKey(
         armoredText: String,
         source: KeyLookupSource? = null,
-        sourceFilename: String? = null
+        sourceFilename: String? = null,
+        sourceUrl: String? = null
     ) {
         // item 19 (#58): a shared browser text selection wraps the key in page
         // text; pull out the armored key block(s) and ignore the surrounding
@@ -861,6 +910,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                     importPreview = preview,
                     importLookupSource = source,
                     importSourceFilename = sourceFilename,
+                    importSourceUrl = sourceUrl,
                     importArmoredText = trimmed,
                     errorMessage = null
                 )
