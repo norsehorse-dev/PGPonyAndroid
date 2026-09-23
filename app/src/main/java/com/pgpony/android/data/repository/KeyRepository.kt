@@ -1215,6 +1215,12 @@ class KeyRepository(
     /** #26 (RC4): raw composite-PRIMARY private ring bytes (algo 30/31 signing
      *  key), or null if not a composite primary or public-only. Fed to the
      *  decrypt path so the ML-KEM subkey can open composite-encrypted mail. */
+    /** 4.6.0 (item 21): see CompositeKeyFacade.classicalDecryptionRing. */
+    fun loadCompositeClassicalDecryptionRing(fingerprint: String): PGPSecretKeyRing? =
+        store.loadPrivateKey(fingerprint)
+            ?.takeIf { CompositeKeyFacade.isCompositePrimary(it) && CompositeKeyFacade.hasSecret(it) }
+            ?.let { CompositeKeyFacade.classicalDecryptionRing(it) }
+
     fun loadCompositePrivateRing(fingerprint: String): ByteArray? {
         val raw = store.loadPrivateKey(fingerprint) ?: return null
         return when {

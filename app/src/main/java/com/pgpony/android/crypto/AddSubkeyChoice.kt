@@ -21,10 +21,22 @@ sealed interface AddSubkeyChoice {
     companion object {
         /**
          * Classical subkey choices for a key of the given version. v6 keys take
-         * Ed25519/X25519 subkeys; v4 keys also take RSA.
+         * Ed25519/X25519 subkeys; v4 keys also take RSA. 4.6.0 (item 21): a
+         * composite ML-DSA primary also takes RSA (v6-framed), for clients such
+         * as Thunderbird that cannot encrypt to its ML-KEM subkey.
          */
-        fun classicalFor(isV6: Boolean): List<Classical> =
-            if (isV6) listOf(
+        fun classicalFor(isV6: Boolean, isCompositeSign: Boolean = false): List<Classical> =
+            if (isV6 && isCompositeSign) listOf(
+                Classical(ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_SIGN),
+                Classical(ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_AUTH),
+                Classical(ClassicalSubkeyGen.ClassicalSubkeyType.X25519_ENCRYPT),
+                Classical(ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_ENCRYPT),
+                Classical(ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_ENCRYPT),
+                Classical(ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_SIGN),
+                Classical(ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_SIGN),
+                Classical(ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_AUTH),
+                Classical(ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_AUTH)
+            ) else if (isV6) listOf(
                 Classical(ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_SIGN),
                 Classical(ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_AUTH),
                 Classical(ClassicalSubkeyGen.ClassicalSubkeyType.X25519_ENCRYPT)

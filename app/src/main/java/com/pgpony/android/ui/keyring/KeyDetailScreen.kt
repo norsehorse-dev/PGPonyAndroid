@@ -805,6 +805,7 @@ fun KeyDetailScreen(
             isProcessing = state.addSubkeyInFlight,
             errorMessage = state.addSubkeyError,
             isV6 = keyForAddSubkey.isV6Key,
+            isCompositeSign = keyForAddSubkey.algorithm.isCompositeSign,
             onApply = { choice, expiresAt, passphrase ->
                 viewModel.addSubkey(choice, expiresAt, passphrase)
             },

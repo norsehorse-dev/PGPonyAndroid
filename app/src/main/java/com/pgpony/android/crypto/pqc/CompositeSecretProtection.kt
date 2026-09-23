@@ -139,8 +139,9 @@ object CompositeSecretProtection {
 
         return when (usage) {
             USAGE_NONE -> {
-                require(body.size - i >= expectedLen) { "composite secret material truncated" }
-                body.copyOfRange(i, i + expectedLen)
+                val len = if (expectedLen < 0) mpiRunLength(body, i, -expectedLen) else expectedLen
+                require(body.size - i >= len) { "composite secret material truncated" }
+                body.copyOfRange(i, i + len)
             }
 
             USAGE_AEAD, USAGE_SHA1, USAGE_CHECKSUM -> {
@@ -205,8 +206,9 @@ object CompositeSecretProtection {
             throw lastError ?: ProtectedKeyException("composite AEAD unlock failed")
         }
         val plain = decryptor.recoverKeyData(symAlg, s2kKey, iv, encData, 0, encData.size)
-        require(plain.size >= expectedLen) { "recovered composite secret material too short" }
-        return plain.copyOfRange(0, expectedLen)
+        val len = if (expectedLen < 0) mpiRunLength(plain, 0, -expectedLen) else expectedLen
+        require(plain.size >= len) { "recovered composite secret material too short" }
+        return plain.copyOfRange(0, len)
     }
 
     private fun buildS2K(b: ByteArray): S2K = when (val type = b[0].toInt() and 0xFF) {
@@ -227,6 +229,24 @@ object CompositeSecretProtection {
     }
 
     // -- packet / int helpers --
+
+    /**
+     * 4.6.0 (item 21): [expectedLen] for secret material that is [count]
+     * OpenPGP MPIs rather than a fixed size (an RSA subkey's d, p, q, u).
+     */
+    fun mpis(count: Int): Int = -count
+
+    /** Octets taken by [count] consecutive MPIs starting at [offset]. */
+    private fun mpiRunLength(b: ByteArray, offset: Int, count: Int): Int {
+        var i = offset
+        repeat(count) {
+            require(i + 2 <= b.size) { "secret MPI truncated" }
+            val bits = ((b[i].toInt() and 0xFF) shl 8) or (b[i + 1].toInt() and 0xFF)
+            i += 2 + (bits + 7) / 8
+        }
+        require(i <= b.size) { "secret MPI truncated" }
+        return i - offset
+    }
 
     /** Length of the public-key body prefix (version .. public material). */
     private fun publicBodyLen(keyPacketBody: ByteArray): Int {

@@ -40,6 +40,8 @@ fun AddSubkeySheet(
     isProcessing: Boolean = false,
     errorMessage: String? = null,
     isV6: Boolean = false,
+    /** 4.6.0 (item 21): a composite ML-DSA primary, which also takes RSA. */
+    isCompositeSign: Boolean = false,
     onApply: (choice: AddSubkeyChoice, expiresAtEpochSeconds: Long?, passphrase: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -96,6 +98,7 @@ fun AddSubkeySheet(
             AddSubkeyTypeChips(
                 selected = selectedChoice,
                 isV6 = isV6,
+                isCompositeSign = isCompositeSign,
                 onSelect = { selectedChoice = it }
             )
 
@@ -242,9 +245,10 @@ private fun AddSubkeyExpiryChips(
 private fun AddSubkeyTypeChips(
     selected: AddSubkeyChoice,
     isV6: Boolean,
+    isCompositeSign: Boolean,
     onSelect: (AddSubkeyChoice) -> Unit
 ) {
-    val classical = AddSubkeyChoice.classicalFor(isV6)
+    val classical = AddSubkeyChoice.classicalFor(isV6, isCompositeSign)
     val postQuantum = AddSubkeyChoice.postQuantumFor(isV6)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(

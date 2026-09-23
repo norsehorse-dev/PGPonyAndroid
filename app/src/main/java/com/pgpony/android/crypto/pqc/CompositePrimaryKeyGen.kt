@@ -702,6 +702,7 @@ object CompositePrimaryKeyGen {
         val pub: ByteArray
         val sec: ByteArray
         var edSecForBackSig: ByteArray? = null
+        var rsaSecForBackSig: org.bouncycastle.crypto.params.RSAPrivateCrtKeyParameters? = null
         when (type) {
             ClassicalSubkeyGen.ClassicalSubkeyType.X25519_ENCRYPT -> {
                 val kp = X25519KeyPairGenerator()
@@ -726,8 +727,28 @@ object CompositePrimaryKeyGen {
                 algId = PublicKeyAlgorithmTags.Ed25519
                 keyFlags = KEY_FLAG_AUTHENTICATE
             }
+            // 4.6.0 (item 21): RSA, v6-framed, so clients that cannot use the
+            // ML-KEM subkey (Thunderbird's RNP) have a classical one to use.
+            ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_ENCRYPT,
+            ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_ENCRYPT,
+            ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_SIGN,
+            ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_SIGN,
+            ClassicalSubkeyGen.ClassicalSubkeyType.RSA_2048_AUTH,
+            ClassicalSubkeyGen.ClassicalSubkeyType.RSA_4096_AUTH -> {
+                val bits = if (type.name.startsWith("RSA_4096")) 4096 else 2048
+                val (rsaPub, rsaSec, priv) = rsaKeyMaterial(bits, random, ctime)
+                pub = rsaPub
+                sec = rsaSec
+                algId = PublicKeyAlgorithmTags.RSA_GENERAL
+                keyFlags = when (type.capability) {
+                    ClassicalSubkeyGen.Capability.ENCRYPT -> KEY_FLAG_ENCRYPT_COMMS or KEY_FLAG_ENCRYPT_STORAGE
+                    ClassicalSubkeyGen.Capability.SIGN -> KEY_FLAG_SIGN
+                    else -> KEY_FLAG_AUTHENTICATE
+                }
+                if (type.capability == ClassicalSubkeyGen.Capability.SIGN) rsaSecForBackSig = priv
+            }
             else -> throw ClassicalSubkeyGen.SubkeyAddError(
-                "Only Ed25519 and X25519 subkeys are supported on a v6 key."
+                "This subkey type is not supported on a composite key."
             )
         }
 
@@ -735,7 +756,25 @@ object CompositePrimaryKeyGen {
         val secBody = pubBody + byteArrayOf(0) + sec
         val bindingData = keyFrame(ctx.pubBody) + keyFrame(pubBody)
 
-        val backSigBody: ByteArray? = if (edSecForBackSig != null) {
+        val rsaBack = rsaSecForBackSig
+        val backSigBody: ByteArray? = if (rsaBack != null) {
+            // A signing subkey needs a 0x19 back-signature made by itself.
+            val subFp = v6Fingerprint(pubBody)
+            val backHashed = ByteArrayOutputStream().apply {
+                write(subpacket(SUBPKT_CREATION_TIME or 0x80, uint32(ctime)))
+                write(issuerFingerprintSubpacket(subFp))
+            }.toByteArray()
+            val salt = ByteArray(SALT_SHA256).also { random.nextBytes(it) }
+            val digest = CompositeSigHash.v6DocumentDigest(
+                hashAlgorithm = HASH_SHA256,
+                salt = salt,
+                data = bindingData,
+                signatureType = SIGTYPE_PRIMARY_BINDING,
+                publicKeyAlgorithm = algId,
+                hashedSubpacketBody = backHashed
+            )
+            v6SigBody(SIGTYPE_PRIMARY_BINDING, algId, backHashed, digest, salt, rsaSignSha256(rsaBack, digest))
+        } else if (edSecForBackSig != null) {
             val subFp = v6Fingerprint(pubBody)
             val backHashed = ByteArrayOutputStream().apply {
                 write(subpacket(SUBPKT_CREATION_TIME or 0x80, uint32(ctime)))
@@ -755,6 +794,51 @@ object CompositePrimaryKeyGen {
 
         val hashed = bindingHashed(ctime, keyFlags, ctx.fingerprint, expirationSeconds, backSigBody)
         return bindAndAppend(ring, ctx, pubBody, secBody, hashed, random)
+    }
+
+    /**
+     * 4.6.0 (item 21): a fresh RSA key as v6 key material: the public MPIs (n, e),
+     * the secret MPIs (d, p, q, u, as RFC 9580 orders them, with p < q), and the
+     * private key for a back-signature. Bouncy Castle's own RSA packet classes
+     * do the MPI encoding.
+     */
+    private fun rsaKeyMaterial(
+        bits: Int,
+        random: SecureRandom,
+        ctime: Int
+    ): Triple<ByteArray, ByteArray, org.bouncycastle.crypto.params.RSAPrivateCrtKeyParameters> {
+        val gen = org.bouncycastle.crypto.generators.RSAKeyPairGenerator().apply {
+            init(org.bouncycastle.crypto.params.RSAKeyGenerationParameters(
+                java.math.BigInteger.valueOf(65537), random, bits, 100
+            ))
+        }
+        val kp = gen.generateKeyPair()
+        val pgp = org.bouncycastle.openpgp.operator.bc.BcPGPKeyPair(
+            org.bouncycastle.bcpg.PublicKeyPacket.VERSION_6,
+            PublicKeyAlgorithmTags.RSA_GENERAL, kp, Date(ctime * 1000L)
+        )
+        val pub = pgp.publicKey.publicKeyPacket.key.encoded
+        val sec = (pgp.privateKey.privateKeyDataPacket as org.bouncycastle.bcpg.RSASecretBCPGKey).encoded
+        return Triple(pub, sec, kp.private as org.bouncycastle.crypto.params.RSAPrivateCrtKeyParameters)
+    }
+
+    /** RSASSA-PKCS1-v1_5 over an already computed SHA-256 [digest], as an OpenPGP MPI. */
+    private fun rsaSignSha256(
+        key: org.bouncycastle.crypto.params.RSAPrivateCrtKeyParameters,
+        digest: ByteArray
+    ): ByteArray {
+        val prefix = byteArrayOf(
+            0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86.toByte(), 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01,
+            0x05, 0x00, 0x04, 0x20
+        )
+        val engine = org.bouncycastle.crypto.encodings.PKCS1Encoding(org.bouncycastle.crypto.engines.RSABlindedEngine())
+        engine.init(true, key)
+        val block = prefix + digest
+        val sig = engine.processBlock(block, 0, block.size)
+        val v = java.math.BigInteger(1, sig)
+        val mag = org.bouncycastle.util.BigIntegers.asUnsignedByteArray(v)
+        val bitLen = v.bitLength()
+        return byteArrayOf((bitLen ushr 8).toByte(), bitLen.toByte()) + mag
     }
 
     private fun ed25519Sign(secret: ByteArray, digest: ByteArray): ByteArray {

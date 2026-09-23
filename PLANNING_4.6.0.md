@@ -731,6 +731,17 @@ support does not yet handle either. If verification shows Thunderbird still cann
 subkey, the reliable interop path is a separate classical key rather than a subkey graft; decide during
 implementation and document whichever holds.
 
+Status: done in code, awaiting on-device check; Thunderbird verification failed, as the note above feared.
+RSA 2048/4096 (encrypt, sign with a 0x19 back-signature, auth) can be added to a composite ML-DSA key,
+v6-framed, bound by the composite primary and protected with the key's passphrase. A message a classical
+client encrypts to that subkey decrypts in PGPony (CompositeKeyFacade.classicalDecryptionRing), which also
+fixes decryption to an X25519 subkey added to a composite key; that never worked before. Interop check: RNP
+0.17 (Thunderbird's library) rejects the certificate outright ("wrong key packet version") and GnuPG 2.4 does
+too ("Invalid packet"), because the primary is a v6 key; the subkey type does not matter. Per the 2026 OpenPGP
+email summit, Thunderbird is working toward v4 PQC, not v6. For Thunderbird today the working path is a separate
+v4 key, or an mlkem-768v4 key once Thunderbird ships v4 PQC. Decision pending: ship the RSA option (useful with
+v6-capable clients) with a note in the add-subkey sheet, or hold it.
+
 ## Delivery note
 
 Android first per the new-feature procedure. iOS mirrors each item once the Android version is verified,

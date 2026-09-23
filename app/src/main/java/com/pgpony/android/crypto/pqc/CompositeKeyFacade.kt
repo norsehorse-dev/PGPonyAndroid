@@ -290,6 +290,40 @@ object CompositeKeyFacade {
         }
     }
 
+    /**
+     * 4.6.0 (item 21): the classical encryption subkeys (RSA, X25519, X448,
+     * ECDH) of a composite ML-DSA key as a Bouncy Castle secret ring, so a
+     * message a classical client (Thunderbird) encrypted to one of them can be
+     * decrypted. Bouncy Castle cannot load the composite primary, so the
+     * subkeys ride on a throwaway v6 Ed25519 primary that is never stored and
+     * never used; they keep their own protection (the user's passphrase).
+     * Null when the key has no such subkey.
+     */
+    fun classicalDecryptionRing(ring: ByteArray): org.bouncycastle.openpgp.PGPSecretKeyRing? {
+        val classical = walk(ring).filter { pkt ->
+            pkt.tag == 7 && (publicKeyBody(pkt.body)[1 + 4].toInt() and 0xFF) in CLASSICAL_ENCRYPTION_ALGS
+        }
+        if (classical.isEmpty()) return null
+        return runCatching {
+            val impl = org.bouncycastle.openpgp.api.bc.BcOpenPGPImplementation()
+            val throwaway = org.bouncycastle.openpgp.api.OpenPGPKeyGenerator(
+                impl, org.bouncycastle.bcpg.PublicKeyPacket.VERSION_6, false, java.util.Date()
+            ).withPrimaryKey(
+                org.bouncycastle.openpgp.api.KeyPairGeneratorCallback { g -> g.generateEd25519KeyPair() }
+            ).addUserId("classical-subkey-carrier").build().getPGPSecretKeyRing()
+            val assembled = ByteArrayOutputStream().apply {
+                write(throwaway.encoded)
+                classical.forEach { write(packet(7, it.body)) }
+            }.toByteArray()
+            org.bouncycastle.openpgp.PGPSecretKeyRing(
+                java.io.ByteArrayInputStream(assembled),
+                org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator()
+            ).takeIf { r -> r.secretKeys.asSequence().count() > 1 }
+        }.getOrNull()
+    }
+
+    private val CLASSICAL_ENCRYPTION_ALGS = setOf(1, 2, 16, 18, 25, 26)
+
     /** True if [ring] carries secret material (a tag-5 secret primary packet). */
     fun hasSecret(ring: ByteArray): Boolean =
         walk(ring).any { it.tag == 5 }
@@ -334,6 +368,8 @@ object CompositeKeyFacade {
                     kem != null -> kem.curve.keyLen + kem.mlkem.seedLen
                     signSub != null -> signSub.compositeSecretLen
                     algId == 25 || algId == 27 -> 32 // X25519 / Ed25519 native secret
+                    // 4.6.0 (item 21): an RSA subkey's secret is four MPIs (d, p, q, u).
+                    algId == 1 || algId == 2 || algId == 3 -> CompositeSecretProtection.mpis(4)
                     else -> null
                 }
                 if (len != null) {

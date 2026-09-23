@@ -3370,6 +3370,16 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         return attempt(rings)
     }
 
+    /**
+     * 4.6.0 (item 21): the secret ring a decrypt tries for [e]. A composite
+     * ML-DSA key is not a Bouncy Castle ring (its ML-KEM subkey goes through
+     * compositePrimaryRings); its classical encryption subkeys, such as an RSA
+     * subkey added for Thunderbird, come as a separate ring.
+     */
+    private fun secretRingForDecrypt(e: PGPKeyEntity): org.bouncycastle.openpgp.PGPSecretKeyRing? =
+        repo.loadSecretKeyRing(e.fingerprint)
+            ?: if (e.algorithm.isCompositeSign) repo.loadCompositeClassicalDecryptionRing(e.fingerprint) else null
+
     private fun decryptAndVerifyPath(s: DecryptUiState) {
         viewModelScope.launch {
             _decryptState.value = _decryptState.value.copy(isProcessing = true, errorMessage = null, decryptedByKeyLabel = null)
@@ -3392,7 +3402,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // decrypt was not, which is why decrypt was the side that
                 // froze.
                 val loaded = withContext(Dispatchers.IO) {
-                    orderedKeys.mapNotNull { e -> repo.loadSecretKeyRing(e.fingerprint)?.let { e to it } }
+                    orderedKeys.mapNotNull { e -> secretRingForDecrypt(e)?.let { e to it } }
                 }
                 val secretRings = loaded.map { it.second }
                 // #26 (RC4): composite-primary keys are not BC rings; pass their
@@ -4365,7 +4375,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // the safety net) — see fallbackOrderedKeys.
                 val orderedKeys = fallbackOrderedKeys(s)
                 val secretRings = withContext(Dispatchers.IO) {
-                    orderedKeys.mapNotNull { repo.loadSecretKeyRing(it.fingerprint) }
+                    orderedKeys.mapNotNull { secretRingForDecrypt(it) }
                 }
                 // Umotas (RC8): composite-primary keys are raw (non-BC) rings;
                 // the streaming path must pass them too so a file encrypted to
@@ -4634,7 +4644,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // either a freeze or a "close app" dialog depending on how
                 // aggressively the OEM's watchdog fires.
                 val loaded = withContext(Dispatchers.IO) {
-                    orderedKeys.mapNotNull { e -> repo.loadSecretKeyRing(e.fingerprint)?.let { e to it } }
+                    orderedKeys.mapNotNull { e -> secretRingForDecrypt(e)?.let { e to it } }
                 }
                 val secretRings = loaded.map { it.second }
                 // #26 (RC4): composite-primary keys are not BC rings; pass their

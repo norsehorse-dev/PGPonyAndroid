@@ -987,7 +987,9 @@ class KeyDetailViewModel(
         }
         return descriptors.map { d ->
             val fpHex = d.fingerprintHex.uppercase()
-            val algo = KeyAlgorithm.from(d.algId, 6)
+            // 4.6.0 (item 21): RSA's one algorithm id covers every size, so no
+            // KeyAlgorithm (which would say 4096) labels it.
+            val algo = if (d.algId in 1..3) null else KeyAlgorithm.from(d.algId, 6)
             val capabilities = if (d.keyFlags != 0) {
                 SubkeyCapability.fromBcKeyFlags(d.keyFlags)
             } else when (d.algId) {
@@ -1015,6 +1017,7 @@ class KeyDetailViewModel(
         31 -> "ML-DSA-87 + Ed448"
         25 -> "X25519"
         27 -> "Ed25519"
+        1, 2, 3 -> "RSA"
         else -> "Subkey (v6)"
     }
 
