@@ -1391,7 +1391,7 @@
     <string name="share_target_root_subtitle_file_format">Выберите, как обработать %1$s:</string>
     <string name="share_target_action_encrypt">Зашифровать</string>
     <string name="share_target_action_encrypt_subtitle">Выберите получателей и создайте шифртекст</string>
-    <string name="share_target_action_decrypt">Расшифровать / Проверить</string>
+    <string name="share_target_action_decrypt">Расшифровать</string>
     <string name="share_target_action_decrypt_subtitle">Прочитать это сообщение PGP одним из ваших ключей</string>
     <string name="share_target_open_full_app">Открыть в PGPony</string>
     <string name="share_target_open_full_app_subtitle_import">Похоже на ключ PGP — импортируйте его на вкладке «Связка ключей»</string>
@@ -2094,4 +2094,15 @@
     <string name="import_url_error_failed_format">Не удалось загрузить ссылку: %1$s</string>
     <string name="import_preview_source_url_format">По ссылке: %1$s</string>
     <string name="key_detail_add_subkey_v6_note">Thunderbird и GnuPG пока не читают ключи v6, поэтому добавленный здесь подключ там работать не будет.</string>
+    <string name="share_target_action_import">Импортировать ключ</string>
+    <string name="share_target_action_import_subtitle">Проверьте отпечаток и добавьте в связку ключей</string>
+    <string name="share_target_action_import_encrypt">Импортировать и зашифровать для этого ключа</string>
+    <string name="share_target_action_import_encrypt_subtitle">Проверьте отпечаток и нажмите «Зашифровать для этого ключа»</string>
+    <string name="share_target_action_verify">Проверить подпись</string>
+    <string name="share_target_action_verify_subtitle">Узнайте, кто подписал. Сообщение подписано, но не зашифровано</string>
+    <string name="share_target_action_sign">Подписать или зашифровать и подписать</string>
+    <string name="share_target_action_sign_subtitle">Открыть текст на экране шифрования PGPony</string>
+    <string name="share_target_action_encrypt_other">Зашифровать остальной текст</string>
+    <string name="share_target_action_encrypt_other_subtitle">Зашифровать текст, отправленный вместе с блоком PGP</string>
+    <string name="share_target_decrypt_result_unknown_signer">Подписано ключом, которого нет в вашей связке</string>
 </resources>

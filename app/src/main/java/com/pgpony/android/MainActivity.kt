@@ -976,6 +976,17 @@ fun PGPonyMainScreen(
                 }
                 pendingAction.value = IntentAction.None
             }
+            is IntentAction.VerifyText -> {
+                // 4.6.0 (item 6): nothing to unlock for a signed-only message,
+                // so verify at once; the banner shows the signer and trust.
+                encDecVm.updateDecryptInput(action.signedMessage)
+                navController.navigate(Screen.Decrypt.route) {
+                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                    launchSingleTop = true
+                }
+                encDecVm.decrypt()
+                pendingAction.value = IntentAction.None
+            }
             is IntentAction.ImportKey -> {
                 keyringVm.showImport()
                 keyringVm.updateImportText(action.armoredKey)

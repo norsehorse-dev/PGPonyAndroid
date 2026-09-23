@@ -1176,7 +1176,7 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="share_target_root_subtitle_file_format">Wähle, wie %1$s behandelt werden soll:</string>
     <string name="share_target_action_encrypt">Verschlüsseln</string>
     <string name="share_target_action_encrypt_subtitle">Empfänger wählen und Chiffretext erzeugen</string>
-    <string name="share_target_action_decrypt">Entschlüsseln / Verifizieren</string>
+    <string name="share_target_action_decrypt">Entschlüsseln</string>
     <string name="share_target_action_decrypt_subtitle">Diese PGP-Nachricht mit einem deiner Schlüssel lesen</string>
     <string name="share_target_open_full_app">In PGPony öffnen</string>
     <string name="share_target_open_full_app_subtitle_import">Das sieht nach einem PGP-Schlüssel aus — importiere ihn im Schlüsselbund-Tab</string>
@@ -2019,4 +2019,15 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="import_url_error_failed_format">Link konnte nicht abgerufen werden: %1$s</string>
     <string name="import_preview_source_url_format">Von Link: %1$s</string>
     <string name="key_detail_add_subkey_v6_note">Thunderbird und GnuPG können v6-Schlüssel noch nicht lesen, daher funktioniert ein hier hinzugefügter Unterschlüssel dort nicht.</string>
+    <string name="share_target_action_import">Schlüssel importieren</string>
+    <string name="share_target_action_import_subtitle">Fingerabdruck prüfen, dann zum Schlüsselbund hinzufügen</string>
+    <string name="share_target_action_import_encrypt">Importieren und an diesen Schlüssel verschlüsseln</string>
+    <string name="share_target_action_import_encrypt_subtitle">Fingerabdruck prüfen, dann auf „An diesen Schlüssel verschlüsseln“ tippen</string>
+    <string name="share_target_action_verify">Signatur prüfen</string>
+    <string name="share_target_action_verify_subtitle">Sehen, wer sie signiert hat. Diese Nachricht ist signiert, nicht verschlüsselt</string>
+    <string name="share_target_action_sign">Signieren oder verschlüsseln und signieren</string>
+    <string name="share_target_action_sign_subtitle">Diesen Text im Verschlüsseln-Bildschirm von PGPony öffnen</string>
+    <string name="share_target_action_encrypt_other">Den übrigen Text verschlüsseln</string>
+    <string name="share_target_action_encrypt_other_subtitle">Den Text verschlüsseln, der zusammen mit dem PGP-Block geteilt wurde</string>
+    <string name="share_target_decrypt_result_unknown_signer">Signiert mit einem Schlüssel, der nicht in deinem Schlüsselbund ist</string>
 </resources>

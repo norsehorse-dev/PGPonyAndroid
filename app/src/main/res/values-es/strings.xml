@@ -1176,7 +1176,7 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="share_target_root_subtitle_file_format">Elige cómo manejar %1$s:</string>
     <string name="share_target_action_encrypt">Cifrar</string>
     <string name="share_target_action_encrypt_subtitle">Elige destinatarios y genera texto cifrado</string>
-    <string name="share_target_action_decrypt">Descifrar / Verificar</string>
+    <string name="share_target_action_decrypt">Descifrar</string>
     <string name="share_target_action_decrypt_subtitle">Leer este mensaje PGP con una de tus claves</string>
     <string name="share_target_open_full_app">Abrir en PGPony</string>
     <string name="share_target_open_full_app_subtitle_import">Esto parece una clave PGP — impórtala desde la pestaña Llavero</string>
@@ -2019,4 +2019,15 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="import_url_error_failed_format">No se pudo obtener el enlace: %1$s</string>
     <string name="import_preview_source_url_format">Desde enlace: %1$s</string>
     <string name="key_detail_add_subkey_v6_note">Thunderbird y GnuPG aún no leen claves v6, así que una subclave añadida aquí no funcionará allí.</string>
+    <string name="share_target_action_import">Importar clave</string>
+    <string name="share_target_action_import_subtitle">Comprueba su huella y añádela a tu llavero</string>
+    <string name="share_target_action_import_encrypt">Importar y cifrar para esta clave</string>
+    <string name="share_target_action_import_encrypt_subtitle">Comprueba su huella y toca Cifrar a esta clave</string>
+    <string name="share_target_action_verify">Verificar firma</string>
+    <string name="share_target_action_verify_subtitle">Mira quién la firmó. Este mensaje está firmado, no cifrado</string>
+    <string name="share_target_action_sign">Firmar, o cifrar y firmar</string>
+    <string name="share_target_action_sign_subtitle">Abrir este texto en la pantalla Cifrar de PGPony</string>
+    <string name="share_target_action_encrypt_other">Cifrar el resto del texto</string>
+    <string name="share_target_action_encrypt_other_subtitle">Cifrar el texto compartido junto al bloque PGP</string>
+    <string name="share_target_decrypt_result_unknown_signer">Firmado con una clave que no está en tu llavero</string>
 </resources>

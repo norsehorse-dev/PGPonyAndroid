@@ -140,6 +140,8 @@ data class ShareTargetUiState(
     val signerName: String? = null,           // populated by decrypt signature info
     val signerKeyId: String? = null,
     val signatureVerified: Boolean = false,
+    /** 4.6.0 (item 15): signed, by a key that is not in the keyring. */
+    val signatureFromUnknownKey: Boolean = false,
 
     // Status
     val errorMessage: String? = null,
@@ -340,6 +342,7 @@ class ShareTargetViewModel(
                 signerKeyId = null,
                 signerName = null,
                 errorMessage = null,
+                signatureFromUnknownKey = false,
             )
         }
     }
@@ -443,21 +446,8 @@ class ShareTargetViewModel(
         _state.update { it.copy(phase = ShareTargetPhase.Processing, errorMessage = null) }
         viewModelScope.launch {
             try {
-                val tryRings = withContext(Dispatchers.IO) {
-                    val rings = mutableListOf<org.bouncycastle.openpgp.PGPSecretKeyRing>()
-                    current.selectedDecryptKey?.let { entity ->
-                        repository.loadSecretKeyRing(entity.fingerprint)?.let { rings.add(it) }
-                    }
-                    current.availableKeyPairs.forEach { pair ->
-                        repository.loadSecretKeyRing(pair.fingerprint)?.let { ring ->
-                            if (rings.none { it.publicKey.fingerprint contentEquals ring.publicKey.fingerprint }) {
-                                rings.add(ring)
-                            }
-                        }
-                    }
-                    rings.toList()
-                }
-                if (tryRings.isEmpty()) {
+                val (tryRings, compositeRings) = withContext(Dispatchers.IO) { decryptRings(current) }
+                if (tryRings.isEmpty() && compositeRings.isEmpty()) {
                     _state.update {
                         it.copy(
                             phase = ShareTargetPhase.Error,
@@ -499,25 +489,26 @@ class ShareTargetViewModel(
                                 secretKeyRings = tryRings,
                                 passphrase = current.passphrase.ifEmpty { null },
                                 verificationKeys = verifyRings,
+                                compositePrimaryRings = compositeRings,
                             )
                         }
                     }
                     dest to r
                 }
-                val signerName = result.signerKeyID?.let { keyId ->
-                    _state.value.availableRecipients.firstOrNull { k ->
-                        k.longKeyId.equals(keyId, ignoreCase = true)
-                    }?.userID
-                }
+                val sig = summarizeSignature(
+                    result.signatureVerified, result.signerKeyID, result.hasSignature,
+                    result.compositeInline, result.compositeInlineBytes, result.compositeClaimedSignerFp
+                )
                 _state.update {
                     it.copy(
                         phase = ShareTargetPhase.DecryptFileResult,
                         decryptedFileBytes = null,
                         decryptedFile = out,
                         decryptedFileName = result.filename?.takeIf { n -> n.isNotBlank() } ?: outName,
-                        signatureVerified = result.signatureVerified,
-                        signerKeyId = result.signerKeyID,
-                        signerName = signerName,
+                        signatureVerified = sig.verified,
+                        signerKeyId = sig.signerKeyId,
+                        signerName = sig.signerName,
+                        signatureFromUnknownKey = sig.unknownSigner,
                     )
                 }
             } catch (e: PGPCryptoError.PassphraseRequired) {
@@ -687,7 +678,10 @@ class ShareTargetViewModel(
         val current = _state.value
         val armored = when (val c = current.content) {
             is ShareIntentContent.Text -> {
-                if (!c.looksLikePgpMessage) {
+                // 4.6.0 (item 6): decrypt the encrypted block itself, not the
+                // text around it.
+                val encryptedBlock = SharePayload.of(c.text).encrypted
+                if (encryptedBlock == null && !c.looksLikePgpMessage) {
                     _state.update {
                         it.copy(
                             phase = ShareTargetPhase.Error,
@@ -698,9 +692,9 @@ class ShareTargetViewModel(
                     }
                     return
                 }
-                c.text
+                encryptedBlock ?: c.text
             }
-            is ShareIntentContent.PgpFile -> c.armoredText ?: run {
+            is ShareIntentContent.PgpFile -> c.armoredText?.let { SharePayload.of(it).encrypted ?: it } ?: run {
                 // Binary PGP path — decrypt the raw bytes instead.
                 // Use decrypt() instead of decryptArmored().
                 //
@@ -742,23 +736,8 @@ class ShareTargetViewModel(
             try {
                 // Try the user-selected key first; if decrypt fails with
                 // "no matching key", fall back to all available pairs.
-                val tryRings = withContext(Dispatchers.IO) {
-                    val rings = mutableListOf<org.bouncycastle.openpgp.PGPSecretKeyRing>()
-                    current.selectedDecryptKey?.let { entity ->
-                        repository.loadSecretKeyRing(entity.fingerprint)?.let { rings.add(it) }
-                    }
-                    // Also include all other pairs as fallback — BC
-                    // walks the list to find the matching sub-key.
-                    current.availableKeyPairs.forEach { pair ->
-                        repository.loadSecretKeyRing(pair.fingerprint)?.let { ring ->
-                            if (rings.none { it.publicKey.fingerprint contentEquals ring.publicKey.fingerprint }) {
-                                rings.add(ring)
-                            }
-                        }
-                    }
-                    rings.toList()
-                }
-                if (tryRings.isEmpty()) {
+                val (tryRings, compositeRings) = withContext(Dispatchers.IO) { decryptRings(current) }
+                if (tryRings.isEmpty() && compositeRings.isEmpty()) {
                     _state.update {
                         it.copy(
                             phase = ShareTargetPhase.Error,
@@ -780,6 +759,7 @@ class ShareTargetViewModel(
                         secretKeyRings = tryRings,
                         passphrase = current.passphrase.ifEmpty { null },
                         verificationKeys = verifyRings,
+                        compositePrimaryRings = compositeRings,
                     )
                 }
                 publishDecryptResult(
@@ -807,6 +787,88 @@ class ShareTargetViewModel(
      * decrypt (which pass the real rings) verified the same message fine. Every
      * stored public key is a candidate signer, mirroring the other paths.
      */
+    /**
+     * 4.6.0 (items 6, 15, 21): the secret rings a Quick Action decrypt tries,
+     * the selected key first: Bouncy Castle rings, the classical subkeys of a
+     * composite ML-DSA key (RSA / X25519, see CompositeKeyFacade), and the raw
+     * composite rings whose ML-KEM subkey opens composite mail. The Quick
+     * Action used to pass only the first kind, so a composite key could not
+     * decrypt anything here.
+     */
+    private fun decryptRings(
+        current: ShareTargetUiState
+    ): Pair<List<org.bouncycastle.openpgp.PGPSecretKeyRing>, List<ByteArray>> {
+        val ordered = listOfNotNull(current.selectedDecryptKey) +
+            current.availableKeyPairs.filter { it.fingerprint != current.selectedDecryptKey?.fingerprint }
+        val rings = mutableListOf<org.bouncycastle.openpgp.PGPSecretKeyRing>()
+        val composite = mutableListOf<ByteArray>()
+        for (entity in ordered) {
+            val ring = repository.loadSecretKeyRing(entity.fingerprint)
+                ?: if (entity.algorithm.isCompositeSign) repository.loadCompositeClassicalDecryptionRing(entity.fingerprint) else null
+            if (ring != null && rings.none { it.publicKey.fingerprint contentEquals ring.publicKey.fingerprint }) {
+                rings.add(ring)
+            }
+            if (entity.algorithm.isCompositeSign) {
+                repository.loadCompositePrivateRing(entity.fingerprint)?.let { composite.add(it) }
+            }
+        }
+        return rings to composite
+    }
+
+    /** 4.6.0 (item 15): what the result screen says about the signature. */
+    private data class SignatureSummary(
+        val verified: Boolean,
+        val signerName: String?,
+        val signerKeyId: String?,
+        /** Signed, but by a key that is not in the keyring. */
+        val unknownSigner: Boolean,
+    )
+
+    /**
+     * 4.6.0 (item 15): the signature state of a Quick Action decrypt. An inline
+     * COMPOSITE (ML-DSA + EdDSA) signature is verified against the stored
+     * composite key, as the Decrypt screen does; before, the Quick Action read
+     * only signatureVerified and showed such a message as unverified.
+     */
+    private suspend fun summarizeSignature(
+        signatureVerified: Boolean,
+        signerKeyID: String?,
+        hasSignature: Boolean,
+        compositeInline: Boolean,
+        compositeInlineBytes: ByteArray?,
+        compositeClaimedSignerFp: String?,
+    ): SignatureSummary {
+        if (compositeInline && compositeInlineBytes != null) {
+            val fp = compositeClaimedSignerFp
+            val match = fp?.let { claimed ->
+                withContext(Dispatchers.IO) {
+                    repository.getAllKeys().filter { it.algorithm.isCompositeSign }.firstNotNullOfOrNull { e ->
+                        repository.loadCompositePublicInfo(e.fingerprint)?.compositeSigners
+                            ?.firstOrNull { it.fingerprintHex.equals(claimed, ignoreCase = true) }
+                            ?.let { e to it }
+                    }
+                }
+            } ?: return SignatureSummary(false, null, fp?.take(16), unknownSigner = true)
+            val (entity, component) = match
+            val ok = withContext(Dispatchers.Default) {
+                runCatching {
+                    com.pgpony.android.crypto.pqc.CompositeDocumentVerifier
+                        .verifyInline(component.publicMaterial, compositeInlineBytes).valid
+                }.getOrDefault(false)
+            }
+            return SignatureSummary(ok, entity.userID, fp.take(16), unknownSigner = false)
+        }
+        val name = signerKeyID?.let { keyId ->
+            _state.value.availableRecipients.firstOrNull { k -> k.longKeyId.equals(keyId, ignoreCase = true) }?.userID
+        }
+        return SignatureSummary(
+            verified = signatureVerified,
+            signerName = name,
+            signerKeyId = signerKeyID,
+            unknownSigner = hasSignature && signerKeyID == null,
+        )
+    }
+
     private suspend fun allVerificationRings(): List<org.bouncycastle.openpgp.PGPPublicKeyRing> =
         withContext(Dispatchers.IO) {
             repository.getAllKeys().mapNotNull { repository.loadPublicKeyRing(it.fingerprint) }
@@ -819,21 +881,8 @@ class ShareTargetViewModel(
         _state.update { it.copy(phase = ShareTargetPhase.Processing, errorMessage = null) }
         viewModelScope.launch {
             try {
-                val tryRings = withContext(Dispatchers.IO) {
-                    val rings = mutableListOf<org.bouncycastle.openpgp.PGPSecretKeyRing>()
-                    current.selectedDecryptKey?.let { entity ->
-                        repository.loadSecretKeyRing(entity.fingerprint)?.let { rings.add(it) }
-                    }
-                    current.availableKeyPairs.forEach { pair ->
-                        repository.loadSecretKeyRing(pair.fingerprint)?.let { ring ->
-                            if (rings.none { it.publicKey.fingerprint contentEquals ring.publicKey.fingerprint }) {
-                                rings.add(ring)
-                            }
-                        }
-                    }
-                    rings.toList()
-                }
-                if (tryRings.isEmpty()) {
+                val (tryRings, compositeRings) = withContext(Dispatchers.IO) { decryptRings(current) }
+                if (tryRings.isEmpty() && compositeRings.isEmpty()) {
                     _state.update {
                         it.copy(
                             phase = ShareTargetPhase.Error,
@@ -853,6 +902,7 @@ class ShareTargetViewModel(
                         secretKeyRings = tryRings,
                         passphrase = current.passphrase.ifEmpty { null },
                         verificationKeys = verifyRings,
+                        compositePrimaryRings = compositeRings,
                     )
                 }
                 publishDecryptResult(result, sourceFilename = sourceFilename)
@@ -897,12 +947,11 @@ class ShareTargetViewModel(
                 null
             }
         }
+        val sig = summarizeSignature(
+            result.signatureVerified, result.signerKeyID, result.hasSignature,
+            result.compositeInline, result.compositeInlineBytes, result.compositeClaimedSignerFp
+        )
         if (mime != null) {
-            val signerNameMime = result.signerKeyID?.let { keyId ->
-                _state.value.availableRecipients.firstOrNull { k ->
-                    k.longKeyId.equals(keyId, ignoreCase = true)
-                }?.userID
-            }
             _state.update {
                 it.copy(
                     phase = ShareTargetPhase.DecryptResult,
@@ -913,9 +962,10 @@ class ShareTargetViewModel(
                             mime.attachments.size
                         )
                     } else null,
-                    signatureVerified = result.signatureVerified,
-                    signerKeyId = result.signerKeyID,
-                    signerName = signerNameMime,
+                    signatureVerified = sig.verified,
+                    signerKeyId = sig.signerKeyId,
+                    signerName = sig.signerName,
+                    signatureFromUnknownKey = sig.unknownSigner,
                 )
             }
             return
@@ -923,11 +973,6 @@ class ShareTargetViewModel(
         val literalName = result.filename?.takeIf { it.isNotBlank() }
         val isFile = literalName != null ||
             (result.plaintext.isEmpty() && result.data.isNotEmpty())
-        val signerName = result.signerKeyID?.let { keyId ->
-            _state.value.availableRecipients.firstOrNull { k ->
-                k.longKeyId.equals(keyId, ignoreCase = true)
-            }?.userID
-        }
         if (isFile) {
             val outName = literalName
                 ?: sourceFilename?.let { stripPgpExtension(it) }
@@ -937,9 +982,10 @@ class ShareTargetViewModel(
                     phase = ShareTargetPhase.DecryptFileResult,
                     decryptedFileBytes = result.data,
                     decryptedFileName = outName,
-                    signatureVerified = result.signatureVerified,
-                    signerKeyId = result.signerKeyID,
-                    signerName = signerName,
+                    signatureVerified = sig.verified,
+                    signerKeyId = sig.signerKeyId,
+                    signerName = sig.signerName,
+                    signatureFromUnknownKey = sig.unknownSigner,
                 )
             }
         } else {
@@ -947,9 +993,10 @@ class ShareTargetViewModel(
                 it.copy(
                     phase = ShareTargetPhase.DecryptResult,
                     outputText = result.plaintext,
-                    signatureVerified = result.signatureVerified,
-                    signerKeyId = result.signerKeyID,
-                    signerName = signerName,
+                    signatureVerified = sig.verified,
+                    signerKeyId = sig.signerKeyId,
+                    signerName = sig.signerName,
+                    signatureFromUnknownKey = sig.unknownSigner,
                 )
             }
         }
@@ -979,6 +1026,7 @@ class ShareTargetViewModel(
                 signerName = null,
                 signerKeyId = null,
                 signatureVerified = false,
+                signatureFromUnknownKey = false,
                 encryptedFileBytes = null,
                 encryptedFileName = null,
                 decryptedFileBytes = null,

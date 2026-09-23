@@ -1489,7 +1489,7 @@
     <string name="share_target_root_subtitle_file_format">Choose how to handle %1$s:</string>
     <string name="share_target_action_encrypt">Encrypt</string>
     <string name="share_target_action_encrypt_subtitle">Pick recipients and produce ciphertext</string>
-    <string name="share_target_action_decrypt">Decrypt / Verify</string>
+    <string name="share_target_action_decrypt">Decrypt</string>
     <string name="share_target_action_decrypt_subtitle">Read this PGP message with one of your keys</string>
     <string name="share_target_open_full_app">Open in PGPony</string>
     <string name="share_target_open_full_app_subtitle_import">This looks like a PGP key. Import it from the Keyring tab</string>
@@ -2116,4 +2116,15 @@
     <string name="import_url_error_failed_format">Could not fetch the link: %1$s</string>
     <string name="import_preview_source_url_format">From link: %1$s</string>
     <string name="key_detail_add_subkey_v6_note">Thunderbird and GnuPG cannot read v6 keys yet, so a subkey added here will not work there.</string>
+    <string name="share_target_action_import">Import key</string>
+    <string name="share_target_action_import_subtitle">Check its fingerprint, then add it to your keyring</string>
+    <string name="share_target_action_import_encrypt">Import and encrypt to this key</string>
+    <string name="share_target_action_import_encrypt_subtitle">Check its fingerprint, then tap Encrypt to this key</string>
+    <string name="share_target_action_verify">Verify signature</string>
+    <string name="share_target_action_verify_subtitle">See who signed it. This message is signed, not encrypted</string>
+    <string name="share_target_action_sign">Sign, or encrypt and sign</string>
+    <string name="share_target_action_sign_subtitle">Open this text on PGPony\'s Encrypt screen</string>
+    <string name="share_target_action_encrypt_other">Encrypt the other text</string>
+    <string name="share_target_action_encrypt_other_subtitle">Encrypt the text shared along with the PGP block</string>
+    <string name="share_target_decrypt_result_unknown_signer">Signed by a key that is not in your keyring</string>
 </resources>

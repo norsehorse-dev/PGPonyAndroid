@@ -1176,7 +1176,7 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="share_target_root_subtitle_file_format">Escolha como tratar %1$s:</string>
     <string name="share_target_action_encrypt">Criptografar</string>
     <string name="share_target_action_encrypt_subtitle">Escolher destinatários e produzir texto cifrado</string>
-    <string name="share_target_action_decrypt">Descriptografar / Verificar</string>
+    <string name="share_target_action_decrypt">Descriptografar</string>
     <string name="share_target_action_decrypt_subtitle">Ler esta mensagem PGP com uma das suas chaves</string>
     <string name="share_target_open_full_app">Abrir no PGPony</string>
     <string name="share_target_open_full_app_subtitle_import">Isso parece uma chave PGP — importe-a pela aba Chaveiro</string>
@@ -2019,4 +2019,15 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="import_url_error_failed_format">Não foi possível buscar o link: %1$s</string>
     <string name="import_preview_source_url_format">Do link: %1$s</string>
     <string name="key_detail_add_subkey_v6_note">O Thunderbird e o GnuPG ainda não leem chaves v6, então uma subchave adicionada aqui não funcionará neles.</string>
+    <string name="share_target_action_import">Importar chave</string>
+    <string name="share_target_action_import_subtitle">Confira a impressão digital e adicione ao seu chaveiro</string>
+    <string name="share_target_action_import_encrypt">Importar e criptografar para esta chave</string>
+    <string name="share_target_action_import_encrypt_subtitle">Confira a impressão digital e toque em Criptografar para esta chave</string>
+    <string name="share_target_action_verify">Verificar assinatura</string>
+    <string name="share_target_action_verify_subtitle">Veja quem assinou. Esta mensagem está assinada, não criptografada</string>
+    <string name="share_target_action_sign">Assinar, ou criptografar e assinar</string>
+    <string name="share_target_action_sign_subtitle">Abrir este texto na tela Criptografar do PGPony</string>
+    <string name="share_target_action_encrypt_other">Criptografar o restante do texto</string>
+    <string name="share_target_action_encrypt_other_subtitle">Criptografar o texto compartilhado junto com o bloco PGP</string>
+    <string name="share_target_decrypt_result_unknown_signer">Assinado por uma chave que não está no seu chaveiro</string>
 </resources>

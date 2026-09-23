@@ -80,6 +80,9 @@ import java.io.InputStreamReader
 sealed class IntentAction {
     data class EncryptText(val text: String) : IntentAction()
     data class DecryptText(val armoredMessage: String) : IntentAction()
+    /** 4.6.0 (item 6): a signed (not encrypted) message from the Quick
+     *  Action: open it on the Decrypt screen and verify it straight away. */
+    data class VerifyText(val signedMessage: String) : IntentAction()
     data class ImportKey(val armoredKey: String) : IntentAction()
     /**
      * 4.0.4 — [data] carries the file for anything small enough to hold
@@ -199,6 +202,11 @@ object IntentHandler {
     const val ACTION_ENCRYPT_TEXT = "com.pgpony.android.action.ENCRYPT_TEXT"
     const val EXTRA_ENCRYPT_TEXT = "com.pgpony.android.extra.ENCRYPT_TEXT"
 
+    // 4.6.0 (item 6): the Quick Action hands a signed-only message to the main
+    // app's verify surface (signer lookup, trust, composite signatures).
+    const val ACTION_VERIFY_TEXT = "com.pgpony.android.action.VERIFY_TEXT"
+    const val EXTRA_VERIFY_TEXT = "com.pgpony.android.extra.VERIFY_TEXT"
+
     // ── 3.1.0 Phase 1 (C3) — size-aware routing constants ──────────────
     //
     // TEXT_PREFILL_LIMIT: armored content at or under this size prefills
@@ -314,6 +322,10 @@ object IntentHandler {
             ACTION_ENCRYPT_TEXT -> {
                 val text = intent.getStringExtra(EXTRA_ENCRYPT_TEXT)
                 if (!text.isNullOrBlank()) IntentAction.EncryptText(text) else IntentAction.None
+            }
+            ACTION_VERIFY_TEXT -> {
+                val text = intent.getStringExtra(EXTRA_VERIFY_TEXT)
+                if (!text.isNullOrBlank()) IntentAction.VerifyText(text) else IntentAction.None
             }
             else -> IntentAction.None
         }

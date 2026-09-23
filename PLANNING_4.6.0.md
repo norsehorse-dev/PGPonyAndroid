@@ -216,6 +216,15 @@ Also reported (a tester, 4.5.3 RC2 testing), same consolidation:
 - Sharing text into PGPony offers encryption only, not decrypt or verify. OpenKeychain offers both directions
   and handles signed-only, with a clear indication of whether the message was encrypted.
 
+Status: done in code, awaiting on-device check. The Quick Action splits shared text (or a text file) into
+what it holds (SharePayload): a public key offers Import key and Import and encrypt to this key (both open
+the import preview for the fingerprint check); an encrypted message offers Decrypt (only the PGP block is
+decrypted, not the text around it); a signed-only message (cleartext-signed, or a PGP MESSAGE that is signed
+but not encrypted) offers Verify signature, which opens it on the Decrypt screen and verifies at once there,
+with signer lookup, trust and composite support; plain text offers Encrypt, plus Sign, or encrypt and sign,
+which opens it on the Encrypt screen; text around a PGP block offers Encrypt the other text. The decrypt card
+now reads "Decrypt" (no longer promising Verify). Quick Action decrypt also now tries composite keys (their
+ML-KEM subkey and any classical subkey) and says when a message is signed by a key not in the keyring.
 
 ## 7. Open UX decision: trust-level colors and shield symbols
 
@@ -390,6 +399,9 @@ even though decryptStream now surfaces the composite fields. Mirror buildVerific
 composite branch (resolve the signer, verifyInline, set the banner state) in the share-target publish path.
 Fold into the item 6 share rework since both touch the same screens.
 
+Status: done in code, awaiting on-device check. Quick Action decrypt results (text, MIME, in-memory file
+and streamed file) verify an inline composite ML-DSA signature against the stored composite key, as the
+Decrypt screen does, instead of reading only signatureVerified.
 
 ## 16. SSH authentication: expose auth-capable keys to an ssh-agent bridge
 

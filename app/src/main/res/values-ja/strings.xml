@@ -1176,7 +1176,7 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="share_target_root_subtitle_file_format">%1$s をどう扱うか選択してください:</string>
     <string name="share_target_action_encrypt">暗号化</string>
     <string name="share_target_action_encrypt_subtitle">受信者を選んで暗号文を生成</string>
-    <string name="share_target_action_decrypt">復号 / 検証</string>
+    <string name="share_target_action_decrypt">復号</string>
     <string name="share_target_action_decrypt_subtitle">この PGP メッセージをあなたの鍵で読む</string>
     <string name="share_target_open_full_app">PGPony で開く</string>
     <string name="share_target_open_full_app_subtitle_import">これは PGP 鍵のようです — 鍵束タブからインポートしてください</string>
@@ -2015,4 +2015,15 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="import_url_error_failed_format">リンクを取得できませんでした: %1$s</string>
     <string name="import_preview_source_url_format">リンクから: %1$s</string>
     <string name="key_detail_add_subkey_v6_note">Thunderbird と GnuPG はまだ v6 キーを読めないため、ここで追加したサブキーはそれらでは使えません。</string>
+    <string name="share_target_action_import">キーをインポート</string>
+    <string name="share_target_action_import_subtitle">フィンガープリントを確認してキーリングに追加</string>
+    <string name="share_target_action_import_encrypt">インポートしてこのキーに暗号化</string>
+    <string name="share_target_action_import_encrypt_subtitle">フィンガープリントを確認して「この鍵に暗号化」をタップ</string>
+    <string name="share_target_action_verify">署名を検証</string>
+    <string name="share_target_action_verify_subtitle">署名者を確認します。このメッセージは署名済みで、暗号化されていません</string>
+    <string name="share_target_action_sign">署名、または暗号化して署名</string>
+    <string name="share_target_action_sign_subtitle">このテキストを PGPony の暗号化画面で開きます</string>
+    <string name="share_target_action_encrypt_other">残りのテキストを暗号化</string>
+    <string name="share_target_action_encrypt_other_subtitle">PGP ブロックと一緒に共有されたテキストを暗号化します</string>
+    <string name="share_target_decrypt_result_unknown_signer">キーリングにないキーで署名されています</string>
 </resources>

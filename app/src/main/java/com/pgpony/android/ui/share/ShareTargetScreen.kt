@@ -38,6 +38,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Verified
+import com.pgpony.android.intent.IntentHandler
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -133,6 +137,14 @@ fun ShareTargetScreen(
                     onOpenFullApp = { launchFullApp(context); onDismiss() },
                     onForwardKeyToMainApp = { armoredKey ->
                         launchFullAppWithForward(context, armoredKey)
+                        onDismiss()
+                    },
+                    onForwardEncryptText = { text ->
+                        forwardToMainApp(context, IntentHandler.ACTION_ENCRYPT_TEXT, IntentHandler.EXTRA_ENCRYPT_TEXT, text)
+                        onDismiss()
+                    },
+                    onForwardVerify = { text ->
+                        forwardToMainApp(context, IntentHandler.ACTION_VERIFY_TEXT, IntentHandler.EXTRA_VERIFY_TEXT, text)
                         onDismiss()
                     },
                 )
@@ -460,6 +472,8 @@ private fun ShareRootContent(
     onDecrypt: () -> Unit,
     onOpenFullApp: () -> Unit,
     onForwardKeyToMainApp: (String) -> Unit,
+    onForwardEncryptText: (String) -> Unit,
+    onForwardVerify: (String) -> Unit,
 ) {
     val content = state.content
     val subtitle = when (content) {
@@ -478,22 +492,20 @@ private fun ShareRootContent(
         )
     }
 
-    // Decide which actions to offer based on classification.
-    val looksLikeKey = when (content) {
-        is ShareIntentContent.Text -> content.looksLikePgpKey
-        is ShareIntentContent.PgpFile -> content.looksLikePgpKey
-        ShareIntentContent.Empty -> false
-    }
-    val looksLikeMessage = when (content) {
-        is ShareIntentContent.Text -> content.looksLikePgpMessage
-        is ShareIntentContent.PgpFile -> content.looksLikePgpMessage
-        ShareIntentContent.Empty -> false
-    }
     val noKeyPairs = state.availableKeyPairs.isEmpty()
     val noRecipients = state.availableRecipients.isEmpty()
 
-    // Empty state: user has no keys at all → must launch full app to set up
-    if (noKeyPairs && noRecipients) {
+    // 4.6.0 (item 6): one payload-aware list. Text (a shared text or a text
+    // file) is split into what it holds, and each part gets its own action.
+    val sharedText: String? = when (content) {
+        is ShareIntentContent.Text -> content.text
+        is ShareIntentContent.PgpFile -> content.armoredText
+        ShareIntentContent.Empty -> null
+    }
+    val payload = remember(sharedText) { sharedText?.let { SharePayload.of(it) } }
+
+    // Empty keyring: only a public key can be acted on (by importing it).
+    if (noKeyPairs && noRecipients && payload?.publicKey == null) {
         ShareActionCard(
             title = stringResource(R.string.share_target_open_full_app),
             subtitle = stringResource(R.string.share_target_open_full_app_subtitle_setup),
@@ -503,50 +515,83 @@ private fun ShareRootContent(
         return
     }
 
-    // PGP key block → defer to main app (import flow lives there). We
-    // forward the armored key text so the user lands directly in the
-    // import sheet rather than an empty Keyring tab.
-    if (looksLikeKey) {
-        val armoredKey: String = when (content) {
-            is ShareIntentContent.Text -> content.text
-            is ShareIntentContent.PgpFile -> content.armoredText.orEmpty()
-            ShareIntentContent.Empty -> ""
+    if (payload == null) {
+        // A binary file: decrypt it when it looks like a PGP message,
+        // otherwise encrypt it.
+        val looksLikeMessage = (content as? ShareIntentContent.PgpFile)?.looksLikePgpMessage == true
+        if (looksLikeMessage) {
+            DecryptCard(onDecrypt, noKeyPairs)
+        } else {
+            EncryptCard(onEncrypt, noRecipients)
         }
-        ShareActionCard(
-            title = stringResource(R.string.share_target_open_full_app),
-            subtitle = stringResource(R.string.share_target_open_full_app_subtitle_import),
-            icon = Icons.Default.OpenInNew,
-            onClick = {
-                if (armoredKey.isNotBlank()) onForwardKeyToMainApp(armoredKey)
-                else onOpenFullApp()
-            },
-        )
         return
     }
 
-    // PGP message → primary action is Decrypt, encrypt is hidden
-    // (re-encrypting a ciphertext is a weird user intent).
-    if (looksLikeMessage) {
+    payload.publicKey?.let { key ->
         ShareActionCard(
-            title = stringResource(R.string.share_target_action_decrypt),
-            subtitle = stringResource(R.string.share_target_action_decrypt_subtitle),
-            icon = Icons.Default.LockOpen,
-            onClick = onDecrypt,
-            enabled = !noKeyPairs,
+            title = stringResource(R.string.share_target_action_import),
+            subtitle = stringResource(R.string.share_target_action_import_subtitle),
+            icon = Icons.Default.Download,
+            onClick = { onForwardKeyToMainApp(key) },
         )
-        if (noKeyPairs) {
-            Text(
-                text = stringResource(R.string.share_target_decrypt_no_key_pairs),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+        ShareActionCard(
+            title = stringResource(R.string.share_target_action_import_encrypt),
+            subtitle = stringResource(R.string.share_target_action_import_encrypt_subtitle),
+            icon = Icons.Default.Lock,
+            onClick = { onForwardKeyToMainApp(key) },
+        )
+    }
+    if (payload.encrypted != null) DecryptCard(onDecrypt, noKeyPairs)
+    payload.signed?.let { signed ->
+        ShareActionCard(
+            title = stringResource(R.string.share_target_action_verify),
+            subtitle = stringResource(R.string.share_target_action_verify_subtitle),
+            icon = Icons.Default.Verified,
+            onClick = { onForwardVerify(signed) },
+        )
+    }
+    if (!payload.hasPgp) {
+        // Plain text: encrypt it here, or open it in PGPony to sign it or
+        // encrypt and sign it.
+        EncryptCard(onEncrypt, noRecipients)
+        ShareActionCard(
+            title = stringResource(R.string.share_target_action_sign),
+            subtitle = stringResource(R.string.share_target_action_sign_subtitle),
+            icon = Icons.Default.Edit,
+            onClick = { onForwardEncryptText(payload.otherText ?: sharedText.orEmpty()) },
+        )
+    } else {
+        payload.otherText?.let { other ->
+            ShareActionCard(
+                title = stringResource(R.string.share_target_action_encrypt_other),
+                subtitle = stringResource(R.string.share_target_action_encrypt_other_subtitle),
+                icon = Icons.Default.Lock,
+                onClick = { onForwardEncryptText(other) },
             )
         }
-        return
     }
+}
 
-    // Plain text → primary action is Encrypt. Also offer Decrypt as
-    // a fallback in case the classifier missed (user pasted raw armor
-    // without the BEGIN marker, edge case).
+@Composable
+private fun DecryptCard(onDecrypt: () -> Unit, noKeyPairs: Boolean) {
+    ShareActionCard(
+        title = stringResource(R.string.share_target_action_decrypt),
+        subtitle = stringResource(R.string.share_target_action_decrypt_subtitle),
+        icon = Icons.Default.LockOpen,
+        onClick = onDecrypt,
+        enabled = !noKeyPairs,
+    )
+    if (noKeyPairs) {
+        Text(
+            text = stringResource(R.string.share_target_decrypt_no_key_pairs),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+}
+
+@Composable
+private fun EncryptCard(onEncrypt: () -> Unit, noRecipients: Boolean) {
     ShareActionCard(
         title = stringResource(R.string.share_target_action_encrypt),
         subtitle = stringResource(R.string.share_target_action_encrypt_subtitle),
@@ -773,6 +818,8 @@ private fun ShareDecryptFileResultContent(
     val signerLabel = when {
         state.signatureVerified && state.signerName != null ->
             stringResource(R.string.share_target_decrypt_result_signed_format, state.signerName)
+        state.signatureFromUnknownKey ->
+            stringResource(R.string.share_target_decrypt_result_unknown_signer)
         state.signerKeyId != null && !state.signatureVerified ->
             stringResource(R.string.share_target_decrypt_result_unverified)
         else -> stringResource(R.string.share_target_decrypt_result_unsigned)
@@ -859,6 +906,8 @@ private fun ShareDecryptResultContent(
     val signerLabel = when {
         state.signatureVerified && state.signerName != null ->
             stringResource(R.string.share_target_decrypt_result_signed_format, state.signerName)
+        state.signatureFromUnknownKey ->
+            stringResource(R.string.share_target_decrypt_result_unknown_signer)
         state.signerKeyId != null && !state.signatureVerified ->
             stringResource(R.string.share_target_decrypt_result_unverified)
         else -> stringResource(R.string.share_target_decrypt_result_unsigned)
@@ -1190,6 +1239,16 @@ private fun launchFullApp(context: Context) {
  * that MainActivity's IntentHandler.process() already recognizes, so
  * there's no parallel code path to maintain.
  */
+/** 4.6.0 (item 6): hand [text] to MainActivity under [action] / [extra]. */
+private fun forwardToMainApp(context: Context, action: String, extra: String, text: String) {
+    val intent = Intent(context, MainActivity::class.java).apply {
+        this.action = action
+        putExtra(extra, text)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+    }
+    context.startActivity(intent)
+}
+
 @Suppress("unused")
 private fun launchFullAppWithForward(context: Context, armoredKey: String) {
     val intent = Intent(context, MainActivity::class.java).apply {
