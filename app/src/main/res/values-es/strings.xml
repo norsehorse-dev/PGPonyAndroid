@@ -1978,4 +1978,15 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="onboarding_page_destructive_toggle_title">Ocultar acciones destructivas</string>
     <string name="onboarding_page_destructive_toggle_subtitle">Oculta eliminar clave, quitar subclave, quitar ID de usuario y borrar todos los datos. Revocar sigue disponible. Puedes cambiar esto más tarde en Ajustes.</string>
     <string name="onboarding_scroll_more">Más opciones abajo</string>
+    <string name="publish_title_update">Actualizar en servidores de claves</string>
+    <string name="publish_action_update">Actualizar</string>
+    <string name="publish_last_uploaded_format">Última subida: %1$s</string>
+    <string name="publish_address_confirmed_format">%1$s: confirmada</string>
+    <string name="publish_address_pending_format">%1$s: aún sin confirmar en este servidor</string>
+    <string name="publish_primary_repair_format">El ID de usuario principal de esta clave es ambiguo (marcado como principal: %1$s; mostrado aquí: %2$s). En ID de usuario, toca Hacer principal en el que quieras y luego publica.</string>
+    <string name="key_detail_action_update_key_servers">Actualizar en servidores de claves</string>
+    <string name="key_detail_detail_key_server_behind">Publicada (cambios locales sin subir)</string>
+    <string name="key_detail_unpublished_changes_body">Esta clave cambió desde la última subida. Los servidores de claves aún tienen la copia anterior.</string>
+    <string name="key_detail_unpublished_changes_action">Actualizar</string>
+    <string name="revocation_result_publish_button">Publicar revocación en servidores de claves</string>
 </resources>

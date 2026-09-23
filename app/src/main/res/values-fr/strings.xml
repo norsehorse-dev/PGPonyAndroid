@@ -1978,4 +1978,15 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="onboarding_page_destructive_toggle_title">Masquer les actions destructrices</string>
     <string name="onboarding_page_destructive_toggle_subtitle">Masque supprimer la clé, retirer une sous-clé, retirer un ID utilisateur et effacer toutes les données. Révoquer reste disponible. Vous pourrez changer ceci plus tard dans les Réglages.</string>
     <string name="onboarding_scroll_more">Plus d\'options ci-dessous</string>
+    <string name="publish_title_update">Mettre à jour sur les serveurs de clés</string>
+    <string name="publish_action_update">Mettre à jour</string>
+    <string name="publish_last_uploaded_format">Dernier envoi : %1$s</string>
+    <string name="publish_address_confirmed_format">%1$s : confirmée</string>
+    <string name="publish_address_pending_format">%1$s : pas encore confirmée sur ce serveur</string>
+    <string name="publish_primary_repair_format">L\'identifiant principal de cette clé est ambigu (marqué principal : %1$s ; affiché ici : %2$s). Dans Identités, touchez Rendre principal sur celui voulu, puis publiez.</string>
+    <string name="key_detail_action_update_key_servers">Mettre à jour sur les serveurs de clés</string>
+    <string name="key_detail_detail_key_server_behind">Publiée (modifications locales non envoyées)</string>
+    <string name="key_detail_unpublished_changes_body">Cette clé a changé depuis le dernier envoi. Les serveurs de clés ont encore l\'ancienne copie.</string>
+    <string name="key_detail_unpublished_changes_action">Mettre à jour</string>
+    <string name="revocation_result_publish_button">Publier la révocation sur les serveurs de clés</string>
 </resources>

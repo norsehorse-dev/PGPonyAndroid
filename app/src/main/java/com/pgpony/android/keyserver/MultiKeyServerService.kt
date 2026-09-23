@@ -254,14 +254,50 @@ class MultiKeyServerService {
         fingerprint: String,
         expectedEmail: String?
     ): VerificationStatus = withContext(Dispatchers.IO) {
+        when (val copy = serverCopy(server, fingerprint)) {
+            ServerCopy.Unknown -> VerificationStatus.Unknown
+            ServerCopy.NotPublished -> VerificationStatus.NotPublished
+            is ServerCopy.Published -> when {
+                expectedEmail.isNullOrBlank() -> VerificationStatus.Published
+                // 4.6.0 (item 9): the address is read from the served copy's
+                // certified User IDs. This used to search the ARMORED text for
+                // the address, which never matches (it is base64), so every
+                // key read as awaiting verification.
+                com.pgpony.android.crypto.CertificateBindings.mailboxOf(expectedEmail) in copy.addresses ->
+                    VerificationStatus.VerifiedIdentity
+                else -> VerificationStatus.AwaitingEmailVerification
+            }
+        }
+    }
+
+    /**
+     * 4.6.0 (item 9): what [server] serves for [fingerprint]: unreachable,
+     * nothing, or a copy with the addresses of its certified User IDs (the
+     * ones a verifying server like keys.openpgp.org has confirmed).
+     */
+    suspend fun serverCopy(server: KeyServer, fingerprint: String): ServerCopy = withContext(Dispatchers.IO) {
         val armored = runCatching { fetchByFingerprint(server, fingerprint) }.getOrElse {
-            return@withContext VerificationStatus.Unknown
-        } ?: return@withContext VerificationStatus.NotPublished
-        if (expectedEmail.isNullOrBlank()) return@withContext VerificationStatus.Published
-        if (armored.contains(expectedEmail, ignoreCase = true)) {
-            VerificationStatus.VerifiedIdentity
-        } else {
-            VerificationStatus.AwaitingEmailVerification
+            return@withContext ServerCopy.Unknown
+        } ?: return@withContext ServerCopy.NotPublished
+        ServerCopy.Published(ServerCopy.addressesIn(armored))
+    }
+}
+
+/** 4.6.0 (item 9): one server's copy of a key, see MultiKeyServerService.serverCopy. */
+sealed class ServerCopy {
+    object Unknown : ServerCopy()
+    object NotPublished : ServerCopy()
+    data class Published(val addresses: Set<String>) : ServerCopy()
+
+    companion object {
+        /** The addresses of the self-certified, unrevoked User IDs in [armored]. */
+        fun addressesIn(armored: String): Set<String> {
+            val certs = com.pgpony.android.network.KeyResponse.certificates(armored.toByteArray(Charsets.UTF_8))
+                ?: return emptySet()
+            return certs.flatMap { cert ->
+                com.pgpony.android.crypto.CertificateBindings.analyze(cert)?.certifiedUserIds.orEmpty()
+                    .map { com.pgpony.android.crypto.CertificateBindings.mailboxOf(it) }
+            }.toSet()
         }
     }
 }

@@ -46,6 +46,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -371,23 +375,35 @@ fun KeyDetailScreen(
                                     onClick = { menuOpen = false; dispatchAction(KeyDetailActionIds.SET_AS_DEFAULT) }
                                 )
                             }
-                            if (menuKey.isKeyPair && !menuKey.keyServerUploaded) {
+                            // 4.6.0 (item 10): every key-server item is hidden
+                            // while offline, like the ActionRows it replaced.
+                            val online = !com.pgpony.android.network.OfflineMode.enabled
+                            // 4.6.0 (item 9): stays after the first upload, as
+                            // "Update on Key Servers", so later edits can be published.
+                            if (menuKey.isKeyPair && online) {
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.key_detail_action_upload_to_key_server)) },
+                                    text = {
+                                        Text(stringResource(
+                                            if (menuKey.keyServerUploaded) R.string.key_detail_action_update_key_servers
+                                            else R.string.key_detail_action_upload_to_key_server
+                                        ))
+                                    },
                                     leadingIcon = { Icon(Icons.Filled.CloudUpload, null) },
                                     onClick = { menuOpen = false; dispatchAction(KeyDetailActionIds.UPLOAD_TO_KEY_SERVER) }
                                 )
                             }
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.key_detail_action_check_key_server)) },
-                                leadingIcon = { Icon(Icons.Filled.CloudDownload, null) },
-                                onClick = { menuOpen = false; dispatchAction(KeyDetailActionIds.CHECK_KEY_SERVER) }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.key_detail_action_refresh_key_server)) },
-                                leadingIcon = { Icon(Icons.Filled.Sync, null) },
-                                onClick = { menuOpen = false; dispatchAction(KeyDetailActionIds.REFRESH_KEY_SERVER) }
-                            )
+                            if (online) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.key_detail_action_check_key_server)) },
+                                    leadingIcon = { Icon(Icons.Filled.CloudDownload, null) },
+                                    onClick = { menuOpen = false; dispatchAction(KeyDetailActionIds.CHECK_KEY_SERVER) }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.key_detail_action_refresh_key_server)) },
+                                    leadingIcon = { Icon(Icons.Filled.Sync, null) },
+                                    onClick = { menuOpen = false; dispatchAction(KeyDetailActionIds.REFRESH_KEY_SERVER) }
+                                )
+                            }
                             HorizontalDivider()
                             if (menuKey.isKeyPair && menuKey.isRevoked) {
                                 DropdownMenuItem(
@@ -925,7 +941,11 @@ fun KeyDetailScreen(
                     }
                 }
             },
-            onDismiss = { viewModel.dismissRevocationResultSheet() }
+            onDismiss = { viewModel.dismissRevocationResultSheet() },
+            onPublish = if (com.pgpony.android.network.OfflineMode.enabled) null else ({
+                viewModel.dismissRevocationResultSheet()
+                showPublish = true
+            })
         )
     }
 
@@ -1456,6 +1476,12 @@ private fun LoadedBody(
         // to scroll to Danger Zone. RevokedBanner internally no-ops when
         // !key.isRevoked, so unconditional inclusion is safe.
         item { RevokedBanner(key = key) }
+        // 4.6.0 (item 11): a published key edited since its last upload.
+        if (key.isKeyPair && key.hasUnpublishedChanges && !com.pgpony.android.network.OfflineMode.enabled) {
+            item {
+                UnpublishedChangesRow(onUpdate = { onComingSoon(KeyDetailActionIds.UPLOAD_TO_KEY_SERVER) })
+            }
+        }
         item {
             FingerprintSection(
                 key = key,
@@ -1557,5 +1583,36 @@ private fun LoadedBody(
         }
         // §5.6.2 (#36): QR, Actions, and Danger Zone moved to the top-bar
         // overflow menu; Share Public Key moved into the fingerprint card.
+    }
+}
+
+/** 4.6.0 (item 11): one-tap update for a published key whose server copy is behind. */
+@Composable
+private fun UnpublishedChangesRow(onUpdate: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Filled.CloudUpload, null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                stringResource(R.string.key_detail_unpublished_changes_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onUpdate) {
+                Text(stringResource(R.string.key_detail_unpublished_changes_action))
+            }
+        }
     }
 }

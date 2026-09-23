@@ -1501,6 +1501,7 @@ class KeyRepository(
      *  the DB row. Mirrors the old hard-delete cleanup. */
     suspend fun purgeKey(entity: PGPKeyEntity) {
         com.pgpony.android.data.RemovedUserIdStore.clear(entity.fingerprint)
+        com.pgpony.android.data.KeyPublicationStore.clear(entity.fingerprint)
         store.deleteKeys(entity.fingerprint)
         fallbackDao?.deleteAllReferencing(entity.fingerprint)
         signingDefaultsDao?.deleteFor(entity.fingerprint)
@@ -1640,6 +1641,51 @@ class KeyRepository(
         }
     }
 
+    /**
+     * 4.6.0 (item 11): record that the key was changed here, so a published
+     * key can show that its server copy is behind (lastLocalEditAt newer than
+     * lastUploadedAt).
+     */
+    private suspend fun stampLocalEdit(fingerprint: String) {
+        dao.getByFingerprint(fingerprint)?.let { key ->
+            dao.update(key.copy(lastLocalEditAt = System.currentTimeMillis()))
+        }
+    }
+
+    /**
+     * 4.6.0 (item 9): what an upload of [fingerprint] would send, built from
+     * the stored key (the same builder for Key Detail and the Exchange tab).
+     * Refused when the key's primary identity is ambiguous: more than one
+     * live User ID carries the primary flag, or the flagged one is not the
+     * identity the app shows for the key. A server would then show a
+     * different name than the owner expects.
+     */
+    sealed class PublishPayload {
+        data class Ready(val armored: String) : PublishPayload()
+        data class NeedsRepair(val flagged: List<String>, val shown: String) : PublishPayload()
+        object Unavailable : PublishPayload()
+    }
+
+    fun publishPayload(fingerprint: String, shownUserId: String): PublishPayload {
+        val armored = exportArmoredPublicKey(fingerprint) ?: return PublishPayload.Unavailable
+        // Composite ML-DSA keys are not Bouncy Castle rings; there is nothing
+        // further to check them with here.
+        val primary = loadPublicKeyRing(fingerprint)?.publicKey ?: return PublishPayload.Ready(armored)
+        val flagged = UserIdService.shared.primaryFlaggedLiveUserIds(primary)
+        val ok = when (flagged.size) {
+            0 -> true
+            1 -> flagged[0] == shownUserId
+            else -> false
+        }
+        return if (ok) PublishPayload.Ready(armored) else PublishPayload.NeedsRepair(flagged, shownUserId)
+    }
+
+    /** 4.6.0 (item 9): [markKeyServerUploaded] plus the per-server record. */
+    suspend fun markKeyServerUploaded(fingerprint: String, serverId: String) {
+        com.pgpony.android.data.KeyPublicationStore.record(fingerprint, serverId)
+        markKeyServerUploaded(fingerprint)
+    }
+
     suspend fun markKeyServerUploaded(fingerprint: String) {
         dao.getByFingerprint(fingerprint)?.let { key ->
             // 3.0.0-KS1: also stamp the upload time so the detail screen can
@@ -1697,7 +1743,11 @@ class KeyRepository(
      * and offer to share it. Throws RevocationError on crypto failure
      * (passphrase wrong, key not a key pair, etc.).
      */
-    suspend fun applyRevocation(
+    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    suspend fun applyRevocation(fingerprint: String, reason: RevocationReason, comment: String?, passphrase: String?): String =
+        applyRevocationEdit(fingerprint, reason, comment, passphrase).also { stampLocalEdit(fingerprint) }
+
+    private suspend fun applyRevocationEdit(
         fingerprint: String,
         reason: RevocationReason,
         comment: String?,
@@ -1771,7 +1821,11 @@ class KeyRepository(
      * target is the key's only usable encryption subkey and
      * [allowLastEncryptionSubkey] is false, so the UI can confirm first.
      */
-    suspend fun revokeSubkey(
+    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    suspend fun revokeSubkey(fingerprint: String, subkeyFingerprint: String, reason: RevocationReason, comment: String?, passphrase: String?, allowLastEncryptionSubkey: Boolean = false) =
+        revokeSubkeyEdit(fingerprint, subkeyFingerprint, reason, comment, passphrase, allowLastEncryptionSubkey).also { stampLocalEdit(fingerprint) }
+
+    private suspend fun revokeSubkeyEdit(
         fingerprint: String,
         subkeyFingerprint: String,
         reason: RevocationReason,
@@ -1861,7 +1915,11 @@ class KeyRepository(
      * is the target subkey's hex fingerprint. Same last-encryption-subkey guard
      * as [revokeSubkey].
      */
-    suspend fun removeSubkey(
+    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    suspend fun removeSubkey(fingerprint: String, subkeyFingerprint: String, allowLastEncryptionSubkey: Boolean = false) =
+        removeSubkeyEdit(fingerprint, subkeyFingerprint, allowLastEncryptionSubkey).also { stampLocalEdit(fingerprint) }
+
+    private suspend fun removeSubkeyEdit(
         fingerprint: String,
         subkeyFingerprint: String,
         allowLastEncryptionSubkey: Boolean = false
@@ -1965,7 +2023,11 @@ class KeyRepository(
      * secret + public rings and stamps entity.expiresAt. Throws
      * ExpirationError on crypto failure (passphrase, etc.).
      */
-    suspend fun setKeyExpirationSoftware(
+    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    suspend fun setKeyExpirationSoftware(fingerprint: String, expiresAtEpochSeconds: Long?, passphrase: String?) =
+        setKeyExpirationSoftwareEdit(fingerprint, expiresAtEpochSeconds, passphrase).also { stampLocalEdit(fingerprint) }
+
+    private suspend fun setKeyExpirationSoftwareEdit(
         fingerprint: String,
         expiresAtEpochSeconds: Long?,
         passphrase: String?
@@ -2085,7 +2147,11 @@ class KeyRepository(
      * by the UI) calls KeyExpirationService.setExpirationCard and hands the
      * updated public ring here. No secret ring exists for card keys.
      */
-    suspend fun persistCardExpiration(
+    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    suspend fun persistCardExpiration(fingerprint: String, updatedPublicRing: org.bouncycastle.openpgp.PGPPublicKeyRing, expiresAtEpochSeconds: Long?) =
+        persistCardExpirationEdit(fingerprint, updatedPublicRing, expiresAtEpochSeconds).also { stampLocalEdit(fingerprint) }
+
+    private suspend fun persistCardExpirationEdit(
         fingerprint: String,
         updatedPublicRing: org.bouncycastle.openpgp.PGPPublicKeyRing,
         expiresAtEpochSeconds: Long?
@@ -2140,7 +2206,11 @@ class KeyRepository(
      * software subkey (public-only, card-backed) or the crypto layer
      * fails (wrong passphrase, binding failure).
      */
-    suspend fun addSubkey(
+    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    suspend fun addSubkey(fingerprint: String, type: ClassicalSubkeyGen.ClassicalSubkeyType, expirationSeconds: Long?, passphrase: String?) =
+        addSubkeyEdit(fingerprint, type, expirationSeconds, passphrase).also { stampLocalEdit(fingerprint) }
+
+    private suspend fun addSubkeyEdit(
         fingerprint: String,
         type: ClassicalSubkeyGen.ClassicalSubkeyType,
         expirationSeconds: Long?,
@@ -2232,7 +2302,11 @@ class KeyRepository(
      * [suite] selects the level: CompositeSuite.IETF_768 (algo 35) or IETF_1024
      * (algo 36). ML-KEM-1024 has no v4 encoding, so a v4 key rejects IETF_1024.
      */
-    suspend fun addCompositeEncryptionSubkey(
+    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    suspend fun addCompositeEncryptionSubkey(fingerprint: String, suite: com.pgpony.android.crypto.pqc.CompositeSuite, expirationSeconds: Long?, passphrase: String?) =
+        addCompositeEncryptionSubkeyEdit(fingerprint, suite, expirationSeconds, passphrase).also { stampLocalEdit(fingerprint) }
+
+    private suspend fun addCompositeEncryptionSubkeyEdit(
         fingerprint: String,
         suite: com.pgpony.android.crypto.pqc.CompositeSuite,
         expirationSeconds: Long?,
@@ -2336,7 +2410,11 @@ class KeyRepository(
      * algo-30 subkey rides as an UnknownBCPGKey. [suite] picks the level
      * (MLDSA65_ED25519 or MLDSA87_ED448).
      */
-    suspend fun addCompositeSigningSubkey(
+    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    suspend fun addCompositeSigningSubkey(fingerprint: String, suite: com.pgpony.android.crypto.pqc.CompositeSignSuite, expirationSeconds: Long?, passphrase: String?) =
+        addCompositeSigningSubkeyEdit(fingerprint, suite, expirationSeconds, passphrase).also { stampLocalEdit(fingerprint) }
+
+    private suspend fun addCompositeSigningSubkeyEdit(
         fingerprint: String,
         suite: com.pgpony.android.crypto.pqc.CompositeSignSuite,
         expirationSeconds: Long?,
@@ -2410,7 +2488,11 @@ class KeyRepository(
      * false, the entity's cached fields are left alone (still describe
      * whichever UID is actually primary).
      */
-    suspend fun addUserId(
+    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    suspend fun addUserId(fingerprint: String, userId: String, makePrimary: Boolean, passphrase: String?) =
+        addUserIdEdit(fingerprint, userId, makePrimary, passphrase).also { stampLocalEdit(fingerprint) }
+
+    private suspend fun addUserIdEdit(
         fingerprint: String,
         userId: String,
         makePrimary: Boolean,
@@ -2471,7 +2553,11 @@ class KeyRepository(
      * re-signing the self-cert with [passphrase], then persist. Mirrors
      * addUserId's gating and persistence.
      */
-    suspend fun setNotations(
+    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    suspend fun setNotations(fingerprint: String, notations: List<UserIdService.Notation>, passphrase: String?) =
+        setNotationsEdit(fingerprint, notations, passphrase).also { stampLocalEdit(fingerprint) }
+
+    private suspend fun setNotationsEdit(
         fingerprint: String,
         notations: List<UserIdService.Notation>,
         passphrase: String?
@@ -2498,7 +2584,11 @@ class KeyRepository(
 
     /** Revoke [userId] on a software key pair. See UserIdService.revokeUserId
      *  for the "can't revoke the last UID" guard. */
-    suspend fun revokeUserId(
+    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    suspend fun revokeUserId(fingerprint: String, userId: String, reason: RevocationReason, comment: String?, passphrase: String?) =
+        revokeUserIdEdit(fingerprint, userId, reason, comment, passphrase).also { stampLocalEdit(fingerprint) }
+
+    private suspend fun revokeUserIdEdit(
         fingerprint: String,
         userId: String,
         reason: RevocationReason,
@@ -2531,7 +2621,11 @@ class KeyRepository(
      *  removed UID was the key's cached identity, the cached name/email move to
      *  the first remaining UID. See UserIdService.removeUserId /
      *  CompositePrimaryKeyGen.removeUserId for the last-UID guard. */
-    suspend fun removeUserId(fingerprint: String, userId: String) {
+    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    suspend fun removeUserId(fingerprint: String, userId: String) =
+        removeUserIdEdit(fingerprint, userId).also { stampLocalEdit(fingerprint) }
+
+    private suspend fun removeUserIdEdit(fingerprint: String, userId: String) {
         val entity = dao.getByFingerprint(fingerprint)
             ?: throw KeyRepoError.NotFound(fingerprint)
         if (!entity.isKeyPair) {
@@ -2585,7 +2679,11 @@ class KeyRepository(
     }
 
     /** Make [userId] the primary identity on a software key pair. */
-    suspend fun setPrimaryUserId(
+    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    suspend fun setPrimaryUserId(fingerprint: String, userId: String, passphrase: String?) =
+        setPrimaryUserIdEdit(fingerprint, userId, passphrase).also { stampLocalEdit(fingerprint) }
+
+    private suspend fun setPrimaryUserIdEdit(
         fingerprint: String,
         userId: String,
         passphrase: String?

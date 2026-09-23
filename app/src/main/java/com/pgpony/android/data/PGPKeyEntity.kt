@@ -216,8 +216,21 @@ data class PGPKeyEntity(
      *  user. Such a key never joins a user-managed key for the same address as
      *  an extra provider recipient. Cleared when the user imports the key
      *  themselves. */
-    val autocryptImportedAt: Long? = null
+    val autocryptImportedAt: Long? = null,
+    /** 4.6.0 (item 11): when this key was last changed here (User IDs,
+     *  subkeys, expiry, notations, revocation). Newer than [lastUploadedAt] on
+     *  a published key means the server copy is behind. */
+    val lastLocalEditAt: Long? = null
 ) {
+    /** 4.6.0 (item 11): published before, edited here since the last upload. */
+    val hasUnpublishedChanges: Boolean
+        get() {
+            val edited = lastLocalEditAt ?: return false
+            if (!keyServerUploaded) return false
+            val uploaded = lastUploadedAt ?: return true
+            return edited > uploaded
+        }
+
     // ── Computed Properties ─────────────────────────────────────────
 
     /**
@@ -386,7 +399,7 @@ interface PGPKeyDao {
         PGPKeyEntity::class, ApiClientEntity::class, AutocryptPeerEntity::class,
         FallbackKeyEntity::class, SigningDefaultsEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 @TypeConverters(

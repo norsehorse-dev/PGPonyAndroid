@@ -1978,4 +1978,15 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="onboarding_page_destructive_toggle_title">Ocultar ações destrutivas</string>
     <string name="onboarding_page_destructive_toggle_subtitle">Oculta excluir chave, remover subchave, remover ID de usuário e apagar todos os dados. Revogar continua disponível. Você pode alterar isto depois em Configurações.</string>
     <string name="onboarding_scroll_more">Mais opções abaixo</string>
+    <string name="publish_title_update">Atualizar nos servidores de chaves</string>
+    <string name="publish_action_update">Atualizar</string>
+    <string name="publish_last_uploaded_format">Último envio: %1$s</string>
+    <string name="publish_address_confirmed_format">%1$s: confirmado</string>
+    <string name="publish_address_pending_format">%1$s: ainda não confirmado neste servidor</string>
+    <string name="publish_primary_repair_format">O ID de usuário principal desta chave é ambíguo (marcado como principal: %1$s; exibido aqui: %2$s). Em IDs de usuário, toque em Tornar principal no que você quer e depois publique.</string>
+    <string name="key_detail_action_update_key_servers">Atualizar nos servidores de chaves</string>
+    <string name="key_detail_detail_key_server_behind">Publicada (alterações locais não enviadas)</string>
+    <string name="key_detail_unpublished_changes_body">Esta chave mudou desde o último envio. Os servidores de chaves ainda têm a cópia antiga.</string>
+    <string name="key_detail_unpublished_changes_action">Atualizar</string>
+    <string name="revocation_result_publish_button">Publicar revogação nos servidores de chaves</string>
 </resources>

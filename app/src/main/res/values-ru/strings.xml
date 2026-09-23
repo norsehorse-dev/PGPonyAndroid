@@ -2047,4 +2047,15 @@
     <string name="onboarding_page_destructive_toggle_title">Скрыть разрушительные действия</string>
     <string name="onboarding_page_destructive_toggle_subtitle">Скрывает удаление ключа, удаление подключа, удаление User ID и очистку всех данных. Отзыв остаётся доступным. Это можно изменить позже в Настройках.</string>
     <string name="onboarding_scroll_more">Больше параметров ниже</string>
+    <string name="publish_title_update">Обновить на серверах ключей</string>
+    <string name="publish_action_update">Обновить</string>
+    <string name="publish_last_uploaded_format">Последняя загрузка: %1$s</string>
+    <string name="publish_address_confirmed_format">%1$s: подтверждён</string>
+    <string name="publish_address_pending_format">%1$s: на этом сервере ещё не подтверждён</string>
+    <string name="publish_primary_repair_format">Основной идентификатор этого ключа неоднозначен (отмечен основным: %1$s; показан здесь: %2$s). В разделе «Идентификаторы пользователя» нажмите «Сделать основным» у нужного, затем опубликуйте.</string>
+    <string name="key_detail_action_update_key_servers">Обновить на серверах ключей</string>
+    <string name="key_detail_detail_key_server_behind">Опубликован (локальные изменения не загружены)</string>
+    <string name="key_detail_unpublished_changes_body">Ключ изменился после последней загрузки. На серверах ключей всё ещё старая копия.</string>
+    <string name="key_detail_unpublished_changes_action">Обновить</string>
+    <string name="revocation_result_publish_button">Опубликовать отзыв на серверах ключей</string>
 </resources>

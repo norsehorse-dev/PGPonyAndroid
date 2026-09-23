@@ -1977,4 +1977,15 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="onboarding_page_destructive_toggle_title">破壊的な操作を非表示</string>
     <string name="onboarding_page_destructive_toggle_subtitle">鍵の削除、サブキーの削除、ユーザーIDの削除、すべてのデータの消去を非表示にします。失効は引き続き利用できます。これは後で設定から変更できます。</string>
     <string name="onboarding_scroll_more">その他のオプションは下にあります</string>
+    <string name="publish_title_update">キーサーバーで更新</string>
+    <string name="publish_action_update">更新</string>
+    <string name="publish_last_uploaded_format">最終アップロード: %1$s</string>
+    <string name="publish_address_confirmed_format">%1$s: 確認済み</string>
+    <string name="publish_address_pending_format">%1$s: このサーバーではまだ未確認</string>
+    <string name="publish_primary_repair_format">このキーのプライマリ ユーザーIDが曖昧です(プライマリに設定: %1$s、ここでの表示: %2$s)。ユーザー ID で使いたいものの「プライマリにする」をタップしてから公開してください。</string>
+    <string name="key_detail_action_update_key_servers">キーサーバーで更新</string>
+    <string name="key_detail_detail_key_server_behind">公開済み(ローカルの変更は未アップロード)</string>
+    <string name="key_detail_unpublished_changes_body">このキーは前回のアップロード後に変更されています。キーサーバーには古いコピーがあります。</string>
+    <string name="key_detail_unpublished_changes_action">更新</string>
+    <string name="revocation_result_publish_button">失効をキーサーバーに公開</string>
 </resources>

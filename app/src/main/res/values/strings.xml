@@ -2075,4 +2075,15 @@
     <string name="onboarding_page_destructive_toggle_title">Hide destructive actions</string>
     <string name="onboarding_page_destructive_toggle_subtitle">Hide delete key, remove subkey, remove User ID, and clear all data. Revoke stays available. You can change this later in Settings.</string>
     <string name="onboarding_scroll_more">More options below</string>
+    <string name="publish_title_update">Update on key servers</string>
+    <string name="publish_action_update">Update</string>
+    <string name="publish_last_uploaded_format">Last uploaded %1$s</string>
+    <string name="publish_address_confirmed_format">%1$s: confirmed</string>
+    <string name="publish_address_pending_format">%1$s: not confirmed on this server yet</string>
+    <string name="publish_primary_repair_format">This key\'s primary User ID is ambiguous (marked primary: %1$s; shown here: %2$s). In User IDs, tap Make Primary on the one you want, then publish.</string>
+    <string name="key_detail_action_update_key_servers">Update on Key Servers</string>
+    <string name="key_detail_detail_key_server_behind">Published (local changes not uploaded)</string>
+    <string name="key_detail_unpublished_changes_body">This key changed since it was last uploaded. Key servers still have the old copy.</string>
+    <string name="key_detail_unpublished_changes_action">Update</string>
+    <string name="revocation_result_publish_button">Publish revocation to key servers</string>
 </resources>

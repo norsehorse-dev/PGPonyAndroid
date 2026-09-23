@@ -16,6 +16,13 @@
 //
 // Self-contained (reads the repo + directory via PGPonyApp.instance),
 // same pattern as ApiClientsScreen / LicensesScreen.
+//
+// 4.6.0 (item 9): also the "Update on Key Servers" sheet. A key published
+// before pre-checks only the servers it went to (KeyPublicationStore) and
+// shows when each last got a copy; each server row lists the key's addresses
+// and whether that server has confirmed them, so a newly added identity's
+// confirmation is visible. The payload comes from KeyRepository.publishPayload,
+// which refuses a key whose primary identity is ambiguous.
 
 package com.pgpony.android.ui.keydetail
 
@@ -62,8 +69,13 @@ import com.pgpony.android.data.PGPKeyEntity
 import com.pgpony.android.keyserver.KeyServer
 import com.pgpony.android.keyserver.MultiKeyServerService
 import com.pgpony.android.keyserver.PublishOutcome
-import com.pgpony.android.keyserver.VerificationStatus
+import com.pgpony.android.keyserver.ServerCopy
+import com.pgpony.android.crypto.CertificateBindings
+import com.pgpony.android.data.KeyPublicationStore
+import com.pgpony.android.data.repository.KeyRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private sealed class RowState {
     object Idle : RowState()
@@ -84,20 +96,35 @@ fun PublishSheet(fingerprint: String, onDismiss: () -> Unit) {
     var servers by remember { mutableStateOf<List<KeyServer>>(emptyList()) }
     val checked = remember { mutableStateMapOf<String, Boolean>() }
     val rowStates = remember { mutableStateMapOf<String, RowState>() }
-    val verification = remember { mutableStateMapOf<String, VerificationStatus>() }
+    val copies = remember { mutableStateMapOf<String, ServerCopy>() }
+    val uploadedAt = remember { mutableStateMapOf<String, Long>() }
+    var addresses by remember { mutableStateOf<List<String>>(emptyList()) }
+    var payload by remember { mutableStateOf<KeyRepository.PublishPayload?>(null) }
+    var isUpdate by remember { mutableStateOf(false) }
 
     LaunchedEffect(fingerprint) {
-        entity = repo.getByFingerprint(fingerprint)
+        val e = repo.getByFingerprint(fingerprint)
+        entity = e
         servers = directory.readOnce().filter { it.publishEnabled }
+        val records = KeyPublicationStore.servers(fingerprint)
+        uploadedAt.putAll(records)
+        isUpdate = records.isNotEmpty() || e?.keyServerUploaded == true
         servers.forEach { s ->
-            checked.putIfAbsent(s.id, true)
+            // An update goes to the servers used before; a first upload (or a
+            // key uploaded before per-server records existed) to all of them.
+            checked.putIfAbsent(s.id, records.isEmpty() || s.id in records)
             rowStates.putIfAbsent(s.id, RowState.Idle)
         }
-        // Kick off verification-status polling for each server.
-        val email = entity?.userEmail
-        servers.forEach { s ->
-            verification[s.id] = service.verificationStatus(s, fingerprint, email)
+        withContext(Dispatchers.IO) {
+            addresses = repo.exportPublicKeyBytes(fingerprint)
+                ?.let { CertificateBindings.analyze(it)?.certifiedUserIds }
+                ?.map { CertificateBindings.mailboxOf(it) }
+                ?.filter { it.contains('@') }
+                ?.distinct()
+                .orEmpty()
+            payload = e?.let { repo.publishPayload(fingerprint, it.userID) }
         }
+        servers.forEach { s -> copies[s.id] = service.serverCopy(s, fingerprint) }
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -120,7 +147,7 @@ fun PublishSheet(fingerprint: String, onDismiss: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    stringResource(R.string.publish_title),
+                    stringResource(if (isUpdate) R.string.publish_title_update else R.string.publish_title),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
@@ -141,7 +168,9 @@ fun PublishSheet(fingerprint: String, onDismiss: () -> Unit) {
                     mayNotAccept = algorithm != null && server.mayNotAccept(algorithm),
                     algorithmLabel = algorithm?.displayName ?: "",
                     state = rowStates[server.id] ?: RowState.Idle,
-                    verification = verification[server.id] ?: VerificationStatus.Unknown
+                    copy = copies[server.id],
+                    addresses = addresses,
+                    lastUploadedAt = uploadedAt[server.id]
                 )
                 if (index != servers.lastIndex) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -149,29 +178,43 @@ fun PublishSheet(fingerprint: String, onDismiss: () -> Unit) {
             }
 
             Spacer(modifier = Modifier.padding(vertical = 8.dp))
+            (payload as? KeyRepository.PublishPayload.NeedsRepair)?.let { repair ->
+                Text(
+                    stringResource(
+                        R.string.publish_primary_repair_format,
+                        repair.flagged.joinToString(", ").ifEmpty { "-" },
+                        repair.shown
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
             val anyChecked = servers.any { checked[it.id] == true }
             val anyPublishing = rowStates.values.any { it is RowState.Publishing }
+            val ready = payload as? KeyRepository.PublishPayload.Ready
             Button(
-                enabled = anyChecked && !anyPublishing,
+                enabled = anyChecked && !anyPublishing && ready != null,
                 onClick = {
-                    val armored = entity?.let { repo.exportArmoredPublicKey(it.fingerprint) }
-                        ?: return@Button
+                    val armored = ready?.armored ?: return@Button
                     servers.filter { checked[it.id] == true }.forEach { server ->
                         rowStates[server.id] = RowState.Publishing
                         scope.launch {
                             val outcome = service.publish(server, armored)
                             rowStates[server.id] = RowState.Done(outcome)
-                            // Refresh verification status after a successful publish.
                             if (outcome is PublishOutcome.Ok) {
-                                verification[server.id] =
-                                    service.verificationStatus(server, fingerprint, entity?.userEmail)
+                                // 4.6.0 (item 9): Key Detail uploads now count as
+                                // uploads (the flag, the date, the server).
+                                repo.markKeyServerUploaded(fingerprint, server.id)
+                                uploadedAt[server.id] = System.currentTimeMillis()
+                                copies[server.id] = service.serverCopy(server, fingerprint)
                             }
                         }
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(stringResource(R.string.publish_action))
+                Text(stringResource(if (isUpdate) R.string.publish_action_update else R.string.publish_action))
             }
             // item 8 (#request): an explicit, unambiguous skip so the online
             // post-keygen prompt does not have to be dismissed by tapping away.
@@ -193,7 +236,9 @@ private fun ServerRow(
     mayNotAccept: Boolean,
     algorithmLabel: String,
     state: RowState,
-    verification: VerificationStatus
+    copy: ServerCopy?,
+    addresses: List<String>,
+    lastUploadedAt: Long?
 ) {
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(
@@ -204,7 +249,17 @@ private fun ServerRow(
             Spacer(modifier = Modifier.width(4.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(server.label, style = MaterialTheme.typography.bodyLarge)
-                VerificationLine(verification)
+                lastUploadedAt?.let {
+                    Text(
+                        stringResource(
+                            R.string.publish_last_uploaded_format,
+                            java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(it))
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                CopyLines(copy, addresses)
             }
             when (state) {
                 is RowState.Publishing ->
@@ -245,22 +300,37 @@ private fun ServerRow(
     }
 }
 
+/** 4.6.0 (item 9): what this server holds, per address of the key. */
 @Composable
-private fun VerificationLine(status: VerificationStatus) {
-    val text = when (status) {
-        VerificationStatus.VerifiedIdentity -> stringResource(R.string.publish_status_verified)
-        VerificationStatus.AwaitingEmailVerification -> stringResource(R.string.publish_status_awaiting)
-        VerificationStatus.Published -> stringResource(R.string.publish_status_published)
-        VerificationStatus.NotPublished -> stringResource(R.string.publish_status_not_published)
-        VerificationStatus.Unknown -> ""
-    }
-    if (text.isNotEmpty()) {
-        Text(
-            text,
+private fun CopyLines(copy: ServerCopy?, addresses: List<String>) {
+    when (copy) {
+        null, ServerCopy.Unknown -> {}
+        ServerCopy.NotPublished -> Text(
+            stringResource(R.string.publish_status_not_published),
             style = MaterialTheme.typography.bodySmall,
-            color = if (status == VerificationStatus.VerifiedIdentity) Color(0xFF22C55E)
-            else MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        is ServerCopy.Published -> {
+            if (addresses.isEmpty()) {
+                Text(
+                    stringResource(R.string.publish_status_published),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            addresses.forEach { address ->
+                val confirmed = address in copy.addresses
+                Text(
+                    stringResource(
+                        if (confirmed) R.string.publish_address_confirmed_format
+                        else R.string.publish_address_pending_format,
+                        address
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (confirmed) Color(0xFF22C55E) else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 

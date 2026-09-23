@@ -246,6 +246,14 @@ Delivery: add a subkey to an already-published key, open Key Detail, "Update on 
 publishes to the servers used before, and a fresh lookup on each server shows the subkey. iOS mirror: 8.3.0
 sections 2 and 3.
 
+Status: done in code, awaiting on-device check. Upload stays on the menu and ActionRow after the first upload,
+labelled "Update on Key Servers". KeyPublicationStore records each server a key went to; PublishSheet
+pre-checks those, shows "Last uploaded" per server and each address's confirmation state (read from the
+served copy's certified User IDs; the old check searched the armor text and never matched). Publishing from
+Key Detail now sets the uploaded flag and date. KeyRepository.publishPayload refuses a key with more than one
+primary-flagged User ID or a flagged one that differs from the shown identity, in both Key Detail and
+Exchange; Make Primary now clears every other flag so it repairs that state.
+
 
 ## 10. Key Detail overflow menu ignores offline mode
 
@@ -258,6 +266,9 @@ client. Gate the three menu items on `!OfflineMode.enabled`, matching the Action
 every network action is hidden while offline.
 
 Delivery: with offline mode on, the Key Detail overflow shows no keyserver items; off, all three return.
+
+Status: done in code, awaiting on-device check. The upload/update, check and refresh menu items are hidden
+while offline.
 
 
 ## 11. "Your published copy is out of date" marker
@@ -274,6 +285,10 @@ certificate is produced, since a revocation that never reaches the servers prote
 
 Delivery: edit a published key, see the marker and the one-tap update, update, marker clears; revoke a
 published key, the publish offer appears in the revocation result.
+
+Status: done in code, awaiting on-device check. PGPKeyEntity.lastLocalEditAt (DB v11, MIGRATION_10_11) is
+stamped by every key-editing repository call; hasUnpublishedChanges drives the Key server row, the menu label
+and an Update row under the header. The revocation result sheet offers "Publish revocation to key servers".
 
 
 ## 12. Key-server refresh: union merge, and the local copy authoritative for key pairs

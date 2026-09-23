@@ -1978,4 +1978,15 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="onboarding_page_destructive_toggle_title">Destruktive Aktionen ausblenden</string>
     <string name="onboarding_page_destructive_toggle_subtitle">Blendet Schlüssel löschen, Unterschlüssel entfernen, Benutzer-ID entfernen und alle Daten löschen aus. Widerrufen bleibt verfügbar. Du kannst dies später in den Einstellungen ändern.</string>
     <string name="onboarding_scroll_more">Weitere Optionen unten</string>
+    <string name="publish_title_update">Auf Schlüsselservern aktualisieren</string>
+    <string name="publish_action_update">Aktualisieren</string>
+    <string name="publish_last_uploaded_format">Zuletzt hochgeladen: %1$s</string>
+    <string name="publish_address_confirmed_format">%1$s: bestätigt</string>
+    <string name="publish_address_pending_format">%1$s: auf diesem Server noch nicht bestätigt</string>
+    <string name="publish_primary_repair_format">Die primäre User-ID dieses Schlüssels ist nicht eindeutig (als primär markiert: %1$s; hier angezeigt: %2$s). Tippe unter Benutzer-IDs bei der gewünschten auf „Zur primären machen“ und veröffentliche dann.</string>
+    <string name="key_detail_action_update_key_servers">Auf Schlüsselservern aktualisieren</string>
+    <string name="key_detail_detail_key_server_behind">Veröffentlicht (lokale Änderungen nicht hochgeladen)</string>
+    <string name="key_detail_unpublished_changes_body">Dieser Schlüssel wurde seit dem letzten Hochladen geändert. Die Schlüsselserver haben noch die alte Kopie.</string>
+    <string name="key_detail_unpublished_changes_action">Aktualisieren</string>
+    <string name="revocation_result_publish_button">Widerruf auf Schlüsselservern veröffentlichen</string>
 </resources>

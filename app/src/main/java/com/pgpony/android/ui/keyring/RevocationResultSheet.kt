@@ -46,6 +46,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.SaveAlt
@@ -77,7 +78,11 @@ fun RevocationResultSheet(
     onCopy: () -> Unit,
     onSaveFile: () -> Unit,
     onShare: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    /** 4.6.0 (item 11): publish the revoked key; null hides the offer
+     *  (offline mode). A revocation that never reaches the servers
+     *  protects nobody who fetches the key there. */
+    onPublish: (() -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -164,6 +169,21 @@ fun RevocationResultSheet(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+
+            if (onPublish != null) {
+                androidx.compose.material3.Button(
+                    onClick = onPublish,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CloudUpload,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.revocation_result_publish_button))
                 }
             }
 

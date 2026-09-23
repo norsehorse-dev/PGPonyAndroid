@@ -352,7 +352,8 @@ class KeyDeduplicationService(
         }
         updated = updated.copy(
             lastUploadedAt = laterOf(updated.lastUploadedAt, loser.lastUploadedAt),
-            lastCheckedAt = laterOf(updated.lastCheckedAt, loser.lastCheckedAt)
+            lastCheckedAt = laterOf(updated.lastCheckedAt, loser.lastCheckedAt),
+            lastLocalEditAt = laterOf(updated.lastLocalEditAt, loser.lastLocalEditAt)
         )
         if (updated.armoredPublicKey.isNullOrEmpty() && !loser.armoredPublicKey.isNullOrEmpty()) {
             updated = updated.copy(armoredPublicKey = loser.armoredPublicKey)

@@ -289,6 +289,12 @@ class UserIdService private constructor() {
         if (currentPrimaryUid != null && currentPrimaryUid != userId) {
             primary = reissueSelfCert(primary, currentPrimaryUid, isPrimary = false, signer = ::signer)
         }
+        // 4.6.0 (item 9): clear the flag from every other User ID too, so Make
+        // Primary also repairs a key that carries more than one primary flag
+        // (the state the publish check refuses).
+        for (other in primaryFlaggedLiveUserIds(primary)) {
+            if (other != userId) primary = reissueSelfCert(primary, other, isPrimary = false, signer = ::signer)
+        }
         primary = reissueSelfCert(primary, userId, isPrimary = true, signer = ::signer)
 
         return reassemble(secretRing, publicRing, primary)
@@ -331,6 +337,24 @@ class UserIdService private constructor() {
      * match against the entity's cached userID field that could disagree
      * with the ring's actual primary-UID subpacket (RC3 §17.2 I bug).
      */
+    /**
+     * 4.6.0 (item 9): the live (unrevoked) User IDs whose newest self-
+     * certification carries the primary-User-ID flag. More than one means the
+     * key's primary identity is ambiguous to anyone who fetches it.
+     */
+    fun primaryFlaggedLiveUserIds(primary: PGPPublicKey): List<String> =
+        primary.userIDs.asSequence().toList().filter { uid ->
+            if (isRevoked(primary, uid)) return@filter false
+            var newest: PGPSignature? = null
+            primary.getSignaturesForID(uid)?.forEach { sig ->
+                if (sig.keyID != primary.keyID) return@forEach
+                if (sig.signatureType in PGPSignature.DEFAULT_CERTIFICATION..PGPSignature.POSITIVE_CERTIFICATION) {
+                    if (newest == null || sig.creationTime.after(newest!!.creationTime)) newest = sig
+                }
+            }
+            newest?.hashedSubPackets?.isPrimaryUserID == true
+        }
+
     fun currentPrimaryUserId(primary: PGPPublicKey): String? {
         val uids = primary.userIDs.asSequence().toList()
         for (uid in uids) {

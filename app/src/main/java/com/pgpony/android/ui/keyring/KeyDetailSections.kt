@@ -509,7 +509,15 @@ fun DetailsSection(
             DetailRow(label = stringResource(R.string.key_detail_detail_drive_backup), value = stringResource(R.string.key_detail_detail_drive_backup_enabled), icon = Icons.Filled.CloudDone)
         }
         if (key.keyServerUploaded) {
-            DetailRow(label = stringResource(R.string.key_detail_detail_key_server), value = stringResource(R.string.key_detail_detail_key_server_published), icon = Icons.Filled.CloudUpload)
+            // 4.6.0 (item 11): say so when local edits have not been uploaded.
+            DetailRow(
+                label = stringResource(R.string.key_detail_detail_key_server),
+                value = stringResource(
+                    if (key.hasUnpublishedChanges) R.string.key_detail_detail_key_server_behind
+                    else R.string.key_detail_detail_key_server_published
+                ),
+                icon = Icons.Filled.CloudUpload
+            )
         }
         // 3.0.0-KS1 (Lukas request) — keyserver activity timestamps. Always
         // shown so the user can see status at a glance; "Never" until set.
@@ -805,11 +813,14 @@ fun ActionsSection(
                 onClick = { onComingSoon(KeyDetailActionIds.SET_AS_DEFAULT) }
             )
         }
-        if (key.isKeyPair && !key.keyServerUploaded &&
-            !com.pgpony.android.network.OfflineMode.enabled) {
+        // 4.6.0 (item 9): offered after the first upload too, as an update.
+        if (key.isKeyPair && !com.pgpony.android.network.OfflineMode.enabled) {
             ActionRow(
                 icon = Icons.Filled.CloudUpload,
-                label = stringResource(R.string.key_detail_action_upload_to_key_server),
+                label = stringResource(
+                    if (key.keyServerUploaded) R.string.key_detail_action_update_key_servers
+                    else R.string.key_detail_action_upload_to_key_server
+                ),
                 onClick = { onComingSoon(KeyDetailActionIds.UPLOAD_TO_KEY_SERVER) }
             )
         }

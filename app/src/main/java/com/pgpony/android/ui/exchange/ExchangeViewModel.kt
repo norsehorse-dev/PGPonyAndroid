@@ -244,13 +244,34 @@ class ExchangeViewModel(
 
     fun uploadToKeyServer() {
         val key = _state.value.selectedKey ?: return
-        val armored = _state.value.armoredPublicKey ?: return
 
         viewModelScope.launch {
             _state.value = _state.value.copy(isUploading = true, errorMessage = null)
             try {
+                // 4.6.0 (item 9): the same payload builder and primary-identity
+                // check as Key Detail's publish sheet.
+                val armored = when (val payload = withContext(Dispatchers.IO) {
+                    repo.publishPayload(key.fingerprint, key.userID)
+                }) {
+                    is KeyRepository.PublishPayload.Ready -> payload.armored
+                    is KeyRepository.PublishPayload.NeedsRepair -> {
+                        _state.value = _state.value.copy(
+                            isUploading = false,
+                            errorMessage = PGPonyApp.instance.getString(
+                                R.string.publish_primary_repair_format,
+                                payload.flagged.joinToString(", ").ifEmpty { "-" },
+                                payload.shown
+                            )
+                        )
+                        return@launch
+                    }
+                    KeyRepository.PublishPayload.Unavailable -> {
+                        _state.value = _state.value.copy(isUploading = false)
+                        return@launch
+                    }
+                }
                 keyServer.upload(armored)
-                repo.markKeyServerUploaded(key.fingerprint)
+                repo.markKeyServerUploaded(key.fingerprint, com.pgpony.android.keyserver.KeyServerDirectory.ID_OPENPGP)
                 _state.value = _state.value.copy(
                     isUploading = false,
                     successMessage = PGPonyApp.instance.getString(R.string.exchange_vm_status_uploaded)
