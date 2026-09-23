@@ -1,6 +1,6 @@
 # PGPony Android 4.6.0 — Planning
 
-Status: planning (opened Sep 13 2026). Feature and fix list for the 4.6.0 cycle, seeded from
+Status: RC1 (Sep 23 2026). Opened Sep 13 2026. Feature and fix list for the 4.6.0 cycle, seeded from
 forum.dark.vegas user feedback. Android leads, then iOS mirrors each item once verified. Items are
 detailed enough to build against; priorities and the RC breakdown are set once the list settles.
 
@@ -44,7 +44,7 @@ Research / unknowns:
 Delivery: a key with a note shows that note as a label on the keyring list, and the note editor is reachable
 near the top of Key Details without scrolling to the bottom. Verified on device.
 
-Status: done in code, awaiting on-device check. The first line of a key's note shows on its keyring row as a
+Status: done, verified on device. The first line of a key's note shows on its keyring row as a
 label (tag icon, one line), and under the Key Detail header as a tappable label (or "Add a label") that opens
 the note editor. The single notes field is kept; notes were already searchable.
 
@@ -92,7 +92,7 @@ Delivery: the user enters a URL, PGPony fetches it through the offline/proxy-awa
 key's fingerprint and UID for verification before anything is stored, and only writes it to the keyring on
 explicit confirm. Verified on device with a raw .asc URL and with a key embedded in an HTML page.
 
-Status: done in code, awaiting on-device check. New "Link" import method: https only (http for .onion),
+Status: done, verified on device. New "Link" import method: https only (http for .onion),
 through the proxy-aware client, hidden in offline mode, redirects followed by hand (at most 5, each hop
 https), body capped at 8 MiB. Public key blocks are pulled out of a raw .asc, a binary key or an HTML page and
 validated like a key-server answer (KeyResponse); private keys and messages are a miss. The key shows in the
@@ -149,7 +149,7 @@ algorithm IDs only for ML-KEM-768, ML-KEM-1024, ML-DSA-65, and ML-DSA-87. There 
 point for ML-DSA-44 or ML-KEM-512, so a 44/512 key would have no interoperable on-wire encoding and no other
 OpenPGP tool could read it. Not viable until the spec registers those levels; revisit if it does.
 
-Status: done in code, awaiting on-device check. ML-DSA-87 + Ed448 is in the Post-Quantum picker group with
+Status: done, verified on device. ML-DSA-87 + Ed448 is in the Post-Quantum picker group with
 its own caption; ML-DSA-65 stays first. CompositePrimaryKeyGen pairs the bundled encryption subkey with the
 signing tier (87 gets ML-KEM-1024 + X448, algo 36; 65 keeps ML-KEM-768 + X25519).
 
@@ -216,7 +216,7 @@ Also reported (a tester, 4.5.3 RC2 testing), same consolidation:
 - Sharing text into PGPony offers encryption only, not decrypt or verify. OpenKeychain offers both directions
   and handles signed-only, with a clear indication of whether the message was encrypted.
 
-Status: done in code, awaiting on-device check. The Quick Action splits shared text (or a text file) into
+Status: done, verified on device. The Quick Action splits shared text (or a text file) into
 what it holds (SharePayload): a public key offers Import key and Import and encrypt to this key (both open
 the import preview for the fingerprint check); an encrypted message offers Decrypt (only the PGP block is
 decrypted, not the text around it); a signed-only message (cleartext-signed, or a PGP MESSAGE that is signed
@@ -234,6 +234,9 @@ Two users want opposite trust-ladder colorings (green at the top for Ultimate vs
 with blue for Ultimate), and CertainBot also proposed swapping the X and ! shield symbols (X for unknown/grey,
 ! for caution/yellow). Left unchanged across 4.4 to 4.5 rather than flipped mid-thread. Plan: split this into
 its own GitHub issue where each side's reasoning is laid out, decide once, then apply. Not blocking 4.6.0.
+
+Status: tabled (Sep 23 2026). The thread went quiet; revisit only if either side raises it again. Not in
+4.6.0.
 
 
 ## 8. Parallel effort (not release-gated): SOP interoperability wrapper
@@ -345,6 +348,10 @@ against a server copy with an extra self-cert; a downgrade expiry), plus the on-
 identity, upload, do not confirm the email, Refresh from key server, identity and primary badge intact.
 iOS mirror: 8.3.0 section 3.3(d).
 
+Status: done in code, landed with item 17.1 (crypto/CertificateMerge.kt, CertificateMergeTest). Its own
+on-device check (add an identity, upload, leave the email unconfirmed, Refresh from key server, identity and
+primary badge intact) goes in the RC1 pass.
+
 
 ## 13. LibrePGP ML-KEM-768 + brainpoolP256r1 keygen, and an "experimental" tag on PQC options
 
@@ -367,7 +374,7 @@ subkey, so signatures stay classical and verify everywhere; only the key exchang
 composite ML-DSA signing keys are the interop liability (their signatures are unreadable to tools without
 composite support). Not proposing to drop them, just to label the whole PQC set experimental.
 
-Status: done in code, awaiting on-device check. ML-KEM-768 + brainpoolP256r1 (LibrePGP, gpg ky768_bp256)
+Status: done, verified on device. ML-KEM-768 + brainpoolP256r1 (LibrePGP, gpg ky768_bp256)
 generates from the Advanced group: v4 Ed25519 primary plus a v5 algo-8 subkey, SHA3-256 in the ECC KEM KDF,
 round-trips in PGPony. Not yet checked against gpg 2.5 / Kleopatra (no gpg 2.5 available here); a tester
 with Kleopatra should import it and encrypt both ways. Every post-quantum picker entry now shows a
@@ -402,7 +409,7 @@ classical-signed control decrypts cleanly in both.
 
 Decision: ask each time. PGPony itself reads that shape, signature included (decrypts, finds the composite
 signer, verifies), so dropping the signature outright would cost PGPony-to-PGPony users for no reason. Status:
-done in code, awaiting on-device check. When a composite ML-DSA signer encrypts text or a file to any v4
+done, verified on device. When a composite ML-DSA signer encrypts text or a file to any v4
 recipient (the SEIPDv1 case), the Encrypt screen shows a prompt: PGPony reads the signature, GnuPG shows the
 message with an error, Thunderbird cannot open it. Buttons: Sign anyway, Send unsigned, Cancel. Send unsigned
 leaves the composite one-pass and signature packets out (still encrypted to everyone); the result sheet then
@@ -424,7 +431,7 @@ even though decryptStream now surfaces the composite fields. Mirror buildVerific
 composite branch (resolve the signer, verifyInline, set the banner state) in the share-target publish path.
 Fold into the item 6 share rework since both touch the same screens.
 
-Status: done in code, awaiting on-device check. Quick Action decrypt results (text, MIME, in-memory file
+Status: done, verified on device. Quick Action decrypt results (text, MIME, in-memory file
 and streamed file) verify an inline composite ML-DSA signature against the stored composite key, as the
 Decrypt screen does, instead of reading only signatureVerified.
 
@@ -466,7 +473,7 @@ shape is unchanged); composite ML-DSA keys may carry a classical Ed25519 (or RSA
 calling app is allowed once and a protected key unlocks once per session, like the OpenPGP provider; the
 Termux side goes upstream as an OkcAgent patch, with a fork only if it stalls.
 
-Status: done in code, awaiting on-device check.
+Status: done, verified on device.
 - SshAuthenticationService (:remote_api, exported, action org.openintents.ssh.authentication.
   ISshAuthenticationService, API version 1): SELECT_KEY (PGPony's key picker in an SSH mode that lists only
   keys with a usable auth subkey), GET_SSH_PUBLIC_KEY, GET_PUBLIC_KEY (X.509), SIGN. Key id is the primary
@@ -792,7 +799,7 @@ it lists the matching keys so the user can compare fingerprints and pick. Touche
 keyring-list work (item 1) and the union-merge work (item 12); keep it as its own additive item so it can ship
 independently. iOS mirrors once verified on Android.
 
-Status: done in code, awaiting on-device check. A keyring row whose identity (email, else the User ID) is
+Status: done, verified on device. A keyring row whose identity (email, else the User ID) is
 shared by other stored keys shows an "N keys" pill; tapping it lists them with fingerprint, label, algorithm,
 creation date and revoked/expired state, and a row opens that key. The Exchange "Key Found" card says how many
 keys a lookup returned when more than one answered; the Keyring import preview already lists extra keys.
