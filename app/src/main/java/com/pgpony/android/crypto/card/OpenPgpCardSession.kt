@@ -378,6 +378,28 @@ class OpenPgpCardSession(private val transport: CardTransport) {
     }
 
     /**
+     * 4.6.0 (item 16): INTERNAL AUTHENTICATE (INS 0x88, P1P2 0x00 0x00), the
+     * authentication slot's private-key operation, used for SSH. [input] is
+     * what the card signs: a PKCS#1 DigestInfo for RSA (the card pads it), the
+     * message itself for EdDSA, the hash for ECDSA (see SshAuth.cardInput).
+     * Returns the raw signature. Requires PW1/0x82 (PW1_OTHER) to have been
+     * verified beforehand.
+     */
+    fun internalAuthenticate(input: ByteArray): ByteArray {
+        val resp = transmit(
+            CommandApdu(
+                cla = 0x00,
+                ins = OpenPgpCard.INS_INTERNAL_AUTHENTICATE,
+                p1 = 0x00,
+                p2 = 0x00,
+                data = input,
+                le = 256
+            )
+        )
+        return resp.data
+    }
+
+    /**
      * CHANGE REFERENCE DATA (INS 0x24). The card splits the concatenated
      * [oldPin]||[newPin] using its stored length of the current PIN, so
      * the caller just supplies both. [pinReference] is CRD_PW1 (0x81) for

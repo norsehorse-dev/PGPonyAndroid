@@ -81,6 +81,18 @@ object ClassicalSubkeyGen {
     class SubkeyAddError(message: String, cause: Throwable? = null) : Exception(message, cause)
 
     /**
+     * 4.6.0 (item 16): the SSH authentication subkey keygen adds to a new key
+     * of [algorithm]. An RSA key gets an RSA subkey (2048 for RSA 2048, 4096
+     * for larger sizes) so it stays all-RSA for servers and policies that
+     * expect it; every other key gets Ed25519.
+     */
+    fun sshAuthTypeFor(algorithm: KeyAlgorithm): ClassicalSubkeyType = when (algorithm) {
+        KeyAlgorithm.RSA_2048 -> ClassicalSubkeyType.RSA_2048_AUTH
+        KeyAlgorithm.RSA_3072, KeyAlgorithm.RSA_4096, KeyAlgorithm.RSA_8192 -> ClassicalSubkeyType.RSA_4096_AUTH
+        else -> ClassicalSubkeyType.ED25519_AUTH
+    }
+
+    /**
      * Add [type] as a new subkey of [secretRing], bound and protected the
      * same way the primary's own subkeys are. [passphrase] must match the
      * ring's existing protection (empty string if the ring is

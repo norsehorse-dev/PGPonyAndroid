@@ -97,6 +97,11 @@ data class KeyringUiState(
     val generateExpiration: ExpirationOption = ExpirationOption.TWO_YEARS,
     // item 7 (#55): advanced granular keygen — compose the primary's subkey set.
     val generateGranular: Boolean = false,
+    // 4.6.0 (item 16): add an [A] subkey for SSH to the new key (RSA on an
+    // RSA key, Ed25519 otherwise). Off
+    // by default so the default key shape is unchanged. Granular mode offers
+    // the same subkey in its own list, so this applies to the simple mode.
+    val generateSshAuth: Boolean = false,
     val granularIncludeDefaultEncryption: Boolean = true,
     val granularSubkeys: List<AddSubkeyChoice> = emptyList(),
     val isGenerating: Boolean = false,
@@ -543,6 +548,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             generatePassphrase = "",
             generateConfirmPassphrase = "",
             generateExpiration = ExpirationOption.TWO_YEARS,
+            generateSshAuth = false,
             errorMessage = null
         )
     }
@@ -576,6 +582,10 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
     }
 
     // ── item 7 (#55): advanced granular keygen controls ──────────────────
+    fun setGenerateSshAuth(on: Boolean) {
+        _state.value = _state.value.copy(generateSshAuth = on)
+    }
+
     fun toggleGenerateGranular(on: Boolean) {
         _state.value = _state.value.copy(generateGranular = on)
     }
@@ -640,7 +650,23 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                         expirationSeconds = s.generateExpiration.seconds
                     )
                 }
+                // 4.6.0 (item 16): the SSH authentication subkey, bound with
+                // the key's own expiry. A failure here keeps the new key and
+                // says so; the subkey can still be added from Key Detail.
+                var sshAuthError: String? = null
+                if (!s.generateGranular && s.generateSshAuth) {
+                    try {
+                        repo.addSshAuthSubkeyAtGeneration(
+                            generated.fingerprint, s.generateAlgorithm, s.generateExpiration.seconds, passphrase
+                        )
+                    } catch (e: Exception) {
+                        sshAuthError = PGPonyApp.instance.getString(
+                            R.string.keyring_generate_ssh_auth_failed, e.message ?: ""
+                        )
+                    }
+                }
                 _state.value = _state.value.copy(
+                    errorMessage = sshAuthError,
                     isGenerating = false,
                     showGenerateSheet = false,
                     // 4.0.0 Phase 5a (§6 Q6) — offer to publish the new key.

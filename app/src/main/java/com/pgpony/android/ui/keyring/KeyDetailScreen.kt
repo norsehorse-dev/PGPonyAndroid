@@ -69,6 +69,7 @@ import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Report
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -366,6 +367,21 @@ fun KeyDetailScreen(
                                     text = { Text(stringResource(R.string.key_detail_action_change_passphrase)) },
                                     leadingIcon = { Icon(Icons.Filled.Password, null) },
                                     onClick = { menuOpen = false; dispatchAction(KeyDetailActionIds.CHANGE_PASSPHRASE) }
+                                )
+                            }
+                            // 4.6.0 (item 16): the authorized_keys line for the
+                            // key's SSH authentication subkey.
+                            state.sshPublicKey?.let { line ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.key_detail_action_copy_ssh_key)) },
+                                    leadingIcon = { Icon(Icons.Filled.Terminal, null) },
+                                    onClick = {
+                                        menuOpen = false
+                                        clipboard.setText(AnnotatedString(line))
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar(context.getString(R.string.key_detail_ssh_key_copied))
+                                        }
+                                    }
                                 )
                             }
                             if (menuKey.isKeyPair && !menuKey.isDefault) {

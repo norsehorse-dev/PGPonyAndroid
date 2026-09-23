@@ -133,6 +133,9 @@ data class PendingSubkeyOp(
 data class KeyDetailUiState(
     /** The loaded key. Null while loading or if not found. */
     val key: PGPKeyEntity? = null,
+    /** 4.6.0 (item 16): the key's SSH public key line (authorized_keys
+     *  form) when it has a usable authentication subkey, else null. */
+    val sshPublicKey: String? = null,
     // RC3 §N (#34): decryption fallbacks + backwards-compatible signing
     // defaults, both key-pair-only surfaces. signerChoices is the picker
     // pool (software key pairs, this key included).
@@ -356,6 +359,16 @@ class KeyDetailViewModel(
      * completes. The screen calls this in a LaunchedEffect keyed on
      * the fingerprint arg.
      */
+    /** 4.6.0 (item 16): see KeyDetailUiState.sshPublicKey. */
+    private suspend fun deriveSshPublicKey(key: PGPKeyEntity): String? = withContext(Dispatchers.Default) {
+        runCatching {
+            val cert = repo.sshAuthCertificate(key.fingerprint) ?: return@runCatching null
+            val sub = com.pgpony.android.crypto.ssh.SshAuth.authSubkey(cert) ?: return@runCatching null
+            val m = com.pgpony.android.crypto.ssh.SshAuth.material(sub.publicBody) ?: return@runCatching null
+            com.pgpony.android.crypto.ssh.SshAuth.authorizedKeysLine(m, key.userEmail.ifBlank { key.userName })
+        }.getOrNull()
+    }
+
     fun load(fingerprint: String) {
         // Skip if already loaded with the same fingerprint
         val current = _state.value.key
@@ -376,6 +389,7 @@ class KeyDetailViewModel(
                 userIds = loaded?.let { deriveUserIds(it) } ?: emptyList(),
                 // 4.2.0 RC3 (§11.2) — same treatment for subkeys.
                 subkeys = loaded?.let { deriveSubkeys(it) } ?: emptyList(),
+                sshPublicKey = loaded?.let { deriveSshPublicKey(it) },
                 // RC3 §N (#34)
                 fallbackKeys = loaded?.let { deriveFallbacks(it) } ?: emptyList(),
                 strictFallbacks = loaded?.let {
@@ -1458,6 +1472,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                 _state.value = _state.value.copy(
                     key = reloaded ?: key,
                     subkeys = reloaded?.let { deriveSubkeys(it) } ?: _state.value.subkeys,
+                    sshPublicKey = reloaded?.let { deriveSshPublicKey(it) },
                     addSubkeyInFlight = false,
                     showAddSubkeySheet = false
                 )
@@ -1510,6 +1525,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                 _state.value = _state.value.copy(
                     key = reloaded ?: key,
                     subkeys = reloaded?.let { deriveSubkeys(it) } ?: _state.value.subkeys,
+                    sshPublicKey = reloaded?.let { deriveSshPublicKey(it) },
                     subkeyRevokeInFlight = false,
                     showSubkeyRevokeSheet = false,
                     subkeyRevokeTarget = null
@@ -1566,6 +1582,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                 _state.value = _state.value.copy(
                     key = reloaded ?: key,
                     subkeys = reloaded?.let { deriveSubkeys(it) } ?: _state.value.subkeys,
+                    sshPublicKey = reloaded?.let { deriveSshPublicKey(it) },
                     subkeyRemoveInFlight = false,
                     subkeyRemoveTarget = null,
                     successMessage = PGPonyApp.instance.getString(R.string.kd_vm_status_subkey_removed)

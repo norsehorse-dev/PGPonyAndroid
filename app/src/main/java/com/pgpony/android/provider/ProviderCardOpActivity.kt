@@ -159,6 +159,8 @@ class ProviderCardOpActivity : ComponentActivity() {
                                         OpenPgpApi.ACTION_DECRYPT_VERIFY,
                                         OpenPgpApi.ACTION_DECRYPT_METADATA ->
                                             R.string.provider_cardop_body_decrypt
+                                        SshAuthenticationService.ACTION_SIGN ->
+                                            R.string.ssh_cardop_body
                                         else -> R.string.provider_cardop_body_sign
                                     }
                                 ),
@@ -385,6 +387,29 @@ class ProviderCardOpActivity : ComponentActivity() {
                     signerKeyIdRaw = result.signerKeyID?.let {
                         runCatching { java.lang.Long.parseUnsignedLong(it, 16) }.getOrNull()
                     }
+                )
+            }
+
+            SshAuthenticationService.ACTION_SIGN -> {
+                // 4.6.0 (item 16): SSH with the authentication slot. The
+                // tapped card's auth slot must hold the key the SSH client
+                // chose, and the certificate must still bind it for auth.
+                val pubRing = ringForSlot(ard.authFingerprint)
+                val authFp = ard.authFingerprint
+                    ?: throw OpenPgpCardException.Malformed(getString(R.string.provider_cardop_no_slot_key))
+                val cert = repo.sshAuthCertificate(op.cardEntityFingerprint) ?: pubRing.encoded
+                val sub = com.pgpony.android.crypto.ssh.SshAuth.authSubkey(cert)
+                if (sub == null || !sub.fingerprintHex.equals(authFp, ignoreCase = true)) {
+                    throw OpenPgpCardException.Malformed(getString(R.string.ssh_cardop_slot_mismatch))
+                }
+                val material = com.pgpony.android.crypto.ssh.SshAuth.material(sub.publicBody)
+                    ?: throw OpenPgpCardException.Malformed(getString(R.string.ssh_error_unsupported_algorithm))
+                session.verify(com.pgpony.android.crypto.card.OpenPgpCard.PW1_OTHER, pinBytes)
+                val raw = session.internalAuthenticate(
+                    com.pgpony.android.crypto.ssh.SshAuth.cardInput(material, op.input, op.sshHash)
+                )
+                ProviderCardOpStore.CompletedOp.SshSignature(
+                    com.pgpony.android.crypto.ssh.SshAuth.blobFromCard(material, raw, op.sshHash)
                 )
             }
 

@@ -65,6 +65,13 @@
 -keep interface org.openintents.openpgp.** { *; }
 -dontwarn org.openintents.openpgp.**
 
+# 4.6.0 (item 16): the SSH authentication API contract crosses the same
+# Binder boundary (SshAuthenticationApiError is read by name on the client
+# side, the AIDL Stub must not be merged away). Same reasoning as above.
+-keep class org.openintents.ssh.authentication.** { *; }
+-keep interface org.openintents.ssh.authentication.** { *; }
+-dontwarn org.openintents.ssh.authentication.**
+
 # Safety net for every other Parcelable that may cross a process
 # boundary: the framework instantiates CREATOR reflectively, so it
 # must never be renamed or stripped.

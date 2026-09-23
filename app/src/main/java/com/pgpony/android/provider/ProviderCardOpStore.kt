@@ -48,6 +48,8 @@ object ProviderCardOpStore {
         /** P2c Fix3: compress the payload? Card ops default OFF so a big
          *  attachment doesn't keep the NFC tag connected while ZLIB runs. */
         val enableCompression: Boolean = false,
+        /** 4.6.0 (item 16): the SSH API hash code for an SSH sign op, else -1. */
+        val sshHash: Int = -1,
         val createdAt: Long = SystemClock.elapsedRealtime()
     )
 
@@ -59,6 +61,8 @@ object ProviderCardOpStore {
          *  deletes it. */
         class StreamFile(val file: java.io.File) : CompletedOp()
         class Detached(val signature: ByteArray, val micalg: String) : CompletedOp()
+        /** 4.6.0 (item 16): an SSH signature blob from the authentication slot. */
+        class SshSignature(val blob: ByteArray) : CompletedOp()
         class Decrypted(
             val data: ByteArray,
             val filename: String?,

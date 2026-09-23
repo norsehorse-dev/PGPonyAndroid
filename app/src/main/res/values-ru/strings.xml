@@ -2110,4 +2110,17 @@
     <string name="share_target_action_encrypt_other">Зашифровать остальной текст</string>
     <string name="share_target_action_encrypt_other_subtitle">Зашифровать текст, отправленный вместе с блоком PGP</string>
     <string name="share_target_decrypt_result_unknown_signer">Подписано ключом, которого нет в вашей связке</string>
+    <!-- 4.6.0 (item 16): SSH authentication -->
+    <string name="ssh_cardop_body">PGPony подпишет вход по SSH слотом аутентификации вашего аппаратного ключа. Введите PIN-код карты и приложите ключ к задней стороне телефона.</string>
+    <string name="ssh_cardop_slot_mismatch">В слоте аутентификации этой карты нет выбранного SSH-ключа.</string>
+    <string name="ssh_error_unsupported_algorithm">Алгоритм этого ключа аутентификации нельзя использовать для SSH.</string>
+    <string name="ssh_error_storage_recoverable">Защищённое хранилище ключей PGPony на этом устройстве было сброшено системой. Откройте PGPony, один раз разблокируйте этот ключ парольной фразой и повторите попытку.</string>
+    <string name="ssh_error_storage_unreadable">Защищённое хранилище ключей PGPony на этом устройстве было сброшено системой, а у этого ключа нет парольной фразы для восстановления. Импортируйте ключ в PGPony заново.</string>
+    <string name="ssh_keypicker_title">Выберите ключ для SSH</string>
+    <string name="ssh_keypicker_empty">Ни у одного из ваших ключей нет подключа аутентификации SSH. Откройте пару ключей в PGPony, добавьте подключ аутентификации и повторите попытку.</string>
+    <string name="key_detail_action_copy_ssh_key">Копировать открытый SSH-ключ</string>
+    <string name="key_detail_ssh_key_copied">Открытый SSH-ключ скопирован</string>
+    <string name="keyring_generate_ssh_auth_toggle">Добавить подключ аутентификации SSH</string>
+    <string name="keyring_generate_ssh_auth_caption">Подключ для входа на серверы по SSH через мост ssh-agent: RSA для ключа RSA, Ed25519 для любого другого ключа.</string>
+    <string name="keyring_generate_ssh_auth_failed">Ключ создан, но подключ SSH добавить не удалось: %1$s. Его можно добавить в сведениях о ключе.</string>
 </resources>

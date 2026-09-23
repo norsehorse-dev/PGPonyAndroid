@@ -2031,4 +2031,17 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="share_target_action_encrypt_other">残りのテキストを暗号化</string>
     <string name="share_target_action_encrypt_other_subtitle">PGP ブロックと一緒に共有されたテキストを暗号化します</string>
     <string name="share_target_decrypt_result_unknown_signer">キーリングにないキーで署名されています</string>
+    <!-- 4.6.0 (item 16): SSH authentication -->
+    <string name="ssh_cardop_body">PGPony はハードウェアキーの認証スロットで SSH ログインに署名します。カードの PIN を入力してから、キーをスマートフォンの背面にかざしてください。</string>
+    <string name="ssh_cardop_slot_mismatch">このカードの認証スロットには、選択した SSH 鍵が入っていません。</string>
+    <string name="ssh_error_unsupported_algorithm">この認証鍵のアルゴリズムは SSH に使用できません。</string>
+    <string name="ssh_error_storage_recoverable">このデバイスの PGPony の安全な鍵ストレージがシステムによってリセットされました。PGPony を開き、この鍵をパスフレーズで一度ロック解除してから、もう一度お試しください。</string>
+    <string name="ssh_error_storage_unreadable">このデバイスの PGPony の安全な鍵ストレージがシステムによってリセットされ、この鍵には復元用のパスフレーズがありません。PGPony で鍵を再インポートしてください。</string>
+    <string name="ssh_keypicker_title">SSH に使う鍵を選択</string>
+    <string name="ssh_keypicker_empty">SSH 認証サブキーを持つ鍵がありません。PGPony で鍵ペアを開いて認証サブキーを追加してから、もう一度お試しください。</string>
+    <string name="key_detail_action_copy_ssh_key">SSH 公開鍵をコピー</string>
+    <string name="key_detail_ssh_key_copied">SSH 公開鍵をコピーしました</string>
+    <string name="keyring_generate_ssh_auth_toggle">SSH 認証サブキーを追加</string>
+    <string name="keyring_generate_ssh_auth_caption">ssh-agent ブリッジ経由で SSH によりサーバーにログインするためのサブキーです。RSA 鍵には RSA、それ以外の鍵には Ed25519 を使います。</string>
+    <string name="keyring_generate_ssh_auth_failed">鍵は作成されましたが、SSH サブキーを追加できませんでした: %1$s。鍵の詳細から追加できます。</string>
 </resources>

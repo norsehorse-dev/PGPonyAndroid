@@ -1215,6 +1215,24 @@ class KeyRepository(
     /** #26 (RC4): raw composite-PRIMARY private ring bytes (algo 30/31 signing
      *  key), or null if not a composite primary or public-only. Fed to the
      *  decrypt path so the ML-KEM subkey can open composite-encrypted mail. */
+    /**
+     * 4.6.0 (item 16): the stored public certificate as raw octets, for
+     * SshAuth.authSubkey. Raw (not a Bouncy Castle ring) so v4 algo-35 and
+     * composite ML-DSA keys are read whole.
+     */
+    fun sshAuthCertificate(fingerprint: String): ByteArray? =
+        store.loadPublicKey(fingerprint) ?: exportPublicKeyBytes(fingerprint)
+
+    /**
+     * 4.6.0 (item 16): the secret ring that holds an SSH authentication
+     * subkey's private part: the ordinary ring, or for a composite ML-DSA
+     * primary the carrier ring of its classical subkeys.
+     */
+    fun loadSshAuthSecretRing(fingerprint: String): PGPSecretKeyRing? =
+        loadSecretKeyRing(fingerprint) ?: store.loadPrivateKey(fingerprint)
+            ?.takeIf { CompositeKeyFacade.isCompositePrimary(it) && CompositeKeyFacade.hasSecret(it) }
+            ?.let { CompositeKeyFacade.classicalAuthRing(it) }
+
     /** 4.6.0 (item 21): see CompositeKeyFacade.classicalDecryptionRing. */
     fun loadCompositeClassicalDecryptionRing(fingerprint: String): PGPSecretKeyRing? =
         store.loadPrivateKey(fingerprint)
@@ -2194,6 +2212,20 @@ class KeyRepository(
     }
 
     // ── Add Subkey (RC3 §17.2 H) ─────────────────────────────────────────
+
+    /**
+     * 4.6.0 (item 16): the keygen "SSH authentication subkey" option. The same
+     * edit as Add Subkey with an Authenticate subkey, without marking the
+     * brand-new key as having unpublished local changes. An RSA key gets an
+     * RSA subkey of the same size (so the key stays all-RSA for servers and
+     * policies that expect it); every other key gets Ed25519.
+     */
+    suspend fun addSshAuthSubkeyAtGeneration(
+        fingerprint: String,
+        algorithm: com.pgpony.android.crypto.KeyAlgorithm,
+        expirationSeconds: Long?,
+        passphrase: String?
+    ) = addSubkeyEdit(fingerprint, ClassicalSubkeyGen.sshAuthTypeFor(algorithm), expirationSeconds, passphrase)
 
     /**
      * Add a classical subkey (RSA / Ed25519 / X25519) to an existing

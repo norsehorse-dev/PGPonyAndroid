@@ -2132,4 +2132,17 @@
     <string name="share_target_action_encrypt_other">Encrypt the other text</string>
     <string name="share_target_action_encrypt_other_subtitle">Encrypt the text shared along with the PGP block</string>
     <string name="share_target_decrypt_result_unknown_signer">Signed by a key that is not in your keyring</string>
+    <!-- 4.6.0 (item 16): SSH authentication -->
+    <string name="ssh_cardop_body">PGPony will sign an SSH login with your hardware key\'s authentication slot. Enter the card PIN, then hold the key against the back of your phone.</string>
+    <string name="ssh_cardop_slot_mismatch">This card\'s authentication slot does not hold the SSH key that was chosen.</string>
+    <string name="ssh_error_unsupported_algorithm">This authentication key\'s algorithm cannot be used for SSH.</string>
+    <string name="ssh_error_storage_recoverable">PGPony\'s secure key storage on this device was reset by the system. Open PGPony and unlock this key with its passphrase once, then try again.</string>
+    <string name="ssh_error_storage_unreadable">PGPony\'s secure key storage on this device was reset by the system and this key has no passphrase to recover it. Re-import the key in PGPony.</string>
+    <string name="ssh_keypicker_title">Choose a key for SSH</string>
+    <string name="ssh_keypicker_empty">None of your keys has an SSH authentication subkey. In PGPony, open a key pair and add an Authenticate subkey, then try again.</string>
+    <string name="key_detail_action_copy_ssh_key">Copy SSH Public Key</string>
+    <string name="key_detail_ssh_key_copied">SSH public key copied</string>
+    <string name="keyring_generate_ssh_auth_toggle">Add SSH authentication subkey</string>
+    <string name="keyring_generate_ssh_auth_caption">A subkey for signing in to servers over SSH through an ssh-agent bridge: RSA on an RSA key, Ed25519 on any other key.</string>
+    <string name="keyring_generate_ssh_auth_failed">Key created, but the SSH subkey could not be added: %1$s. You can add it from Key Detail.</string>
 </resources>

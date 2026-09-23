@@ -91,6 +91,11 @@ class ProviderKeyPickerActivity : ComponentActivity() {
 
         /** #51: marks a resumed sign op so the service does not prompt again. */
         const val EXTRA_SIGN_CHOICE_MADE = "com.pgpony.android.provider.SIGN_CHOICE_MADE"
+
+        /** 4.6.0 (item 16): SSH key selection. Lists only keys with a usable
+         *  authentication subkey and returns the pick as the SSH API's
+         *  key id (the primary fingerprint). */
+        const val EXTRA_FOR_SSH = "com.pgpony.android.provider.FOR_SSH"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,6 +109,7 @@ class ProviderKeyPickerActivity : ComponentActivity() {
             intent.getParcelableExtra(EXTRA_API_DATA)
         }
         val forOp = intent.getBooleanExtra(EXTRA_FOR_OP, false)
+        val forSsh = intent.getBooleanExtra(EXTRA_FOR_SSH, false)
         val currentKeyId = intent.getLongExtra(EXTRA_CURRENT_KEY_ID, 0L)
         val preselectUserId = intent.getStringExtra(EXTRA_PRESELECT_USER_ID)
         val preselectEmail = intent.getStringExtra(EXTRA_PRESELECT_EMAIL)
@@ -123,6 +129,14 @@ class ProviderKeyPickerActivity : ComponentActivity() {
                     // of Phase 2). Revoked keys are never offered.
                     value = repo.getAllKeys()
                         .filter { (it.isKeyPair || it.isCardBacked) && !it.isRevoked }
+                        // 4.6.0 (item 16): SSH offers only keys with a usable
+                        // authentication subkey.
+                        .filter { key ->
+                            !forSsh || kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                repo.sshAuthCertificate(key.fingerprint)
+                                    ?.let { com.pgpony.android.crypto.ssh.SshAuth.hasAuthSubkey(it) } == true
+                            }
+                        }
                         // #51: per-send mode scopes to the sending address, so
                         // the choice is between the keys ON that address, not
                         // every key in the ring. Only scope when the address is
@@ -141,14 +155,20 @@ class ProviderKeyPickerActivity : ComponentActivity() {
 
                 AlertDialog(
                     onDismissRequest = { cancel() },
-                    title = { Text(stringResource(R.string.provider_keypicker_title)) },
+                    title = {
+                        Text(
+                            stringResource(
+                                if (forSsh) R.string.ssh_keypicker_title else R.string.provider_keypicker_title
+                            )
+                        )
+                    },
                     text = {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .verticalScroll(rememberScrollState())
                         ) {
-                            if (!preselectUserId.isNullOrEmpty()) {
+                            if (!forSsh && !preselectUserId.isNullOrEmpty()) {
                                 Text(
                                     stringResource(
                                         R.string.provider_keypicker_for_format,
@@ -169,12 +189,16 @@ class ProviderKeyPickerActivity : ComponentActivity() {
                                         preselectEmail ?: "", ignoreCase = true
                                     ),
                                     isCurrent = isCurrent,
-                                    onClick = { pick(apiData, key, forOp) }
+                                    onClick = {
+                                        if (forSsh) pickSsh(apiData, key) else pick(apiData, key, forOp)
+                                    }
                                 )
                             }
                             if (keys?.isEmpty() == true) {
                                 Text(
-                                    stringResource(R.string.provider_keypicker_empty),
+                                    stringResource(
+                                        if (forSsh) R.string.ssh_keypicker_empty else R.string.provider_keypicker_empty
+                                    ),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(vertical = 8.dp)
@@ -183,7 +207,7 @@ class ProviderKeyPickerActivity : ComponentActivity() {
                             if (!keys.isNullOrEmpty()) {
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                             }
-                            if (keys != null && !forOp) {
+                            if (keys != null && !forOp && !forSsh) {
                                 NoKeyRow(onClick = { pickNone(apiData) })
                             }
                         }
@@ -206,6 +230,14 @@ class ProviderKeyPickerActivity : ComponentActivity() {
             cancel(); return
         }
         finishWithKeyId(apiData, keyId, forOp)
+    }
+
+    /** 4.6.0 (item 16): the SSH API re-executes SELECT_KEY with this intent. */
+    private fun pickSsh(apiData: Intent?, key: PGPKeyEntity) {
+        val result = Intent(apiData ?: Intent())
+        result.putExtra(SshAuthenticationService.EXTRA_KEY_ID, key.fingerprint.uppercase())
+        setResult(Activity.RESULT_OK, result)
+        finish()
     }
 
     private fun pickNone(apiData: Intent?) = finishWithKeyId(apiData, KEY_ID_NONE, forOp = false)

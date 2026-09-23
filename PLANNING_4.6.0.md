@@ -461,6 +461,35 @@ request). The Termux-client integration (fork vs upstream configurable target) i
 rather than release-gated, since it lives outside this repo. Sequencing note: the `[A]` subkey work also
 unblocks anything else that wants authentication keys, so it is the first sub-task regardless.
 
+Decisions: keygen gets an opt-in "Add SSH authentication subkey" switch (off by default, so the default key
+shape is unchanged); composite ML-DSA keys may carry a classical Ed25519 (or RSA) auth subkey for SSH; the
+calling app is allowed once and a protected key unlocks once per session, like the OpenPGP provider; the
+Termux side goes upstream as an OkcAgent patch, with a fork only if it stalls.
+
+Status: done in code, awaiting on-device check.
+- SshAuthenticationService (:remote_api, exported, action org.openintents.ssh.authentication.
+  ISshAuthenticationService, API version 1): SELECT_KEY (PGPony's key picker in an SSH mode that lists only
+  keys with a usable auth subkey), GET_SSH_PUBLIC_KEY, GET_PUBLIC_KEY (X.509), SIGN. Key id is the primary
+  fingerprint; a decimal 64-bit key id (what OpenKeychain hands out) is accepted too. Consent, passphrase and
+  card prompts reuse the provider activities and hand the request back so the client re-executes it.
+- crypto/ssh/SshAuth: picks the newest bound, unrevoked, unexpired auth-flagged subkey from the certificate
+  (CertificateBindings, so v4, v5, v6 and composite primaries alike); OpenSSH encoding for Ed25519 (algo 22
+  and 27), RSA (ssh-rsa, rsa-sha2-256, rsa-sha2-512) and ECDSA P-256/384/521; signature blobs.
+- Card: INTERNAL AUTHENTICATE on the auth slot (PW1 0x82), with a wrong-card and slot-mismatch guard.
+- Keygen switch (simple mode; granular mode already offers the subkey): RSA 2048 / 4096 keys get an RSA
+  auth subkey of the same size, every other key Ed25519. Key Detail menu: Copy SSH Public Key
+  (authorized_keys line) when the key has an auth subkey.
+- Verified: ssh-keygen -Y verify accepts signatures from every key type above (v4 and v6 Ed25519, RSA,
+  ECDSA on all three curves, Ed25519 and RSA auth subkeys on a composite ML-DSA key), and a real OpenSSH login
+  to sshd through an agent backed by this code works for Ed25519 and RSA (rsa-sha2-512). SshAuthTest covers
+  the same in unit tests.
+- On device: v4 Ed25519 auth subkey with a passphrase logged in to Termux sshd through the patched
+  OkcAgent; the passphrase prompt arrived through OkcAgent's notification. OkcAgent needs notification
+  permission on Android 13+, and an unanswered prompt blocks every later request until it is force-stopped.
+- OkcAgent patch: a "Crypto provider" setting listing installed apps that offer the SSH or OpenPGP API
+  (OpenKeychain stays the default), plus the matching <queries> entries. It also gives Termux gpg through
+  PGPony's OpenPGP API. To be submitted upstream.
+
 ## 17. Security review remediation (preliminary review, September 2026)
 
 Priority: HIGH (the first two sub-items are the highest-severity work in this cycle). Origin: an internal

@@ -2035,4 +2035,17 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="share_target_action_encrypt_other">Cifrar el resto del texto</string>
     <string name="share_target_action_encrypt_other_subtitle">Cifrar el texto compartido junto al bloque PGP</string>
     <string name="share_target_decrypt_result_unknown_signer">Firmado con una clave que no está en tu llavero</string>
+    <!-- 4.6.0 (item 16): SSH authentication -->
+    <string name="ssh_cardop_body">PGPony firmará un inicio de sesión SSH con la ranura de autenticación de tu llave de hardware. Introduce el PIN de la tarjeta y acerca la llave a la parte trasera del teléfono.</string>
+    <string name="ssh_cardop_slot_mismatch">La ranura de autenticación de esta tarjeta no contiene la clave SSH elegida.</string>
+    <string name="ssh_error_unsupported_algorithm">El algoritmo de esta clave de autenticación no se puede usar para SSH.</string>
+    <string name="ssh_error_storage_recoverable">El almacén seguro de claves de PGPony en este dispositivo fue restablecido por el sistema. Abre PGPony, desbloquea esta clave una vez con su frase de contraseña y vuelve a intentarlo.</string>
+    <string name="ssh_error_storage_unreadable">El almacén seguro de claves de PGPony en este dispositivo fue restablecido por el sistema y esta clave no tiene frase de contraseña para recuperarla. Vuelve a importar la clave en PGPony.</string>
+    <string name="ssh_keypicker_title">Elige una clave para SSH</string>
+    <string name="ssh_keypicker_empty">Ninguna de tus claves tiene una subclave de autenticación SSH. En PGPony, abre un par de claves, añade una subclave de autenticación y vuelve a intentarlo.</string>
+    <string name="key_detail_action_copy_ssh_key">Copiar clave pública SSH</string>
+    <string name="key_detail_ssh_key_copied">Clave pública SSH copiada</string>
+    <string name="keyring_generate_ssh_auth_toggle">Añadir subclave de autenticación SSH</string>
+    <string name="keyring_generate_ssh_auth_caption">Una subclave para iniciar sesión en servidores por SSH a través de un puente ssh-agent: RSA en una clave RSA, Ed25519 en cualquier otra.</string>
+    <string name="keyring_generate_ssh_auth_failed">Clave creada, pero no se pudo añadir la subclave SSH: %1$s. Puedes añadirla desde el detalle de la clave.</string>
 </resources>

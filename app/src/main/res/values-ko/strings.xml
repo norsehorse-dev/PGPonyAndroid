@@ -2107,4 +2107,17 @@
     <string name="share_target_action_encrypt_other">나머지 텍스트 암호화</string>
     <string name="share_target_action_encrypt_other_subtitle">PGP 블록과 함께 공유된 텍스트를 암호화합니다</string>
     <string name="share_target_decrypt_result_unknown_signer">키링에 없는 키로 서명됨</string>
+    <!-- 4.6.0 (item 16): SSH authentication -->
+    <string name="ssh_cardop_body">PGPony가 하드웨어 키의 인증 슬롯으로 SSH 로그인에 서명합니다. 카드 PIN을 입력한 다음 키를 휴대폰 뒷면에 대세요.</string>
+    <string name="ssh_cardop_slot_mismatch">이 카드의 인증 슬롯에 선택한 SSH 키가 없습니다.</string>
+    <string name="ssh_error_unsupported_algorithm">이 인증 키의 알고리즘은 SSH에 사용할 수 없습니다.</string>
+    <string name="ssh_error_storage_recoverable">이 기기에서 PGPony의 보안 키 저장소가 시스템에 의해 초기화되었습니다. PGPony를 열고 이 키를 암호문으로 한 번 잠금 해제한 뒤 다시 시도하세요.</string>
+    <string name="ssh_error_storage_unreadable">이 기기에서 PGPony의 보안 키 저장소가 시스템에 의해 초기화되었고, 이 키에는 복구할 암호문이 없습니다. PGPony에서 키를 다시 가져오세요.</string>
+    <string name="ssh_keypicker_title">SSH에 사용할 키 선택</string>
+    <string name="ssh_keypicker_empty">SSH 인증 하위 키가 있는 키가 없습니다. PGPony에서 키 쌍을 열고 인증 하위 키를 추가한 뒤 다시 시도하세요.</string>
+    <string name="key_detail_action_copy_ssh_key">SSH 공개 키 복사</string>
+    <string name="key_detail_ssh_key_copied">SSH 공개 키를 복사했습니다</string>
+    <string name="keyring_generate_ssh_auth_toggle">SSH 인증 하위 키 추가</string>
+    <string name="keyring_generate_ssh_auth_caption">ssh-agent 브리지를 통해 SSH로 서버에 로그인하기 위한 하위 키입니다. RSA 키에는 RSA, 그 밖의 키에는 Ed25519를 사용합니다.</string>
+    <string name="keyring_generate_ssh_auth_failed">키가 생성되었지만 SSH 하위 키를 추가하지 못했습니다: %1$s. 키 세부 정보에서 추가할 수 있습니다.</string>
 </resources>

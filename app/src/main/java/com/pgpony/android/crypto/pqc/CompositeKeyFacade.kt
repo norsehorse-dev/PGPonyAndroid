@@ -299,9 +299,22 @@ object CompositeKeyFacade {
      * never used; they keep their own protection (the user's passphrase).
      * Null when the key has no such subkey.
      */
-    fun classicalDecryptionRing(ring: ByteArray): org.bouncycastle.openpgp.PGPSecretKeyRing? {
+    fun classicalDecryptionRing(ring: ByteArray): org.bouncycastle.openpgp.PGPSecretKeyRing? =
+        classicalSubkeyRing(ring, CLASSICAL_ENCRYPTION_ALGS)
+
+    /**
+     * 4.6.0 (item 16): the same carrier ring for a composite key's classical
+     * SSH-capable subkeys (RSA, ECDSA, Ed25519), so the SSH authentication
+     * service can sign with an authentication subkey added to the key. Which
+     * subkey carries the Authenticate flag is decided from the certificate
+     * (CertificateBindings), not from this ring, which has no bindings.
+     */
+    fun classicalAuthRing(ring: ByteArray): org.bouncycastle.openpgp.PGPSecretKeyRing? =
+        classicalSubkeyRing(ring, CLASSICAL_AUTH_ALGS)
+
+    private fun classicalSubkeyRing(ring: ByteArray, algs: Set<Int>): org.bouncycastle.openpgp.PGPSecretKeyRing? {
         val classical = walk(ring).filter { pkt ->
-            pkt.tag == 7 && (publicKeyBody(pkt.body)[1 + 4].toInt() and 0xFF) in CLASSICAL_ENCRYPTION_ALGS
+            pkt.tag == 7 && (publicKeyBody(pkt.body)[1 + 4].toInt() and 0xFF) in algs
         }
         if (classical.isEmpty()) return null
         return runCatching {
@@ -323,6 +336,7 @@ object CompositeKeyFacade {
     }
 
     private val CLASSICAL_ENCRYPTION_ALGS = setOf(1, 2, 16, 18, 25, 26)
+    private val CLASSICAL_AUTH_ALGS = setOf(1, 3, 19, 22, 27)
 
     /** True if [ring] carries secret material (a tag-5 secret primary packet). */
     fun hasSecret(ring: ByteArray): Boolean =

@@ -2035,4 +2035,17 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="share_target_action_encrypt_other">Criptografar o restante do texto</string>
     <string name="share_target_action_encrypt_other_subtitle">Criptografar o texto compartilhado junto com o bloco PGP</string>
     <string name="share_target_decrypt_result_unknown_signer">Assinado por uma chave que não está no seu chaveiro</string>
+    <!-- 4.6.0 (item 16): SSH authentication -->
+    <string name="ssh_cardop_body">O PGPony vai assinar um login SSH com o slot de autenticação da sua chave de hardware. Digite o PIN do cartão e encoste a chave na parte de trás do celular.</string>
+    <string name="ssh_cardop_slot_mismatch">O slot de autenticação deste cartão não contém a chave SSH escolhida.</string>
+    <string name="ssh_error_unsupported_algorithm">O algoritmo desta chave de autenticação não pode ser usado para SSH.</string>
+    <string name="ssh_error_storage_recoverable">O armazenamento seguro de chaves do PGPony neste dispositivo foi redefinido pelo sistema. Abra o PGPony, desbloqueie esta chave uma vez com a frase secreta e tente de novo.</string>
+    <string name="ssh_error_storage_unreadable">O armazenamento seguro de chaves do PGPony neste dispositivo foi redefinido pelo sistema e esta chave não tem frase secreta para recuperá-la. Importe a chave de novo no PGPony.</string>
+    <string name="ssh_keypicker_title">Escolha uma chave para SSH</string>
+    <string name="ssh_keypicker_empty">Nenhuma das suas chaves tem uma subchave de autenticação SSH. No PGPony, abra um par de chaves, adicione uma subchave de autenticação e tente de novo.</string>
+    <string name="key_detail_action_copy_ssh_key">Copiar chave pública SSH</string>
+    <string name="key_detail_ssh_key_copied">Chave pública SSH copiada</string>
+    <string name="keyring_generate_ssh_auth_toggle">Adicionar subchave de autenticação SSH</string>
+    <string name="keyring_generate_ssh_auth_caption">Uma subchave para entrar em servidores por SSH através de uma ponte ssh-agent: RSA em uma chave RSA, Ed25519 em qualquer outra.</string>
+    <string name="keyring_generate_ssh_auth_failed">Chave criada, mas não foi possível adicionar a subchave SSH: %1$s. Você pode adicioná-la nos detalhes da chave.</string>
 </resources>

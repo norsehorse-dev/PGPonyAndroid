@@ -2035,4 +2035,17 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="share_target_action_encrypt_other">Den übrigen Text verschlüsseln</string>
     <string name="share_target_action_encrypt_other_subtitle">Den Text verschlüsseln, der zusammen mit dem PGP-Block geteilt wurde</string>
     <string name="share_target_decrypt_result_unknown_signer">Signiert mit einem Schlüssel, der nicht in deinem Schlüsselbund ist</string>
+    <!-- 4.6.0 (item 16): SSH authentication -->
+    <string name="ssh_cardop_body">PGPony signiert eine SSH-Anmeldung mit dem Authentifizierungs-Slot deines Hardware-Schlüssels. Gib die Karten-PIN ein und halte den Schlüssel dann an die Rückseite deines Telefons.</string>
+    <string name="ssh_cardop_slot_mismatch">Der Authentifizierungs-Slot dieser Karte enthält nicht den gewählten SSH-Schlüssel.</string>
+    <string name="ssh_error_unsupported_algorithm">Der Algorithmus dieses Authentifizierungsschlüssels kann nicht für SSH verwendet werden.</string>
+    <string name="ssh_error_storage_recoverable">Der sichere Schlüsselspeicher von PGPony auf diesem Gerät wurde vom System zurückgesetzt. Öffne PGPony, entsperre diesen Schlüssel einmal mit seiner Passphrase und versuche es erneut.</string>
+    <string name="ssh_error_storage_unreadable">Der sichere Schlüsselspeicher von PGPony auf diesem Gerät wurde vom System zurückgesetzt, und dieser Schlüssel hat keine Passphrase zur Wiederherstellung. Importiere den Schlüssel in PGPony erneut.</string>
+    <string name="ssh_keypicker_title">Schlüssel für SSH wählen</string>
+    <string name="ssh_keypicker_empty">Keiner deiner Schlüssel hat einen SSH-Authentifizierungs-Unterschlüssel. Öffne in PGPony ein Schlüsselpaar, füge einen Authentifizierungs-Unterschlüssel hinzu und versuche es erneut.</string>
+    <string name="key_detail_action_copy_ssh_key">Öffentlichen SSH-Schlüssel kopieren</string>
+    <string name="key_detail_ssh_key_copied">Öffentlicher SSH-Schlüssel kopiert</string>
+    <string name="keyring_generate_ssh_auth_toggle">SSH-Authentifizierungs-Unterschlüssel hinzufügen</string>
+    <string name="keyring_generate_ssh_auth_caption">Ein Unterschlüssel, um dich über eine ssh-agent-Brücke per SSH an Servern anzumelden: RSA bei einem RSA-Schlüssel, sonst Ed25519.</string>
+    <string name="keyring_generate_ssh_auth_failed">Schlüssel erstellt, aber der SSH-Unterschlüssel konnte nicht hinzugefügt werden: %1$s. Du kannst ihn in den Schlüsseldetails hinzufügen.</string>
 </resources>

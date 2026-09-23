@@ -52,6 +52,10 @@ class ProviderPassphraseActivity : ComponentActivity() {
 
         /** The client's original API request intent, echoed back on unlock. */
         const val EXTRA_API_DATA = "com.pgpony.android.provider.PASSPHRASE_API_DATA"
+
+        /** 4.6.0 (item 16): hide "Change key" (the SSH service picks its key
+         *  through its own key selection, not the OpenPGP signing picker). */
+        const val EXTRA_NO_KEY_CHANGE = "com.pgpony.android.provider.PASSPHRASE_NO_KEY_CHANGE"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,6 +71,7 @@ class ProviderPassphraseActivity : ComponentActivity() {
         val keyId = intent.getLongExtra(EXTRA_KEY_ID, 0L)
         val keyLabel = intent.getStringExtra(EXTRA_KEY_LABEL) ?: ""
         val wasWrong = intent.getBooleanExtra(EXTRA_WRONG, false)
+        val allowKeyChange = !intent.getBooleanExtra(EXTRA_NO_KEY_CHANGE, false)
 
         if (keyId == 0L) {
             setResult(Activity.RESULT_CANCELED)
@@ -131,7 +136,7 @@ class ProviderPassphraseActivity : ComponentActivity() {
                                     .fillMaxWidth()
                                     .autofillPassword { passphrase = it }
                             )
-                            TextButton(
+                            if (allowKeyChange) TextButton(
                                 onClick = {
                                     val pickerIntent = Intent(
                                         context, ProviderKeyPickerActivity::class.java

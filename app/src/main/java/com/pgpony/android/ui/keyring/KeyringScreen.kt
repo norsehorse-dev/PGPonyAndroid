@@ -759,6 +759,26 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
                 Spacer(modifier = Modifier.height(12.dp))
             }
 
+            // 4.6.0 (item 16): opt-in SSH authentication subkey.
+            if (!state.generateGranular) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                        checked = state.generateSshAuth,
+                        onCheckedChange = { viewModel.setGenerateSshAuth(it) }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(stringResource(R.string.keyring_generate_ssh_auth_toggle))
+                        Text(
+                            stringResource(R.string.keyring_generate_ssh_auth_caption),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             // item 7 (#55): advanced granular composer.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(

@@ -2035,4 +2035,17 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="share_target_action_encrypt_other">Chiffrer le reste du texte</string>
     <string name="share_target_action_encrypt_other_subtitle">Chiffrer le texte partagé avec le bloc PGP</string>
     <string name="share_target_decrypt_result_unknown_signer">Signé par une clé absente de votre trousseau</string>
+    <!-- 4.6.0 (item 16): SSH authentication -->
+    <string name="ssh_cardop_body">PGPony va signer une connexion SSH avec l\'emplacement d\'authentification de ta clé matérielle. Saisis le PIN de la carte, puis tiens la clé contre le dos de ton téléphone.</string>
+    <string name="ssh_cardop_slot_mismatch">L\'emplacement d\'authentification de cette carte ne contient pas la clé SSH choisie.</string>
+    <string name="ssh_error_unsupported_algorithm">L\'algorithme de cette clé d\'authentification ne peut pas servir pour SSH.</string>
+    <string name="ssh_error_storage_recoverable">Le stockage sécurisé des clés de PGPony sur cet appareil a été réinitialisé par le système. Ouvre PGPony, déverrouille cette clé une fois avec sa phrase secrète, puis réessaie.</string>
+    <string name="ssh_error_storage_unreadable">Le stockage sécurisé des clés de PGPony sur cet appareil a été réinitialisé par le système et cette clé n\'a pas de phrase secrète pour la récupérer. Réimporte la clé dans PGPony.</string>
+    <string name="ssh_keypicker_title">Choisir une clé pour SSH</string>
+    <string name="ssh_keypicker_empty">Aucune de tes clés n\'a de sous-clé d\'authentification SSH. Dans PGPony, ouvre une paire de clés, ajoute une sous-clé d\'authentification, puis réessaie.</string>
+    <string name="key_detail_action_copy_ssh_key">Copier la clé publique SSH</string>
+    <string name="key_detail_ssh_key_copied">Clé publique SSH copiée</string>
+    <string name="keyring_generate_ssh_auth_toggle">Ajouter une sous-clé d\'authentification SSH</string>
+    <string name="keyring_generate_ssh_auth_caption">Une sous-clé pour se connecter à des serveurs en SSH via un pont ssh-agent : RSA sur une clé RSA, Ed25519 sur toute autre clé.</string>
+    <string name="keyring_generate_ssh_auth_failed">Clé créée, mais la sous-clé SSH n\'a pas pu être ajoutée : %1$s. Tu peux l\'ajouter depuis le détail de la clé.</string>
 </resources>

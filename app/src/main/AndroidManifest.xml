@@ -413,6 +413,23 @@
         </service>
 
         <!--
+          4.6.0 (item 16, issue #68): SSH authentication API
+          (org.openintents.ssh.authentication, version 1), the interface an
+          ssh-agent bridge such as OkcAgent binds to. Same security boundary
+          as the OpenPGP provider: exported so other apps can bind, gated
+          inside the service by the signature-pinned allow-list, with the
+          same consent, passphrase, key-picker and card activities.
+        -->
+        <service
+            android:name=".provider.SshAuthenticationService"
+            android:process=":remote_api"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.openintents.ssh.authentication.ISshAuthenticationService" />
+            </intent-filter>
+        </service>
+
+        <!--
           4.0.0 Succession Phase 1 — first-use consent dialog for API
           clients. NOT exported: it is only ever launched through the
           PendingIntent the provider service returns with

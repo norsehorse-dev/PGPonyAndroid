@@ -46,7 +46,7 @@ object OpenPgpCard {
     const val INS_VERIFY: Int = 0x20                       // Phase 2/3
     const val INS_CHANGE_REFERENCE_DATA: Int = 0x24        // Phase 2 (PW1 change)
     const val INS_PERFORM_SECURITY_OPERATION: Int = 0x2A   // Phase 2/3 (PSO)
-    const val INS_INTERNAL_AUTHENTICATE: Int = 0x88        // deferred (auth slot)
+    const val INS_INTERNAL_AUTHENTICATE: Int = 0x88        // 4.6.0 (item 16): auth slot, SSH
     const val INS_GENERATE_ASYMMETRIC_KEY_PAIR: Int = 0x47
     const val INS_PUT_DATA: Int = 0xDA                     // Phase B1: write DOs
     // ── Phase B2: admin-PIN lifecycle ──────────────────────────────────

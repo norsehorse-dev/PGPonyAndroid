@@ -43,6 +43,11 @@ class ApiConsentActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_PACKAGE_NAME = "com.pgpony.android.provider.PACKAGE_NAME"
+
+        /** 4.6.0 (item 16): the client's request, handed back on allow. The
+         *  SSH API client (OkcAgent) re-executes whatever intent the activity
+         *  returns, so a bare RESULT_OK is not enough there. */
+        const val EXTRA_API_DATA = "com.pgpony.android.provider.CONSENT_API_DATA"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -95,9 +100,15 @@ class ApiConsentActivity : ComponentActivity() {
                                 busy = true
                                 lifecycleScope.launch {
                                     val ok = authorizer.grant(clientPackage)
-                                    setResult(
-                                        if (ok) Activity.RESULT_OK else Activity.RESULT_CANCELED
-                                    )
+                                    @Suppress("DEPRECATION")
+                                    val apiData: android.content.Intent? = intent.getParcelableExtra(EXTRA_API_DATA)
+                                    if (ok && apiData != null) {
+                                        setResult(Activity.RESULT_OK, android.content.Intent(apiData))
+                                    } else {
+                                        setResult(
+                                            if (ok) Activity.RESULT_OK else Activity.RESULT_CANCELED
+                                        )
+                                    }
                                     finish()
                                 }
                             }
