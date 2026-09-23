@@ -1206,7 +1206,9 @@ fun PGPonyMainScreen(
                                 launchSingleTop = true
                             }
                         },
-                        onDecryptWithKey = {
+                        onDecryptWithKey = { fp ->
+                            // 4.6.0 (item 5, #63): carry the key into "Decrypt with".
+                            encDecVm.preselectDecryptKey(fp)
                             navController.navigate(Screen.Decrypt.route) {
                                 popUpTo(navController.graph.startDestinationId) { saveState = true }
                                 launchSingleTop = true

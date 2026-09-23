@@ -119,7 +119,7 @@ fun KeyDetailScreen(
     onBack: () -> Unit,
     onChangeCardPin: () -> Unit = {},
     onEncryptToKey: (String) -> Unit = {},
-    onDecryptWithKey: () -> Unit = {}
+    onDecryptWithKey: (String) -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     val clipboard = LocalClipboardManager.current
@@ -1453,7 +1453,7 @@ private fun LoadedBody(
     onRevokeUserId: (String) -> Unit,
     onRemoveUserId: (String) -> Unit,
     onEncryptToKey: (String) -> Unit,
-    onDecryptWithKey: () -> Unit,
+    onDecryptWithKey: (String) -> Unit,
     onEditNotations: () -> Unit,
     // RC3 §N (#34)
     onToggleFallback: (String) -> Unit,
@@ -1470,7 +1470,7 @@ private fun LoadedBody(
         contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item { KeyHeaderSection(key = key, onCopyEmail = onCopyEmail, onAvatarClick = { if (key.isKeyPair) onDecryptWithKey() else onEncryptToKey(key.fingerprint) }) }
+        item { KeyHeaderSection(key = key, onCopyEmail = onCopyEmail, onAvatarClick = { if (key.isKeyPair) onDecryptWithKey(key.fingerprint) else onEncryptToKey(key.fingerprint) }) }
         // Phase A6 — Revoked banner directly under the header so it's
         // the first thing the user sees on a revoked key without having
         // to scroll to Danger Zone. RevokedBanner internally no-ops when

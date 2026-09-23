@@ -169,6 +169,10 @@ avatar append to the recipient set; restore the star and right-alignment on the 
 Delivery: the avatar shortcut sets the key on both Encrypt (added to current recipients) and Decrypt; the
 Default Key picker shows the star and sits to the right of the title. Verified on device.
 
+Status: done in code, awaiting on-device check. The key-pair avatar carries its key into "Decrypt with" (a
+card key takes the PIN + tap path); the public-key avatar adds the key to the recipients already chosen; the
+Default Key picker is a row again with the star on the left and the choice as a plain text button on the right.
+
 
 ## 6. One payload-aware share dialog (consolidate the share actions)
 

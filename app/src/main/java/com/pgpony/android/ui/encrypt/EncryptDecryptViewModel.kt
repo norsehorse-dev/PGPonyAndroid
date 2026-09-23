@@ -728,11 +728,19 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             // #58 (CertainBot): an explicit one-shot preselect from the
             // import-and-encrypt jump wins over the default-recipient rule so
             // the freshly-shared key lands selected as recipient.
-            val explicitPreselect = pendingPreselectRecipientFp?.let { fp ->
+            // 4.6.0 (item 5, #63): additive. The key joins the recipients
+            // already chosen (still in the pool) instead of replacing them;
+            // with none chosen it is the only one, as before.
+            val explicitKey = pendingPreselectRecipientFp?.let { fp ->
                 unrevokedRecipients.firstOrNull { it.fingerprint.equals(fp, ignoreCase = true) }
-            }?.let { listOf(it) }
+            }
             pendingPreselectRecipientFp = null
-            val finalRecipients = explicitPreselect ?: preselectedRecipients
+            val finalRecipients = if (explicitKey != null) {
+                val kept = _encryptState.value.selectedRecipients.filter { sel ->
+                    unrevokedRecipients.any { it.fingerprint == sel.fingerprint }
+                }
+                if (kept.any { it.fingerprint == explicitKey.fingerprint }) kept else kept + explicitKey
+            } else preselectedRecipients
 
             _encryptState.value = _encryptState.value.copy(
                 availableRecipients = unrevokedRecipients,
@@ -783,6 +791,14 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 selectedKeyFingerprint = _decryptState.value.selectedKeyFingerprint
                     ?: orderedKeys.firstOrNull()?.fingerprint
             )
+            // 4.6.0 (item 5, #63): the Key Detail avatar's key, applied through
+            // selectDecryptKey so a card key takes the PIN + tap path.
+            pendingPreselectDecryptFp?.let { fp ->
+                pendingPreselectDecryptFp = null
+                orderedKeys.firstOrNull { it.fingerprint.equals(fp, ignoreCase = true) }
+                    ?.let { selectDecryptKey(it.fingerprint) }
+            }
+            if (explicitKey != null) recomputePqWarning()
         }
     }
 
@@ -800,6 +816,15 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     /** #58 — preselect a recipient by fingerprint and refresh the key pool. */
     fun preselectRecipient(fingerprint: String) {
         pendingPreselectRecipientFp = fingerprint.uppercase()
+        loadKeys()
+    }
+
+    // 4.6.0 (item 5, #63): Key Detail's avatar on a key pair opens Decrypt
+    // with that key chosen in "Decrypt with"; applied on the next loadKeys.
+    private var pendingPreselectDecryptFp: String? = null
+
+    fun preselectDecryptKey(fingerprint: String) {
+        pendingPreselectDecryptFp = fingerprint.uppercase()
         loadKeys()
     }
 

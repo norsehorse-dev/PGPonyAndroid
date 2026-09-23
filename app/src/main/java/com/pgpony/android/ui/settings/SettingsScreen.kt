@@ -704,36 +704,49 @@ fun SettingsScreen(
             SectionHeader(stringResource(R.string.settings_section_key_management))
             // #63 (CertainBot): the Default Key is pickable from here, not just
             // shown. Reuses the same dropdown pattern as the default recipient.
+            // 4.6.0 (item 5, #63): the picker sits in a SettingsRow-style row
+            // again, star on the left and the choice on the right of the
+            // title, as a plain text button rather than an outlined oval.
             if (state.signingKeyChoices.isNotEmpty()) {
-                Text(
-                    text = stringResource(R.string.settings_key_default_label),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(start = 16.dp, top = 8.dp)
-                )
                 var defaultKeyMenuExpanded by remember { mutableStateOf(false) }
-                Box(modifier = Modifier.padding(start = 16.dp, top = 4.dp, end = 16.dp)) {
-                    OutlinedButton(onClick = { defaultKeyMenuExpanded = true }) {
-                        Text(
-                            text = state.defaultKeyName
-                                ?: stringResource(R.string.settings_key_default_choose),
-                            maxLines = 1,
-                        )
-                        Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
-                    }
-                    DropdownMenu(
-                        expanded = defaultKeyMenuExpanded,
-                        onDismissRequest = { defaultKeyMenuExpanded = false }
-                    ) {
-                        state.signingKeyChoices.forEach { key ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(key.userName.ifBlank { key.userEmail }.ifBlank { key.userID })
-                                },
-                                onClick = {
-                                    viewModel.setDefaultSigningKey(key.fingerprint)
-                                    defaultKeyMenuExpanded = false
-                                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Filled.Star, null, tint = Color(0xFFF59E0B), modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        stringResource(R.string.settings_key_default_label),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box {
+                        TextButton(onClick = { defaultKeyMenuExpanded = true }) {
+                            Text(
+                                text = state.defaultKeyName
+                                    ?: stringResource(R.string.settings_key_default_choose),
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = 180.dp)
                             )
+                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                        }
+                        DropdownMenu(
+                            expanded = defaultKeyMenuExpanded,
+                            onDismissRequest = { defaultKeyMenuExpanded = false }
+                        ) {
+                            state.signingKeyChoices.forEach { key ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(key.userName.ifBlank { key.userEmail }.ifBlank { key.userID })
+                                    },
+                                    onClick = {
+                                        viewModel.setDefaultSigningKey(key.fingerprint)
+                                        defaultKeyMenuExpanded = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
