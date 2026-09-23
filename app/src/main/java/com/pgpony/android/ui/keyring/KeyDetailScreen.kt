@@ -134,11 +134,17 @@ fun KeyDetailScreen(
     // 4.6.0 (item 16): the "SSH from Termux" setup sheet.
     var showSshTermux by remember { mutableStateOf(false) }
     // #63 (CertainBot): one-time hint that the header avatar is a shortcut.
+    // 4.6.0: one hint per kind (a key pair's avatar decrypts, a public key's
+    // encrypts), kept as TooltipState flags so Settings > Reset tips shows
+    // them again. The old single flag hid the key-pair hint once the
+    // public-key one had shown, and Reset tips did not clear it.
     LaunchedEffect(state.key?.fingerprint) {
         val k = state.key ?: return@LaunchedEffect
         val prefs = context.getSharedPreferences("pgpony_prefs", android.content.Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("kd_avatar_shortcut_hint_shown", false)) {
-            prefs.edit().putBoolean("kd_avatar_shortcut_hint_shown", true).apply()
+        val tips = com.pgpony.android.ui.components.TooltipState(prefs)
+        val tipKey = if (k.isKeyPair) "kd_avatar_keypair" else "kd_avatar_public"
+        if (tips.shouldShow(tipKey)) {
+            tips.markShown(tipKey)
             snackbarHostState.showSnackbar(
                 context.getString(
                     if (k.isKeyPair) R.string.kd_avatar_hint_decrypt else R.string.kd_avatar_hint_encrypt
