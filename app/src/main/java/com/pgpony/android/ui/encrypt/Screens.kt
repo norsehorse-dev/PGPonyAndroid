@@ -966,7 +966,7 @@ private fun RecipientPickerCard(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Bart (email): when two selected recipients share a display name,
+            // limbodiver (email): when two selected recipients share a display name,
             // a plain name chip cannot tell them apart. Show the email on the
             // colliding ones only, so the common single-name case stays compact.
             val selectedNameCounts = state.selectedRecipients
@@ -1301,7 +1301,7 @@ private fun RecipientPickerRow(
                 key.userName.ifBlank { key.userEmail },
                 style = MaterialTheme.typography.bodyMedium
             )
-            // Bart (email): show the email on the secondary line when the row's
+            // limbodiver (email): show the email on the secondary line when the row's
             // primary label is the name, so several keys under one name are told
             // apart without typing the address. Falls back to the fingerprint
             // alone when there is no name (email already leads) or no email.
@@ -4335,7 +4335,7 @@ private fun DecryptKeyPickerRow(
                 key.userName.ifBlank { key.userEmail },
                 style = MaterialTheme.typography.bodyMedium
             )
-            // Bart (email): show the email on the secondary line when the row's
+            // limbodiver (email): show the email on the secondary line when the row's
             // primary label is the name, so several keys under one name are told
             // apart without typing the address. Falls back to the fingerprint
             // alone when there is no name (email already leads) or no email.

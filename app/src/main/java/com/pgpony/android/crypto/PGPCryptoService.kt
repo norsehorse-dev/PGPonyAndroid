@@ -1777,7 +1777,7 @@ class PGPCryptoService private constructor() {
             // algorithm), so try the hand-rolled composite path first. It
             // returns null when the message carries no composite PKESK, in
             // which case we fall back to BC's normal PKESK/SKESK discovery.
-            // Scott Lu (RC7): catch a composite "no held key" miss instead of
+            // Tester report (RC7): catch a composite "no held key" miss instead of
             // failing outright. A miss means a composite recipient slot was
             // present but none of our held keys opened it; the message may
             // still carry a classical PKESK we can open, so we fall through to
@@ -1808,7 +1808,7 @@ class PGPCryptoService private constructor() {
             } else if (librePgp != null) {
                 integrityObj = librePgp.integrity
             } else {
-                // Scott Lu (RC7): a mixed multi-recipient message (composite +
+                // Tester report (RC7): a mixed multi-recipient message (composite +
                 // classical) that we hold only a classical key for. BC can't
                 // parse a message that still has a composite PKESK in it, so
                 // when a composite slot missed, strip the composite PKESKs and

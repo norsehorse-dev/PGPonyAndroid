@@ -70,7 +70,7 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
 }
 
 /**
- * Phase 3.0.0-KS1 — add keyserver activity timestamps (Lukas request).
+ * Phase 3.0.0-KS1 — add keyserver activity timestamps (lukascomer request).
  *
  * Same non-destructive shape as the earlier migrations: two new nullable
  * columns, so existing rows pick up NULL ("Never" in the UI) without backfill

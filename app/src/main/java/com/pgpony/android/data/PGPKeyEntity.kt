@@ -191,7 +191,7 @@ data class PGPKeyEntity(
     // card — via KeyRepository.incrementDecryptUseCount. Starts at 0, so
     // until there's history the default falls back to isDefault then name.
     val decryptUseCount: Int = 0,
-    // ── Phase 3.0.0-KS1: Keyserver activity timestamps (Lukas request) ──
+    // ── Phase 3.0.0-KS1: Keyserver activity timestamps (lukascomer request) ──
     //
     // Two epoch-millis stamps surfaced on the key detail screen under the
     // key-server section. Nullable so existing rows migrate cleanly with no

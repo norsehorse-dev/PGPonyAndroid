@@ -157,7 +157,7 @@ data class KeyringUiState(
     val pendingEncryptToFingerprint: String? = null,
     // Delete confirm
     val keyToDelete: PGPKeyEntity? = null,
-    // Keyring sorting (Lukas feedback). Default MANUAL + empty order
+    // Keyring sorting (lukascomer feedback). Default MANUAL + empty order
     // preserves the existing createdAt-DESC order on upgrade until the
     // user picks alphabetical or drags something.
     val sortMode: SortMode = SortMode.MANUAL,

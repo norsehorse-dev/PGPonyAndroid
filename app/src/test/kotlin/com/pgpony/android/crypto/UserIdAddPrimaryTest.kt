@@ -1,5 +1,5 @@
 // UserIdAddPrimaryTest.kt
-// PGPony Android — 4.5.0 (Bart, email Sep 2026): adding a second User ID must
+// PGPony Android — 4.5.0 (limbodiver, email Sep 2026): adding a second User ID must
 // not silently make the new address primary.
 //
 // A freshly generated key has one UID with no explicit IsPrimaryUserId flag, so
@@ -29,8 +29,8 @@ class UserIdAddPrimaryTest {
     private fun freshRings(): Pair<PGPSecretKeyRing, PGPPublicKeyRing> {
         val imported = svc.importKeyData(
             svc.generateKeyPair(
-                name = "Bart",
-                email = "bart@first.test",
+                name = "Alex",
+                email = "alex@first.test",
                 algorithm = KeyAlgorithm.ED25519_CV25519,
                 passphrase = pass
             ).privateKeyData
@@ -52,7 +52,7 @@ class UserIdAddPrimaryTest {
     fun `adding a non-primary UID pins the original as explicit primary`() {
         val (sec, pub) = freshRings()
         val firstUid = pub.publicKey.userIDs.asSequence().first()
-        val newUid = "Bart <bart@second.test>"
+        val newUid = "Alex <alex@second.test>"
 
         val updated = uidSvc.addUserId(sec, pub, newUid, makePrimary = false, passphrase = pass)
         val p = updated.publicRing.publicKey
@@ -66,7 +66,7 @@ class UserIdAddPrimaryTest {
     fun `adding a primary UID makes the new one primary and clears the old`() {
         val (sec, pub) = freshRings()
         val firstUid = pub.publicKey.userIDs.asSequence().first()
-        val newUid = "Bart <bart@second.test>"
+        val newUid = "Alex <alex@second.test>"
 
         val updated = uidSvc.addUserId(sec, pub, newUid, makePrimary = true, passphrase = pass)
         val p = updated.publicRing.publicKey

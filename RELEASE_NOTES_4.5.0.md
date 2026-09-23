@@ -59,7 +59,7 @@ Adding a second email to a key set the new address as primary once the key was
 uploaded, even when it was not marked primary. A fresh key's first User ID is
 only implicitly primary, so the newer self-signature won on the server. Adding
 a non-primary User ID now pins the original as primary explicitly. Reported by
-Bart.
+limbodiver.
 
 A truncated or incomplete PGP message showed a raw range error instead of a
 clear "incomplete message". A post-quantum-only key could not produce a QR

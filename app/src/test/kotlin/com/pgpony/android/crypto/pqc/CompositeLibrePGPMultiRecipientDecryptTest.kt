@@ -1,5 +1,5 @@
 // CompositeLibrePGPMultiRecipientDecryptTest.kt
-// PGPony Android — 4.5.0 (Scott Lu, PGPony Android 4.4.1 feedback)
+// PGPony Android — 4.5.0 (a tester, PGPony Android 4.4.1 feedback)
 //
 // Regression for the multi-recipient LibrePGP composite (algorithm 8, v5)
 // decrypt bug: a message encrypted to two LibrePGP composite recipients must
@@ -9,7 +9,7 @@
 //
 // This is the same defect #57 fixed on the IETF algo-35/36 path, but in the
 // separate CompositeLibrePGPDecryptor, which was still taking only the first
-// PKESK (split() kept one, recover() tried one). Scott Lu reported it on
+// PKESK (split() kept one, recover() tried one). A tester reported it on
 // LibrePGP PQC keys generated in PGPony.
 
 package com.pgpony.android.crypto.pqc
@@ -44,7 +44,7 @@ class CompositeLibrePGPMultiRecipientDecryptTest {
     private fun bothRecipientsDecrypt(algorithm: KeyAlgorithm) {
         val (secA, pubA) = composite("alice", algorithm)
         val (secB, pubB) = composite("bob", algorithm)
-        val plaintext = "multi-recipient LibrePGP composite round-trip (Scott Lu)".toByteArray()
+        val plaintext = "multi-recipient LibrePGP composite round-trip (tester report)".toByteArray()
 
         val message = svc.encrypt(plaintext, listOf(pubA, pubB))
 

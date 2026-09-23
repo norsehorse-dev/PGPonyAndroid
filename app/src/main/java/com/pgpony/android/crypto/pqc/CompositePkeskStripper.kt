@@ -1,5 +1,5 @@
 // CompositePkeskStripper.kt
-// PGPony Android — 4.5.0 RC7 (Scott Lu, PGPony Android 4.4.1 feedback)
+// PGPony Android — 4.5.0 RC7 (a tester, PGPony Android 4.4.1 feedback)
 //
 // Remove composite (post-quantum) PKESK packets from a message so BouncyCastle
 // can decrypt the classical part of a MIXED multi-recipient message.

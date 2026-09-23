@@ -554,7 +554,7 @@ fun DetailsSection(
                 icon = Icons.Filled.CloudUpload
             )
         }
-        // 3.0.0-KS1 (Lukas request) — keyserver activity timestamps. Always
+        // 3.0.0-KS1 (lukascomer request) — keyserver activity timestamps. Always
         // shown so the user can see status at a glance; "Never" until set.
         DetailRow(
             label = stringResource(R.string.key_detail_last_uploaded_label),
@@ -861,7 +861,7 @@ fun ActionsSection(
         }
         // RC1 offline switch: keyserver check/refresh hidden while offline.
         if (!com.pgpony.android.network.OfflineMode.enabled) {
-        // 3.0.0-KS1 (Lukas request) — look this key up on a keyserver and
+        // 3.0.0-KS1 (lukascomer request) — look this key up on a keyserver and
         // stamp "Last checked". Available for any key (read-only lookup).
         // 4.0.0 Phase 2 — gains the inline spinner the KS1 state flag
         // always intended (isCheckingKeyServer finally reaches the row).

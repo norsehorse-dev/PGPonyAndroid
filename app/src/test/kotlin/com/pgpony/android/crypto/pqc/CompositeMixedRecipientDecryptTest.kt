@@ -1,5 +1,5 @@
 // CompositeMixedRecipientDecryptTest.kt
-// PGPony Android — 4.5.0 RC7 (Scott Lu, PGPony Android 4.4.1 feedback)
+// PGPony Android — 4.5.0 RC7 (a tester, PGPony Android 4.4.1 feedback)
 //
 // A MIXED multi-recipient message: one classical recipient and one composite
 // (post-quantum) recipient. A holder of only the CLASSICAL key must still be
@@ -8,7 +8,7 @@
 // past the composite PKESK to reach the classical one, so the classical holder
 // failed. RC7 strips the composite PKESKs and lets BC open the classical slot.
 //
-// Scott Lu reported that any multi-recipient message with a post-quantum key in
+// A tester reported that any multi-recipient message with a post-quantum key in
 // it failed to decrypt, while an all-classical message worked. This covers the
 // half of that where the held key is the classical one; the all-composite half
 // is CompositeMultiRecipientDecryptTest / CompositeLibrePGPMultiRecipientDecryptTest.
@@ -47,7 +47,7 @@ class CompositeMixedRecipientDecryptTest {
     private fun mixedDecrypts(compositeAlgorithm: KeyAlgorithm) {
         val (secClassical, pubClassical) = keypair("classical", KeyAlgorithm.ED25519_CV25519)
         val (secComposite, pubComposite) = keypair("composite", compositeAlgorithm)
-        val plaintext = "mixed classical + composite recipients (Scott Lu)".toByteArray()
+        val plaintext = "mixed classical + composite recipients (tester report)".toByteArray()
 
         val message = svc.encrypt(plaintext, listOf(pubClassical, pubComposite))
 

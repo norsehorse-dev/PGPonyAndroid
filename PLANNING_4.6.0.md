@@ -101,7 +101,7 @@ Import, through the normal dedup/merge path.
 
 ## 3. Offer ML-DSA-87 as a key-generation algorithm, paired with ML-KEM-1024
 
-Priority: medium. Origin: Scott Lu (email, "PGPony Android Feedback (4.5.0)", Google Pixel 8, Android 17,
+Priority: medium. Origin: a tester (email, "PGPony Android Feedback (4.5.0)", Google Pixel 8, Android 17,
 6:39 PM).
 
 Reported: add ML-DSA-87 as an option when choosing the algorithm for key generation, paired with
@@ -127,7 +127,7 @@ Work:
 
 Research / unknowns:
 
-- Default vs option: Scott suggests ML-DSA-87 + ML-KEM-1024 as the default. These keys are much larger
+- Default vs option: the tester suggests ML-DSA-87 + ML-KEM-1024 as the default. These keys are much larger
   (ML-DSA-87 public material 2592 bytes, ML-KEM-1024 1568) and slower to generate and sign than the 65/768
   pair. Decide whether ML-DSA-65 + ML-KEM-768 stays the default with 87/1024 as an explicit stronger option,
   or 87/1024 becomes default. Leaning toward keeping 65 default and adding 87 as an option, since the larger
@@ -138,12 +138,12 @@ Research / unknowns:
 Delivery: the key-generation picker offers an ML-DSA-87 composite primary, and generating one produces a
 matching ML-KEM-1024 encryption subkey rather than a ML-KEM-768 one.
 
-Refinement (Scott Lu, follow-up, 7:49 PM): frame the choice as two tiers rather than a single option. Keep
+Refinement (same tester, follow-up, 7:49 PM): frame the choice as two tiers rather than a single option. Keep
 ML-DSA-65 + ML-KEM-768 as the DEFAULT for portability, speed, and already-ample security, and offer
 ML-DSA-87 + ML-KEM-1024 as a max-security option with the larger, slower keys. That settles the default
 question above: 65/768 stays default, 87/1024 is the explicit stronger opt-in.
 
-Out of scope: Scott also suggested an even-lighter ML-DSA-44 + ML-KEM-512 tier. Those NIST levels exist, but
+Out of scope: the tester also suggested an even-lighter ML-DSA-44 + ML-KEM-512 tier. Those NIST levels exist, but
 the OpenPGP PQC draft (draft-ietf-openpgp-pqc, the composite code points PGPony implements) registers
 algorithm IDs only for ML-KEM-768, ML-KEM-1024, ML-DSA-65, and ML-DSA-87. There is no OpenPGP composite code
 point for ML-DSA-44 or ML-KEM-512, so a 44/512 key would have no interoperable on-wire encoding and no other
@@ -339,9 +339,9 @@ iOS mirror: 8.3.0 section 3.3(d).
 
 ## 13. LibrePGP ML-KEM-768 + brainpoolP256r1 keygen, and an "experimental" tag on PQC options
 
-Priority: medium. Origin: Bart (limbodiver), Sep 2026, after cross-app testing against GnuPG/Kleopatra.
+Priority: medium. Origin: limbodiver, Sep 2026, after cross-app testing against GnuPG/Kleopatra.
 
-Bart asked for the two LibrePGP composite KEM pairings Kleopatra offers. One already ships:
+limbodiver asked for the two LibrePGP composite KEM pairings Kleopatra offers. One already ships:
 ML-KEM-1024 + brainpoolP384r1 (LibrePGP), added in 4.3.x (issue #2). The missing one is
 ML-KEM-768 + brainpoolP256r1 (LibrePGP). The LibrePGP algo-8 path, the Brainpool domain handling, and
 the v5 KEM subkey under a v4 Ed25519 primary all already exist for the P-384 variant, so this is the P-256

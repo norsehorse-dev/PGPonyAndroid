@@ -20,15 +20,15 @@ class UserIdRemoveTest {
     fun `remove strips the User ID and keeps the other`() {
         val imported = svc.importKeyData(
             svc.generateKeyPair(
-                name = "Bart", email = "bart@first.test",
+                name = "Alex", email = "alex@first.test",
                 algorithm = KeyAlgorithm.ED25519_CV25519, passphrase = pass
             ).privateKeyData
         )
         val two = uidSvc.addUserId(
             imported.secretKeyRing!!, imported.publicKeyRing!!,
-            "Bart <bart@second.test>", makePrimary = false, passphrase = pass
+            "Alex <alex@second.test>", makePrimary = false, passphrase = pass
         )
-        val target = "Bart <bart@second.test>"
+        val target = "Alex <alex@second.test>"
 
         val updated = uidSvc.removeUserId(two.secretRing, two.publicRing, target)
 

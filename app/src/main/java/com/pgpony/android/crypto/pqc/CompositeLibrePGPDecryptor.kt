@@ -50,7 +50,7 @@ object CompositeLibrePGPDecryptor {
         val binary = toBinary(encryptedData)
         val split = split(binary) ?: return null // no LibrePGP algo-8 PKESK
 
-        // Scott Lu (4.4.1): a multi-recipient message carries one composite
+        // Tester report (4.4.1): a multi-recipient message carries one composite
         // PKESK per recipient. Try each held key against every slot, not just
         // the first, so a message addressed to us plus others opens even when
         // we are not the first recipient.
@@ -105,7 +105,7 @@ object CompositeLibrePGPDecryptor {
     private class Recovered(val sessionKey: ByteArray, val symAlgo: Int)
 
     /**
-     * Scott Lu (4.4.1): try each composite PKESK in a multi-recipient message
+     * Tester report (4.4.1): try each composite PKESK in a multi-recipient message
      * against the held keys and return the first that opens, mirroring
      * CompositeDecryptor.recoverAmong on the IETF path. A slot addressed to a
      * key we do not hold misses with NoMatchingKey and we move on; a matched
@@ -264,7 +264,7 @@ object CompositeLibrePGPDecryptor {
             if (first and 0x80 == 0) break
             val tag = if (first and 0x40 != 0) first and 0x3F else (first shr 2) and 0x0F
             if (tag != TAG_PKESK && tag != TAG_SKESK) {
-                // Scott Lu (4.4.1): collect EVERY composite PKESK, not just the
+                // Tester report (4.4.1): collect EVERY composite PKESK, not just the
                 // first, so multi-recipient messages try all recipient slots.
                 if (pkesks.isEmpty()) return null
                 return Split(pkesks, data.copyOfRange(i, n))

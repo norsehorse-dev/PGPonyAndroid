@@ -114,7 +114,7 @@ class UserIdService private constructor() {
                 primary = reissueSelfCert(primary, currentPrimaryUid, isPrimary = false, signer = ::signer)
             }
         } else {
-            // Bug (Bart, Sep 2026): the new UID's self-cert is stamped "now". If
+            // Bug (limbodiver, Sep 2026): the new UID's self-cert is stamped "now". If
             // no existing UID carries an explicit IsPrimaryUserId flag (the usual
             // case, since generation never flags a lone UID), keyservers and gpg
             // fall back to "newest self-sig wins" and show the just-added address

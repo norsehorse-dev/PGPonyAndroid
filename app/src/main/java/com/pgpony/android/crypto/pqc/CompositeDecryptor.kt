@@ -113,7 +113,7 @@ object CompositeDecryptor {
     fun recoverSessionKey(
         eskRegion: ByteArray,
         secretKeyRings: List<PGPSecretKeyRing>,
-        // Scott Lu / Umotas (RC8): the streaming (file) path must thread the
+        // Umotas and a tester (RC8): the streaming (file) path must thread the
         // raw composite-PRIMARY rings too, or a file encrypted to an imported
         // composite key (ML-DSA primary + ML-KEM subkey) never reaches
         // findRawComposite and fails with "no held composite secret key".

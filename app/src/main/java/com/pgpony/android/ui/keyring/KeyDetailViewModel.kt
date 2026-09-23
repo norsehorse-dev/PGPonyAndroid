@@ -852,7 +852,7 @@ class KeyDetailViewModel(
     }
 
     /**
-     * 3.0.0-KS1 (Lukas request) — check/refresh this key against a keyserver.
+     * 3.0.0-KS1 (lukascomer request) — check/refresh this key against a keyserver.
      * Looks the key up by fingerprint; whether or not it's found, the attempt
      * stamps `lastCheckedAt` so the detail screen shows "Last checked: <date>".
      * The success message reports whether the key is still published.
