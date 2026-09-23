@@ -97,7 +97,7 @@ fun SettingsScreen(
     // 4.0.0 Succession Phase 1 — OpenPGP provider → Connected apps
     // overlay flag, same pattern as the overlays above.
     var showApiClients by remember { mutableStateOf(false) }
-    var showSshAgent by remember { mutableStateOf(false) }
+    var showSshTermux by remember { mutableStateOf(false) }
     // 4.0.0 Phase 5a — Key servers directory overlay flag.
     var showKeyservers by remember { mutableStateOf(false) }
     var showBackup by remember { mutableStateOf(false) }
@@ -789,13 +789,13 @@ fun SettingsScreen(
                 iconTint = Color(0xFF8B5CF6),
                 onClick = { showApiClients = true }
             )
-            // 4.6.0 (item 16b): the SSHPony ssh-agent bridge for Termux.
+            // 4.6.0 (item 16): SSH in Termux through the OkcAgent fork.
             SettingsAction(
-                title = stringResource(R.string.agent_settings_title),
-                subtitle = stringResource(R.string.agent_settings_row_subtitle),
+                title = stringResource(R.string.ssh_help_title),
+                subtitle = stringResource(R.string.ssh_help_row_subtitle),
                 icon = Icons.Filled.Terminal,
                 iconTint = Color(0xFF8B5CF6),
-                onClick = { showSshAgent = true }
+                onClick = { showSshTermux = true }
             )
             Spacer(modifier = Modifier.height(16.dp))
             // RC1 offline switch (hard gate): the network surfaces below are
@@ -1384,9 +1384,9 @@ fun SettingsScreen(
         ApiClientsScreen(onDismiss = { showApiClients = false })
     }
 
-    // ── SSH agent for Termux (4.6.0 item 16b) ───────────────────────────
-    if (showSshAgent) {
-        SshAgentScreen(onDismiss = { showSshAgent = false })
+    // ── SSH from Termux (4.6.0 item 16) ─────────────────────────────────
+    if (showSshTermux) {
+        SshTermuxSheet(onDismiss = { showSshTermux = false })
     }
 
     // ── Key servers (4.0.0 Phase 5a) ────────────────────────────────────

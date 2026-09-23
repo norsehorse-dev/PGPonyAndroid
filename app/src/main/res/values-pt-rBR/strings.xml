@@ -2048,41 +2048,16 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="keyring_generate_ssh_auth_toggle">Adicionar subchave de autenticação SSH</string>
     <string name="keyring_generate_ssh_auth_caption">Uma subchave para entrar em servidores por SSH através de uma ponte ssh-agent: RSA em uma chave RSA, Ed25519 em qualquer outra.</string>
     <string name="keyring_generate_ssh_auth_failed">Chave criada, mas não foi possível adicionar a subchave SSH: %1$s. Você pode adicioná-la nos detalhes da chave.</string>
-    <!-- 4.6.0 (item 16b): SSHPony ssh-agent bridge -->
-    <string name="agent_channel_status_name">Atividade do agente SSH</string>
-    <string name="agent_channel_prompts_name">Pedidos de login SSH</string>
-    <string name="agent_status_title">Agente SSH ativo</string>
-    <string name="agent_status_text">Respondendo a um login SSH do Termux</string>
-    <string name="agent_prompt_unlock_title">Desbloquear %1$s para SSH</string>
-    <string name="agent_prompt_unlock_text">Toque para digitar a frase secreta e o Termux concluir o login.</string>
-    <string name="agent_prompt_card_title">Toque na sua chave de segurança para SSH</string>
-    <string name="agent_prompt_card_text">Toque aqui, digite o PIN e encoste a chave de %1$s no celular.</string>
-    <string name="agent_notice_off_title">O agente SSH do PGPony está desligado</string>
-    <string name="agent_notice_off_text">O Termux pediu ao PGPony um login SSH. Ligue o agente SSH e pareie o Termux em Configurações, Agente SSH para Termux.</string>
-    <string name="agent_notice_background_title">O agente SSH não pôde iniciar</string>
-    <string name="agent_notice_background_text">O Android impediu o PGPony de iniciar em segundo plano. Defina o uso de bateria do PGPony como Sem restrições e tente de novo.</string>
-    <string name="agent_settings_title">Agente SSH para Termux</string>
-    <string name="agent_settings_row_subtitle">Entre em servidores pelo Termux com suas chaves do PGPony</string>
-    <string name="agent_settings_subtitle">Com o SSHPony instalado no Termux, ssh e git podem entrar com uma chave guardada no PGPony. Suas chaves privadas nunca saem do PGPony.</string>
-    <string name="agent_settings_enable">Permitir que o SSHPony use suas chaves SSH</string>
-    <string name="agent_settings_enable_caption">Só um Termux pareado pode pedir, e uma chave protegida continua pedindo a frase secreta.</string>
-    <string name="agent_settings_pairing">Pareamento</string>
-    <string name="agent_settings_paired">O Termux está pareado. Parear de novo substitui o código, e o Termux vai precisar do novo.</string>
-    <string name="agent_settings_not_paired">Não pareado. Pareie uma vez para que só o seu Termux use o agente.</string>
-    <string name="agent_settings_pair">Parear Termux</string>
-    <string name="agent_settings_repair">Parear de novo</string>
-    <string name="agent_settings_unpair">Desparear</string>
-    <string name="agent_settings_copy_command">Copiar comando</string>
-    <string name="agent_settings_copied">Copiado</string>
-    <string name="agent_settings_pair_hint">Cole isto no Termux e execute. Quem tiver este código pode pedir assinaturas ao PGPony, então não compartilhe.</string>
-    <string name="agent_settings_background">Iniciar em segundo plano</string>
-    <string name="agent_settings_background_ok">Permitido</string>
-    <string name="agent_settings_background_needed">Necessário: toque, abra Bateria e escolha Sem restrições</string>
-    <string name="agent_settings_notifications">Notificações</string>
-    <string name="agent_settings_notifications_ok">Permitidas. Os pedidos de frase secreta e de chave de segurança chegam como notificação.</string>
-    <string name="agent_settings_notifications_needed">Necessárias para os pedidos de frase secreta e de chave de segurança. Toque para permitir.</string>
-    <string name="agent_settings_keys">Chaves oferecidas ao SSH</string>
-    <string name="agent_settings_keys_empty">Nenhuma das suas chaves tem uma subchave de autenticação SSH. Adicione uma subchave de autenticação nos detalhes da chave.</string>
-    <string name="agent_settings_termux">No Termux</string>
-    <string name="agent_settings_termux_body">Instale o SSHPony, execute o comando de pareamento e inicie o agente com eval $(sshpony-agent). Depois disso ssh, ssh-add -l e git por ssh usam as chaves acima.</string>
+    <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
+    <string name="ssh_help_title">SSH pelo Termux</string>
+    <string name="ssh_help_row_subtitle">Use suas chaves do PGPony com ssh e git no Termux</string>
+    <string name="ssh_help_body">O PGPony pode assinar seus logins SSH no Termux. O OkcAgent repassa os pedidos do ssh ao PGPony, e suas chaves privadas nunca saem do PGPony.</string>
+    <string name="ssh_help_get">Baixar o OkcAgent para PGPony</string>
+    <string name="ssh_help_steps">1. Dê a uma chave uma subchave de autenticação (detalhes da chave, Adicionar subchave). Copiar chave pública SSH nos detalhes da chave dá a linha para o authorized_keys do servidor.
+2. Instale o OkcAgent pelo link acima. Desinstale antes qualquer outro OkcAgent.
+3. No OkcAgent, abra Settings, Crypto provider, escolha PGPony e permita as notificações do OkcAgent.
+4. No OkcAgent, toque em Add SSH key e escolha sua chave.
+5. No Termux, rode pkg install okc-agents e depois eval $(okc-ssh-agent). ssh e git por ssh passam a usar sua chave.</string>
+    <string name="ssh_help_note">Os pedidos de frase secreta e de chave de segurança chegam como notificações do OkcAgent. Se o ssh parecer travado, confira as notificações.</string>
+    <string name="key_detail_action_ssh_setup">Configurar SSH no Termux</string>
 </resources>

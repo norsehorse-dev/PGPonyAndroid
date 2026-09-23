@@ -19,13 +19,6 @@
         after the user's first restart.
     -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!--
-      4.6.0 (item 16b): the SSHPony ssh-agent bridge runs as a short-lived
-      foreground service while Termux's ssh talks to it ("specialUse": there is
-      no dedicated type for a terminal's ssh-agent).
-    -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!--
       HW Phase 1 — NFC hardware-key (OpenPGP card) support.
@@ -417,27 +410,6 @@
             <intent-filter>
                 <action android:name="org.openintents.openpgp.IOpenPgpService2" />
             </intent-filter>
-        </service>
-
-        <!--
-          4.6.0 (item 16b): SSHPony ssh-agent bridge. sshpony-agent in
-          Termux broadcasts to the receiver (exported, explicit component) with a
-          localhost port; the service calls back, proves the pairing secret
-          (AgentBridge) and answers the ssh-agent protocol. Both run in
-          :remote_api to share the provider's unlock session and prompts.
-        -->
-        <receiver
-            android:name=".provider.agent.AgentBridgeReceiver"
-            android:process=":remote_api"
-            android:exported="true" />
-        <service
-            android:name=".provider.agent.AgentBridgeService"
-            android:process=":remote_api"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="ssh-agent for a terminal app: answers an ssh client's key list and sign requests while it connects" />
         </service>
 
         <!--

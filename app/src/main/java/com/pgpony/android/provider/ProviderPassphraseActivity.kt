@@ -56,10 +56,6 @@ class ProviderPassphraseActivity : ComponentActivity() {
         /** 4.6.0 (item 16): hide "Change key" (the SSH service picks its key
          *  through its own key selection, not the OpenPGP signing picker). */
         const val EXTRA_NO_KEY_CHANGE = "com.pgpony.android.provider.PASSPHRASE_NO_KEY_CHANGE"
-
-        /** 4.6.0 (item 16b): set when the SSHPony bridge is waiting on this
-         *  prompt, so a cancel ends the wait at once instead of timing out. */
-        const val EXTRA_AGENT_WAIT_ID = "com.pgpony.android.provider.PASSPHRASE_AGENT_WAIT_ID"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -185,7 +181,6 @@ class ProviderPassphraseActivity : ComponentActivity() {
     }
 
     private fun cancel() {
-        intent.getStringExtra(EXTRA_AGENT_WAIT_ID)?.let { com.pgpony.android.provider.agent.AgentWaits.cancel(it) }
         setResult(Activity.RESULT_CANCELED)
         finish()
     }

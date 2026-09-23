@@ -2044,41 +2044,16 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="keyring_generate_ssh_auth_toggle">SSH 認証サブキーを追加</string>
     <string name="keyring_generate_ssh_auth_caption">ssh-agent ブリッジ経由で SSH によりサーバーにログインするためのサブキーです。RSA 鍵には RSA、それ以外の鍵には Ed25519 を使います。</string>
     <string name="keyring_generate_ssh_auth_failed">鍵は作成されましたが、SSH サブキーを追加できませんでした: %1$s。鍵の詳細から追加できます。</string>
-    <!-- 4.6.0 (item 16b): SSHPony ssh-agent bridge -->
-    <string name="agent_channel_status_name">SSH エージェントの動作</string>
-    <string name="agent_channel_prompts_name">SSH ログインのリクエスト</string>
-    <string name="agent_status_title">SSH エージェント動作中</string>
-    <string name="agent_status_text">Termux からの SSH ログインに応答しています</string>
-    <string name="agent_prompt_unlock_title">SSH のために %1$s をロック解除</string>
-    <string name="agent_prompt_unlock_text">タップしてパスフレーズを入力すると、Termux がログインを完了できます。</string>
-    <string name="agent_prompt_card_title">SSH のためにセキュリティキーをタップ</string>
-    <string name="agent_prompt_card_text">ここをタップして PIN を入力し、%1$s のキーをスマートフォンにかざしてください。</string>
-    <string name="agent_notice_off_title">PGPony の SSH エージェントがオフです</string>
-    <string name="agent_notice_off_text">Termux が PGPony に SSH ログインを要求しました。設定の「Termux 用 SSH エージェント」でエージェントをオンにし、Termux をペアリングしてください。</string>
-    <string name="agent_notice_background_title">SSH エージェントを開始できませんでした</string>
-    <string name="agent_notice_background_text">Android が PGPony のバックグラウンド起動を止めました。PGPony の電池の使用を「制限なし」にしてから、もう一度お試しください。</string>
-    <string name="agent_settings_title">Termux 用 SSH エージェント</string>
-    <string name="agent_settings_row_subtitle">PGPony の鍵で Termux からサーバーにログイン</string>
-    <string name="agent_settings_subtitle">Termux に SSHPony を入れると、ssh と git が PGPony にある鍵でログインできます。秘密鍵が PGPony の外に出ることはありません。</string>
-    <string name="agent_settings_enable">SSHPony に SSH 鍵の使用を許可</string>
-    <string name="agent_settings_enable_caption">ペアリングした Termux だけが要求でき、保護された鍵は引き続きパスフレーズを求めます。</string>
-    <string name="agent_settings_pairing">ペアリング</string>
-    <string name="agent_settings_paired">Termux はペアリング済みです。再ペアリングするとコードが置き換わり、Termux には新しいコードが必要になります。</string>
-    <string name="agent_settings_not_paired">未ペアリング。一度ペアリングすると、あなたの Termux だけがエージェントを使えます。</string>
-    <string name="agent_settings_pair">Termux をペアリング</string>
-    <string name="agent_settings_repair">再ペアリング</string>
-    <string name="agent_settings_unpair">ペアリング解除</string>
-    <string name="agent_settings_copy_command">コマンドをコピー</string>
-    <string name="agent_settings_copied">コピーしました</string>
-    <string name="agent_settings_pair_hint">これを Termux に貼り付けて実行してください。このコードを持つ人は PGPony に署名を要求できるので、他人に教えないでください。</string>
-    <string name="agent_settings_background">バックグラウンドで起動</string>
-    <string name="agent_settings_background_ok">許可済み</string>
-    <string name="agent_settings_background_needed">必要: タップして「電池」を開き、「制限なし」を選択</string>
-    <string name="agent_settings_notifications">通知</string>
-    <string name="agent_settings_notifications_ok">許可済み。パスフレーズとセキュリティキーの確認は通知で届きます。</string>
-    <string name="agent_settings_notifications_needed">パスフレーズとセキュリティキーの確認に必要です。タップして許可してください。</string>
-    <string name="agent_settings_keys">SSH に提供する鍵</string>
-    <string name="agent_settings_keys_empty">SSH 認証サブキーを持つ鍵がありません。鍵の詳細で認証サブキーを追加してください。</string>
-    <string name="agent_settings_termux">Termux 側</string>
-    <string name="agent_settings_termux_body">SSHPony をインストールし、ペアリングコマンドを実行してから、eval $(sshpony-agent) でエージェントを起動します。以降、ssh、ssh-add -l、ssh 経由の git は上の鍵を使います。</string>
+    <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
+    <string name="ssh_help_title">Termux からの SSH</string>
+    <string name="ssh_help_row_subtitle">PGPony の鍵を Termux の ssh と git で使う</string>
+    <string name="ssh_help_body">PGPony は Termux での SSH ログインに署名できます。OkcAgent が ssh の要求を PGPony に渡し、秘密鍵が PGPony の外に出ることはありません。</string>
+    <string name="ssh_help_get">PGPony 用 OkcAgent を入手</string>
+    <string name="ssh_help_steps">1. 鍵に認証サブキーを追加します (鍵の詳細、サブキーを追加)。鍵の詳細の「SSH 公開鍵をコピー」で、サーバーの authorized_keys に入れる行が得られます。
+2. 上のリンクから OkcAgent をインストールします。先に他の OkcAgent をアンインストールしてください。
+3. OkcAgent で Settings、Crypto provider を開いて PGPony を選び、OkcAgent の通知を許可します。
+4. OkcAgent で Add SSH key をタップし、鍵を選びます。
+5. Termux で pkg install okc-agents を実行し、続けて eval $(okc-ssh-agent) を実行します。これで ssh と ssh 経由の git があなたの鍵を使います。</string>
+    <string name="ssh_help_note">パスフレーズとセキュリティキーの確認は OkcAgent の通知で届きます。ssh が止まったように見えたら通知を確認してください。</string>
+    <string name="key_detail_action_ssh_setup">Termux で SSH を設定</string>
 </resources>

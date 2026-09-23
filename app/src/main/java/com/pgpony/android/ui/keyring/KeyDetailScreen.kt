@@ -131,6 +131,8 @@ fun KeyDetailScreen(
     // immediately after writing to the clipboard without round-tripping
     // through the VM's state machine).
     val scope = rememberCoroutineScope()
+    // 4.6.0 (item 16): the "SSH from Termux" setup sheet.
+    var showSshTermux by remember { mutableStateOf(false) }
     // #63 (CertainBot): one-time hint that the header avatar is a shortcut.
     LaunchedEffect(state.key?.fingerprint) {
         val k = state.key ?: return@LaunchedEffect
@@ -383,6 +385,11 @@ fun KeyDetailScreen(
                                         }
                                     }
                                 )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.key_detail_action_ssh_setup)) },
+                                    leadingIcon = { Icon(Icons.Filled.Terminal, null) },
+                                    onClick = { menuOpen = false; showSshTermux = true }
+                                )
                             }
                             if (menuKey.isKeyPair && !menuKey.isDefault) {
                                 DropdownMenuItem(
@@ -494,6 +501,11 @@ fun KeyDetailScreen(
             fingerprint = fingerprint,
             onDismiss = { showPublish = false }
         )
+    }
+
+    // 4.6.0 (item 16): SSH from Termux setup.
+    if (showSshTermux) {
+        com.pgpony.android.ui.settings.SshTermuxSheet(onDismiss = { showSshTermux = false })
     }
 
     // QR sheet — overlaid on top of the screen content.

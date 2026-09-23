@@ -2145,41 +2145,16 @@
     <string name="keyring_generate_ssh_auth_toggle">Add SSH authentication subkey</string>
     <string name="keyring_generate_ssh_auth_caption">A subkey for signing in to servers over SSH through an ssh-agent bridge: RSA on an RSA key, Ed25519 on any other key.</string>
     <string name="keyring_generate_ssh_auth_failed">Key created, but the SSH subkey could not be added: %1$s. You can add it from Key Detail.</string>
-    <!-- 4.6.0 (item 16b): SSHPony ssh-agent bridge -->
-    <string name="agent_channel_status_name">SSH agent activity</string>
-    <string name="agent_channel_prompts_name">SSH sign-in requests</string>
-    <string name="agent_status_title">SSH agent active</string>
-    <string name="agent_status_text">Answering an SSH sign-in from Termux</string>
-    <string name="agent_prompt_unlock_title">Unlock %1$s for SSH</string>
-    <string name="agent_prompt_unlock_text">Tap to enter the passphrase so Termux can finish signing in.</string>
-    <string name="agent_prompt_card_title">Tap your security key for SSH</string>
-    <string name="agent_prompt_card_text">Tap here, enter the PIN and hold the key for %1$s against your phone.</string>
-    <string name="agent_notice_off_title">PGPony\'s SSH agent is off</string>
-    <string name="agent_notice_off_text">Termux asked PGPony to sign in over SSH. Turn on the SSH agent and pair Termux in Settings, SSH agent for Termux.</string>
-    <string name="agent_notice_background_title">SSH agent could not start</string>
-    <string name="agent_notice_background_text">Android stopped PGPony from starting in the background. Set PGPony\'s battery use to Unrestricted, then try again.</string>
-    <string name="agent_settings_title">SSH agent for Termux</string>
-    <string name="agent_settings_row_subtitle">Sign in to servers from Termux with your PGPony keys</string>
-    <string name="agent_settings_subtitle">With SSHPony installed in Termux, ssh and git can sign in with a key held in PGPony. Your private keys never leave PGPony.</string>
-    <string name="agent_settings_enable">Allow SSHPony to use your SSH keys</string>
-    <string name="agent_settings_enable_caption">Only a paired Termux can ask, and a protected key still asks for its passphrase.</string>
-    <string name="agent_settings_pairing">Pairing</string>
-    <string name="agent_settings_paired">Termux is paired. Pairing again replaces the code, so Termux then needs the new one.</string>
-    <string name="agent_settings_not_paired">Not paired. Pair once so only your Termux can use the agent.</string>
-    <string name="agent_settings_pair">Pair Termux</string>
-    <string name="agent_settings_repair">Pair again</string>
-    <string name="agent_settings_unpair">Unpair</string>
-    <string name="agent_settings_copy_command">Copy command</string>
-    <string name="agent_settings_copied">Copied</string>
-    <string name="agent_settings_pair_hint">Paste this in Termux and run it. Anyone with this code can ask PGPony to sign, so keep it to yourself.</string>
-    <string name="agent_settings_background">Start in the background</string>
-    <string name="agent_settings_background_ok">Allowed</string>
-    <string name="agent_settings_background_needed">Needed: tap, open Battery and choose Unrestricted</string>
-    <string name="agent_settings_notifications">Notifications</string>
-    <string name="agent_settings_notifications_ok">Allowed. Passphrase and security key prompts arrive as notifications.</string>
-    <string name="agent_settings_notifications_needed">Needed for passphrase and security key prompts. Tap to allow.</string>
-    <string name="agent_settings_keys">Keys offered to SSH</string>
-    <string name="agent_settings_keys_empty">None of your keys has an SSH authentication subkey. Add an Authenticate subkey in Key Detail.</string>
-    <string name="agent_settings_termux">In Termux</string>
-    <string name="agent_settings_termux_body">Install SSHPony, run the pairing command, then start the agent with eval $(sshpony-agent). ssh, ssh-add -l and git over ssh then use the keys above.</string>
+    <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
+    <string name="ssh_help_title">SSH from Termux</string>
+    <string name="ssh_help_row_subtitle">Use your PGPony keys with ssh and git in Termux</string>
+    <string name="ssh_help_body">PGPony can sign your SSH logins in Termux. OkcAgent passes ssh\'s requests to PGPony, and your private keys never leave PGPony.</string>
+    <string name="ssh_help_get">Get OkcAgent for PGPony</string>
+    <string name="ssh_help_steps">1. Give a key an Authenticate subkey (Key Detail, Add Subkey). Copy SSH Public Key in Key Detail gives you the line for a server\'s authorized_keys.
+2. Install OkcAgent from the link above. Uninstall any other OkcAgent first.
+3. In OkcAgent, open Settings, Crypto provider, choose PGPony, and allow OkcAgent\'s notifications.
+4. In OkcAgent, tap Add SSH key and pick your key.
+5. In Termux, run pkg install okc-agents, then eval $(okc-ssh-agent). ssh and git over ssh now use your key.</string>
+    <string name="ssh_help_note">Passphrase and security key prompts arrive as OkcAgent notifications. If ssh seems stuck, check the notification shade.</string>
+    <string name="key_detail_action_ssh_setup">Set Up SSH in Termux</string>
 </resources>
