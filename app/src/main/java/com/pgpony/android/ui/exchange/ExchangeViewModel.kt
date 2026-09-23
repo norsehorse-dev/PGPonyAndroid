@@ -25,6 +25,13 @@ import kotlinx.coroutines.withContext
 
 enum class ExchangeSection { SHOW_KEY, SCAN_KEY, KEY_SERVER }
 
+/** 4.6.0 (item 18 follow-up): the key-server import outcome shown on screen. */
+data class ExchangeImportedNotice(
+    val message: String,
+    val userId: String,
+    val fingerprint: String
+)
+
 data class ExchangeUiState(
     val section: ExchangeSection = ExchangeSection.SHOW_KEY,
     val myKeyPairs: List<PGPKeyEntity> = emptyList(),
@@ -39,6 +46,10 @@ data class ExchangeUiState(
     val searchResult: String? = null,
     val isSearching: Boolean = false,
     val isUploading: Boolean = false,
+    /** 4.6.0 (item 18 follow-up): what the last Import did, shown in place of
+     *  the "Key Found" card so the import visibly lands. Cleared by the next
+     *  search or an edit to the query. */
+    val importedNotice: ExchangeImportedNotice? = null,
     // Import from scan
     val scannedText: String? = null,
     val showImportConfirm: Boolean = false,
@@ -171,7 +182,7 @@ class ExchangeViewModel(
     // ── Key Server ─────────────────────────────────────────────────────
 
     fun updateSearchQuery(query: String) {
-        _state.value = _state.value.copy(searchQuery = query)
+        _state.value = _state.value.copy(searchQuery = query, importedNotice = null)
     }
 
     fun searchKeyServer() {
@@ -179,7 +190,8 @@ class ExchangeViewModel(
         if (query.isBlank()) return
 
         viewModelScope.launch {
-            _state.value = _state.value.copy(isSearching = true, searchResult = null, errorMessage = null)
+            _state.value = _state.value.copy(isSearching = true, searchResult = null, errorMessage = null,
+                importedNotice = null)
             try {
                 val result = if (query.contains("@")) {
                     keyServer.searchByEmail(query)
@@ -210,11 +222,18 @@ class ExchangeViewModel(
                         PGPonyApp.instance.getString(R.string.import_result_already_in_keyring)
                     ImportResolution.MERGED_NEW_MATERIAL ->
                         PGPonyApp.instance.getString(R.string.import_result_merged)
-                    else -> "Key imported from key server"
+                    else -> PGPonyApp.instance.getString(R.string.exchange_keyserver_imported)
                 }
+                // 4.6.0 (item 18 follow-up): the card used to vanish with only a
+                // short snackbar (easy to miss under the keyboard), so an
+                // import looked like nothing happened. Show the outcome in place.
                 _state.value = _state.value.copy(
                     searchResult = null,
-                    successMessage = message
+                    importedNotice = ExchangeImportedNotice(
+                        message = message,
+                        userId = outcome.entity.userID,
+                        fingerprint = outcome.entity.fingerprint
+                    )
                 )
                 loadKeys()
             } catch (e: Exception) {

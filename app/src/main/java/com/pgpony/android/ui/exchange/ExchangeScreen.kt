@@ -322,8 +322,14 @@ private fun KeyServerSection(state: ExchangeUiState, viewModel: ExchangeViewMode
             singleLine = true
         )
         Spacer(modifier = Modifier.height(12.dp))
+        val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
         Button(
-            onClick = { viewModel.searchKeyServer() },
+            onClick = {
+                // 4.6.0 (item 18 follow-up): the open keyboard hid the result
+                // and the import confirmation.
+                keyboard?.hide()
+                viewModel.searchKeyServer()
+            },
             enabled = state.searchQuery.isNotBlank() && !state.isSearching,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -367,6 +373,34 @@ private fun KeyServerSection(state: ExchangeUiState, viewModel: ExchangeViewMode
                         Icon(Icons.Filled.Download, null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(stringResource(R.string.exchange_keyserver_import_button))
+                    }
+                }
+            }
+        }
+        // 4.6.0 (item 18 follow-up): the import outcome, in place of the card.
+        state.importedNotice?.let { notice ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
+                    Icon(Icons.Filled.CheckCircle, null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(notice.message, style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(notice.userId, style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text(
+                            notice.fingerprint.uppercase().chunked(4).joinToString(" "),
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
                     }
                 }
             }

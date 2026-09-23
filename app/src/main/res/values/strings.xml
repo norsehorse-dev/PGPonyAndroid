@@ -1299,6 +1299,7 @@
     <string name="exchange_keyserver_search_button">Search key servers</string>
     <string name="exchange_keyserver_searching">Searching…</string>
     <string name="exchange_keyserver_import_button">Import Key</string>
+    <string name="exchange_keyserver_imported">Key imported to your keyring.</string>
 
     <!-- ── Tooltip ──────────────────────────────────────────────────── -->
     <string name="exchange_tooltip_qr">Pick a key here to get a QR code or shareable file. The other person scans or imports it to send you encrypted messages.</string>

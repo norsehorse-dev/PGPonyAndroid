@@ -1205,6 +1205,7 @@
     <string name="exchange_keyserver_search_button">Искать на серверах ключей</string>
     <string name="exchange_keyserver_searching">Поиск…</string>
     <string name="exchange_keyserver_import_button">Импортировать ключ</string>
+    <string name="exchange_keyserver_imported">Ключ импортирован в вашу связку ключей.</string>
 
     <!-- ── Tooltip ──────────────────────────────────────────────────── -->
     <string name="exchange_tooltip_qr">Выберите здесь ключ, чтобы получить QR-код или файл для отправки. Собеседник отсканирует или импортирует его, чтобы присылать вам зашифрованные сообщения.</string>

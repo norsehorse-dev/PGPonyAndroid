@@ -1213,6 +1213,7 @@
     <string name="exchange_keyserver_search_button">키 서버 검색</string>
     <string name="exchange_keyserver_searching">검색 중…</string>
     <string name="exchange_keyserver_import_button">키 불러오기</string>
+    <string name="exchange_keyserver_imported">키를 키링으로 가져왔습니다.</string>
 
     <!-- ── Tooltip ──────────────────────────────────────────────────── -->
     <string name="exchange_tooltip_qr">Pick a key here to get a QR code or shareable file. The other person scans or imports it to send you encrypted messages.</string>

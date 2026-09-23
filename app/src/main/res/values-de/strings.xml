@@ -1000,6 +1000,7 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="exchange_keyserver_query_label">E-Mail oder Fingerabdruck</string>
     <string name="exchange_keyserver_search_cd">Suchen</string>
     <string name="exchange_keyserver_import_button">Schlüssel importieren</string>
+    <string name="exchange_keyserver_imported">Schlüssel in deinen Schlüsselbund importiert.</string>
 
     <!-- ── Tooltip ──────────────────────────────────────────────────── -->
     <string name="exchange_tooltip_qr">Wähle hier einen Schlüssel, um einen QR-Code oder eine teilbare Datei zu erhalten. Die andere Person scannt oder importiert ihn, um dir verschlüsselte Nachrichten zu senden.</string>

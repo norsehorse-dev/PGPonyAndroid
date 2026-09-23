@@ -1000,6 +1000,7 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="exchange_keyserver_query_label">Correo o huella digital</string>
     <string name="exchange_keyserver_search_cd">Buscar</string>
     <string name="exchange_keyserver_import_button">Importar clave</string>
+    <string name="exchange_keyserver_imported">Clave importada a tu llavero.</string>
 
     <!-- ── Tooltip ──────────────────────────────────────────────────── -->
     <string name="exchange_tooltip_qr">Elige aquí una clave para obtener un código QR o un archivo que puedas compartir. La otra persona lo escanea o importa para enviarte mensajes cifrados.</string>

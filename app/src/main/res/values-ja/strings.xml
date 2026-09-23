@@ -1000,6 +1000,7 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="exchange_keyserver_query_label">メールまたはフィンガープリント</string>
     <string name="exchange_keyserver_search_cd">検索</string>
     <string name="exchange_keyserver_import_button">鍵をインポート</string>
+    <string name="exchange_keyserver_imported">キーをキーリングにインポートしました。</string>
 
     <!-- ── Tooltip ──────────────────────────────────────────────────── -->
     <string name="exchange_tooltip_qr">ここで鍵を選ぶと、QR コードまたは共有可能なファイルを取得できます。相手はそれをスキャンまたはインポートして、あなたに暗号化メッセージを送信できます。</string>

@@ -1000,6 +1000,7 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="exchange_keyserver_query_label">E-mail ou impressão digital</string>
     <string name="exchange_keyserver_search_cd">Buscar</string>
     <string name="exchange_keyserver_import_button">Importar chave</string>
+    <string name="exchange_keyserver_imported">Chave importada para o seu chaveiro.</string>
 
     <!-- ── Tooltip ──────────────────────────────────────────────────── -->
     <string name="exchange_tooltip_qr">Escolha uma chave aqui para obter um código QR ou um arquivo compartilhável. A outra pessoa escaneia ou importa para enviar mensagens criptografadas para você.</string>

@@ -1000,6 +1000,7 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="exchange_keyserver_query_label">E-mail ou empreinte</string>
     <string name="exchange_keyserver_search_cd">Rechercher</string>
     <string name="exchange_keyserver_import_button">Importer la clé</string>
+    <string name="exchange_keyserver_imported">Clé importée dans votre trousseau.</string>
 
     <!-- ── Tooltip ──────────────────────────────────────────────────── -->
     <string name="exchange_tooltip_qr">Choisissez une clé ici pour obtenir un QR code ou un fichier partageable. L\'autre personne le scanne ou l\'importe pour vous envoyer des messages chiffrés.</string>
