@@ -2058,6 +2058,6 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
 3. Öffne in OkcAgent Einstellungen, Crypto provider, wähle PGPony und erlaube die Benachrichtigungen von OkcAgent.
 4. Tippe in OkcAgent auf Add SSH key und wähle deinen Schlüssel.
 5. Führe in Termux pkg install okc-agents aus, dann eval $(okc-ssh-agent). ssh und git über ssh nutzen jetzt deinen Schlüssel.</string>
-    <string name="ssh_help_note">Passphrase- und Sicherheitsschlüssel-Abfragen kommen als Benachrichtigungen von OkcAgent. Wenn ssh hängt, sieh in die Benachrichtigungsleiste.</string>
+    <string name="ssh_help_note">Passphrase- und Sicherheitsschlüssel-Abfragen kommen als Benachrichtigungen von OkcAgent. Wenn ssh hängt, sieh in die Benachrichtigungsleiste. Unter GrapheneOS schalte außerdem die Netzwerk-Berechtigung für OkcAgent ein: Termux erreicht es über eine lokale Verbindung, ohne sie hängt ssh.</string>
     <string name="key_detail_action_ssh_setup">SSH in Termux einrichten</string>
 </resources>

@@ -2054,6 +2054,6 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
 3. OkcAgent で Settings、Crypto provider を開いて PGPony を選び、OkcAgent の通知を許可します。
 4. OkcAgent で Add SSH key をタップし、鍵を選びます。
 5. Termux で pkg install okc-agents を実行し、続けて eval $(okc-ssh-agent) を実行します。これで ssh と ssh 経由の git があなたの鍵を使います。</string>
-    <string name="ssh_help_note">パスフレーズとセキュリティキーの確認は OkcAgent の通知で届きます。ssh が止まったように見えたら通知を確認してください。</string>
+    <string name="ssh_help_note">パスフレーズとセキュリティキーの確認は OkcAgent の通知で届きます。ssh が止まったように見えたら通知を確認してください。 GrapheneOS では OkcAgent のネットワーク権限も有効にしてください。Termux はローカル接続で OkcAgent につなぐため、権限がないと ssh が止まります。</string>
     <string name="key_detail_action_ssh_setup">Termux で SSH を設定</string>
 </resources>

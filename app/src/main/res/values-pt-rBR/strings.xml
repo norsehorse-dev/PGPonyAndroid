@@ -2058,6 +2058,6 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
 3. No OkcAgent, abra Settings, Crypto provider, escolha PGPony e permita as notificações do OkcAgent.
 4. No OkcAgent, toque em Add SSH key e escolha sua chave.
 5. No Termux, rode pkg install okc-agents e depois eval $(okc-ssh-agent). ssh e git por ssh passam a usar sua chave.</string>
-    <string name="ssh_help_note">Os pedidos de frase secreta e de chave de segurança chegam como notificações do OkcAgent. Se o ssh parecer travado, confira as notificações.</string>
+    <string name="ssh_help_note">Os pedidos de frase secreta e de chave de segurança chegam como notificações do OkcAgent. Se o ssh parecer travado, confira as notificações. No GrapheneOS, ative também a permissão de Rede do OkcAgent: o Termux se conecta a ele localmente e, sem ela, o ssh trava.</string>
     <string name="key_detail_action_ssh_setup">Configurar SSH no Termux</string>
 </resources>
