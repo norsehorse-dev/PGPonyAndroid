@@ -516,231 +516,27 @@ to Copy SSH Public Key. All 8 locales.
 Status: done in code, awaiting on-device check with the fork's release build.
 
 
-## 17. Security review remediation (preliminary review, September 2026)
+## 17. Security review remediation (September 2026)
 
-Priority: HIGH (the first two sub-items are the highest-severity work in this cycle). Origin: an internal
-preliminary security review of PGPony Android, PGPonyCore and PGPony iOS, run before the planned independent
-audit. Full write-ups, exact sites, proof-of-concept inputs, unit tests and proposed patches live OUTSIDE this
-repo, under `~/Apps/PGPony_PreAudit_2026-09/` (REPORT.md, patches/, poc/). This item tracks the Android
-remediation; it does not restate the detail.
+Priority: high (release-gating). Origin: an internal security review of the Android app ahead of an external
+audit. The detailed findings are kept out of this repository and go to the auditors directly.
 
-Embargo: this review is unpublished and some of it overlaps the earlier private review already tracked as item
-11 in the 4.5.0 cycle, so the same embargo applies. Keep public release notes generic ("input-bounding,
-trust and provider hardening") until the window is open; keep finding detail, credit and any reporter out of
-public commits, issues and release notes. Do not commit the pre-audit folder or its findings verbatim into
-this repo. Refer to findings by their pre-audit ID (PPA-...), never by any name.
+The work, in general terms:
 
-Design constraints carry over from item 11: no legitimate message or key may start being rejected (every
-bound sits above real GnuPG, Sequoia and PGPony values), fail closed with a typed error, and keep bounds in
-`SecurityLimits`. Several findings extend guards that item 11 already shipped, so re-diff against HEAD before
-editing.
+- 17.1 Keys: every imported or refreshed key component is accepted only with a verified binding signature, and
+  key-server refresh merges into the local copy instead of replacing it.
+- 17.2 and 17.4 Other apps: the OpenPGP provider releases decrypted output only after its integrity check, and
+  key material from other apps and Autocrypt headers is checked before it is stored.
+- 17.3 Files: names that come from messages or other apps are reduced to plain file names before anything is
+  written.
+- 17.5 and 17.6 Limits: decompression, Argon2 and other resource limits apply on every path, and new
+  passphrase-protected keys use a stronger key derivation setting.
+- 17.7 Provider and Quick Action hardening, including screen-overlay protection on consent and prompt screens.
+- 17.8 Network privacy fixes.
+- 17.9 Import preview, key storage recovery and backup restore fixes.
+- 17.10 Smaller hardening across signature checks, card handling, archives and caches.
 
-### 17.1 Critical: verify binding signatures on every imported or refreshed component (PPA-MULTI-001 / 002)
-
-The single most important fix. Import, keyserver refresh and WKD add subkeys, User IDs, expiry, key flags and
-revocations to a stored certificate without verifying the binding signatures that tie them to the primary. A
-hostile or compromised keyserver or WKD host (in the threat model) can serve a copy of a contact's real
-certificate (so the primary fingerprint the user verified still matches) with an extra ML-KEM / X25519 / ECDH
-encryption subkey bound by a forged signature; `KeyDeduplicationService.merge` stores the fetched bytes
-verbatim, and `encryptionKeys` / `findEncryptionKey` then pick that subkey (they select on Bouncy Castle's
-algorithm-level `isEncryptionKey` plus an Encrypt flag read from an unverified self-signature, preferring a
-subkey), so the next message to that contact is encrypted to the attacker. The same missing check lets an
-attacker graft a signing subkey so a real signature displays as coming from the victim (`SignerEvaluator`
-checks only revocation, expiry and flags, never the 0x18 binding or the 0x19 back-signature).
-
-Fix:
-- Before adopting or using any subkey, require a subkey-binding signature (0x18) from the primary that
-  verifies cryptographically, and a valid embedded back-signature (0x19) for a signing subkey. Apply the same
-  to composite subkeys (`crypto/pqc/CompositeKeyFacade` selects composite subkeys and signers on tag plus
-  algorithm only; the tag-2 bindings are present in the certificate and never verified).
-- Select encryption recipients only from bound, unexpired, unrevoked encryption subkeys, on every encrypt
-  path (compose, share target, provider, Autocrypt, contacts).
-- On merge, add a component only when its binding self-signature verifies (a certificate union that verifies
-  each packet), keeping the item-12 union / tombstone / expiry-downgrade rules inside it.
-- Re-validate rings already stored, since a planted subkey may already be present.
-- Land the check in a shared helper so decrypt-verify, VerifyService, the provider and the composite paths all
-  use it.
-
-Starting-point patches (partial, not a complete fix): `patches/AND-SIG_01_signer_evaluator_verified_bindings.diff`,
-`patches/AND-SIG_02_ops_keyid_sigtype_and_enc_subkey_filter.diff`. The 0x19 back-signature check, the
-composite-subkey binding check, and full recipient gating still need finishing and on-device testing. Open
-question for the release: confirm whether keys.pgpony.app already validates self-signatures and strips unbound
-subkeys server-side (it is queried first on refresh); if not, this is reachable without a third-party host.
-
-### 17.2 High: stop releasing unverified plaintext on the provider stream (PPA-AND-003)
-
-`streamDecryptedContent` writes the decrypted literal to the output stream as it reads, and the SEIPDv1 MDC is
-checked only afterward; Bouncy Castle validates the MDC only on the explicit `verify()`. On the OpenPGP API
-provider path that output is the calling app's pipe, so a local app with the API grant can submit an
-intercepted ciphertext and read the released plaintext despite the integrity failure, and repeat it as a CFB
-oracle (the EFAIL class). Confirmed against Bouncy Castle 1.85: all plaintext is delivered before `verify()`
-returns false. SEIPDv1 is the default container for v4 recipients. In-app file and share paths are contained
-(scratch deleted on failure) but still write plaintext to disk before verification.
-
-Fix: for the provider path (and any streaming to an untrusted consumer), buffer the plaintext and run the
-integrity gate before releasing it, or refuse to stream non-AEAD (SEIPDv1) messages over the API (AEAD /
-SEIPDv2 is per-chunk authenticated and unaffected). Decision needed: buffer-and-verify vs refuse SEIPDv1 on
-the API.
-
-### 17.3 High: sanitize the literal-data filename on the Share write path (PPA-AND-005)
-
-The buffered Share branch writes a decrypted file as `File(File(cacheDir, "exports"), outName)` where
-`outName` is the OpenPGP literal filename taken verbatim from the message. A filename like
-`../../files/secure_keystore_v2/pgpony_key_<fp>_private` climbs out of `exports/` and overwrites the stored
-private key blob or its `.dek` envelope (the fingerprint is public), or `pgpony_prefs.xml` / `pgpony.db`.
-Confirmed: the name survives decryption verbatim (GnuPG shows the same) and the two write statements overwrite
-the target. The streaming path and `ScratchFiles.allocate` already sanitize; this buffered branch and the
-Quick Action equivalent were missed.
-
-Fix: reduce the literal filename to a basename at the source and write only through a canonical-path-checked
-helper on every `exports/` write. Patch: `patches/AND-SYS_01_literal_filename_traversal.diff`. Also clear
-`cacheDir/exports/` on start and on result-sheet dismiss (unprotected key exports and buffered plaintext
-currently linger there).
-
-### 17.4 High: provider / Autocrypt key injection (PPA-AND-008)
-
-`ACTION_UPDATE_AUTOCRYPT_PEER` feeds client-supplied keydata straight into the main keyring with no user
-prompt, the gossip path applies no From/addr binding, and the encrypt path encrypts to every non-revoked key
-held for an address. So one email with a crafted Autocrypt header, or one connected app, silently adds an
-attacker recipient key for a contact. Fix: hold API / Autocrypt-imported keys separate from the user keyring
-and encrypt to the designated peer key; at minimum apply the From/addr binding to `updateKey` and
-`updateGossipKey` and do not silently union an unverified API-imported key with a user key for the same
-address. This compounds 17.1 (no binding verification). Partial patch:
-`patches/AND-SYS_06_autocrypt_addr_binding.diff`.
-
-### 17.5 Medium: close the decompression and Argon2 guard bypasses (PPA-AND-009 / 010 / 020)
-
-Item 11 Findings A and B shipped but have gaps:
-- `CompositeDocumentVerifier.inflate` (reached from `decrypt()` on every message, and from the pasted-text /
-  file inline-verify pre-checks) fully inflates a leading Compressed Data packet with no cap, so a small zlib
-  bomb OOM-crashes the app before the capped loop runs. Cap it at `SecurityLimits.MAX_MESSAGE_PLAINTEXT_BYTES`
-  (or classify from a bounded head). Patch: `patches/AND-DEC_01_inline_decompress_cap.diff`. Also add the
-  decompression-bomb regression unit test item 11 still lacks (`poc/AND-DEC_DecompressionBombTest.kt`).
-- `decryptStream` only scans the first 64 KiB for the SKESK Argon2 guard, and the guard fails open on a
-  truncated head, so a decoy PKESK larger than 64 KiB before the SKESK evades it and the unbounded KDF runs.
-  Widen the scan to the whole leading ESK region. Patch: `patches/AND-DEC_02_stream_argon2_full_esk_scan.diff`.
-- The composite secret-key unlock paths (`crypto/pqc/CompositeSecretKeyMaterial`, `CompositeSecretProtection`,
-  `V4Algo35Protection`, `CompositeLibrePGPKeyMaterial`) call `makeKeyFromPassPhrase` with no
-  `enforceArgon2Policy` first, unlike the classical sites. Add the guard before each.
-
-### 17.6 Medium: raise the v4 secret-key S2K iteration count (PPA-MULTI-011)
-
-v4 secret-key protection (keygen, export, change-passphrase) uses coded count `0x60` (65,536 octets),
-about 1000x weaker than GnuPG's `0xFF`. Anyone who gets an exported protected key or a backup of one
-brute-forces the passphrase cheaply. Raise to `0xFF` (or calibrate per device). Patch:
-`patches/AND-SYS_10_v4_secret_key_s2k_count.diff`. Existing keys keep their weak S2K until the passphrase is
-changed; the symmetric / backup path already uses `0xFF`. v6 (Argon2id) is unaffected.
-
-### 17.7 Medium: provider and Quick Action hardening (PPA-AND-017, PPA-MULTI-018)
-
-- `createOutputPipe` runs no authorization and leaks two FDs plus a map entry per call, so any bound app can
-  exhaust the `:remote_api` FD table and kill the API for real clients. Cap un-consumed pipes per uid and
-  close stale write ends. Patch: `patches/AND-PROV_01_createOutputPipe_dos_cap.diff`. Also cap decrypt input
-  size (only card ops are capped today).
-- The provider consent, passphrase and card-PIN activities have no FLAG_SECURE and no overlay protection, so
-  the consent tap is tapjackable and the passphrase / PIN are screenshot-able and appear in Recents (issue #8
-  was only half-addressed). The Quick Action (`ShareTargetActivity`) also skips the Recents protection and the
-  app lock, so its decrypted output shows in the app switcher and it can decrypt / sign with passphrase-less
-  keys while the app lock is on. Apply FLAG_SECURE + `setHideOverlayWindows` to the provider dialogs and the
-  Recents protection + lock to the Quick Action. Patches:
-  `patches/AND-PROV_02_provider_dialogs_flag_secure.diff`,
-  `patches/AND-SYS_09_d2d_exclusion_quickaction_recents.diff`.
-
-### 17.8 Medium: network privacy fixes (PPA-AND-013, PPA-MULTI-014 / 019)
-
-- SOCKS stream-isolation credentials are never sent (the `Authenticator` filters on `RequestorType.PROXY`,
-  but libcore requests them as `SERVER` for SOCKS5), and the proxy fails open when Custom mode is set with a
-  blank host, so requests go direct while Settings shows a proxy. Match `requestingProtocol == "SOCKS5"` and
-  fail closed on a missing host. Patch: `patches/AND-SYS_03_proxy_fail_closed_socks_auth.diff`. Confirm on a
-  device whether the hostname is resolved through the proxy (Task 15 / the SOCKS logger in the pre-audit poc).
-- WKD results are not filtered to the queried address and there is no response size cap on WKD or keyserver
-  fetches, so a WKD host for any looked-up domain can return arbitrary UIDs or a gzip bomb. Keep only UIDs
-  equal to the queried address, reject a response with none, cap the response size, and send
-  `Accept-Encoding: identity`. Also lowercase ASCII only (non-ASCII local parts currently miss) and fall back
-  advanced-to-direct only on NXDOMAIN.
-- Background refresh sends the whole keyring to every enabled server in one burst (metadata leak, worse with
-  the broken SOCKS isolation above). Randomize per-key timing, use one lookup server per key, and consider
-  default-off or proxy-only (Parcimonie model).
-
-### 17.9 Medium: import preview, keystore recovery, backup restore (PPA-AND-016 / 022 / 031)
-
-- Import shows only the first key in the preview but commits every armored block found in the payload, so a
-  noisy paste can slip a hidden second key into the keyring behind the one the user reviewed. Enumerate every
-  ring in the preview, or import only the previewed ring and require an explicit multi-key confirmation.
-- `SecureKeyStore` after a Keystore alias invalidation: any write mints a fresh DEK and rewrites the envelope
-  with `pwPresent=false` (a background public-key refresh is enough), orphaning the passphrase-recovery wrap,
-  and each recovery deletes the single shared hardware key, invalidating everything written since (a
-  passphrase-less key is then lost for good). The legacy EncryptedSharedPreferences copy is also never
-  deleted, so a fallback can resurrect a stale secret. Patch: `patches/AND-SYS_07_securekeystore_recovery_wrap.diff`
-  (first two); delete legacy entries after a successful migration (third).
-- Backup restore silently switches the proxy off, applies trust levels, and replaces the keyserver list from
-  the file, so a crafted backup a user restores can downgrade Tor and plant trusted keys / servers. Ask
-  before applying settings, never downgrade the proxy, and do not import trust from the file.
-
-### 17.10 Low: verify-time digest policy, card bounds, ustar, cache clearing (PPA-MULTI-024 / 027 / 030, PPA-AND-028)
-
-- No digest allowlist at verify time: SHA-1 (and MD5, RIPEMD160) data signatures, self-signatures and
-  certifications are accepted. Add a `SignaturePolicy.isAcceptableDigest()` gate on all four verify paths
-  (data sigs, and ideally self-sigs and certifications), and reject far-future creation times and v3
-  signatures. The Swift core already restricts digests, so this is Android-specific.
-- Card APDU layer: the 0x61xx GET RESPONSE and 0x6Cxx re-send loops have no cap, and the TLV 4-byte length can
-  go negative and throw an untyped exception. A hostile card, NFC relay or HCE emulator can hang the NFC
-  thread or grow the buffer. Cap the loops and bounds. Patch: `patches/AND-SYS_04_card_apdu_tlv_bounds.diff`.
-- The ustar backup reader loops forever on a crafted negative (wrapped) entry size. Patch:
-  `patches/AND-SYS_05_ustar_negative_size.diff`.
-- "Clear" and "Clear all data" do not clear the in-app passphrase cache or the `:remote_api` card PIN, so a
-  user who pressed Clear is not actually cleared. Patch: `patches/AND-SYS_02_secret_cache_clear.diff`.
-
-### 17.11 Info: hardening directions (PPA-MULTI-033)
-
-No zeroization of passphrases (Java strings) or key material; a real hardening direction, not a one-line fix,
-already noted under item 11. Strip `Log.d` / `Log.v` in release (release logcat currently carries looked-up
-email addresses; no key material or plaintext is logged). No action required this cycle beyond noting it.
-
-### Status (Sep 23 2026): done. Code complete, Gradle build and on-device checks green
-
-All of 17.1 to 17.11 is implemented in the working tree and covered by JVM unit tests (700 pass). What
-landed, by sub-item:
-
-- 17.1: `crypto/CertificateBindings.kt` verifies 0x18 / 0x19 / 0x28 / 0x20 / 0x30 and User ID self-certs at
-  the packet level (BC rings, composite 30/31 primaries, v4 algo-35 rings). Unbound components are stripped
-  on import, fetch and storage (`SecureKeyStore.storePublicKey`), stored rings are re-validated once at
-  startup, recipients are chosen only from bound, unrevoked, unexpired keys (by fingerprint), and signers
-  must be bound and back-signed. `crypto/CertificateMerge.kt` makes refresh a verified union (the union
-  half of item 12). Verification work is bounded per certificate.
-- 17.2: `decryptStream(releaseOnlyWhenVerified = true)` on the provider path holds non-AEAD plaintext
-  (`VerifiedReleaseSink`) until the MDC check passes. Decision taken: buffer-and-verify, not refuse SEIPDv1.
-- 17.3: `LiteralFilename.sanitize` at the three read sites, `ScratchFiles.safeChild` on every `exports/`
-  write, `exports/` cleared at launch and on decrypt-result dismiss.
-- 17.4: Autocrypt keys accepted only when every certified User ID is the peer address; new
-  `autocryptImportedAt` column (Room 9 to 10, backfilled from autocrypt_peers); provider recipients never
-  union an Autocrypt-origin key with a user-managed one.
-- 17.5 to 17.9: inflate cap, Argon2 guard at the KDF (`GuardedPBEDataDecryptorFactory`) and on the composite
-  unlocks, calibrated SHA-256 S2K (0xE0 to 0xFF), output-pipe and input caps, FLAG_SECURE + overlay
-  protection on the provider screens, Quick Action lock and Recents, device-transfer exclusion, SOCKS auth
-  fix, proxy fail-closed, identity encoding + 8 MiB response cap, WKD address filter / ASCII lowercase /
-  NXDOMAIN-only fallback, randomized one-server-per-key refresh batches, full multi-key import preview,
-  SecureKeyStore recovery fixes, backup restore asks before settings and never imports trust or drops a proxy.
-- 17.10 / 17.11: verify-time digest and date policy (`SignaturePolicy`), card APDU / TLV bounds, ustar size,
-  secret-cache clearing, `Log.d` / `Log.v` stripped in release.
-
-Verified on the Mac and on device (Sep 23 2026): Gradle unit suite and release build, the pre-audit
-Task 15 checks, keystore wipe and recovery, and the Room 9 to 10 upgrade from a 4.5.3 install.
-
-Product calls, settled Sep 23 2026: background refresh stays default-on for play (foss stays off).
-keys.pgpony.app: the site repo carries a server-side binding check (`api/keyserver/_binding.php`, wired
-into upload and merge in `_ks_lib.php`, plus `api/migrate_keyserver_bindings.php` to prune stored keys).
-It keeps a subkey only with a verified 0x18 from the primary (RSA, Ed25519 legacy and v6, NIST ECDSA,
-ML-DSA-65 on its Ed25519 half); other primary algorithms pass through unchecked and are left to the
-clients, which now verify every binding themselves. Confirmed live Sep 23 2026; the migration found no
-stored key to prune or re-fingerprint, so nothing needed applying.
-
-### Sequencing
-
-17.1 first (the binding-verification helper unblocks 17.4 and the composite side too), then 17.2 and 17.3,
-then the Medium set, then the Low set. 17.1 and the EFAIL fix (17.2) are the two that should not ship in a
-release that claims security hardening without them. As with item 11, if the cycle runs long, pull 17.1 to
-17.4 into a dedicated hardening release sooner.
+### Status (Sep 23 2026): done. Code complete, Gradle build and on-device checks green. Shipped in 4.6.0.
 
 ## 18. Validate key-server / WKD responses before showing "Key Found"
 
