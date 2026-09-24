@@ -663,9 +663,14 @@ fun KeyDetailScreen(
                 onDismissRequest = { viewModel.dismissDeleteConfirm() },
                 title = { Text(stringResource(R.string.key_detail_delete_dialog_title)) },
                 text = {
+                    // #58: a public key goes to Recently Deleted like a key
+                    // pair does, so the dialog says so instead of "cannot be
+                    // undone".
                     Text(
-                        stringResource(R.string.key_detail_delete_dialog_intro) +
-                                stringResource(R.string.key_detail_delete_dialog_body_public_only)
+                        stringResource(
+                            R.string.key_detail_delete_dialog_body_public_only,
+                            com.pgpony.android.data.repository.KeyRepository.RECYCLE_BIN_RETENTION_DAYS
+                        )
                     )
                 },
                 confirmButton = {

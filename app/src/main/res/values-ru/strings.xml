@@ -550,7 +550,7 @@
 
     <!-- ── Delete confirmation ──────────────────────────────────────── -->
     <string name="keyring_delete_dialog_title">Удалить ключ?</string>
-    <string name="keyring_delete_dialog_body_format">Удалить %1$s (%2$s)? Это действие нельзя отменить.</string>
+    <string name="keyring_delete_dialog_body_format">Удалить %1$s (%2$s)? Ключ перемещается в «Недавно удалённые» на %3$d дн., затем удаляется навсегда. До этого момента вы можете его восстановить.</string>
     <string name="keyring_delete_dialog_confirm">Удалить</string>
 
     <!-- ── First-visit tooltip ──────────────────────────────────────── -->
@@ -815,9 +815,8 @@
 
     <!-- ── Delete dialog ───────────────────────────────────────────── -->
     <string name="key_detail_delete_dialog_title">Удалить ключ</string>
-    <string name="key_detail_delete_dialog_intro">Это действие нельзя отменить. </string>
     <string name="key_detail_delete_dialog_body_key_pair">И ваш открытый, и закрытый ключ будут удалены навсегда.</string>
-    <string name="key_detail_delete_dialog_body_public_only">Открытый ключ будет удалён из вашей связки ключей.</string>
+    <string name="key_detail_delete_dialog_body_public_only">Этот ключ перемещается в «Недавно удалённые» на %1$d дн., затем удаляется навсегда. До этого момента вы можете его восстановить.</string>
     <string name="key_detail_delete_dialog_confirm">Удалить</string>
     <!-- RC3 §L (#21): key-pair delete safeguards sheet. -->
     <string name="key_delete_sheet_title">Удалить пару ключей?</string>

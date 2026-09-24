@@ -461,7 +461,7 @@ pgpony.app</string>
 
     <!-- ── Delete confirmation ──────────────────────────────────────── -->
     <string name="keyring_delete_dialog_title">Schlüssel löschen?</string>
-    <string name="keyring_delete_dialog_body_format">%1$s (%2$s) löschen? Dies kann nicht rückgängig gemacht werden.</string>
+    <string name="keyring_delete_dialog_body_format">%1$s (%2$s) löschen? Er wird für %3$d Tage in Zuletzt gelöscht verschoben und danach endgültig entfernt. Bis dahin kannst du ihn wiederherstellen.</string>
     <string name="keyring_delete_dialog_confirm">Löschen</string>
 
     <!-- ── First-visit tooltip ──────────────────────────────────────── -->
@@ -626,9 +626,8 @@ pgpony.app</string>
 
     <!-- ── Delete dialog ───────────────────────────────────────────── -->
     <string name="key_detail_delete_dialog_title">Schlüssel löschen</string>
-    <string name="key_detail_delete_dialog_intro">Diese Aktion kann nicht rückgängig gemacht werden. </string>
     <string name="key_detail_delete_dialog_body_key_pair">Sowohl dein öffentlicher als auch dein privater Schlüssel werden dauerhaft gelöscht.</string>
-    <string name="key_detail_delete_dialog_body_public_only">Der öffentliche Schlüssel wird aus deinem Schlüsselbund entfernt.</string>
+    <string name="key_detail_delete_dialog_body_public_only">Dieser Schlüssel wird für %1$d Tage in Zuletzt gelöscht verschoben und danach endgültig entfernt. Bis dahin kannst du ihn wiederherstellen.</string>
     <string name="key_detail_delete_dialog_confirm">Löschen</string>
 
     <!-- ── Export Private Key dialog ───────────────────────────────── -->

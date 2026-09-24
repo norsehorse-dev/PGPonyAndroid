@@ -548,7 +548,15 @@ fun KeyringScreen(
                 onDismissRequest = { viewModel.cancelDelete() },
                 title = { Text(stringResource(R.string.keyring_delete_dialog_title)) },
                 text = {
-                    Text(stringResource(R.string.keyring_delete_dialog_body_format, key.userName.ifBlank { key.userEmail }, key.shortFingerprint))
+                    // #58: public keys go to Recently Deleted too; say so.
+                    Text(
+                        stringResource(
+                            R.string.keyring_delete_dialog_body_format,
+                            key.userName.ifBlank { key.userEmail },
+                            key.shortFingerprint,
+                            com.pgpony.android.data.repository.KeyRepository.RECYCLE_BIN_RETENTION_DAYS
+                        )
+                    )
                 },
                 confirmButton = {
                     TextButton(

@@ -592,7 +592,7 @@
 
     <!-- ── Delete confirmation ──────────────────────────────────────── -->
     <string name="keyring_delete_dialog_title">Delete Key?</string>
-    <string name="keyring_delete_dialog_body_format">Delete %1$s (%2$s)? This cannot be undone.</string>
+    <string name="keyring_delete_dialog_body_format">Delete %1$s (%2$s)? It moves to Recently Deleted for %3$d days, then is removed for good. You can restore it until then.</string>
     <string name="keyring_delete_dialog_confirm">Delete</string>
 
     <!-- ── First-visit tooltip ──────────────────────────────────────── -->
@@ -901,9 +901,8 @@
 
     <!-- ── Delete dialog ───────────────────────────────────────────── -->
     <string name="key_detail_delete_dialog_title">Delete Key</string>
-    <string name="key_detail_delete_dialog_intro">This action cannot be undone. </string>
     <string name="key_detail_delete_dialog_body_key_pair">Both your public and private key will be permanently deleted.</string>
-    <string name="key_detail_delete_dialog_body_public_only">The public key will be removed from your keyring.</string>
+    <string name="key_detail_delete_dialog_body_public_only">This key moves to Recently Deleted for %1$d days, then is removed for good. You can restore it until then.</string>
     <string name="key_detail_delete_dialog_confirm">Delete</string>
     <!-- RC3 §L (#21): key-pair delete safeguards sheet. -->
     <string name="key_delete_sheet_title">Delete key pair?</string>

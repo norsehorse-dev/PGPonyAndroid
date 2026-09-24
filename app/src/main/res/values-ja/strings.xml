@@ -461,7 +461,7 @@ pgpony.app</string>
 
     <!-- ── Delete confirmation ──────────────────────────────────────── -->
     <string name="keyring_delete_dialog_title">鍵を削除しますか?</string>
-    <string name="keyring_delete_dialog_body_format">%1$s (%2$s) を削除しますか?この操作は取り消せません。</string>
+    <string name="keyring_delete_dialog_body_format">%1$s (%2$s) を削除しますか?%3$d 日間「最近削除した項目」に移動され、その後完全に削除されます。それまでは復元できます。</string>
     <string name="keyring_delete_dialog_confirm">削除</string>
 
     <!-- ── First-visit tooltip ──────────────────────────────────────── -->
@@ -626,9 +626,8 @@ pgpony.app</string>
 
     <!-- ── Delete dialog ───────────────────────────────────────────── -->
     <string name="key_detail_delete_dialog_title">鍵を削除</string>
-    <string name="key_detail_delete_dialog_intro">この操作は取り消せません。</string>
     <string name="key_detail_delete_dialog_body_key_pair">公開鍵と秘密鍵の両方が完全に削除されます。</string>
-    <string name="key_detail_delete_dialog_body_public_only">公開鍵が鍵束から削除されます。</string>
+    <string name="key_detail_delete_dialog_body_public_only">この鍵は %1$d 日間「最近削除した項目」に移動され、その後完全に削除されます。それまでは復元できます。</string>
     <string name="key_detail_delete_dialog_confirm">削除</string>
 
     <!-- ── Export Private Key dialog ───────────────────────────────── -->

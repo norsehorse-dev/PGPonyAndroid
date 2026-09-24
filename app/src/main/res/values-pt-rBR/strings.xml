@@ -461,7 +461,7 @@ pgpony.app</string>
 
     <!-- ── Delete confirmation ──────────────────────────────────────── -->
     <string name="keyring_delete_dialog_title">Excluir chave?</string>
-    <string name="keyring_delete_dialog_body_format">Excluir %1$s (%2$s)? Isso não pode ser desfeito.</string>
+    <string name="keyring_delete_dialog_body_format">Excluir %1$s (%2$s)? Ela vai para Excluídos recentemente por %3$d dias e depois é removida de vez. Você pode restaurá-la até lá.</string>
     <string name="keyring_delete_dialog_confirm">Excluir</string>
 
     <!-- ── First-visit tooltip ──────────────────────────────────────── -->
@@ -626,9 +626,8 @@ pgpony.app</string>
 
     <!-- ── Delete dialog ───────────────────────────────────────────── -->
     <string name="key_detail_delete_dialog_title">Excluir chave</string>
-    <string name="key_detail_delete_dialog_intro">Esta ação não pode ser desfeita. </string>
     <string name="key_detail_delete_dialog_body_key_pair">Tanto a chave pública quanto a privada serão excluídas permanentemente.</string>
-    <string name="key_detail_delete_dialog_body_public_only">A chave pública será removida do seu chaveiro.</string>
+    <string name="key_detail_delete_dialog_body_public_only">Esta chave vai para Excluídos recentemente por %1$d dias e depois é removida de vez. Você pode restaurá-la até lá.</string>
     <string name="key_detail_delete_dialog_confirm">Excluir</string>
 
     <!-- ── Export Private Key dialog ───────────────────────────────── -->

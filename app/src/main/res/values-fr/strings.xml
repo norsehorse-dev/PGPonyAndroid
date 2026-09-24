@@ -461,7 +461,7 @@ pgpony.app</string>
 
     <!-- ── Delete confirmation ──────────────────────────────────────── -->
     <string name="keyring_delete_dialog_title">Supprimer la clé ?</string>
-    <string name="keyring_delete_dialog_body_format">Supprimer %1$s (%2$s) ? Cette action est irréversible.</string>
+    <string name="keyring_delete_dialog_body_format">Supprimer %1$s (%2$s) ? Elle est déplacée vers Récemment supprimés pendant %3$d jours, puis supprimée définitivement. Vous pouvez la restaurer jusque-là.</string>
     <string name="keyring_delete_dialog_confirm">Supprimer</string>
 
     <!-- ── First-visit tooltip ──────────────────────────────────────── -->
@@ -626,9 +626,8 @@ pgpony.app</string>
 
     <!-- ── Delete dialog ───────────────────────────────────────────── -->
     <string name="key_detail_delete_dialog_title">Supprimer la clé</string>
-    <string name="key_detail_delete_dialog_intro">Cette action est irréversible. </string>
     <string name="key_detail_delete_dialog_body_key_pair">Vos clés publique et privée seront supprimées définitivement.</string>
-    <string name="key_detail_delete_dialog_body_public_only">La clé publique sera retirée de votre trousseau.</string>
+    <string name="key_detail_delete_dialog_body_public_only">Cette clé est déplacée vers Récemment supprimés pendant %1$d jours, puis supprimée définitivement. Vous pouvez la restaurer jusque-là.</string>
     <string name="key_detail_delete_dialog_confirm">Supprimer</string>
 
     <!-- ── Export Private Key dialog ───────────────────────────────── -->
