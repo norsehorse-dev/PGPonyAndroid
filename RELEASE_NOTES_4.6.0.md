@@ -75,13 +75,13 @@ names, archives), and tighter handling of other apps' access.
 Whole-file SHA-256 (is this download the published file):
 
 ```
-<APK_SHA256>
+0995431de506531682a17e0e3e0c06cb5dc9c90b1656b4f946c3112d71675dbf
 ```
 
 Content hash (for rebuilders; excludes signature, see REPRODUCIBLE_BUILDS_PLAYBOOK.md):
 
 ```
-<CONTENT_HASH>
+bcd8bb459fc57614d4442a9c686fc1bfda22014952461c384201e737c7343787
 ```
 
 The APK is signed with the NorseHorse release key
