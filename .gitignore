@@ -29,3 +29,7 @@ app/build/
 .gradle/
 local.properties
 .DS_Store
+
+_archive/
+drafts/
+.idea/

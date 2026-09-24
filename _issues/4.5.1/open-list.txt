@@ -1,6 +1,0 @@
-63	OPEN	An issue and suggestions		2026-09-16T15:57:03Z
-58	OPEN	Share a pub key to PGPony		2026-09-16T15:12:06Z
-57	OPEN	Decryption Failure with Multi-Recipient PGP Messages		2026-09-08T20:19:35Z
-56	OPEN	Consider adding support for v4 PQC encryption subkeys based on ML-KEM-768+X25519		2026-09-14T22:11:39Z
-55	OPEN	Bug reports and feature requests: ML-KEM, RSA-8192, ML-DSA User IDs, and custom key servers		2026-09-12T05:47:54Z
-36	OPEN	New Features List 😅		2026-09-16T15:57:55Z

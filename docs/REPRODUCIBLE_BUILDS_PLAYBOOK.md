@@ -293,7 +293,7 @@ Step 6, sign and publish:
 ```
 gpg --detach-sign --armor --local-user 0x53F9798E4919DE62 --output /tmp/<App>-X.Y.Z-foss.apk.asc /tmp/<App>-X.Y.Z-foss.apk
 shasum -a 256 /tmp/<App>-X.Y.Z-foss.apk
-gh release create <tag> /tmp/<App>-X.Y.Z-foss.apk /tmp/<App>-X.Y.Z-foss.apk.asc --title "<App> X.Y.Z" --notes-file RELEASE_NOTES_X.Y.Z.md
+gh release create <tag> /tmp/<App>-X.Y.Z-foss.apk /tmp/<App>-X.Y.Z-foss.apk.asc --title "<App> X.Y.Z" --notes-file docs/releases/RELEASE_NOTES_X.Y.Z.md
 ```
 
 Release notes carry BOTH hashes with their meanings: the whole-file

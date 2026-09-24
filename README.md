@@ -69,7 +69,7 @@ tools/verify_repro.sh rebuild v<version> PGPony-<version>-foss.apk
 It requires an Android SDK and network access for the clone and
 dependency downloads, and prints per-dex SHA-256s and the canonical
 content hash. The full procedure, and how this maps to F-Droid's own
-verification, is in `REPRODUCIBLE_BUILDS_PLAYBOOK.md` and
+verification, is in `docs/REPRODUCIBLE_BUILDS_PLAYBOOK.md` and
 `docs/REPRODUCIBLE_BUILDS.md`.
 
 ## License
