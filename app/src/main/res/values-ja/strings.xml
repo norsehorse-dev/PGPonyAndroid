@@ -499,8 +499,8 @@ pgpony.app</string>
     <!-- ── ImportMethod enum (KeyringViewModel) ─────────────────────── -->
     <string name="import_method_paste">貼り付け</string>
     <string name="import_method_file">ファイル</string>
-    <string name="import_method_qr_code">QR コード</string>
-    <string name="import_method_key_server">鍵サーバー</string>
+    <string name="import_method_qr_code">QR</string>
+    <string name="import_method_key_server">サーバー</string>
 
     <!-- ── ExpirationOption enum (KeyringViewModel) ─────────────────── -->
     <string name="expiration_one_year">1 年</string>

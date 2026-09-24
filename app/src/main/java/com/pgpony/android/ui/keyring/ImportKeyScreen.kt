@@ -110,9 +110,7 @@ fun ImportKeyScreen(state: KeyringUiState, viewModel: KeyringViewModel) {
 
             // ── Method picker (segmented) ─────────────────────────────
             //
-            // Material 3's SingleChoiceSegmentedButtonRow gives the
-            // closest analogue to iOS's .pickerStyle(.segmented).
-            // Switching method clears any in-flight preview because
+            // Wrapping chips (see ImportMethodPicker). Switching method clears any in-flight preview because
             // the new method may have a totally different data source.
             ImportMethodPicker(
                 selected = state.importMethod,
@@ -231,7 +229,12 @@ fun ImportKeyScreen(state: KeyringUiState, viewModel: KeyringViewModel) {
 
 // ── Method picker ──────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
+// 4.6.0, per NorseHorse device testing: five segments in a
+// SingleChoiceSegmentedButtonRow squeezed every label ("Key Ser...",
+// "QR Code" touching its neighbour). Same fix the Encrypt mode picker
+// took in RC3: a centered FlowRow of FilterChips that wraps to a second
+// line instead of truncating, with the two longest labels shortened.
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun ImportMethodPicker(
     selected: ImportMethod,
@@ -241,20 +244,19 @@ private fun ImportMethodPicker(
         // RC1 offline switch: no keyserver import method while offline.
         (it == ImportMethod.KEY_SERVER || it == ImportMethod.URL) && com.pgpony.android.network.OfflineMode.enabled
     }
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-        methods.forEachIndexed { index, method ->
-            SegmentedButton(
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+    ) {
+        methods.forEach { method ->
+            FilterChip(
                 selected = selected == method,
                 onClick = { onSelect(method) },
-                shape = SegmentedButtonDefaults.itemShape(
-                    index = index,
-                    count = methods.size
-                ),
-                icon = {
+                leadingIcon = {
                     Icon(
                         imageVector = iconForMethod(method),
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(FilterChipDefaults.IconSize)
                     )
                 },
                 label = {
@@ -266,9 +268,7 @@ private fun ImportMethodPicker(
                             ImportMethod.KEY_SERVER -> stringResource(R.string.import_method_key_server)
                             ImportMethod.URL -> stringResource(R.string.import_method_url)
                         },
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        maxLines = 1
                     )
                 }
             )

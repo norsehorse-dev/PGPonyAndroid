@@ -606,8 +606,8 @@
     <!-- ── ImportMethod enum (KeyringViewModel) ─────────────────────── -->
     <string name="import_method_paste">Вставить</string>
     <string name="import_method_file">Файл</string>
-    <string name="import_method_qr_code">QR-код</string>
-    <string name="import_method_key_server">Сервер ключей</string>
+    <string name="import_method_qr_code">QR</string>
+    <string name="import_method_key_server">Сервер</string>
 
     <!-- ── ExpirationOption enum (KeyringViewModel) ─────────────────── -->
     <string name="expiration_one_year">1 год</string>

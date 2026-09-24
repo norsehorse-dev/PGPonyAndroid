@@ -499,8 +499,8 @@ pgpony.app</string>
     <!-- ── ImportMethod enum (KeyringViewModel) ─────────────────────── -->
     <string name="import_method_paste">Pegar</string>
     <string name="import_method_file">Archivo</string>
-    <string name="import_method_qr_code">Código QR</string>
-    <string name="import_method_key_server">Servidor de claves</string>
+    <string name="import_method_qr_code">QR</string>
+    <string name="import_method_key_server">Servidor</string>
 
     <!-- ── ExpirationOption enum (KeyringViewModel) ─────────────────── -->
     <string name="expiration_one_year">1 año</string>
