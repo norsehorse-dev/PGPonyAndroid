@@ -25,12 +25,20 @@
 // PGPony.
 //
 // Consent and unlock follow the OpenPGP provider: the calling app is allowed
-// once (the same signature-pinned allow-list, Settings > Connected apps), a
+// once (the same signature-pinned allow-list, Settings > Connected apps, but
+// its own SSH scope: an app allowed for OpenPGP gets no SSH signatures, and an
+// app allowed for SSH gets no OpenPGP operations), a
 // protected key asks for its passphrase once per unlock session
 // (ProviderPassphraseCache), and a card key asks for a tap and PIN on every
 // signature (INTERNAL AUTHENTICATE on the authentication slot). Every prompt
 // is a PendingIntent the client launches; each hands the client's request
 // back so the client re-executes it.
+//
+// 4.6.0: each app is bound to the key the user picked for it in the SSH key
+// picker (ApiClientAuthorizer.bindSshKey, written only by the picker). A
+// request naming any other key gets the picker again, showing only that key,
+// so the user approves it explicitly; nothing is signed with a key the user
+// did not choose for that app.
 
 package com.pgpony.android.provider
 
@@ -44,6 +52,7 @@ import com.pgpony.android.R
 import com.pgpony.android.crypto.CertificateBindings
 import com.pgpony.android.crypto.ssh.SshAuth
 import com.pgpony.android.crypto.ssh.SshSigningKey
+import com.pgpony.android.data.ApiClientEntity
 import com.pgpony.android.data.PGPKeyEntity
 import com.pgpony.android.data.repository.KeyRepository
 import kotlinx.coroutines.runBlocking
@@ -119,7 +128,7 @@ class SshAuthenticationService : Service() {
         val callingPackage = packageManager.getPackagesForUid(callingUid)?.firstOrNull()
             ?: return error(SshAuthenticationApiError.GENERIC_ERROR, "Could not resolve the calling app")
 
-        when (runBlocking { authorizer.authorize(callingPackage) }) {
+        when (runBlocking { authorizer.authorize(callingPackage, ApiClientEntity.SCOPE_SSH) }) {
             ApiClientAuthorizer.Decision.AUTHORIZED -> Unit
             ApiClientAuthorizer.Decision.UNKNOWN -> return consentRequired(callingPackage, data)
             ApiClientAuthorizer.Decision.SIGNATURE_MISMATCH -> return error(
@@ -135,9 +144,9 @@ class SshAuthenticationService : Service() {
 
         return when (data.action) {
             ACTION_SELECT_KEY -> selectKey(data, callingPackage)
-            ACTION_GET_SSH_PUBLIC_KEY -> publicKey(data, sshFormat = true)
-            ACTION_GET_PUBLIC_KEY -> publicKey(data, sshFormat = false)
-            ACTION_SIGN -> sign(data)
+            ACTION_GET_SSH_PUBLIC_KEY -> publicKey(data, callingPackage, sshFormat = true)
+            ACTION_GET_PUBLIC_KEY -> publicKey(data, callingPackage, sshFormat = false)
+            ACTION_SIGN -> sign(data, callingPackage)
             else -> error(SshAuthenticationApiError.UNKNOWN_ACTION, "Unknown action: ${data.action}")
         }
     }
@@ -172,8 +181,12 @@ class SshAuthenticationService : Service() {
             ?: return Lookup.Fail(
                 error(
                     SshAuthenticationApiError.NO_AUTH_KEY,
-                    "${entity.userID} has no usable authentication subkey. " +
-                        "Add an Authenticate subkey in PGPony's Key Detail."
+                    if (SshAuth.onlyDualUseAuthSubkeys(cert)) {
+                        getString(R.string.ssh_error_dual_use_auth)
+                    } else {
+                        "${entity.userID} has no usable authentication subkey. " +
+                            "Add an Authenticate subkey in PGPony's Key Detail."
+                    }
                 )
             )
         val material = SshAuth.material(sub.publicBody)
@@ -193,6 +206,34 @@ class SshAuthenticationService : Service() {
         }
     }
 
+    /**
+     * The key named by [data] if it is the one bound to [callingPackage];
+     * otherwise the picker, limited to that key, for the user to approve.
+     */
+    private fun resolveBound(data: Intent, callingPackage: String): Lookup {
+        val l = resolve(data)
+        if (l !is Lookup.Ok) return l
+        if (runBlocking { authorizer.sshKeyAllowed(callingPackage, l.r.entity.fingerprint) }) return l
+        return Lookup.Fail(keyPicker(data, callingPackage, onlyFingerprint = l.r.entity.fingerprint))
+    }
+
+    private fun keyPicker(data: Intent, callingPackage: String, onlyFingerprint: String?): Intent {
+        val picker = Intent(this, ProviderKeyPickerActivity::class.java).apply {
+            putExtra(ProviderKeyPickerActivity.EXTRA_API_DATA, data)
+            putExtra(ProviderKeyPickerActivity.EXTRA_FOR_SSH, true)
+            putExtra(ProviderKeyPickerActivity.EXTRA_SSH_CLIENT_PACKAGE, callingPackage)
+            if (onlyFingerprint != null) {
+                putExtra(ProviderKeyPickerActivity.EXTRA_SSH_ONLY_FINGERPRINT, onlyFingerprint.uppercase())
+            }
+            setData(
+                android.net.Uri.parse(
+                    "pgpony-ssh-selectkey://$callingPackage/${onlyFingerprint?.uppercase() ?: "any"}"
+                )
+            )
+        }
+        return interaction(PendingIntent.getActivity(this, 10, picker, pendingFlags()))
+    }
+
     private fun description(r: Resolved): String =
         "${r.entity.userID.ifBlank { r.entity.shortFingerprint }} (${String.format("%016X", r.sub.keyId)})"
 
@@ -200,14 +241,9 @@ class SshAuthenticationService : Service() {
 
     private fun selectKey(data: Intent, callingPackage: String): Intent {
         if (data.getStringExtra(EXTRA_KEY_ID).isNullOrEmpty()) {
-            val picker = Intent(this, ProviderKeyPickerActivity::class.java).apply {
-                putExtra(ProviderKeyPickerActivity.EXTRA_API_DATA, data)
-                putExtra(ProviderKeyPickerActivity.EXTRA_FOR_SSH, true)
-                setData(android.net.Uri.parse("pgpony-ssh-selectkey://$callingPackage"))
-            }
-            return interaction(PendingIntent.getActivity(this, 10, picker, pendingFlags()))
+            return keyPicker(data, callingPackage, onlyFingerprint = null)
         }
-        return when (val l = resolve(data)) {
+        return when (val l = resolveBound(data, callingPackage)) {
             is Lookup.Fail -> l.response
             is Lookup.Ok -> success().apply {
                 putExtra(EXTRA_KEY_ID, l.r.entity.fingerprint.uppercase())
@@ -216,22 +252,23 @@ class SshAuthenticationService : Service() {
         }
     }
 
-    private fun publicKey(data: Intent, sshFormat: Boolean): Intent = when (val l = resolve(data)) {
-        is Lookup.Fail -> l.response
-        is Lookup.Ok -> if (sshFormat) {
-            success().apply {
-                putExtra(EXTRA_SSH_PUBLIC_KEY, SshAuth.authorizedKeysLine(l.r.material, ""))
-            }
-        } else {
-            val (spki, alg) = SshAuth.subjectPublicKeyInfo(l.r.material)
-            success().apply {
-                putExtra(EXTRA_PUBLIC_KEY, spki)
-                putExtra(EXTRA_PUBLIC_KEY_ALGORITHM, alg)
+    private fun publicKey(data: Intent, callingPackage: String, sshFormat: Boolean): Intent =
+        when (val l = resolveBound(data, callingPackage)) {
+            is Lookup.Fail -> l.response
+            is Lookup.Ok -> if (sshFormat) {
+                success().apply {
+                    putExtra(EXTRA_SSH_PUBLIC_KEY, SshAuth.authorizedKeysLine(l.r.material, ""))
+                }
+            } else {
+                val (spki, alg) = SshAuth.subjectPublicKeyInfo(l.r.material)
+                success().apply {
+                    putExtra(EXTRA_PUBLIC_KEY, spki)
+                    putExtra(EXTRA_PUBLIC_KEY_ALGORITHM, alg)
+                }
             }
         }
-    }
 
-    private fun sign(data: Intent): Intent {
+    private fun sign(data: Intent, callingPackage: String): Intent {
         val challenge = data.getByteArrayExtra(EXTRA_CHALLENGE)
         if (challenge == null || challenge.isEmpty()) {
             return error(SshAuthenticationApiError.GENERIC_ERROR, "No challenge given")
@@ -240,7 +277,7 @@ class SshAuthenticationService : Service() {
             return error(SshAuthenticationApiError.GENERIC_ERROR, "Challenge too large")
         }
         val hash = data.getIntExtra(EXTRA_HASH_ALGORITHM, SshAuthenticationApiError.INVALID_HASH_ALGORITHM)
-        val r = when (val l = resolve(data)) {
+        val r = when (val l = resolveBound(data, callingPackage)) {
             is Lookup.Fail -> return l.response
             is Lookup.Ok -> l.r
         }
@@ -312,7 +349,7 @@ class SshAuthenticationService : Service() {
         val consent = Intent(this, ApiConsentActivity::class.java).apply {
             putExtra(ApiConsentActivity.EXTRA_PACKAGE_NAME, callingPackage)
             putExtra(ApiConsentActivity.EXTRA_API_DATA, data)
-            setData(android.net.Uri.parse("pgpony-ssh-consent://$callingPackage"))
+            setData(android.net.Uri.parse("${ApiConsentActivity.SSH_CONSENT_SCHEME}://$callingPackage"))
         }
         return interaction(PendingIntent.getActivity(this, 11, consent, pendingFlags()))
     }

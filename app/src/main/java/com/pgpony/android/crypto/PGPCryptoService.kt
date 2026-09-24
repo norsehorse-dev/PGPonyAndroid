@@ -241,11 +241,6 @@ data class DecryptStreamResult(
     val compositeClaimedSignerFp: String? = null
 )
 
-data class VerifyResult(
-    val isValid: Boolean,
-    val signerKeyID: String?,
-    val signatureDate: Date?
-)
 
 data class ImportResult(
     val fingerprint: String,
@@ -1883,7 +1878,8 @@ class PGPCryptoService private constructor() {
 
                 val pgpFactory = JcaPGPObjectFactory(inputStream)
                 val encData = findEncryptedData(pgpFactory)
-                    ?: throw PGPCryptoError.DecryptionFailed("No encrypted data found in message")
+                    ?: return signedOnly(bcBytes, verificationKeys)
+                        ?: throw PGPCryptoError.DecryptionFailed("No encrypted data found in message")
 
                 // Find matching secret key and decrypt session key. A message
                 // may carry public-key (PKESK) and/or password (SKESK) session
@@ -2955,95 +2951,27 @@ class PGPCryptoService private constructor() {
     }
 
     // ── Verify ─────────────────────────────────────────────────────────
+    //
+    // 4.6.0: there is no separate inline-signed verifier here. A signed (not
+    // encrypted) PGP MESSAGE goes through decrypt(), which hands it to
+    // [signedOnly]: the same content walk every decrypted message takes, with
+    // the same decompression depth and size caps, and the signature graded by
+    // SignerEvaluator. Clear-signed and detached signatures go through
+    // VerifyService.
 
     /**
-     * Verify an inline-signed message.
+     * [message] (armored or binary) read as a signed, unencrypted message, or
+     * null when it carries no signature, so plain unsigned literal data is
+     * never presented as a decrypted result.
      */
-    fun verify(
-        signedData: ByteArray,
-        verificationKeys: List<PGPPublicKeyRing>
-    ): VerifyResult {
-        try {
-            val inputStream = if (isArmored(signedData)) {
-                ArmoredInputStream(ByteArrayInputStream(signedData))
-            } else {
-                ByteArrayInputStream(signedData)
-            }
-
-            val factory = JcaPGPObjectFactory(inputStream)
-            var obj = factory.nextObject()
-
-            while (obj != null) {
-                when (obj) {
-                    is PGPCompressedData -> {
-                        val compFactory = JcaPGPObjectFactory(obj.dataStream)
-                        return verifyFromFactory(compFactory, verificationKeys)
-                    }
-                    is PGPOnePassSignatureList -> {
-                        return verifyFromFactory(factory, verificationKeys, obj)
-                    }
-                }
-                obj = factory.nextObject()
-            }
-
-            throw PGPCryptoError.VerificationFailed("No signature found in message")
-        } catch (e: PGPCryptoError) {
-            throw e
-        } catch (e: Exception) {
-            throw PGPCryptoError.VerificationFailed(e.message ?: "Unknown error")
+    private fun signedOnly(message: ByteArray, verificationKeys: List<PGPPublicKeyRing>?): DecryptResult? {
+        val input = if (isArmored(message)) {
+            ArmoredInputStream(ByteArrayInputStream(message))
+        } else {
+            ByteArrayInputStream(message)
         }
-    }
-
-    private fun verifyFromFactory(
-        factory: JcaPGPObjectFactory,
-        verificationKeys: List<PGPPublicKeyRing>,
-        opsList: PGPOnePassSignatureList? = null
-    ): VerifyResult {
-        var onePassSig: PGPOnePassSignature? = null
-        var signerKeyID: String? = null
-
-        val ops = opsList ?: (factory.nextObject() as? PGPOnePassSignatureList)
-        if (ops != null && ops.size() > 0) {
-            val opsEntry = ops[0]
-            val signerPubKey = findPublicKey(opsEntry.keyID, verificationKeys)
-            if (signerPubKey != null) {
-                opsEntry.init(
-                    org.bouncycastle.openpgp.operator.bc.BcPGPContentVerifierBuilderProvider(),
-                    signerPubKey
-                )
-                onePassSig = opsEntry
-                signerKeyID = String.format("%016X", opsEntry.keyID)
-            }
-        }
-
-        // Read literal data
-        val litData = factory.nextObject() as? PGPLiteralData
-            ?: throw PGPCryptoError.VerificationFailed("No literal data in signed message")
-
-        val litStream = litData.inputStream
-        val buf = ByteArray(4096)
-        var len: Int
-        while (litStream.read(buf).also { len = it } >= 0) {
-            onePassSig?.update(buf, 0, len)
-        }
-
-        // Read signature
-        val sigList = factory.nextObject() as? PGPSignatureList
-            ?: throw PGPCryptoError.VerificationFailed("No signature packet found")
-
-        // 4.6.0 (item 17.1): a passing crypto check is graded like every other
-        // verify path (same key as the one-pass header, document type, digest
-        // policy, signer binding / revocation / expiry).
-        val sig0 = sigList[0]
-        val verified = onePassSig != null && sig0.keyID == onePassSig.keyID &&
-            onePassSig.verify(sig0) &&
-            SignerEvaluator.evaluate(sig0, verificationKeys) == SignerStatus.VERIFIED
-
-        return VerifyResult(
-            isValid = verified,
-            signerKeyID = signerKeyID,
-            signatureDate = sigList[0].creationTime
-        )
+        val result = processDecryptedContent(JcaPGPObjectFactory(input), verificationKeys)
+        return result.takeIf { it.hasSignature }
     }
 
     // ── Algorithm Detection ────────────────────────────────────────────
@@ -3526,6 +3454,12 @@ class PGPCryptoService private constructor() {
         var obj = factory.nextObject()
         while (obj != null) {
             if (obj is PGPEncryptedDataList) return obj
+            // 4.6.0: a message that opens with signed or literal content is not
+            // encrypted. Stop there: reading past an unconsumed (possibly
+            // indefinite-length) compressed packet only yields a parse error.
+            if (obj is PGPCompressedData || obj is PGPLiteralData ||
+                obj is PGPOnePassSignatureList || obj is PGPSignatureList
+            ) return null
             obj = factory.nextObject()
         }
         return null

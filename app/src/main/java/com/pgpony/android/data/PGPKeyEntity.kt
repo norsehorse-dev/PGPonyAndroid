@@ -409,7 +409,7 @@ interface PGPKeyDao {
         PGPKeyEntity::class, ApiClientEntity::class, AutocryptPeerEntity::class,
         FallbackKeyEntity::class, SigningDefaultsEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 @TypeConverters(

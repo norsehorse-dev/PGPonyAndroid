@@ -173,6 +173,17 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
 // else reads as user-managed, and importing a key again clears the mark.
 /** 4.6.0 (item 11): lastLocalEditAt, null for every existing row (no edit
  *  is known to be unpublished until the next one). */
+// 4.6.0: allowed_api_clients gains per-grant scopes (OpenPGP and SSH are
+// separate consents) and the SSH key binding. Every existing row was granted
+// through the OpenPGP consent screen, so it keeps OpenPGP only; an app that
+// also used SSH asks once for the SSH scope.
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `allowed_api_clients` ADD COLUMN `scopes` INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE `allowed_api_clients` ADD COLUMN `sshKeyFingerprint` TEXT")
+    }
+}
+
 val MIGRATION_10_11 = object : Migration(10, 11) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE `pgp_keys` ADD COLUMN `lastLocalEditAt` INTEGER")

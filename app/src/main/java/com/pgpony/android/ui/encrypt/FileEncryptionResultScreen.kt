@@ -333,7 +333,13 @@ stringResource(R.string.file_enc_result_badge_can_decrypt),
                         // it is shared in place rather than copied again.
                         val exportsDir = File(context.cacheDir, "exports").apply { mkdirs() }
                         val shareUri = if (wrapZip) {
-                            val zipFile = File(exportsDir, "$encryptedName.zip")
+                            // 4.6.0: the name comes from the picked file's
+                            // display name, so it goes through safeChild like
+                            // every other exports/ write; ZipPackaging reduces
+                            // the entry name to a base name as well.
+                            val zipFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(
+                                exportsDir, "$encryptedName.zip", "encrypted.gpg.zip"
+                            )
                             com.pgpony.android.ui.util.ZipPackaging.writeSingleEntry(
                                 java.io.FileOutputStream(zipFile), encryptedName
                             ) { dst ->

@@ -74,8 +74,9 @@ class RFC9580VectorTest {
         val msg = vector("a7_inline.asc")
         val c = vector("a3_cert.asc")
         assumeTrue("a7_inline.asc / a3_cert.asc absent — run the fetch script", msg != null && c != null)
-        val result = PGPCryptoService.shared.verify(msg!!, listOf(cert(c!!)))
-        assertTrue("expected a valid signature", result.isValid)
+        // A signed, unencrypted PGP MESSAGE verifies through decrypt().
+        val result = PGPCryptoService.shared.decrypt(msg!!, emptyList(), null, listOf(cert(c!!)))
+        assertTrue("expected a valid signature", result.signatureVerified)
     }
 
     @Test

@@ -862,6 +862,32 @@ sheet on composite keys that Thunderbird and GnuPG cannot read v6 keys yet.
 A tester sent a redesigned icon with "PGP" lettered under the lock. Not adopting: the current icon is
 the one users already recognize across iOS, Android and desktop. Recorded so it is not re-raised as new.
 
+## 23. API consent and input-bounding hardening
+
+Priority: high (release-gating). Origin: internal review of the 4.6.0 tree.
+
+- Connected apps are granted per service. OpenPGP (encrypt, decrypt, sign) and SSH login are separate consents
+  with their own consent text; an app allowed for one gets nothing from the other. Grants from before 4.6.0
+  keep OpenPGP only (DB v12, MIGRATION_11_12), so an app already using SSH asks once for SSH.
+- SSH logins are bound to the key the user picks for that app in the SSH key picker. A request for any other
+  key shows the picker again with only that key, for the user to approve.
+- Settings > Connected apps lists each app's access (OpenPGP, and SSH with its key) and removes each one
+  separately. Removing SSH clears the key binding.
+- SSH signing uses only a dedicated Authenticate subkey. A subkey that can also sign or certify (a GnuPG [SA]
+  subkey, say) is not used, and the error says to add a dedicated Authenticate subkey.
+- The zip wrapping an encrypted file for sharing is named through the same safe-name path as every other
+  export, and the entry inside it is a plain base name.
+- Opening a zip that wraps a message is bounded: payload size and entry count are capped, and a partial
+  payload is deleted on refusal.
+- Cleanups: the unused inline-signed verifier is gone. A signed, unencrypted PGP MESSAGE now verifies through
+  the decrypt path (the same capped content walk and signer grading), which also makes the Quick Action's
+  Verify signature work for classical signed-only messages. A stale storage comment is corrected. The
+  provider was checked for a truncated AEAD message: the stream error reaches the client as an error result.
+
+Status: done in code, unit tests green. On device: an SSH-only app cannot use the OpenPGP provider, a mail
+client gets no SSH signatures, Connected apps shows and removes each access, OkcAgent logs in after the SSH
+consent and key pick, and a signed-only PGP MESSAGE verifies from the Decrypt screen and the Quick Action.
+
 ## Delivery note
 
 Android first per the new-feature procedure. iOS mirrors each item once the Android version is verified,

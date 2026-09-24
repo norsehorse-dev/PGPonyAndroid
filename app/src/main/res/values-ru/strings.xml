@@ -2135,4 +2135,13 @@
 5. В Termux выполните pkg install okc-agents, затем eval $(okc-ssh-agent). Теперь ssh и git через ssh используют ваш ключ.</string>
     <string name="ssh_help_note">Запросы парольной фразы и ключа безопасности приходят как уведомления OkcAgent. Если ssh словно завис, проверьте уведомления. В GrapheneOS также включите для OkcAgent разрешение «Сеть»: Termux связывается с ним через локальное соединение, и без него ssh зависает.</string>
     <string name="key_detail_action_ssh_setup">Настроить SSH в Termux</string>
+    <!-- 4.6.0: API consent and SSH scope -->
+    <string name="ssh_error_dual_use_auth">Подключ аутентификации этого ключа может и подписывать. Добавьте отдельный подключ аутентификации в сведениях о ключе.</string>
+    <string name="provider_consent_ssh_title">Разрешить %1$s использовать SSH?</string>
+    <string name="provider_consent_ssh_body">%1$s (%2$s) хочет использовать ваш ключ аутентификации PGPony для входа на SSH-серверы. Он не может шифровать, расшифровывать или подписывать сообщения.\n\nДалее вы выберете ключ, и приложение сможет использовать только его. Это можно убрать в любой момент в Настройки → Подключённые приложения.</string>
+    <string name="ssh_keypicker_confirm">%1$s хочет войти с этим ключом. Нажмите на него, чтобы разрешить.</string>
+    <string name="provider_clients_scope_openpgp">OpenPGP: шифрование, расшифровка и подпись</string>
+    <string name="provider_clients_scope_ssh">Вход по SSH с %1$s</string>
+    <string name="provider_clients_scope_ssh_nokey">Вход по SSH (ключ ещё не выбран)</string>
+    <string name="provider_clients_scope_remove">Убрать</string>
 </resources>

@@ -27,6 +27,8 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -96,6 +98,15 @@ class ProviderKeyPickerActivity : ComponentActivity() {
          *  authentication subkey and returns the pick as the SSH API's
          *  key id (the primary fingerprint). */
         const val EXTRA_FOR_SSH = "com.pgpony.android.provider.FOR_SSH"
+
+        /** 4.6.0: the SSH client the pick is for. The pick binds that app's
+         *  SSH logins to the chosen key (ApiClientAuthorizer.bindSshKey). Set
+         *  only by SshAuthenticationService; this activity is not exported. */
+        const val EXTRA_SSH_CLIENT_PACKAGE = "com.pgpony.android.provider.SSH_CLIENT_PACKAGE"
+
+        /** 4.6.0: the client asked for this key (primary fingerprint) but it is
+         *  not the one bound to the app, so only it is offered, for approval. */
+        const val EXTRA_SSH_ONLY_FINGERPRINT = "com.pgpony.android.provider.SSH_ONLY_FINGERPRINT"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -111,6 +122,18 @@ class ProviderKeyPickerActivity : ComponentActivity() {
         val forOp = intent.getBooleanExtra(EXTRA_FOR_OP, false)
         val forSsh = intent.getBooleanExtra(EXTRA_FOR_SSH, false)
         val currentKeyId = intent.getLongExtra(EXTRA_CURRENT_KEY_ID, 0L)
+        val sshClient = intent.getStringExtra(EXTRA_SSH_CLIENT_PACKAGE)
+        val sshOnly = intent.getStringExtra(EXTRA_SSH_ONLY_FINGERPRINT)
+        if (forSsh && sshClient.isNullOrEmpty()) {
+            // An SSH pick must bind to an app; without one there is nothing to approve.
+            setResult(Activity.RESULT_CANCELED)
+            finish()
+            return
+        }
+        val sshClientLabel = sshClient?.let { pkg ->
+            runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString() }
+                .getOrDefault(pkg)
+        }
         val preselectUserId = intent.getStringExtra(EXTRA_PRESELECT_USER_ID)
         val preselectEmail = intent.getStringExtra(EXTRA_PRESELECT_EMAIL)
             ?.takeIf { it.isNotBlank() }
@@ -131,6 +154,7 @@ class ProviderKeyPickerActivity : ComponentActivity() {
                         .filter { (it.isKeyPair || it.isCardBacked) && !it.isRevoked }
                         // 4.6.0 (item 16): SSH offers only keys with a usable
                         // authentication subkey.
+                        .filter { key -> sshOnly == null || key.fingerprint.equals(sshOnly, ignoreCase = true) }
                         .filter { key ->
                             !forSsh || kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                                 repo.sshAuthCertificate(key.fingerprint)
@@ -168,6 +192,14 @@ class ProviderKeyPickerActivity : ComponentActivity() {
                                 .fillMaxWidth()
                                 .verticalScroll(rememberScrollState())
                         ) {
+                            if (forSsh && sshOnly != null) {
+                                Text(
+                                    stringResource(R.string.ssh_keypicker_confirm, sshClientLabel ?: ""),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(bottom = 12.dp)
+                                )
+                            }
                             if (!forSsh && !preselectUserId.isNullOrEmpty()) {
                                 Text(
                                     stringResource(
@@ -190,7 +222,7 @@ class ProviderKeyPickerActivity : ComponentActivity() {
                                     ),
                                     isCurrent = isCurrent,
                                     onClick = {
-                                        if (forSsh) pickSsh(apiData, key) else pick(apiData, key, forOp)
+                                        if (forSsh) pickSsh(apiData, key, sshClient!!) else pick(apiData, key, forOp)
                                     }
                                 )
                             }
@@ -232,12 +264,26 @@ class ProviderKeyPickerActivity : ComponentActivity() {
         finishWithKeyId(apiData, keyId, forOp)
     }
 
-    /** 4.6.0 (item 16): the SSH API re-executes SELECT_KEY with this intent. */
-    private fun pickSsh(apiData: Intent?, key: PGPKeyEntity) {
-        val result = Intent(apiData ?: Intent())
-        result.putExtra(SshAuthenticationService.EXTRA_KEY_ID, key.fingerprint.uppercase())
-        setResult(Activity.RESULT_OK, result)
-        finish()
+    /**
+     * 4.6.0 (item 16): the SSH API re-executes the client's request with this
+     * intent. The pick is the user's approval, so it binds [client]'s SSH
+     * logins to [key] first; the service refuses any other key for that app.
+     */
+    private fun pickSsh(apiData: Intent?, key: PGPKeyEntity, client: String) {
+        val authorizer = ApiClientAuthorizer(
+            dao = (application as PGPonyApp).database.apiClientDao(),
+            signatureSha256Of = ApiClientAuthorizer.platformSignatureLookup(packageManager)
+        )
+        lifecycleScope.launch {
+            if (!authorizer.bindSshKey(client, key.fingerprint)) {
+                cancel()
+                return@launch
+            }
+            val result = Intent(apiData ?: Intent())
+            result.putExtra(SshAuthenticationService.EXTRA_KEY_ID, key.fingerprint.uppercase())
+            setResult(Activity.RESULT_OK, result)
+            finish()
+        }
     }
 
     private fun pickNone(apiData: Intent?) = finishWithKeyId(apiData, KEY_ID_NONE, forOp = false)

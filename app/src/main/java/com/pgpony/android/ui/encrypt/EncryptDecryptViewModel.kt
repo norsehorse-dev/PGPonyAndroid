@@ -4347,8 +4347,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         val s = _decryptState.value
         fileOpJob = viewModelScope.launch(Dispatchers.IO) {
             _decryptState.value = _decryptState.value.copy(isProcessing = true, errorMessage = null)
+            var entryFile: java.io.File? = null
             try {
-                val entryFile = com.pgpony.android.ui.util.ScratchFiles.allocate(
+                entryFile = com.pgpony.android.ui.util.ScratchFiles.allocate(
                     PGPonyApp.instance, "zip-payload", "decrypt-zip"
                 )
                 var count = 0
@@ -4360,8 +4361,13 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 }
                 raw?.use { input ->
                     java.util.zip.ZipInputStream(input).use { zip ->
+                        // 4.6.0: bounded. The entry count and the payload size
+                        // are both capped, so a small crafted archive cannot
+                        // fill storage before any OpenPGP limit applies.
+                        val budget = com.pgpony.android.ui.util.ZipPackaging.EntryBudget()
                         var e = zip.nextEntry
                         while (e != null) {
+                            budget.next()
                             val nm = e.name
                             val isPgp = !e.isDirectory &&
                                 listOf(".gpg", ".pgp", ".asc").any { nm.lowercase().endsWith(it) }
@@ -4369,7 +4375,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                                 count++
                                 if (entryName == null) {
                                     entryName = nm.substringAfterLast('/')
-                                    java.io.FileOutputStream(entryFile).use { zip.copyTo(it) }
+                                    java.io.FileOutputStream(entryFile).use {
+                                        com.pgpony.android.ui.util.ZipPackaging.copyToCapped(zip, it)
+                                    }
                                 }
                             }
                             zip.closeEntry()
@@ -4383,6 +4391,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     count > 1 -> R.string.decrypt_zip_multiple
                     else -> 0
                 }
+                if (errorRes != 0) entryFile.delete()
+                val extracted = entryFile
                 kotlinx.coroutines.withContext(Dispatchers.Main) {
                     fileOpJob = null
                     if (errorRes != 0) {
@@ -4395,14 +4405,16 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             isProcessing = false,
                             errorMessage = null,
                             selectedFileBytes = null,
-                            selectedFileUri = android.net.Uri.fromFile(entryFile),
+                            selectedFileUri = android.net.Uri.fromFile(extracted),
                             selectedFileName = finalName,
-                            selectedFileSize = entryFile.length()
+                            selectedFileSize = extracted.length()
                         )
                         decryptFile(passphrase)
                     }
                 }
             } catch (t: Throwable) {
+                // No partial payload is left behind in scratch.
+                entryFile?.delete()
                 kotlinx.coroutines.withContext(Dispatchers.Main) {
                     fileOpJob = null
                     _decryptState.value = _decryptState.value.copy(

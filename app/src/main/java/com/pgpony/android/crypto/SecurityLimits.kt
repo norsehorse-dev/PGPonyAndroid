@@ -40,4 +40,10 @@ object SecurityLimits {
     // as input in one call. The provider buffers input whole (it sniffs the
     // message shape first), so this bounds the :remote_api process's memory.
     const val MAX_PROVIDER_INPUT_BYTES = 256L * 1024 * 1024
+
+    // 4.6.0: a .zip that wraps a message. The payload is ciphertext, so it gets
+    // the streaming path's bound; the entry count stops an archive of millions
+    // of tiny entries from spinning the scan.
+    const val MAX_ZIP_PAYLOAD_BYTES = MAX_STREAM_PLAINTEXT_BYTES
+    const val MAX_ZIP_ENTRIES = 1000
 }

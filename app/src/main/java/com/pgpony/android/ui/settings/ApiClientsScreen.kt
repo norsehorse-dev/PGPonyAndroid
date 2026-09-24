@@ -12,6 +12,11 @@
 // in this package. Self-contained (reads the DAO via PGPonyApp.instance
 // like CardPinCacheSection reads its cache) — no SettingsViewModel
 // changes needed.
+//
+// 4.6.0: each app shows the access it holds, OpenPGP and SSH separately (for
+// SSH, the key its logins are bound to), and each can be removed on its own.
+// Removing SSH also clears the key binding. The delete icon still removes the
+// app entirely.
 
 package com.pgpony.android.ui.settings
 
@@ -42,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -79,8 +85,19 @@ fun ApiClientsScreen(onDismiss: () -> Unit) {
     // Bumped after every revoke so the list re-reads.
     var refresh by remember { mutableIntStateOf(0) }
 
+    val authorizer = remember {
+        com.pgpony.android.provider.ApiClientAuthorizer(
+            dao = dao,
+            signatureSha256Of = com.pgpony.android.provider.ApiClientAuthorizer.platformSignatureLookup(context.packageManager)
+        )
+    }
+    var keyLabels by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+
     LaunchedEffect(refresh) {
         clients = dao.getAll()
+        keyLabels = PGPonyApp.instance.keyRepository.getAllKeys().associate {
+            it.fingerprint.uppercase() to (it.userID.ifBlank { it.shortFingerprint })
+        }
         loaded = true
     }
 
@@ -177,9 +194,16 @@ fun ApiClientsScreen(onDismiss: () -> Unit) {
                 ApiClientRow(
                     client = client,
                     label = rememberAppLabel(client.packageName),
+                    sshKeyLabel = client.sshKeyFingerprint?.let { keyLabels[it.uppercase()] ?: it },
                     onRevoke = {
                         scope.launch {
-                            dao.deleteByPackage(client.packageName)
+                            authorizer.revoke(client.packageName)
+                            refresh++
+                        }
+                    },
+                    onRevokeScope = { s ->
+                        scope.launch {
+                            authorizer.revokeScope(client.packageName, s)
                             refresh++
                         }
                     }
@@ -211,7 +235,9 @@ private fun rememberAppLabel(packageName: String): String {
 private fun ApiClientRow(
     client: ApiClientEntity,
     label: String,
-    onRevoke: () -> Unit
+    sshKeyLabel: String?,
+    onRevoke: () -> Unit,
+    onRevokeScope: (Int) -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -240,6 +266,22 @@ private fun ApiClientRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (client.has(ApiClientEntity.SCOPE_OPENPGP)) {
+                ScopeRow(
+                    text = stringResource(R.string.provider_clients_scope_openpgp),
+                    onRemove = { onRevokeScope(ApiClientEntity.SCOPE_OPENPGP) }
+                )
+            }
+            if (client.has(ApiClientEntity.SCOPE_SSH)) {
+                ScopeRow(
+                    text = if (sshKeyLabel != null) {
+                        stringResource(R.string.provider_clients_scope_ssh, sshKeyLabel)
+                    } else {
+                        stringResource(R.string.provider_clients_scope_ssh_nokey)
+                    },
+                    onRemove = { onRevokeScope(ApiClientEntity.SCOPE_SSH) }
+                )
+            }
         }
         IconButton(onClick = onRevoke) {
             Icon(
@@ -251,6 +293,24 @@ private fun ApiClientRow(
     }
 }
 
+
+/** 4.6.0: one kind of access an app holds, with its own Remove. */
+@Composable
+private fun ScopeRow(text: String, onRemove: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f)
+        )
+        TextButton(onClick = onRemove) {
+            Text(stringResource(R.string.provider_clients_scope_remove))
+        }
+    }
+}
 
 // ── #51: per-address signing-key selector ──────────────────────────────
 // When an address carries more than one of the user's signing keys, this lets

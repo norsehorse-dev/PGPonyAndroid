@@ -2132,4 +2132,13 @@
 5. Termux에서 pkg install okc-agents를 실행한 뒤 eval $(okc-ssh-agent)를 실행하세요. 이제 ssh와 ssh를 통한 git이 내 키를 사용합니다.</string>
     <string name="ssh_help_note">암호문과 보안 키 확인은 OkcAgent 알림으로 옵니다. ssh가 멈춘 것 같으면 알림을 확인하세요. GrapheneOS에서는 OkcAgent의 네트워크 권한도 켜세요. Termux가 로컬 연결로 OkcAgent에 접속하므로 권한이 없으면 ssh가 멈춥니다.</string>
     <string name="key_detail_action_ssh_setup">Termux에서 SSH 설정</string>
+    <!-- 4.6.0: API consent and SSH scope -->
+    <string name="ssh_error_dual_use_auth">이 키의 인증 하위 키는 서명도 할 수 있습니다. 키 세부 정보에서 인증 전용 하위 키를 추가하세요.</string>
+    <string name="provider_consent_ssh_title">%1$s에 SSH를 허용할까요?</string>
+    <string name="provider_consent_ssh_body">%1$s(%2$s)이(가) PGPony 인증 키로 SSH 서버에 로그인하려고 합니다. 메시지를 암호화, 복호화하거나 서명할 수는 없습니다.\n\n다음에 키를 선택하며, 이 앱은 그 키만 사용할 수 있습니다. 설정 → 연결된 앱에서 언제든지 제거할 수 있습니다.</string>
+    <string name="ssh_keypicker_confirm">%1$s이(가) 이 키로 로그인하려고 합니다. 허용하려면 탭하세요.</string>
+    <string name="provider_clients_scope_openpgp">OpenPGP: 암호화, 복호화, 서명</string>
+    <string name="provider_clients_scope_ssh">%1$s로 SSH 로그인</string>
+    <string name="provider_clients_scope_ssh_nokey">SSH 로그인 (아직 키를 선택하지 않음)</string>
+    <string name="provider_clients_scope_remove">제거</string>
 </resources>

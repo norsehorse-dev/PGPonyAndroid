@@ -18,6 +18,7 @@
 
 package com.pgpony.android.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Insert
@@ -41,8 +42,32 @@ data class ApiClientEntity(
     val signatureSha256: String,
 
     /** When the user granted access (epoch ms). Shown in Settings. */
-    val grantedAt: Long
-)
+    val grantedAt: Long,
+
+    /**
+     * 4.6.0: which provider services this app may use, a bitmask of
+     * [SCOPE_OPENPGP] and [SCOPE_SSH]. Each is its own consent: an app
+     * connected for SSH cannot encrypt, decrypt or sign messages, and a mail
+     * client connected for OpenPGP cannot get SSH signatures. Rows from
+     * before 4.6.0 are OpenPGP only (MIGRATION_11_12).
+     */
+    @ColumnInfo(defaultValue = "1")
+    val scopes: Int = SCOPE_OPENPGP,
+
+    /**
+     * 4.6.0: the primary fingerprint (hex) of the key the user picked for this
+     * app's SSH logins. SSH requests for any other key are refused. Cleared
+     * with the SSH scope.
+     */
+    val sshKeyFingerprint: String? = null
+) {
+    fun has(scope: Int): Boolean = scopes and scope == scope
+
+    companion object {
+        const val SCOPE_OPENPGP = 1
+        const val SCOPE_SSH = 2
+    }
+}
 
 // ── DAO ────────────────────────────────────────────────────────────────
 
@@ -64,6 +89,13 @@ interface ApiClientDao {
 
     @Query("DELETE FROM allowed_api_clients WHERE packageName = :packageName")
     suspend fun deleteByPackage(packageName: String)
+
+    /** 4.6.0: set the scope bits and the SSH key binding of an existing row. */
+    @Query(
+        "UPDATE allowed_api_clients SET scopes = :scopes, sshKeyFingerprint = :sshKeyFingerprint " +
+            "WHERE packageName = :packageName"
+    )
+    suspend fun updateAccess(packageName: String, scopes: Int, sshKeyFingerprint: String?)
 
     @Query("SELECT COUNT(*) FROM allowed_api_clients")
     suspend fun count(): Int

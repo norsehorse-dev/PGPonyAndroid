@@ -2157,4 +2157,13 @@
 5. In Termux, run pkg install okc-agents, then eval $(okc-ssh-agent). ssh and git over ssh now use your key.</string>
     <string name="ssh_help_note">Passphrase and security key prompts arrive as OkcAgent notifications. If ssh seems stuck, check the notification shade. On GrapheneOS, also turn on OkcAgent\'s Network permission: Termux reaches it over a local connection, and without it ssh hangs.</string>
     <string name="key_detail_action_ssh_setup">Set Up SSH in Termux</string>
+    <!-- 4.6.0: API consent and SSH scope -->
+    <string name="ssh_error_dual_use_auth">This key\'s authentication subkey can also sign. Add a dedicated Authenticate subkey in Key Detail.</string>
+    <string name="provider_consent_ssh_title">Allow %1$s to use SSH?</string>
+    <string name="provider_consent_ssh_body">%1$s (%2$s) wants to use your PGPony authentication key to log in to SSH servers. It cannot encrypt, decrypt or sign messages.\n\nYou choose the key next, and it can use only that key. You can remove this at any time in Settings → Connected apps.</string>
+    <string name="ssh_keypicker_confirm">%1$s wants to log in with this key. Tap it to allow.</string>
+    <string name="provider_clients_scope_openpgp">OpenPGP: encrypt, decrypt and sign</string>
+    <string name="provider_clients_scope_ssh">SSH login with %1$s</string>
+    <string name="provider_clients_scope_ssh_nokey">SSH login (no key chosen yet)</string>
+    <string name="provider_clients_scope_remove">Remove</string>
 </resources>

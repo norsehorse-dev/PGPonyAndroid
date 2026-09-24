@@ -390,13 +390,16 @@ class BouncyCastleValidationTest {
         assertTrue(String(signed).contains("-----BEGIN PGP MESSAGE-----"))
 
         // Verify
-        val verifyResult = cryptoService.verify(
-            signedData = signed,
+        val verifyResult = cryptoService.decrypt(
+            encryptedData = signed,
+            secretKeyRings = emptyList(),
+            passphrase = null,
             verificationKeys = listOf(imported.publicKeyRing!!)
         )
 
-        assertTrue("Signature should be valid", verifyResult.isValid)
+        assertTrue("Signature should be valid", verifyResult.signatureVerified)
         assertNotNull(verifyResult.signerKeyID)
+        assertEquals(message, verifyResult.plaintext)
     }
 
     @Test
@@ -442,12 +445,14 @@ class BouncyCastleValidationTest {
         )
 
         // Verify with wrong key should return isValid = false
-        val result = cryptoService.verify(
-            signedData = signed,
+        val result = cryptoService.decrypt(
+            encryptedData = signed,
+            secretKeyRings = emptyList(),
+            passphrase = null,
             verificationKeys = listOf(importedOther.publicKeyRing!!)
         )
 
-        assertFalse("Verification should fail with wrong key", result.isValid)
+        assertFalse("Verification should fail with wrong key", result.signatureVerified)
     }
 
     // ────────────────────────────────────────────────────────────────────

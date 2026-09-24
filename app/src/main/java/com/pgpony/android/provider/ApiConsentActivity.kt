@@ -37,6 +37,7 @@ import androidx.lifecycle.lifecycleScope
 import com.pgpony.android.PGPonyApp
 import com.pgpony.android.PGPonyTheme
 import com.pgpony.android.R
+import com.pgpony.android.data.ApiClientEntity
 import kotlinx.coroutines.launch
 
 class ApiConsentActivity : ComponentActivity() {
@@ -48,6 +49,9 @@ class ApiConsentActivity : ComponentActivity() {
          *  SSH API client (OkcAgent) re-executes whatever intent the activity
          *  returns, so a bare RESULT_OK is not enough there. */
         const val EXTRA_API_DATA = "com.pgpony.android.provider.CONSENT_API_DATA"
+
+        /** 4.6.0: the data scheme the SSH service's consent intent carries. */
+        const val SSH_CONSENT_SCHEME = "pgpony-ssh-consent"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,6 +74,13 @@ class ApiConsentActivity : ComponentActivity() {
             clientPackage
         }
 
+        // 4.6.0: OpenPGP and SSH are separate grants. The SSH service's
+        // consent intent is told apart by its data scheme (the activity is
+        // not exported, so only PGPony's own PendingIntents reach it), and
+        // Allow grants that one scope only.
+        val forSsh = intent.data?.scheme == SSH_CONSENT_SCHEME
+        val scope = if (forSsh) ApiClientEntity.SCOPE_SSH else ApiClientEntity.SCOPE_OPENPGP
+
         val authorizer = ApiClientAuthorizer(
             dao = (application as PGPonyApp).database.apiClientDao(),
             signatureSha256Of = ApiClientAuthorizer.platformSignatureLookup(packageManager)
@@ -81,12 +92,15 @@ class ApiConsentActivity : ComponentActivity() {
                 AlertDialog(
                     onDismissRequest = { deny() },
                     title = {
-                        Text(stringResource(R.string.provider_consent_title, clientLabel))
+                        Text(
+                            if (forSsh) stringResource(R.string.provider_consent_ssh_title, clientLabel)
+                            else stringResource(R.string.provider_consent_title, clientLabel)
+                        )
                     },
                     text = {
                         Text(
                             stringResource(
-                                R.string.provider_consent_body,
+                                if (forSsh) R.string.provider_consent_ssh_body else R.string.provider_consent_body,
                                 clientLabel,
                                 clientPackage
                             ),
@@ -99,7 +113,7 @@ class ApiConsentActivity : ComponentActivity() {
                             onClick = {
                                 busy = true
                                 lifecycleScope.launch {
-                                    val ok = authorizer.grant(clientPackage)
+                                    val ok = authorizer.grant(clientPackage, scope)
                                     @Suppress("DEPRECATION")
                                     val apiData: android.content.Intent? = intent.getParcelableExtra(EXTRA_API_DATA)
                                     if (ok && apiData != null) {

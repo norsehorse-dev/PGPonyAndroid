@@ -2056,4 +2056,13 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
 5. Termux で pkg install okc-agents を実行し、続けて eval $(okc-ssh-agent) を実行します。これで ssh と ssh 経由の git があなたの鍵を使います。</string>
     <string name="ssh_help_note">パスフレーズとセキュリティキーの確認は OkcAgent の通知で届きます。ssh が止まったように見えたら通知を確認してください。 GrapheneOS では OkcAgent のネットワーク権限も有効にしてください。Termux はローカル接続で OkcAgent につなぐため、権限がないと ssh が止まります。</string>
     <string name="key_detail_action_ssh_setup">Termux で SSH を設定</string>
+    <!-- 4.6.0: API consent and SSH scope -->
+    <string name="ssh_error_dual_use_auth">この鍵の認証サブキーは署名もできます。鍵の詳細で認証専用のサブキーを追加してください。</string>
+    <string name="provider_consent_ssh_title">%1$s に SSH を許可しますか?</string>
+    <string name="provider_consent_ssh_body">%1$s (%2$s) が PGPony の認証鍵を使って SSH サーバーにログインしようとしています。メッセージの暗号化、復号、署名はできません。\n\n次に鍵を選びます。このアプリが使えるのはその鍵だけです。設定 → 接続済みアプリでいつでも削除できます。</string>
+    <string name="ssh_keypicker_confirm">%1$s がこの鍵でログインしようとしています。許可するにはタップしてください。</string>
+    <string name="provider_clients_scope_openpgp">OpenPGP: 暗号化、復号、署名</string>
+    <string name="provider_clients_scope_ssh">%1$s で SSH ログイン</string>
+    <string name="provider_clients_scope_ssh_nokey">SSH ログイン (鍵は未選択)</string>
+    <string name="provider_clients_scope_remove">削除</string>
 </resources>

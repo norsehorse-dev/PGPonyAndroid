@@ -2060,4 +2060,13 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
 5. En Termux, ejecuta pkg install okc-agents y luego eval $(okc-ssh-agent). ssh y git por ssh ya usan tu clave.</string>
     <string name="ssh_help_note">Las solicitudes de frase de contraseña y de llave de seguridad llegan como notificaciones de OkcAgent. Si ssh parece atascado, revisa las notificaciones. En GrapheneOS, activa también el permiso de Red de OkcAgent: Termux se conecta a él de forma local y, sin ese permiso, ssh se queda atascado.</string>
     <string name="key_detail_action_ssh_setup">Configurar SSH en Termux</string>
+    <!-- 4.6.0: API consent and SSH scope -->
+    <string name="ssh_error_dual_use_auth">La subclave de autenticación de esta clave también puede firmar. Añade una subclave de autenticación propia en el detalle de la clave.</string>
+    <string name="provider_consent_ssh_title">¿Permitir que %1$s use SSH?</string>
+    <string name="provider_consent_ssh_body">%1$s (%2$s) quiere usar tu clave de autenticación de PGPony para iniciar sesión en servidores SSH. No puede cifrar, descifrar ni firmar mensajes.\n\nA continuación eliges la clave, y solo podrá usar esa. Puedes quitarlo cuando quieras en Ajustes → Apps conectadas.</string>
+    <string name="ssh_keypicker_confirm">%1$s quiere iniciar sesión con esta clave. Tócala para permitirlo.</string>
+    <string name="provider_clients_scope_openpgp">OpenPGP: cifrar, descifrar y firmar</string>
+    <string name="provider_clients_scope_ssh">Inicio de sesión SSH con %1$s</string>
+    <string name="provider_clients_scope_ssh_nokey">Inicio de sesión SSH (aún sin clave elegida)</string>
+    <string name="provider_clients_scope_remove">Quitar</string>
 </resources>

@@ -35,7 +35,9 @@
 //
 // Existing 4.5.2-and-earlier installs migrate lazily and losslessly: a read that
 // misses the new store falls back to the old EncryptedSharedPreferences and
-// copies the value forward. The legacy store is never deleted.
+// copies the value forward. Once the new store verifiably holds the value, the
+// legacy copy of it is deleted (readWithMigration), so a later fallback cannot
+// bring back a stale secret.
 //
 // Storage layout (per fingerprint, lowercased) under filesDir/secure_keystore_v2/:
 //   <fp>.dek   DEK envelope (magic PKD2)

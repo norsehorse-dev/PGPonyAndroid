@@ -204,6 +204,53 @@ class SshAuthTest {
         }
     }
 
+    /** A P-256 key whose subkeys carry [subkeyFlags], oldest first. */
+    private fun ringWithSubkeys(vararg subkeyFlags: Int): PGPSecretKeyRing {
+        val oid = ASN1ObjectIdentifier("1.2.840.10045.3.1.7")
+        val start = System.currentTimeMillis() - 60_000L
+        fun pair(at: Long): BcPGPKeyPair {
+            val g = ECKeyPairGenerator()
+            g.init(ECKeyGenerationParameters(ECNamedDomainParameters(oid, ECNamedCurveTable.getByOID(oid)), SecureRandom()))
+            return BcPGPKeyPair(PublicKeyAlgorithmTags.ECDSA, g.generateKeyPair(), Date(at))
+        }
+        val gen = PGPKeyRingGenerator(
+            PGPSignature.POSITIVE_CERTIFICATION, pair(start), "F <f@example.org>",
+            BcPGPDigestCalculatorProvider().get(HashAlgorithmTags.SHA1),
+            PGPSignatureSubpacketGenerator().apply { setKeyFlags(false, 0x01) }.generate(), null,
+            BcPGPContentSignerBuilder(PublicKeyAlgorithmTags.ECDSA, HashAlgorithmTags.SHA256), null
+        )
+        subkeyFlags.forEachIndexed { i, flags ->
+            gen.addSubKey(pair(start + (i + 1) * 1000L), PGPSignatureSubpacketGenerator().apply { setKeyFlags(false, flags) }.generate(), null)
+        }
+        return gen.generateSecretKeyRing()
+    }
+
+    private fun flagsOf(cert: ByteArray): Int? = SshAuth.authSubkey(cert)?.keyFlags
+
+    @Test
+    fun `a dedicated Authenticate subkey is chosen`() {
+        val cert = pubOf(ringWithSubkeys(0x20))
+        assertEquals(0x20, flagsOf(cert))
+        assertTrue(!SshAuth.onlyDualUseAuthSubkeys(cert))
+    }
+
+    @Test
+    fun `an auth subkey that can also sign or certify is refused`() {
+        for (flags in listOf(0x22, 0x21, 0x23)) {
+            val cert = pubOf(ringWithSubkeys(flags))
+            assertNull("flags $flags", SshAuth.authSubkey(cert))
+            assertTrue("flags $flags", SshAuth.onlyDualUseAuthSubkeys(cert))
+        }
+    }
+
+    @Test
+    fun `a dedicated auth subkey wins over a newer dual-use one`() {
+        val cert = pubOf(ringWithSubkeys(0x20, 0x22))
+        assertEquals(0x20, flagsOf(cert))
+        val reversed = pubOf(ringWithSubkeys(0x22, 0x20))
+        assertEquals(0x20, flagsOf(reversed))
+    }
+
     @Test
     fun `a key without an auth subkey has none`() {
         val k = svc.generateKeyPair("N", "n@example.org", KeyAlgorithm.ED25519_CV25519, null, null)

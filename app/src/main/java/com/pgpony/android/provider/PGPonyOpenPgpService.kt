@@ -249,7 +249,7 @@ class PGPonyOpenPgpService : Service() {
             )
 
         // 3) Authorization (signature-pinned, re-checked every call).
-        when (runBlocking { authorizer.authorize(callingPackage) }) {
+        when (runBlocking { authorizer.authorize(callingPackage, com.pgpony.android.data.ApiClientEntity.SCOPE_OPENPGP) }) {
             ApiClientAuthorizer.Decision.AUTHORIZED -> Unit // fall through
 
             ApiClientAuthorizer.Decision.UNKNOWN ->

@@ -67,6 +67,7 @@ object SshAuth {
     const val API_EDDSA = 2
 
     private const val FLAG_AUTHENTICATE = 0x20
+    private const val FLAGS_SIGN_OR_CERTIFY = 0x03
 
     private val ED25519_LEGACY_OID = byteArrayOf(0x2B, 0x06, 0x01, 0x04, 0x01, 0xDA.toByte(), 0x47, 0x0F, 0x01)
 
@@ -96,19 +97,40 @@ object SshAuth {
             }
     }
 
-    /** The authentication subkey to use from [rawCertificate], or null. */
-    fun authSubkey(rawCertificate: ByteArray, nowMs: Long = System.currentTimeMillis()): CertificateBindings.SubkeyState? {
+    /**
+     * The authentication subkey to use from [rawCertificate], or null.
+     *
+     * A subkey that also carries Sign (0x02) or Certify (0x01) is never used:
+     * the SSH API signs bytes the caller chooses, so a dual-use subkey could
+     * be made to produce a signature OpenPGP would accept as a data or
+     * certification signature. Only a dedicated Authenticate subkey signs.
+     */
+    fun authSubkey(rawCertificate: ByteArray, nowMs: Long = System.currentTimeMillis()): CertificateBindings.SubkeyState? =
+        authCandidates(rawCertificate, nowMs)
+            ?.filter { (it.keyFlags ?: 0) and FLAGS_SIGN_OR_CERTIFY == 0 }
+            ?.maxByOrNull { it.createdAtMs }
+
+    /**
+     * True when [rawCertificate] has no usable authentication subkey only
+     * because every Authenticate subkey it has can also sign or certify (a
+     * GnuPG [SA] subkey, say), so the caller can say what to do about it.
+     */
+    fun onlyDualUseAuthSubkeys(rawCertificate: ByteArray, nowMs: Long = System.currentTimeMillis()): Boolean {
+        val candidates = authCandidates(rawCertificate, nowMs) ?: return false
+        return candidates.isNotEmpty() && candidates.all { (it.keyFlags ?: 0) and FLAGS_SIGN_OR_CERTIFY != 0 }
+    }
+
+    /** Bound, live, SSH-capable subkeys with the Authenticate flag. */
+    private fun authCandidates(rawCertificate: ByteArray, nowMs: Long): List<CertificateBindings.SubkeyState>? {
         val report = CertificateBindings.analyze(rawCertificate) ?: return null
         if (!report.supported || report.primaryRevoked) return null
         if (report.primaryExpiresAtMs != null && report.primaryExpiresAtMs <= nowMs) return null
-        return report.subkeys
-            .filter { s ->
-                s.bound && !s.revoked &&
-                    (s.keyFlags ?: 0) and FLAG_AUTHENTICATE != 0 &&
-                    (s.expiresAtMs == null || s.expiresAtMs > nowMs) &&
-                    material(s.publicBody) != null
-            }
-            .maxByOrNull { it.createdAtMs }
+        return report.subkeys.filter { s ->
+            s.bound && !s.revoked &&
+                (s.keyFlags ?: 0) and FLAG_AUTHENTICATE != 0 &&
+                (s.expiresAtMs == null || s.expiresAtMs > nowMs) &&
+                material(s.publicBody) != null
+        }
     }
 
     /** True when [rawCertificate] has a usable authentication subkey. */

@@ -2060,4 +2060,13 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
 5. Dans Termux, lance pkg install okc-agents, puis eval $(okc-ssh-agent). ssh et git via ssh utilisent maintenant ta clé.</string>
     <string name="ssh_help_note">Les demandes de phrase secrète et de clé de sécurité arrivent en notifications d\'OkcAgent. Si ssh semble bloqué, regarde les notifications. Sous GrapheneOS, active aussi l\'autorisation Réseau d\'OkcAgent : Termux le joint par une connexion locale, et sans elle ssh reste bloqué.</string>
     <string name="key_detail_action_ssh_setup">Configurer SSH dans Termux</string>
+    <!-- 4.6.0: API consent and SSH scope -->
+    <string name="ssh_error_dual_use_auth">La sous-clé d\'authentification de cette clé peut aussi signer. Ajoute une sous-clé d\'authentification dédiée dans le détail de la clé.</string>
+    <string name="provider_consent_ssh_title">Autoriser %1$s à utiliser SSH ?</string>
+    <string name="provider_consent_ssh_body">%1$s (%2$s) veut utiliser ta clé d\'authentification PGPony pour se connecter à des serveurs SSH. Il ne peut pas chiffrer, déchiffrer ni signer de messages.\n\nTu choisis la clé ensuite, et il ne pourra utiliser que celle-là. Tu peux retirer cet accès à tout moment dans Paramètres → Applications connectées.</string>
+    <string name="ssh_keypicker_confirm">%1$s veut se connecter avec cette clé. Touche-la pour l\'autoriser.</string>
+    <string name="provider_clients_scope_openpgp">OpenPGP : chiffrer, déchiffrer et signer</string>
+    <string name="provider_clients_scope_ssh">Connexion SSH avec %1$s</string>
+    <string name="provider_clients_scope_ssh_nokey">Connexion SSH (aucune clé choisie)</string>
+    <string name="provider_clients_scope_remove">Retirer</string>
 </resources>
