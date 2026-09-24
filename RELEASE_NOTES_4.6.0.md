@@ -1,7 +1,7 @@
 # PGPony 4.6.0
 
 SSH logins with your PGPony keys, one share dialog that works out what you shared, a round of key-server
-fixes, and security hardening ahead of an external audit.
+fixes, and security hardening from an internal review.
 
 4.6.0 carries versionCode 460 and installs in place over 4.5.3.
 
@@ -66,7 +66,7 @@ Encrypt and sign for plain text. When a PGP block sits inside other text, only t
 
 ## Security hardening
 
-This release includes hardening from an internal security review done ahead of an external audit: stricter
+This release includes hardening from an internal security review: stricter
 checks on keys and key-server answers, tighter limits on untrusted input (message size and nesting, file
 names, archives), and tighter handling of other apps' access.
 

@@ -518,8 +518,8 @@ Status: done in code, awaiting on-device check with the fork's release build.
 
 ## 17. Security review remediation (September 2026)
 
-Priority: high (release-gating). Origin: an internal security review of the Android app ahead of an external
-audit. The detailed findings are kept out of this repository and go to the auditors directly.
+Priority: high (release-gating). Origin: an internal security review of the Android app. The detailed findings are kept out of this
+repository.
 
 The work, in general terms:
 
