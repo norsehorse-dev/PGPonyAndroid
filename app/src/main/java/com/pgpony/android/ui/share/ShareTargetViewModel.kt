@@ -356,6 +356,48 @@ class ShareTargetViewModel(
     // ── Encrypt action ─────────────────────────────────────────────────
 
     /**
+     * 4.6.1 (#67): every selected recipient, loaded the way the Encrypt
+     * screen loads them (composite ML-DSA keys through their ML-KEM subkey,
+     * v4 algo-35 keys on their own channel). See ShareRecipients.
+     */
+    private suspend fun loadShareRecipients(
+        current: ShareTargetUiState
+    ): ShareRecipients.Loaded<org.bouncycastle.openpgp.PGPPublicKeyRing, com.pgpony.android.crypto.pqc.V4Algo35Recipient> =
+        withContext(Dispatchers.IO) {
+            val byFp = current.availableRecipients.associateBy { it.fingerprint.uppercase() }
+            ShareRecipients.load(
+                fingerprints = current.selectedRecipients,
+                isV4Algo35 = { fp ->
+                    byFp[fp.uppercase()]?.algorithm == com.pgpony.android.crypto.KeyAlgorithm.MLKEM768_X25519_V4
+                },
+                ring = { fp -> repository.loadEncryptionRecipientRing(fp) },
+                v4Algo35 = { fp -> repository.loadV4Algo35Recipient(fp) }
+            )
+        }
+
+    /**
+     * 4.6.1 (#67): why encrypting to [recipients] must not go ahead, or null.
+     * A selected recipient that gave no key stops the whole operation, so a
+     * file is never encrypted with someone quietly left out.
+     */
+    private fun recipientError(
+        current: ShareTargetUiState,
+        recipients: ShareRecipients.Loaded<*, *>
+    ): String? {
+        if (!recipients.isComplete) {
+            val byFp = current.availableRecipients.associateBy { it.fingerprint.uppercase() }
+            val names = recipients.unusable.joinToString(", ") { fp ->
+                byFp[fp.uppercase()]?.let { e -> e.userID.ifBlank { e.shortFingerprint } } ?: fp
+            }
+            return PGPonyApp.instance.getString(R.string.share_target_encrypt_recipient_unusable_format, names)
+        }
+        if (recipients.isEmpty) {
+            return PGPonyApp.instance.getString(R.string.share_target_encrypt_recipients_empty)
+        }
+        return null
+    }
+
+    /**
      * 4.0.4 — encrypt a shared file straight from its URI into a scratch
      * file. Binary output (armor = false), matching the buffered file
      * path: the Quick Action's file result is a .gpg the user shares on,
@@ -377,20 +419,9 @@ class ShareTargetViewModel(
         _state.update { it.copy(phase = ShareTargetPhase.Processing, errorMessage = null) }
         viewModelScope.launch {
             try {
-                val recipientRings = withContext(Dispatchers.IO) {
-                    current.selectedRecipients.mapNotNull { fp ->
-                        repository.loadPublicKeyRing(fp)
-                    }
-                }
-                if (recipientRings.isEmpty()) {
-                    _state.update {
-                        it.copy(
-                            phase = ShareTargetPhase.Error,
-                            errorMessage = PGPonyApp.instance.getString(
-                                R.string.share_target_encrypt_recipients_empty
-                            ),
-                        )
-                    }
+                val recipients = loadShareRecipients(current)
+                recipientError(current, recipients)?.let { msg ->
+                    _state.update { it.copy(phase = ShareTargetPhase.Error, errorMessage = msg) }
                     return@launch
                 }
                 // 3.1.0 Phase 1 (C2) — .gpg for binary output.
@@ -404,11 +435,12 @@ class ShareTargetViewModel(
                             PGPCryptoService.shared.encryptStream(
                                 input = source,
                                 output = sink,
-                                recipientPublicKeys = recipientRings,
+                                recipientPublicKeys = recipients.rings,
                                 signingSecretKey = null,
                                 passphrase = null,
                                 filename = sourceFilename,
                                 armor = false,
+                                v4Algo35Recipients = recipients.v4Algo35,
                             )
                         }
                     }
@@ -615,31 +647,21 @@ class ShareTargetViewModel(
 
         viewModelScope.launch {
             try {
-                val recipientRings = withContext(Dispatchers.IO) {
-                    current.selectedRecipients.mapNotNull { fp ->
-                        repository.loadPublicKeyRing(fp)
-                    }
-                }
-                if (recipientRings.isEmpty()) {
-                    _state.update {
-                        it.copy(
-                            phase = ShareTargetPhase.Error,
-                            errorMessage = PGPonyApp.instance.getString(
-                                R.string.share_target_encrypt_recipients_empty
-                            ),
-                        )
-                    }
+                val recipients = loadShareRecipients(current)
+                recipientError(current, recipients)?.let { msg ->
+                    _state.update { it.copy(phase = ShareTargetPhase.Error, errorMessage = msg) }
                     return@launch
                 }
                 val cipher = withContext(Dispatchers.Default) {
                     PGPCryptoService.shared.encrypt(
                         data = plaintextBytes,
-                        recipientPublicKeys = recipientRings,
+                        recipientPublicKeys = recipients.rings,
                         signingSecretKey = null,
                         passphrase = null,
                         filename = literalFilename,
                         // Files → binary .pgp (smaller, standard). Text → armored.
                         armor = !produceFileResult,
+                        v4Algo35Recipients = recipients.v4Algo35,
                     )
                 }
                 if (produceFileResult) {

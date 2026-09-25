@@ -1190,6 +1190,7 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="share_target_input_truncated_format">… %1$d caractères au total</string>
     <string name="share_target_input_binary_format">Contenu binaire — %1$d octets</string>
     <string name="share_target_encrypt_title">Chiffrer pour…</string>
+    <string name="share_target_encrypt_recipient_unusable_format">Rien n\'a été chiffré : PGPony n\'a pas pu charger de clé de chiffrement pour %1$s.</string>
     <string name="share_target_encrypt_recipients_empty">Aucune clé de destinataire dans votre trousseau. Ajoutez d\'abord une clé publique depuis l\'application principale.</string>
     <string name="share_target_encrypt_no_recipients_selected">Sélectionnez au moins un destinataire</string>
     <string name="share_target_encrypt_button">Chiffrer</string>

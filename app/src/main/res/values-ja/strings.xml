@@ -1190,6 +1190,7 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="share_target_input_truncated_format">… 全部で %1$d 文字</string>
     <string name="share_target_input_binary_format">バイナリコンテンツ — %1$d バイト</string>
     <string name="share_target_encrypt_title">宛先を選んで暗号化…</string>
+    <string name="share_target_encrypt_recipient_unusable_format">何も暗号化されていません。PGPony は %1$s の暗号化鍵を読み込めませんでした。</string>
     <string name="share_target_encrypt_recipients_empty">鍵束に受信者の鍵がありません。先にメインアプリで公開鍵を追加してください。</string>
     <string name="share_target_encrypt_no_recipients_selected">受信者を少なくとも 1 人選んでください</string>
     <string name="share_target_encrypt_button">暗号化</string>

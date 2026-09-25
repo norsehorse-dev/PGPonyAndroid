@@ -1507,6 +1507,7 @@
 
     <!-- Encrypt screen -->
     <string name="share_target_encrypt_title">Encrypt for…</string>
+    <string name="share_target_encrypt_recipient_unusable_format">Nothing was encrypted: PGPony could not load an encryption key for %1$s.</string>
     <string name="share_target_encrypt_recipients_empty">No recipient keys in your keyring. Add a public key in the main app first.</string>
     <string name="share_target_encrypt_no_recipients_selected">Select at least one recipient</string>
     <string name="share_target_encrypt_button">Encrypt</string>

@@ -1190,6 +1190,7 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="share_target_input_truncated_format">… %1$d caracteres no total</string>
     <string name="share_target_input_binary_format">Conteúdo binário — %1$d bytes</string>
     <string name="share_target_encrypt_title">Criptografar para…</string>
+    <string name="share_target_encrypt_recipient_unusable_format">Nada foi criptografado: o PGPony não conseguiu carregar uma chave de criptografia para %1$s.</string>
     <string name="share_target_encrypt_recipients_empty">Nenhuma chave de destinatário no seu chaveiro. Adicione primeiro uma chave pública pelo app principal.</string>
     <string name="share_target_encrypt_no_recipients_selected">Selecione pelo menos um destinatário</string>
     <string name="share_target_encrypt_button">Criptografar</string>

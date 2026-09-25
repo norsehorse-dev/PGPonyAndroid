@@ -1409,6 +1409,7 @@
 
     <!-- Encrypt screen -->
     <string name="share_target_encrypt_title">Зашифровать для…</string>
+    <string name="share_target_encrypt_recipient_unusable_format">Ничего не зашифровано: PGPony не смог загрузить ключ шифрования для %1$s.</string>
     <string name="share_target_encrypt_recipients_empty">В связке ключей нет ключей получателей. Сначала добавьте открытый ключ в основном приложении.</string>
     <string name="share_target_encrypt_no_recipients_selected">Выберите хотя бы одного получателя</string>
     <string name="share_target_encrypt_button">Зашифровать</string>

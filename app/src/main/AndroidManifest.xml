@@ -66,6 +66,7 @@
         android:theme="@style/Theme.PGPony"
         android:localeConfig="@xml/locales_config"
         android:networkSecurityConfig="@xml/network_security_config"
+        android:memtagMode="async"
         tools:targetApi="36">
         <activity
             android:name=".MainActivity"

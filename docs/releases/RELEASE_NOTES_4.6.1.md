@@ -1,0 +1,44 @@
+# PGPony 4.6.1
+
+A bug fix for encrypting from the share menu, and memory tagging on phones that support it. 4.6.1 carries versionCode 461 and installs in place over 4.6.0.
+
+## Post-quantum recipients in the share menu (#67)
+
+Encrypting a shared file or text to a composite ML-DSA key, or to a v4 key with an ML-KEM subkey, did not work
+from the share menu. With that key as the only recipient it failed with "No recipient keys in your keyring",
+even though the same key worked from the Encrypt screen. With other recipients selected as well, it was worse:
+the key was left out without a warning and the file was encrypted to everyone else, so that person could not
+open it.
+
+The share menu loaded recipients with a loader that cannot read these keys, while the Encrypt screen uses one
+that reaches their ML-KEM encryption subkey. The share menu now loads recipients the same way, and if any
+selected recipient still cannot be used it stops and names the key instead of encrypting without it.
+
+If you encrypted a file from the share menu to several people, one of them with an ML-DSA key or a v4
+key with an ML-KEM subkey, that person may not be able to open it. Encrypt it again with 4.6.1.
+
+## Memory tagging (#70)
+
+PGPony now asks for Arm Memory Tagging Extension (MTE) in asynchronous mode. Where MTE is available (GrapheneOS
+on supported Pixels, or Pixel 8 and later with MTE turned on in developer options), the system tags the app's
+native memory and stops the app on a
+use-after-free or out-of-bounds access instead of letting it run on corrupted memory. Other phones ignore the
+setting. Origin: Sami32 (#70).
+
+## Verify this build
+
+Whole-file SHA-256 (is this download the published file):
+
+```
+<APK_SHA256>
+```
+
+Content hash (for rebuilders; excludes signature, see docs/REPRODUCIBLE_BUILDS_PLAYBOOK.md):
+
+```
+<CONTENT_HASH>
+```
+
+The APK is signed with the NorseHorse release key
+(A0CBC8F65AACE56F1C5B767753F9798E4919DE62); the detached signature is attached to
+this release.

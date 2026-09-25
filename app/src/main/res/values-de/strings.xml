@@ -1190,6 +1190,7 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="share_target_input_truncated_format">… insgesamt %1$d Zeichen</string>
     <string name="share_target_input_binary_format">Binärer Inhalt — %1$d Bytes</string>
     <string name="share_target_encrypt_title">Verschlüsseln für…</string>
+    <string name="share_target_encrypt_recipient_unusable_format">Es wurde nichts verschlüsselt: PGPony konnte keinen Verschlüsselungsschlüssel für %1$s laden.</string>
     <string name="share_target_encrypt_recipients_empty">Keine Empfängerschlüssel im Schlüsselbund. Füge zuerst einen öffentlichen Schlüssel in der Haupt-App hinzu.</string>
     <string name="share_target_encrypt_no_recipients_selected">Wähle mindestens einen Empfänger</string>
     <string name="share_target_encrypt_button">Verschlüsseln</string>

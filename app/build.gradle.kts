@@ -252,8 +252,8 @@ android {
         // Quick Action, SSH authentication service (#68), key-server merge and
         // the security review remediation. versionCode 460 so it installs over
         // 4.5.3.
-        versionCode = 460
-        versionName = "4.6.0"
+        versionCode = 461
+        versionName = "4.6.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
