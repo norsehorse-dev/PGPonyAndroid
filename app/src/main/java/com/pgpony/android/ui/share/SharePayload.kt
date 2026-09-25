@@ -5,7 +5,9 @@
 // A share can carry a public key, an encrypted message, a signed message
 // (cleartext-signed, or an inline-signed PGP MESSAGE that is not encrypted),
 // ordinary text, or a mix of these with text around the PGP block (an email
-// body with a key pasted in, say). Each kind gets its own action; text around
+// body with a key pasted in, say). 4.6.1 (#67): a private key block is
+// recognized too and offered for import, instead of falling through to the
+// plain-text encrypt and sign options. Each kind gets its own action; text around
 // a PGP block can still be encrypted on its own.
 
 package com.pgpony.android.ui.share
@@ -15,6 +17,8 @@ import com.pgpony.android.crypto.ArmorExtractor
 data class SharePayload(
     /** The PUBLIC KEY BLOCK(s), joined, or null. */
     val publicKey: String?,
+    /** 4.6.1 (#67): the PRIVATE KEY BLOCK(s), joined, or null. */
+    val privateKey: String?,
     /** The first encrypted PGP MESSAGE block, or null. */
     val encrypted: String?,
     /** The first signed-only block (SIGNED MESSAGE, or a PGP MESSAGE that is
@@ -23,7 +27,7 @@ data class SharePayload(
     /** The text outside every PGP block, trimmed, or null when there is none. */
     val otherText: String?
 ) {
-    val hasPgp: Boolean get() = publicKey != null || encrypted != null || signed != null
+    val hasPgp: Boolean get() = publicKey != null || privateKey != null || encrypted != null || signed != null
 
     companion object {
         private val ENCRYPTED_TAGS = setOf(1, 3, 9, 18, 20)
@@ -40,6 +44,7 @@ data class SharePayload(
             for (c in cleartext) remaining = remaining.replace(c, "\n")
             val blocks = ArmorExtractor.blocks(remaining)
             val publicKeys = blocks.filter { it.type == "PUBLIC KEY BLOCK" }.map { it.text }
+            val privateKeys = blocks.filter { it.type == "PRIVATE KEY BLOCK" }.map { it.text }
             var encrypted: String? = null
             var signed: String? = cleartext.firstOrNull()
             for (b in blocks) {
@@ -57,6 +62,7 @@ data class SharePayload(
             val other = rest.trim().takeIf { it.isNotEmpty() }
             return SharePayload(
                 publicKey = publicKeys.takeIf { it.isNotEmpty() }?.joinToString("\n\n"),
+                privateKey = privateKeys.takeIf { it.isNotEmpty() }?.joinToString("\n\n"),
                 encrypted = encrypted,
                 signed = signed,
                 otherText = other

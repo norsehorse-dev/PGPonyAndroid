@@ -505,7 +505,7 @@ private fun ShareRootContent(
     val payload = remember(sharedText) { sharedText?.let { SharePayload.of(it) } }
 
     // Empty keyring: only a public key can be acted on (by importing it).
-    if (noKeyPairs && noRecipients && payload?.publicKey == null) {
+    if (noKeyPairs && noRecipients && payload?.publicKey == null && payload?.privateKey == null) {
         ShareActionCard(
             title = stringResource(R.string.share_target_open_full_app),
             subtitle = stringResource(R.string.share_target_open_full_app_subtitle_setup),
@@ -538,6 +538,17 @@ private fun ShareRootContent(
             title = stringResource(R.string.share_target_action_import_encrypt),
             subtitle = stringResource(R.string.share_target_action_import_encrypt_subtitle),
             icon = Icons.Default.Lock,
+            onClick = { onForwardKeyToMainApp(key) },
+        )
+    }
+    // 4.6.1 (#67): a private key imports through the same preview as a
+    // public one (the main app's import sheet takes both), where the key
+    // pair and its fingerprint are shown before anything is added.
+    payload.privateKey?.let { key ->
+        ShareActionCard(
+            title = stringResource(R.string.share_target_action_import),
+            subtitle = stringResource(R.string.share_target_action_import_subtitle),
+            icon = Icons.Default.Download,
             onClick = { onForwardKeyToMainApp(key) },
         )
     }

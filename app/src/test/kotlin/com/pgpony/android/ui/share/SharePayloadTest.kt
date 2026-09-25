@@ -63,4 +63,14 @@ class SharePayloadTest {
         assertNotNull("inline-signed, not encrypted", p.signed)
         assertNull(p.encrypted)
     }
+
+    @Test
+    fun `a private key block is offered for import, not as text to encrypt`() {
+        val p = SharePayload.of(k.armoredPrivateKey)
+        assertNotNull(p.privateKey)
+        assertTrue(p.privateKey!!.contains("BEGIN PGP PRIVATE KEY BLOCK"))
+        assertNull(p.publicKey)
+        assertTrue(p.hasPgp)
+        assertNull(p.otherText)
+    }
 }

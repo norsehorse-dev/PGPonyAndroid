@@ -1,6 +1,6 @@
 # PGPony 4.6.1
 
-A bug fix for encrypting from the share menu, and memory tagging on phones that support it. 4.6.1 carries versionCode 461 and installs in place over 4.6.0.
+Fixes for encrypting from and importing through the share menu, and memory tagging on phones that support it. 4.6.1 carries versionCode 461 and installs in place over 4.6.0.
 
 ## Post-quantum recipients in the share menu (#67)
 
@@ -16,6 +16,12 @@ selected recipient still cannot be used it stops and names the key instead of en
 
 If you encrypted a file from the share menu to several people, one of them with an ML-DSA key or a v4
 key with an ML-KEM subkey, that person may not be able to open it. Encrypt it again with 4.6.1.
+
+## Importing a private key from the share menu (#67)
+
+Sharing a private key file or text to PGPony only offered to encrypt or sign it as text; only public keys were
+recognized as keys. A private key block now gets Import key, which opens it in the usual import preview, where
+the key pair and its fingerprint are shown before anything is added.
 
 ## Memory tagging (#70)
 
