@@ -204,6 +204,89 @@ Security note: this is new code handling private key bytes and an admin PIN; it 
 review together with the card code it extends.
 
 
+## 14. Simplified Chinese (zh-Hans)
+
+Priority: medium (localization). Origin: a user, by email, Sep 26 2026.
+
+Requested: a Simplified Chinese interface.
+
+Approach: NorseHorse does not read Chinese, so this is mostly machine translation. PGPony iOS already has a
+zh-Hans translation done by a Chinese-speaking tester; reuse those strings wherever the Android string has the
+same meaning (key terms first: encrypt, decrypt, sign, verify, key pair, subkey, fingerprint, keyring, trust
+levels, passphrase), so the vocabulary matches iOS, and machine-translate the rest (about 1,570 strings and 6
+plurals as of 4.6.1). Say plainly in the release notes and the reply that the translation is mostly machine-made,
+and invite corrections.
+
+Work:
+
+- New resource folder values-b+zh+Hans (script qualifier, so it covers zh-CN, zh-SG and any other Simplified
+  locale, not only mainland China). Keep format arguments (%1$s, %1$d), escapes (\', \n) and XML entities
+  intact; run the string-resource lint and a format-argument check against values/.
+- Add zh-Hans to res/xml/locales_config.xml and to the in-app picker (i18n/LanguageManager: "简体中文").
+- Plurals: Chinese uses only the "other" form.
+- Fastlane: fastlane/metadata/android/zh-CN/ (title, short and full description; changelogs can stay English
+  until someone reviews them), and the Play listing translation.
+- Check layouts for text overflow is not the issue it is for German; check instead that CJK fonts render in the
+  QR/Exchange and monospace fingerprint views.
+- Ask the iOS translator, and the user who asked, to review the most-used screens (Encrypt, Decrypt, Keyring,
+  Key Detail, Settings, the share dialog) before the release.
+
+Related: values-ko exists but is not in locales_config, and much of it is still English. Either finish Korean the
+same way or remove the folder, so the picker and the resources agree.
+
+
+## 15. ML-DSA keys cannot sign a package (#72)
+
+Priority: high (bug, user-facing). Origin: #72.
+
+Reported: Package (bundle) mode only signs with classical keys; an ML-DSA key cannot be used to sign a package.
+
+Cause: encryptBundle loads the signer with KeyRepository.loadSecretKeyRing, the BouncyCastle loader, which cannot
+read a composite ML-DSA key and returns null. The 4.1.0 guard then refuses with "the selected signing key could
+not be unlocked", which is also the wrong reason. It is the same gap 4.5.3 closed for single-file signing (#65):
+the file paths learned the composite signer, the bundle path did not.
+
+Work:
+
+- Sign a bundle through the composite signer when the signing key is a composite ML-DSA key, the way
+  sign-while-encrypting a single file does since 4.5.3, for both the streamed and the in-memory bundle paths and
+  the card path where it applies.
+- Apply the 4.6.0 item 14 rule: a composite signature encrypted to a v4-only recipient asks Sign anyway / Send
+  unsigned / Cancel, as on the Encrypt screen.
+- Give the refusal an accurate message when a key truly cannot sign (no signing-capable key, key not on this
+  device), instead of "could not be unlocked".
+- Decrypting a signed bundle verifies the composite signature, as file decrypt does.
+
+Test: unit test that a bundle signed with ML-DSA-65 and with ML-DSA-87 decrypts in PGPony with a verified
+composite signature; the v4-recipient prompt; the error text when the key cannot sign.
+
+
+## 16. Encrypt or sign each file separately when several files are chosen (#72)
+
+Priority: medium (feature). Origin: #72.
+
+Requested: when several files are chosen, Package mode is the only option and it produces one archive. Offer to
+encrypt and/or sign each file on its own, as desktop PGP tools and AgePony do.
+
+Work:
+
+- Package mode gets an output choice: "One package" (today's behavior) or "Each file separately".
+- Each file separately: every file is encrypted to the same recipients as its own .gpg (binary) or .asc
+  (armored), streamed one at a time so memory stays flat, with the same progress and cancel handling as single
+  file mode. Signing options per run: signed inside each file (sign-while-encrypting), a detached .sig next to
+  each file, or sign only (a detached .sig per file with no encryption). Composite ML-DSA signers work in every
+  option (item 15).
+- Output: save all results into a folder the user picks (ACTION_OPEN_DOCUMENT_TREE, names through
+  ScratchFiles.safeChild / LiteralFilename.sanitize), or share them together as multiple attachments. A failure
+  on one file is reported by name and does not leave a half-written file behind; the others still complete.
+- Decrypt and verify side: accept several .gpg / .sig files at once and process each, with a per-file result
+  list, so the round trip works inside PGPony too.
+- iOS mirrors it once Android is verified (8.3.0 track).
+
+Test: encrypt, encrypt and sign, and sign only for 3 files of different sizes including one over the in-memory
+limit; decrypt and verify each in PGPony and with gpg; one unreadable input file fails on its own.
+
+
 ## Release process notes (learned in 4.6.0)
 
 - F-Droid reads the changelog (fastlane/metadata/android/en-US/changelogs/<versionCode>.txt) from the tagged
