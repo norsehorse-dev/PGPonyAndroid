@@ -25,8 +25,15 @@ object SessionPolicy {
     const val DURATION_UNTIL_CLEARED = -1
     const val DURATION_UNTIL_LOCKED = -2
 
+    // 4.6.1 (#15): MODE_MULTI_PROCESS, like the provider's other shared
+    // settings. The OpenPGP provider and its passphrase and PIN caches run in
+    // the :remote_api process, whose MODE_PRIVATE instance caches the file on
+    // first read and never sees a duration changed later in Settings; mail
+    // apps then kept the 5-minute default. This mode re-reads the file on
+    // each getSharedPreferences call, so every read here is current.
+    @Suppress("DEPRECATION")
     private fun prefsOrNull() = runCatching {
-        PGPonyApp.instance.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        PGPonyApp.instance.getSharedPreferences(PREFS, Context.MODE_MULTI_PROCESS)
     }.getOrNull()
 
     fun durationSec(): Int =

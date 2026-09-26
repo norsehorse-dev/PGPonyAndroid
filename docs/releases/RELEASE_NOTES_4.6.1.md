@@ -1,6 +1,6 @@
 # PGPony 4.6.1
 
-Fixes for encrypting from and importing through the share menu, and memory tagging on phones that support it. 4.6.1 carries versionCode 461 and installs in place over 4.6.0.
+Fixes for the share menu and for the passphrase cache in mail apps, and memory tagging on phones that support it. 4.6.1 carries versionCode 461 and installs in place over 4.6.0.
 
 ## Post-quantum recipients in the share menu (#67)
 
@@ -22,6 +22,14 @@ key with an ML-KEM subkey, that person may not be able to open it. Encrypt it ag
 Sharing a private key file or text to PGPony only offered to encrypt or sign it as text; only public keys were
 recognized as keys. A private key block now gets Import key, which opens it in the usual import preview, where
 the key pair and its fingerprint are shown before anything is added.
+
+## Mail apps follow the passphrase cache duration (#15)
+
+Settings lets you keep a passphrase unlocked for 1 minute to 1 hour, until you clear it, or until the phone
+locks. A passphrase entered while decrypting in a mail app stayed for 5 minutes whatever was chosen. The part of
+PGPony that answers mail apps runs in its own background process, and that process read the setting once and
+kept the old value. It now reads the current setting every time, so mail apps, security key PINs and the app
+itself all follow the same duration.
 
 ## Memory tagging (#70)
 
