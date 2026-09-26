@@ -44,13 +44,13 @@ setting. Origin: Sami32 (#70).
 Whole-file SHA-256 (is this download the published file):
 
 ```
-<APK_SHA256>
+681d13767d4ece6a79a5f2da095c2a3a1f5495ea0d8feb91737c6d89693ecbda
 ```
 
 Content hash (for rebuilders; excludes signature, see docs/REPRODUCIBLE_BUILDS_PLAYBOOK.md):
 
 ```
-<CONTENT_HASH>
+75fcea38ca8435f9348c1a1305cb023de3408f3f897fac9c1bb3423b0c5cd716
 ```
 
 The APK is signed with the NorseHorse release key
