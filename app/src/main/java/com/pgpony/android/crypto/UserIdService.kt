@@ -402,7 +402,10 @@ class UserIdService private constructor() {
         }
         val cert = newestCert ?: return false
         val revocation = newestRevocation ?: return false
-        return revocation.creationTime.after(cert.creationTime)
+        // 4.7.0 (item 18): a revocation wins a tie. Signature times have one-second
+        // resolution, so a User ID revoked in the same second it was last certified
+        // (just added, or re-signed by a make-primary) used to read as not revoked.
+        return !revocation.creationTime.before(cert.creationTime)
     }
 
     private fun copyUserIdSubpackets(

@@ -1257,7 +1257,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             ?: return base
         val pickedFp = when {
             signOnly -> row.signOnlySignerFingerprint
-            recipients.isNotEmpty() && recipients.all { it.algorithm.isComposite } ->
+            // 4.7.0 (item 18): isPostQuantum, not isComposite. A composite ML-DSA
+            // recipient receives on its ML-KEM subkey, so it is a post-quantum
+            // recipient too; the provider twin (resolveProviderSigner) already
+            // counts it that way by looking at the recipient ring.
+            recipients.isNotEmpty() && recipients.all { it.algorithm.isPostQuantum } ->
                 row.pqcSignerFingerprint
             else -> row.classicalSignerFingerprint
         } ?: return base

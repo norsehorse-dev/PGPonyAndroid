@@ -56,6 +56,15 @@ import kotlinx.coroutines.withContext
  * bytes. [isPrimary] marks the ID the row displays (the stored
  * entity.userID), falling back to the first when none matches.
  */
+/**
+ * 4.7.0 (item 18): turn the Add Subkey sheet's expiry date (epoch seconds, null =
+ * never) into the lifetime the subkey generators expect (seconds after creation,
+ * which is now). A date already past becomes one second, so the subkey is born
+ * expired rather than never expiring.
+ */
+internal fun addSubkeyLifetimeSeconds(expiresAtEpochSeconds: Long?, nowMs: Long): Long? =
+    expiresAtEpochSeconds?.let { (it - nowMs / 1000L).coerceAtLeast(1L) }
+
 data class KeyUserIdInfo(
     val raw: String,
     val name: String,
@@ -1453,10 +1462,15 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
      */
     fun addSubkey(
         choice: AddSubkeyChoice,
-        expirationSeconds: Long?,
+        expiresAtEpochSeconds: Long?,
         passphrase: String?
     ) {
         val key = _state.value.key ?: return
+        // 4.7.0 (item 18): AddSubkeySheet hands over the chosen expiry DATE, while
+        // every generator writes a key-expiration subpacket, which is seconds after
+        // the subkey's creation. Passing the date straight through set "1 year" to
+        // roughly 58 years.
+        val expirationSeconds = addSubkeyLifetimeSeconds(expiresAtEpochSeconds, System.currentTimeMillis())
         _state.value = _state.value.copy(addSubkeyInFlight = true, addSubkeyError = null)
         viewModelScope.launch {
             try {

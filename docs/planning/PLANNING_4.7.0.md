@@ -305,6 +305,30 @@ Test: SettingsStoresTest (defaults with nothing installed, round trip, the old k
 WKD lookup, publish a key and reopen Key Detail, remove a User ID and refresh, set a fallback key to
 strict; each survives an app restart, and existing values from 4.6.1 are still read after the update.
 
+## 18. Three key-management fixes found by the Desktop 3.0.0 port
+
+Priority: high for the first (it changes what a key says about itself), low for the others. Origin: PGPony
+Desktop 3.0.0 stage 2, which ported this code and tested it on its own.
+
+- **Add Subkey expiry.** AddSubkeySheet hands over the chosen expiry as a date (epoch seconds), and
+  KeyDetailViewModel.addSubkey passed it straight to the generators, which write it as a key-expiration
+  subpacket: seconds after the subkey's creation. "1 year" made a subkey good for about 58 years; any
+  preset or custom date had the same problem. Fixed: addSubkeyLifetimeSeconds turns the date into a
+  lifetime (a date already past becomes one second). Keygen, granular keygen and the SSH subkey at
+  generation already passed a lifetime and are unchanged. Subkeys already added this way keep their long
+  expiry; the user can set it again from Key Detail.
+- **User ID revoked in the same second.** UserIdService.isRevoked needed the revocation strictly newer than
+  the newest certification. Signature times have one-second resolution, so a User ID revoked in the same
+  second it was last certified read as not revoked. A revocation now wins a tie.
+- **Post-quantum signing default.** EncryptDecryptViewModel.resolveEffectiveSigner chose the post-quantum
+  default only when every recipient isComposite (ML-KEM keys), so a composite ML-DSA recipient took the
+  classical default. It now uses isPostQuantum, which matches the provider twin (resolveProviderSigner
+  looks at the recipient ring, and a composite ML-DSA key's recipient ring is its ML-KEM subkey).
+
+Test: AddSubkeyLifetimeTest, UserIdRevokeTieTest. On device: add a subkey with "1 year" and check its
+expiry in Key Detail and in `gpg --list-keys`; add a User ID and revoke it at once; set a post-quantum
+signing default and encrypt to a composite ML-DSA key.
+
 ## Release process notes (learned in 4.6.0)
 
 - F-Droid reads the changelog (fastlane/metadata/android/en-US/changelogs/<versionCode>.txt) from the tagged
