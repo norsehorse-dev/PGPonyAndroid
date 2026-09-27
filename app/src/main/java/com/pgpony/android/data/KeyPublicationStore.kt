@@ -9,19 +9,16 @@
 
 package com.pgpony.android.data
 
-import android.content.Context
-import com.pgpony.android.PGPonyApp
+import com.pgpony.android.data.settings.SettingsStores
 import org.json.JSONObject
 
 object KeyPublicationStore {
 
-    private const val PREFS = "pgpony_prefs"
+    private const val PREFS = SettingsStores.APP_PREFS
 
     private fun key(fingerprint: String) = "published_to_${fingerprint.lowercase()}"
 
-    private fun prefsOrNull() = runCatching {
-        PGPonyApp.instance.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    }.getOrNull()
+    private fun prefsOrNull() = SettingsStores.open(PREFS)
 
     /** Server id to the epoch ms of the last successful upload of [fingerprint]. */
     fun servers(fingerprint: String): Map<String, Long> {
@@ -38,11 +35,11 @@ object KeyPublicationStore {
         val o = JSONObject()
         servers(fingerprint).forEach { (id, t) -> o.put(id, t) }
         o.put(serverId, atMs)
-        p.edit().putString(key(fingerprint), o.toString()).apply()
+        p.putString(key(fingerprint), o.toString())
     }
 
     /** Forget every record for [fingerprint], e.g. when the key is purged. */
     fun clear(fingerprint: String) {
-        prefsOrNull()?.edit()?.remove(key(fingerprint))?.apply()
+        prefsOrNull()?.remove(key(fingerprint))
     }
 }

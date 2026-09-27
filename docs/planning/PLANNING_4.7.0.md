@@ -287,6 +287,24 @@ Test: encrypt, encrypt and sign, and sign only for 3 files of different sizes in
 limit; decrypt and verify each in PGPony and with gpg; one unreadable input file fails on its own.
 
 
+## 17. Settings seam for PGPony Desktop (KeyValueSettings)
+
+Priority: medium (internal, no user-visible change). Origin: PGPony Desktop 3.0.0 planning.
+
+Four small stores reached SharedPreferences through PGPonyApp.instance, which forced Desktop to exclude
+each one and keep a hand-written twin. They now go through data/settings/KeyValueSettings.kt, and
+Android installs platform/SharedPreferencesSettings first thing in PGPonyApp.onCreate, in every process.
+
+- Moved: KeyPublicationStore, RemovedUserIdStore, WkdLookup, FallbackPrefs. Same file (pgpony_prefs),
+  same mode (MODE_PRIVATE), same keys. Public APIs unchanged, so no caller changed.
+- Later, as each is touched: ProxyPrefs, OfflineMode and CardPinCache (these need the multiProcess
+  flag, which maps to MODE_MULTI_PROCESS) and PassStorePrefs.
+- Not covered: KeyRepository, KeyServerDirectory and ArmorCommentSettings (DataStore) and SecureKeyStore.
+
+Test: SettingsStoresTest (defaults with nothing installed, round trip, the old keys). On device: toggle
+WKD lookup, publish a key and reopen Key Detail, remove a User ID and refresh, set a fallback key to
+strict; each survives an app restart, and existing values from 4.6.1 are still read after the update.
+
 ## Release process notes (learned in 4.6.0)
 
 - F-Droid reads the changelog (fastlane/metadata/android/en-US/changelogs/<versionCode>.txt) from the tagged

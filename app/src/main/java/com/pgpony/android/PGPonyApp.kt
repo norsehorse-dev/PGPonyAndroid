@@ -53,6 +53,11 @@ class PGPonyApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // 4.7.0: the settings seam. First, in every process, before anything
+        // reads a store (KeyPublicationStore, RemovedUserIdStore, WkdLookup,
+        // FallbackPrefs).
+        com.pgpony.android.platform.SharedPreferencesSettings.install(this)
+
         // Register Bouncy Castle as the #1 security provider
         Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME)
         Security.insertProviderAt(BouncyCastleProvider(), 1)

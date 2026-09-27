@@ -2,11 +2,12 @@
 // PGPony Android, 4.6.0 (item 17.3)
 //
 // A literal-data filename is attacker-chosen. Decrypt hands callers only a
-// base name, and ScratchFiles.safeChild never yields a file outside its parent.
+// base name. The ScratchFiles.safeChild half lives in
+// ui/util/ScratchFilesSafeChildTest.kt, so this file stays free of Android UI
+// code and runs verbatim in PGPony Desktop's vendored test suite.
 
 package com.pgpony.android.crypto
 
-import com.pgpony.android.ui.util.ScratchFiles
 import org.bouncycastle.bcpg.CompressionAlgorithmTags
 import org.bouncycastle.bcpg.SymmetricKeyAlgorithmTags
 import org.bouncycastle.openpgp.PGPEncryptedDataGenerator
@@ -19,11 +20,9 @@ import org.bouncycastle.openpgp.operator.bc.BcPublicKeyKeyEncryptionMethodGenera
 import org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.nio.file.Files
 import java.security.SecureRandom
 import java.util.Date
 
@@ -66,15 +65,5 @@ class LiteralFilenameTest {
         assertNull(LiteralFilename.sanitize("foo/.."))
         assertNull(LiteralFilename.sanitize(""))
         assertEquals("report.pdf", LiteralFilename.sanitize("report.pdf"))
-    }
-
-    @Test
-    fun `safeChild never escapes its parent`() {
-        val parent = Files.createTempDirectory("exports").toFile()
-        for (n in listOf(hostile, "..", ".", "a/../../b", "..\\..\\c", "", null, "ok.txt")) {
-            val f = ScratchFiles.safeChild(parent, n, "fallback")
-            assertEquals(parent.canonicalFile, f.canonicalFile.parentFile)
-        }
-        assertTrue(ScratchFiles.safeChild(parent, "..", "fallback").name == "fallback")
     }
 }

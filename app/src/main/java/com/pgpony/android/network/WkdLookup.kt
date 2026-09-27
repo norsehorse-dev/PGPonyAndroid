@@ -10,24 +10,21 @@
 
 package com.pgpony.android.network
 
-import android.content.Context
-import com.pgpony.android.PGPonyApp
+import com.pgpony.android.data.settings.SettingsStores
 
 object WkdLookup {
 
-    private const val PREFS = "pgpony_prefs"
+    private const val PREFS = SettingsStores.APP_PREFS
     const val KEY_ENABLED = "wkd_lookup_enabled"
     const val DEFAULT = true
 
-    private fun prefsOrNull() = runCatching {
-        PGPonyApp.instance.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    }.getOrNull()
+    private fun prefsOrNull() = SettingsStores.open(PREFS)
 
     /** Authoritative, process-safe. The lookup path gates here. */
     fun isEnabled(): Boolean =
         prefsOrNull()?.getBoolean(KEY_ENABLED, DEFAULT) ?: DEFAULT
 
     fun set(value: Boolean) {
-        prefsOrNull()?.edit()?.putBoolean(KEY_ENABLED, value)?.apply()
+        prefsOrNull()?.putBoolean(KEY_ENABLED, value)
     }
 }

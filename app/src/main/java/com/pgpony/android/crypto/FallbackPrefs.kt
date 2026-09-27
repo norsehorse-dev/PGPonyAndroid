@@ -4,29 +4,26 @@
 // Per-key strict-mode flag for the decryption-fallback list. RC3 shipped
 // the fallback ORDER in the fallback_keys table but kept every remaining
 // key as a trailing compatibility net, so nothing that decrypted before
-// stopped decrypting. EmanuelLoos read the issue as only-enabled
+// stopped decrypting. The #34 reporter read the issue as only-enabled
 // semantics; this flag gives users that reading per key. Stored in
 // SharedPreferences rather than a schema bump - one boolean per
 // fingerprint, same precedent as keyring_manual_order.
 
 package com.pgpony.android.crypto
 
-import android.content.Context
-import com.pgpony.android.PGPonyApp
+import com.pgpony.android.data.settings.SettingsStores
 
 object FallbackPrefs {
 
-    private const val PREFS = "pgpony_prefs"
+    private const val PREFS = SettingsStores.APP_PREFS
     private const val KEY_PREFIX = "fallback_strict_"
 
-    private fun prefsOrNull() = runCatching {
-        PGPonyApp.instance.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    }.getOrNull()
+    private fun prefsOrNull() = SettingsStores.open(PREFS)
 
     fun isStrict(fingerprint: String): Boolean =
         prefsOrNull()?.getBoolean(KEY_PREFIX + fingerprint, false) ?: false
 
     fun setStrict(fingerprint: String, strict: Boolean) {
-        prefsOrNull()?.edit()?.putBoolean(KEY_PREFIX + fingerprint, strict)?.apply()
+        prefsOrNull()?.putBoolean(KEY_PREFIX + fingerprint, strict)
     }
 }

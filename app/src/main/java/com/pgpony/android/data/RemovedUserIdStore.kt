@@ -11,39 +11,36 @@
 
 package com.pgpony.android.data
 
-import android.content.Context
-import com.pgpony.android.PGPonyApp
+import com.pgpony.android.data.settings.SettingsStores
 
 object RemovedUserIdStore {
 
-    private const val PREFS = "pgpony_prefs"
+    private const val PREFS = SettingsStores.APP_PREFS
 
     private fun key(fingerprint: String) = "removed_uids_${fingerprint.lowercase()}"
 
-    private fun prefsOrNull() = runCatching {
-        PGPonyApp.instance.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    }.getOrNull()
+    private fun prefsOrNull() = SettingsStores.open(PREFS)
 
     /** UIDs the user has removed locally from [fingerprint]. */
     fun removed(fingerprint: String): Set<String> =
-        prefsOrNull()?.getStringSet(key(fingerprint), emptySet())?.toSet() ?: emptySet()
+        prefsOrNull()?.getStringSet(key(fingerprint), emptySet()) ?: emptySet()
 
     /** Record that [userId] was removed locally from [fingerprint]. */
     fun addRemoved(fingerprint: String, userId: String) {
         val p = prefsOrNull() ?: return
-        val cur = p.getStringSet(key(fingerprint), emptySet())?.toMutableSet() ?: mutableSetOf()
-        if (cur.add(userId)) p.edit().putStringSet(key(fingerprint), cur).apply()
+        val cur = p.getStringSet(key(fingerprint), emptySet()).toMutableSet()
+        if (cur.add(userId)) p.putStringSet(key(fingerprint), cur)
     }
 
     /** Drop the tombstone for [userId], e.g. when it is deliberately re-added. */
     fun forget(fingerprint: String, userId: String) {
         val p = prefsOrNull() ?: return
-        val cur = p.getStringSet(key(fingerprint), emptySet())?.toMutableSet() ?: return
-        if (cur.remove(userId)) p.edit().putStringSet(key(fingerprint), cur).apply()
+        val cur = p.getStringSet(key(fingerprint), emptySet()).toMutableSet()
+        if (cur.remove(userId)) p.putStringSet(key(fingerprint), cur)
     }
 
     /** Clear every tombstone for [fingerprint], e.g. when the key is purged. */
     fun clear(fingerprint: String) {
-        prefsOrNull()?.edit()?.remove(key(fingerprint))?.apply()
+        prefsOrNull()?.remove(key(fingerprint))
     }
 }
