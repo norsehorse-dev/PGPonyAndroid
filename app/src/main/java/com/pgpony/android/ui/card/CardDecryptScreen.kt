@@ -47,6 +47,7 @@ import com.pgpony.android.PGPonyApp
 import com.pgpony.android.R
 import com.pgpony.android.crypto.card.CardDecryptService
 import com.pgpony.android.crypto.card.OpenPgpCardException
+import com.pgpony.android.i18n.ErrorText
 
 private sealed class DecState {
     data object Form : DecState()
@@ -105,13 +106,13 @@ fun CardDecryptScreen(onBack: () -> Unit) {
             session.select()
             val ard = session.getApplicationRelatedData()
             val primaryFp = ard.sigFingerprint ?: ard.decFingerprint
-                ?: throw OpenPgpCardException.Malformed("This card has no keys.")
+                ?: throw OpenPgpCardException.Malformed(context.getString(R.string.card_decrypt_no_keys))
             // 3.1.0 Phase 7 Fix1: this fingerprint is card-derived and is a
             // SUBKEY on offline-primary layouts — tolerant loader.
             val pubRing = PGPonyApp.instance.keyRepository
                 .loadPublicKeyRingByCardFingerprint(primaryFp)
                 ?: throw OpenPgpCardException.Malformed(
-                    "Pair this card's public key into your keyring first, then try again."
+                    context.getString(R.string.card_sign_pair_first)
                 )
             CardDecryptService.shared.decrypt(session, pubRing, pinBytes, msg)
         }
@@ -126,14 +127,14 @@ fun CardDecryptScreen(onBack: () -> Unit) {
                     UsbCardOperations.run(manager, device, operation) { result ->
                         result
                             .onSuccess { state.value = DecState.Result(it.data.toString(Charsets.UTF_8)) }
-                            .onFailure { e -> state.value = DecState.Failed(e.message ?: "Decryption failed") }
+                            .onFailure { e -> state.value = DecState.Failed(ErrorText.localize(context, e.message) ?: context.getString(R.string.card_decrypt_failed_generic)) }
                     }
                 }
             }
             CardLinkKind.NFC -> activity?.startCardOperation(operation) { result ->
                 result
                     .onSuccess { state.value = DecState.Result(it.data.toString(Charsets.UTF_8)) }
-                    .onFailure { e -> state.value = DecState.Failed(e.message ?: "Decryption failed") }
+                    .onFailure { e -> state.value = DecState.Failed(ErrorText.localize(context, e.message) ?: context.getString(R.string.card_decrypt_failed_generic)) }
             }
             null -> state.value = DecState.Failed(noReaderMessage)
         }

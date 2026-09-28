@@ -19,6 +19,7 @@ import com.pgpony.android.data.repository.KeyRepository
 import com.pgpony.android.data.PGPKeyEntity
 import com.pgpony.android.data.ArmorCommentDefaults
 import com.pgpony.android.data.ArmorCommentStore
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.notifications.KeyExpirationService
 import com.pgpony.android.ui.keyring.BiometricAvailability
 import com.pgpony.android.ui.keyring.BiometricGate
@@ -501,7 +502,7 @@ class SettingsViewModel(
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     isClearing = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.settings_data_clear_error_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.settings_data_clear_error_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }

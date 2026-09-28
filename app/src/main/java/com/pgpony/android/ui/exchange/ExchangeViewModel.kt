@@ -15,6 +15,7 @@ import com.pgpony.android.data.PGPKeyEntity
 import com.pgpony.android.qr.QrBitmap
 import com.pgpony.android.data.repository.ImportResolution
 import com.pgpony.android.data.repository.KeyRepository
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.network.KeyServerRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -118,7 +119,7 @@ class ExchangeViewModel(
                 }
                 _state.value = _state.value.copy(qrFrames = frames, qrIndex = 0)
             } catch (e: Exception) {
-                _state.value = _state.value.copy(errorMessage = PGPonyApp.instance.getString(R.string.exchange_vm_error_qr_failed_format, e.message ?: ""))
+                _state.value = _state.value.copy(errorMessage = PGPonyApp.instance.getString(R.string.exchange_vm_error_qr_failed_format, ErrorText.detail(e.message) ?: ""))
             }
         }
     }
@@ -158,7 +159,7 @@ class ExchangeViewModel(
                         PGPonyApp.instance.getString(R.string.import_result_already_in_keyring)
                     ImportResolution.MERGED_NEW_MATERIAL ->
                         PGPonyApp.instance.getString(R.string.import_result_merged)
-                    else -> "Key imported from QR code"
+                    else -> PGPonyApp.instance.getString(R.string.exchange_vm_status_qr_imported)
                 }
                 _state.value = _state.value.copy(
                     scannedText = null,
@@ -169,7 +170,7 @@ class ExchangeViewModel(
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     showImportConfirm = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.exchange_vm_error_import_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.exchange_vm_error_import_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -204,7 +205,7 @@ class ExchangeViewModel(
                     _state.value = _state.value.copy(isSearching = false, errorMessage = PGPonyApp.instance.getString(R.string.exchange_vm_error_no_key_found_format, query))
                 }
             } catch (e: Exception) {
-                _state.value = _state.value.copy(isSearching = false, errorMessage = PGPonyApp.instance.getString(R.string.exchange_vm_error_search_failed_format, e.message ?: ""))
+                _state.value = _state.value.copy(isSearching = false, errorMessage = PGPonyApp.instance.getString(R.string.exchange_vm_error_search_failed_format, ErrorText.detail(e.message) ?: ""))
             }
         }
     }
@@ -237,7 +238,7 @@ class ExchangeViewModel(
                 )
                 loadKeys()
             } catch (e: Exception) {
-                _state.value = _state.value.copy(errorMessage = PGPonyApp.instance.getString(R.string.exchange_vm_error_import_failed_format, e.message ?: ""))
+                _state.value = _state.value.copy(errorMessage = PGPonyApp.instance.getString(R.string.exchange_vm_error_import_failed_format, ErrorText.detail(e.message) ?: ""))
             }
         }
     }
@@ -279,7 +280,7 @@ class ExchangeViewModel(
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     isUploading = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.exchange_vm_error_upload_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.exchange_vm_error_upload_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }

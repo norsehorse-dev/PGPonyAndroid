@@ -20,6 +20,7 @@ import com.pgpony.android.data.PgpSubkeyEntity
 import com.pgpony.android.data.repository.ImportPreview
 import com.pgpony.android.data.repository.ImportResolution
 import com.pgpony.android.data.repository.KeyRepository
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.network.KeyLookupSource
 import com.pgpony.android.network.KeyServerRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -442,7 +443,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     isLoading = false,
-                    errorMessage = e.message
+                    errorMessage = ErrorText.localize(e.message)
                 )
             }
         }
@@ -518,7 +519,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                 holdRefreshIndicator(startedAt)
                 _state.value = _state.value.copy(
                     isRefreshing = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_refresh_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_refresh_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -661,7 +662,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                         )
                     } catch (e: Exception) {
                         sshAuthError = PGPonyApp.instance.getString(
-                            R.string.keyring_generate_ssh_auth_failed, e.message ?: ""
+                            R.string.keyring_generate_ssh_auth_failed, ErrorText.localize(e.message) ?: ""
                         )
                     }
                 }
@@ -682,7 +683,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     isGenerating = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_generation_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_generation_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -799,7 +800,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                 is com.pgpony.android.network.UrlKeyFetcher.Result.HttpError ->
                     _state.value = _state.value.copy(errorMessage = app.getString(R.string.import_url_error_http_format, result.status))
                 is com.pgpony.android.network.UrlKeyFetcher.Result.Failed ->
-                    _state.value = _state.value.copy(errorMessage = app.getString(R.string.import_url_error_failed_format, result.message))
+                    _state.value = _state.value.copy(errorMessage = app.getString(R.string.import_url_error_failed_format, ErrorText.localize(result.message) ?: result.message))
             }
         }
     }
@@ -988,7 +989,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     isSearchingKeyServer = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_search_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_search_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -1090,7 +1091,10 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                         PGPonyApp.instance.getString(R.string.import_result_merged)
                     ImportResolution.UPGRADED_TO_KEY_PAIR ->
                         PGPonyApp.instance.getString(R.string.keyring_status_key_upgraded)
-                    else -> if (preview.hasPrivateKey) "Key pair imported" else "Public key imported"
+                    else -> PGPonyApp.instance.getString(
+                        if (preview.hasPrivateKey) R.string.keyring_status_key_pair_imported
+                        else R.string.keyring_status_public_key_imported
+                    )
                 }
                 _state.value = _state.value.copy(
                     isImporting = false,
@@ -1102,7 +1106,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     isImporting = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_import_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_import_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -1137,7 +1141,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                 _state.value = _state.value.copy(
                     isImporting = false,
                     errorMessage = PGPonyApp.instance.getString(
-                        R.string.keyring_error_import_failed_format, e.message ?: ""
+                        R.string.keyring_error_import_failed_format, ErrorText.detail(e.message) ?: ""
                     )
                 )
             }
@@ -1175,7 +1179,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     isImporting = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_import_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_import_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -1244,7 +1248,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     keyToDelete = null,
-                    errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_delete_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_delete_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }

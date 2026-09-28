@@ -101,7 +101,7 @@ fun ExchangeScreen(viewModel: ExchangeViewModel) {
             title = { Text(stringResource(R.string.exchange_import_dialog_title)) },
             text = { Text(stringResource(R.string.exchange_import_dialog_body)) },
             confirmButton = {
-                TextButton(onClick = { viewModel.importScannedKey() }) { Text("Import") }
+                TextButton(onClick = { viewModel.importScannedKey() }) { Text(stringResource(R.string.signer_lookup_import_button)) }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissImportConfirm() }) { Text(stringResource(R.string.common_button_cancel)) }
@@ -138,7 +138,7 @@ private fun ShowKeySection(
         Spacer(modifier = Modifier.height(8.dp))
         if (state.myKeyPairs.isEmpty()) {
             Spacer(modifier = Modifier.height(48.dp))
-            Text("No key pairs", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.exchange_no_key_pairs_title), style = MaterialTheme.typography.titleMedium)
             Text(
                 stringResource(R.string.exchange_no_keys),
                 style = MaterialTheme.typography.bodyMedium,
@@ -147,7 +147,7 @@ private fun ShowKeySection(
         } else {
             // Key selector
             if (state.myKeyPairs.size > 1) {
-                Text("Select Key", style = MaterialTheme.typography.labelMedium,
+                Text(stringResource(R.string.exchange_select_key_label), style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.fillMaxWidth())
                 Spacer(modifier = Modifier.height(4.dp))
                 state.myKeyPairs.forEach { key ->
@@ -287,9 +287,9 @@ private fun ScanKeySection(state: ExchangeUiState, viewModel: ExchangeViewModel)
                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Text("Scan QR Code", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.qr_scanner_title), style = MaterialTheme.typography.titleMedium)
             Text(
-                "Scan a PGP public key QR code to import it",
+                stringResource(R.string.exchange_scan_hint),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -312,7 +312,7 @@ private fun KeyServerSection(state: ExchangeUiState, viewModel: ExchangeViewMode
             .padding(horizontal = 16.dp)
     ) {
         Spacer(modifier = Modifier.height(8.dp))
-        Text("Search key servers (WKD → keys.pgpony.app → keys.openpgp.org)", style = MaterialTheme.typography.labelLarge)
+        Text(stringResource(R.string.exchange_keyserver_search_order), style = MaterialTheme.typography.labelLarge)
         Spacer(modifier = Modifier.height(4.dp))
         OutlinedTextField(
             value = state.searchQuery,
@@ -357,7 +357,7 @@ private fun KeyServerSection(state: ExchangeUiState, viewModel: ExchangeViewMode
                 )
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text("Key Found", style = MaterialTheme.typography.titleSmall,
+                    Text(stringResource(R.string.signer_lookup_found_title), style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.primary)
                     // 4.6.0 (item 20): more than one key answered for this address.
                     val found = remember(armored) {

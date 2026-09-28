@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -115,9 +116,7 @@ fun EncryptionResultScreen(state: EncryptUiState, onDismiss: () -> Unit) {
                     val count = state.selectedRecipients.size
                     StatusBadge(
                         icon = Icons.Filled.Person,
-                        // iOS uses localized plurals here; we mimic the
-                        // English version pending the localization phase.
-                        label = if (count == 1) "1 recipient" else "$count recipients",
+                        label = pluralStringResource(R.plurals.pass_store_recipients, count, count),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }

@@ -42,7 +42,7 @@ import com.pgpony.android.R
 import com.pgpony.android.crypto.card.CardInfo
 import com.pgpony.android.crypto.card.CardSlot
 import com.pgpony.android.crypto.card.CardSlotInfo
-import java.text.SimpleDateFormat
+import com.pgpony.android.i18n.ErrorText
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
@@ -100,7 +100,7 @@ fun CardScanScreen(
         activity?.startCardScan { result ->
             result
                 .onSuccess { info -> scanState.value = ScanState.Found(info) }
-                .onFailure { e -> scanState.value = ScanState.Failed(e.message ?: "Could not read card") }
+                .onFailure { e -> scanState.value = ScanState.Failed(ErrorText.localize(context, e.message) ?: context.getString(R.string.card_scan_read_failed)) }
             // Re-arm for the next physical tap so the user can read again
             // in place (lift and tap) without leaving the screen. Reader
             // mode stays engaged; this only resets the one-shot flag.
@@ -120,7 +120,7 @@ fun CardScanScreen(
             result
                 .onSuccess { info -> scanState.value = ScanState.Found(info) }
                 .onFailure { e ->
-                    scanState.value = ScanState.Failed(e.message ?: "Could not read card")
+                    scanState.value = ScanState.Failed(ErrorText.localize(context, e.message) ?: context.getString(R.string.card_scan_read_failed))
                 }
         }
     }
@@ -213,7 +213,7 @@ fun CardScanScreen(
                                             snackbarHostState.showSnackbar(importedMsg)
                                         } catch (e: Exception) {
                                             scanState.value =
-                                                ScanState.Failed(e.message ?: "Import failed")
+                                                ScanState.Failed(ErrorText.localize(context, e.message) ?: context.getString(R.string.card_scan_import_failed))
                                         } finally {
                                             importing = false
                                         }
@@ -499,7 +499,7 @@ private fun SlotRow(slot: CardSlotInfo) {
 }
 
 private fun formatCardDate(epochMillis: Long): String =
-    SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(epochMillis))
+    java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM, Locale.getDefault()).format(Date(epochMillis))
 
 private fun formatFingerprint(fp: String): String =
     fp.uppercase().chunked(4).joinToString(" ")

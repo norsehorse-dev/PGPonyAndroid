@@ -35,6 +35,7 @@ import com.pgpony.android.crypto.card.CardLinkAvailability
 import com.pgpony.android.crypto.card.CardLinkKind
 import com.pgpony.android.MainActivity
 import com.pgpony.android.R
+import com.pgpony.android.i18n.ErrorText
 
 private sealed class PinState {
     data object Form : PinState()
@@ -81,7 +82,7 @@ fun CardPinChangeScreen(onBack: () -> Unit, onDone: () -> Unit = {}) {
         activity.startCardOperation({ session -> session.changeUserPin(cur, nw) }) { result ->
             result
                 .onSuccess { state.value = PinState.Done }
-                .onFailure { e -> state.value = PinState.Failed(e.message ?: "PIN change failed") }
+                .onFailure { e -> state.value = PinState.Failed(ErrorText.localize(context, e.message) ?: context.getString(R.string.card_pin_change_failed_generic)) }
         }
     }
 

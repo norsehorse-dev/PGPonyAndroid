@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import com.pgpony.android.R
 import com.pgpony.android.crypto.KeyAlgorithm
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.ui.keyring.KeygenAlgorithmPicker
 import com.pgpony.android.ui.keyring.KeyringViewModel
 
@@ -70,7 +71,7 @@ fun OnboardingGenerateSheet(
         if (mode == GenerateMode.Loading && !vmState.isGenerating) {
             val errMsg = vmState.errorMessage
             mode = if (errMsg != null) {
-                GenerateMode.Error(errMsg)
+                GenerateMode.Error(ErrorText.localize(errMsg) ?: errMsg)
             } else {
                 GenerateMode.Success
             }

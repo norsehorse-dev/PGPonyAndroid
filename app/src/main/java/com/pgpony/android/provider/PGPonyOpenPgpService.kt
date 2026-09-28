@@ -52,6 +52,7 @@ import com.pgpony.android.crypto.VerifyService
 import com.pgpony.android.autocrypt.AutocryptPeerStore
 import com.pgpony.android.autocrypt.AutocryptRecommendation
 import com.pgpony.android.data.repository.KeyRepository
+import com.pgpony.android.i18n.ErrorText
 import kotlinx.coroutines.runBlocking
 import org.openintents.openpgp.AutocryptPeerUpdate
 import org.openintents.openpgp.IOpenPgpService2
@@ -2156,8 +2157,10 @@ class PGPonyOpenPgpService : Service() {
         putExtra(OpenPgpApi.RESULT_CODE, OpenPgpApi.RESULT_CODE_SUCCESS)
     }
 
+    // 4.6.2: the one place the text for the calling app is built, so every
+    // error (including e.message passthroughs) reaches it in the user's language.
     private fun errorResult(errorId: Int, message: String): Intent = Intent().apply {
         putExtra(OpenPgpApi.RESULT_CODE, OpenPgpApi.RESULT_CODE_ERROR)
-        putExtra(OpenPgpApi.RESULT_ERROR, OpenPgpError(errorId, message))
+        putExtra(OpenPgpApi.RESULT_ERROR, OpenPgpError(errorId, ErrorText.localize(message) ?: message))
     }
 }

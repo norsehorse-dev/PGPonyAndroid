@@ -42,6 +42,7 @@ import com.pgpony.android.crypto.pass.PassEntryParser
 import com.pgpony.android.crypto.pass.PassRoute
 import com.pgpony.android.crypto.pass.PassStorePrefs
 import com.pgpony.android.crypto.pass.PassStoreService
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.ui.keyring.BiometricAvailability
 import com.pgpony.android.ui.keyring.BiometricGate
 import com.pgpony.android.ui.util.ClipboardService
@@ -99,6 +100,8 @@ fun PassEntryScreen(
     val noKey = stringResource(R.string.pass_entry_no_key)
     val nfcUnavailable = stringResource(R.string.pass_entry_card_nfc_off)
     val cardFailed = stringResource(R.string.pass_entry_card_failed)
+    val cardNoKeys = stringResource(R.string.card_decrypt_no_keys)
+    val cardPairFirst = stringResource(R.string.pass_entry_card_pair_first)
     val copiedMsg = stringResource(R.string.pass_copied)
 
     suspend fun attemptSoftware(withPassphrase: String?) {
@@ -134,14 +137,14 @@ fun PassEntryScreen(
             session.select()
             val ard = session.getApplicationRelatedData()
             val primaryFp = ard.sigFingerprint ?: ard.decFingerprint
-                ?: throw OpenPgpCardException.Malformed("This card has no keys.")
+                ?: throw OpenPgpCardException.Malformed(cardNoKeys)
             val pubRing = repo.loadPublicKeyRing(primaryFp)
-                ?: throw OpenPgpCardException.Malformed("Pair this card's public key into your keyring first.")
+                ?: throw OpenPgpCardException.Malformed(cardPairFirst)
             CardDecryptService.shared.decryptBytes(session, pubRing, pin.toByteArray(Charsets.UTF_8), b)
         }) { result ->
             result
                 .onSuccess { state = EntryState.Shown(PassEntryParser.parse(it.data.toString(Charsets.UTF_8))) }
-                .onFailure { e -> state = EntryState.Failed(e.message ?: cardFailed) }
+                .onFailure { e -> state = EntryState.Failed(ErrorText.localize(context, e.message) ?: cardFailed) }
         } ?: false
         if (started != true) state = EntryState.Failed(cardFailed)
     }

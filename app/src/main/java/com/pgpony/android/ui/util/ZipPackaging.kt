@@ -10,9 +10,11 @@
 
 package com.pgpony.android.ui.util
 
+import com.pgpony.android.R
 import com.pgpony.android.crypto.LiteralFilename
 import com.pgpony.android.crypto.PGPCryptoError
 import com.pgpony.android.crypto.SecurityLimits
+import com.pgpony.android.i18n.ErrorText
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.zip.ZipEntry
@@ -71,7 +73,16 @@ object ZipPackaging {
             val n = input.read(buf)
             if (n < 0) return total
             total += n
-            if (total > max) throw PGPCryptoError.ResourceLimitExceeded("zip entry larger than $max bytes")
+            // 4.6.2: shown to the user inside "Decryption failed". The English
+            // fallback covers JVM unit tests, where no Application exists.
+            if (total > max) throw PGPCryptoError.ResourceLimitExceeded(
+                ErrorText.appContext()?.let {
+                    it.getString(
+                        R.string.util_zip_error_entry_too_large,
+                        android.text.format.Formatter.formatShortFileSize(it, max)
+                    )
+                } ?: "zip entry larger than $max bytes"
+            )
             out.write(buf, 0, n)
         }
     }
@@ -80,7 +91,11 @@ object ZipPackaging {
     class EntryBudget(private val max: Int = SecurityLimits.MAX_ZIP_ENTRIES) {
         private var seen = 0
         fun next() {
-            if (++seen > max) throw PGPCryptoError.ResourceLimitExceeded("zip has more than $max entries")
+            if (++seen > max) throw PGPCryptoError.ResourceLimitExceeded(
+                ErrorText.appContext()?.resources
+                    ?.getQuantityString(R.plurals.util_zip_error_too_many_entries, max, max)
+                    ?: "zip has more than $max entries"
+            )
         }
     }
 

@@ -1,0 +1,30 @@
+PGPony, Android için bir OpenPGP uygulamasıdır. Mesajları ve dosyaları şifreleyin, şifrelerini çözün, imzalayın ve doğrulayın, anahtarlığınızı yönetin ve NFC üzerinden donanım güvenlik anahtarı kullanın. Hepsi cihazın üzerinde gerçekleşir.
+
+Özellikler:
+
+- Metin ve dosyaları şifreleme, şifre çözme, imzalama ve doğrulama
+- Kuantum sonrası şifreleme: ML-KEM-768 + X25519 (Kyber) bileşik anahtarlar, hem IETF taslağı (v6) hem de LibrePGP / GnuPG 2.5 (v5) biçiminde
+- OpenPGP sağlayıcı hizmeti: PGPony'yi Thunderbird for Android, K-9 Mail ve Password Store için şifreleme motoru olarak kullanın (OpenKeychain uyumlu API)
+- RFC 9580 (OpenPGP v6) Ed25519 ve X25519 dahil modern anahtarlar oluşturma, Argon2id ile parola ifadesi koruması
+- NFC üzerinden donanım güvenlik anahtarları (YubiKey 5 NFC ve Token2 dahil): kart üzerinde anahtar oluşturma, şifre çözme, imzalama, PIN yönetimi ve fabrika ayarlarına sıfırlama
+- Donanım anahtarıyla korunanlar dahil pass parola deposu kayıtlarını okuma
+- Şifreli anahtarlık yedekleme ve geri yükleme, OpenKeychain yedeklerini içe aktarma
+- PGP/MIME e-posta: ekli mesajların şifresini çözme, şifreli .eml oluşturma
+- WKD ve doğrulamalı anahtar sunucusu keys.openpgp.org üzerinden anahtar bulma; isteğe bağlı olarak Orbot ile Tor yönlendirmesi
+- Alıcı seçimi için isteğe bağlı kişi entegrasyonu
+- Anahtarlar için QR ile içe aktarma ve tarama
+- Varsayılan imzalama anahtarı, biyometrik kilit ve güvenli ekran koruması
+
+Kuantum sonrası sınırlamalar:
+
+Kuantum sonrası OpenPGP hâlâ standartlaştırılma aşamasında olduğundan araçlar arası destek sınırlıdır:
+
+- LibrePGP biçimindeki (v5) anahtarlar bugün GnuPG 2.5+ ile birlikte çalışır: mesajlar iki yönde de şifrelenir ve çözülür, açık anahtarlar sorunsuz içe aktarılır. GnuPG henüz hiçbir uygulamadan kuantum sonrası GİZLİ anahtarları içe aktaramaz, çünkü bunları kendine özgü bir iç biçimde saklar.
+- IETF biçimindeki (v6) anahtarlar draft-ietf-openpgp-pqc taslağını uygular ve taslağın resmî test vektörleriyle doğrulanmıştır. Ancak güncel Sequoia (sq) ön sürümleri taslağın farklı bir revizyonunu uyguladığı için bunları henüz okuyamaz; GnuPG ise bu biçimi hiç desteklemez.
+- Klasik anahtarlar (RSA, Ed25519, v4 ve v6) bundan etkilenmez.
+
+PGPony hesap, reklam, analiz veya izleme kullanmaz. F-Droid sürümü hiçbir Google hizmeti içermez ve Google'sız cihazlarda eksiksiz çalışır.
+
+Şifreleme çekirdeği ayrı olarak açık kaynak yayımlanmıştır (PGPonyCore-Kotlin) ve uygulamanın tüm kaynak kodu Apache-2.0 lisansıyla sunulur.
+
+Bu sayfanın ve uygulamanın Türkçe çevirisi büyük ölçüde makine çevirisidir. Düzeltmelerinizi memnuniyetle karşılarım.

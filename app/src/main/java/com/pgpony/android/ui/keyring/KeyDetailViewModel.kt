@@ -38,6 +38,7 @@ import com.pgpony.android.data.RevocationReason
 import com.pgpony.android.data.TrustLevel
 import com.pgpony.android.data.repository.KeyRepository
 import com.pgpony.android.data.repository.KeyRepoError
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.network.KeyServerRepository
 import org.bouncycastle.openpgp.PGPPublicKey
 import kotlinx.coroutines.Dispatchers
@@ -446,7 +447,7 @@ class KeyDetailViewModel(
             } else {
                 _state.value = _state.value.copy(
                     isRecovering = false,
-                    recoveryError = "That passphrase didn't unlock the stored key. Try again."
+                    recoveryError = PGPonyApp.instance.getString(R.string.key_detail_recovery_wrong_passphrase)
                 )
             }
         }
@@ -577,7 +578,7 @@ class KeyDetailViewModel(
                 withContext(Dispatchers.Default) { QrBitmap.encodeFrames(armored) }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
-                    errorMessage = PGPonyApp.instance.getString(R.string.kd_vm_error_qr_failed_format, e.message ?: ""),
+                    errorMessage = PGPonyApp.instance.getString(R.string.kd_vm_error_qr_failed_format, ErrorText.detail(e.message) ?: ""),
                     showQRSheet = false
                 )
                 return@launch
@@ -859,7 +860,7 @@ class KeyDetailViewModel(
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     isUploadingToKeyServer = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.kd_vm_error_upload_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.kd_vm_error_upload_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -895,7 +896,7 @@ class KeyDetailViewModel(
                     key = reloaded ?: key,
                     isCheckingKeyServer = false,
                     errorMessage = PGPonyApp.instance.getString(
-                        R.string.kd_vm_check_failed_format, e.message ?: ""
+                        R.string.kd_vm_check_failed_format, ErrorText.detail(e.message) ?: ""
                     )
                 )
             }
@@ -1032,7 +1033,7 @@ class KeyDetailViewModel(
         25 -> "X25519"
         27 -> "Ed25519"
         1, 2, 3 -> "RSA"
-        else -> "Subkey (v6)"
+        else -> PGPonyApp.instance.getString(R.string.sign_as_subkey_subkey_label, "v6")
     }
 
     private suspend fun deriveSubkeys(entity: PGPKeyEntity): List<SubkeyDisplayInfo> {
@@ -1154,7 +1155,7 @@ class KeyDetailViewModel(
                     userIds = deriveUserIds(result.entity),
                     isRefreshingFromKeyServer = false,
                     errorMessage = app.getString(
-                        R.string.kd_vm_refresh_failed_format, result.detail
+                        R.string.kd_vm_refresh_failed_format, ErrorText.detail(result.detail) ?: result.detail
                     )
                 )
                 KeyRefreshResult.KeyMissing -> _state.value = _state.value.copy(
@@ -1252,7 +1253,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     showDeleteConfirm = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.kd_vm_error_delete_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.kd_vm_error_delete_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -1334,7 +1335,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
             } catch (e: RevocationError) {
                 _state.value = _state.value.copy(
                     isRevoking = false,
-                    revokeError = e.message ?: PGPonyApp.instance.getString(R.string.kd_vm_error_revocation_failed_default)
+                    revokeError = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.kd_vm_error_revocation_failed_default)
                 )
             } catch (e: Exception) {
                 // Anything non-RevocationError (DB write fail, store write
@@ -1343,7 +1344,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                 // sheet. The sheet stays open for retry.
                 _state.value = _state.value.copy(
                     isRevoking = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.kd_vm_error_revocation_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.kd_vm_error_revocation_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -1389,12 +1390,12 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
             } catch (e: KeyExpirationService.ExpirationError) {
                 _state.value = _state.value.copy(
                     expiryInFlight = false,
-                    expiryError = e.message ?: PGPonyApp.instance.getString(R.string.key_detail_expiry_failed)
+                    expiryError = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.key_detail_expiry_failed)
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     expiryInFlight = false,
-                    expiryError = e.message ?: PGPonyApp.instance.getString(R.string.key_detail_expiry_failed)
+                    expiryError = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.key_detail_expiry_failed)
                 )
             }
         }
@@ -1407,7 +1408,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
     }
 
     fun onCardExpiryFailure(message: String) {
-        _state.value = _state.value.copy(expiryInFlight = false, expiryError = message)
+        _state.value = _state.value.copy(expiryInFlight = false, expiryError = ErrorText.localize(message) ?: message)
     }
 
     /** Persist the card-updated public ring and refresh. */
@@ -1428,7 +1429,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     expiryInFlight = false,
-                    expiryError = e.message ?: PGPonyApp.instance.getString(R.string.key_detail_expiry_failed)
+                    expiryError = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.key_detail_expiry_failed)
                 )
             }
         }
@@ -1479,12 +1480,12 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
             } catch (e: ClassicalSubkeyGen.SubkeyAddError) {
                 _state.value = _state.value.copy(
                     addSubkeyInFlight = false,
-                    addSubkeyError = e.message ?: PGPonyApp.instance.getString(R.string.key_detail_add_subkey_failed)
+                    addSubkeyError = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.key_detail_add_subkey_failed)
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     addSubkeyInFlight = false,
-                    addSubkeyError = e.message ?: PGPonyApp.instance.getString(R.string.key_detail_add_subkey_failed)
+                    addSubkeyError = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.key_detail_add_subkey_failed)
                 )
             }
         }
@@ -1541,7 +1542,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     subkeyRevokeInFlight = false,
-                    subkeyRevokeError = e.message
+                    subkeyRevokeError = ErrorText.localize(e.message)
                         ?: PGPonyApp.instance.getString(R.string.key_detail_subkey_action_failed)
                 )
             }
@@ -1597,7 +1598,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                 _state.value = _state.value.copy(
                     subkeyRemoveInFlight = false,
                     subkeyRemoveTarget = null,
-                    errorMessage = e.message
+                    errorMessage = ErrorText.localize(e.message)
                         ?: PGPonyApp.instance.getString(R.string.key_detail_subkey_action_failed)
                 )
             }
@@ -1683,7 +1684,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     changePassphraseInFlight = false,
-                    changePassphraseError = e.message
+                    changePassphraseError = ErrorText.localize(e.message)
                         ?: PGPonyApp.instance.getString(R.string.change_passphrase_failed)
                 )
             }
@@ -1720,7 +1721,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                     is UserIdService.UserIdError.InvalidPassphrase,
                     is UserIdService.UserIdError.PassphraseRequired ->
                         PGPonyApp.instance.getString(R.string.encdec_error_incorrect_passphrase_retry)
-                    else -> e.message ?: PGPonyApp.instance.getString(R.string.key_detail_notations_failed)
+                    else -> ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.key_detail_notations_failed)
                 }
                 _state.value = _state.value.copy(notationsInFlight = false, notationsError = msg)
             } catch (e: org.bouncycastle.openpgp.PGPException) {
@@ -1731,7 +1732,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     notationsInFlight = false,
-                    notationsError = e.message ?: PGPonyApp.instance.getString(R.string.key_detail_notations_failed)
+                    notationsError = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.key_detail_notations_failed)
                 )
             }
         }
@@ -1753,12 +1754,12 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
             } catch (e: UserIdService.UserIdError) {
                 _state.value = _state.value.copy(
                     addUserIdInFlight = false,
-                    addUserIdError = e.message ?: PGPonyApp.instance.getString(R.string.key_detail_add_userid_failed)
+                    addUserIdError = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.key_detail_add_userid_failed)
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     addUserIdInFlight = false,
-                    addUserIdError = e.message ?: PGPonyApp.instance.getString(R.string.key_detail_add_userid_failed)
+                    addUserIdError = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.key_detail_add_userid_failed)
                 )
             }
         }
@@ -1806,12 +1807,12 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
             } catch (e: UserIdService.UserIdError) {
                 _state.value = _state.value.copy(
                     userIdActionInFlight = false,
-                    userIdActionError = e.message ?: PGPonyApp.instance.getString(R.string.key_detail_userid_action_failed)
+                    userIdActionError = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.key_detail_userid_action_failed)
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     userIdActionInFlight = false,
-                    userIdActionError = e.message ?: PGPonyApp.instance.getString(R.string.key_detail_userid_action_failed)
+                    userIdActionError = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.key_detail_userid_action_failed)
                 )
             }
         }

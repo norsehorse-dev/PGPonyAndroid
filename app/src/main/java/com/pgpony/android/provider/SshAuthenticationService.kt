@@ -55,6 +55,7 @@ import com.pgpony.android.crypto.ssh.SshSigningKey
 import com.pgpony.android.data.ApiClientEntity
 import com.pgpony.android.data.PGPKeyEntity
 import com.pgpony.android.data.repository.KeyRepository
+import com.pgpony.android.i18n.ErrorText
 import kotlinx.coroutines.runBlocking
 import org.openintents.ssh.authentication.ISshAuthenticationService
 import org.openintents.ssh.authentication.SshAuthenticationApiError
@@ -383,8 +384,10 @@ class SshAuthenticationService : Service() {
         putExtra(EXTRA_RESULT_CODE, RESULT_CODE_SUCCESS)
     }
 
+    // 4.6.2: the one place the text for the SSH client is built, so every
+    // error (including e.message passthroughs) reaches it in the user's language.
     private fun error(code: Int, message: String): Intent = Intent().apply {
         putExtra(EXTRA_RESULT_CODE, RESULT_CODE_ERROR)
-        putExtra(EXTRA_ERROR, SshAuthenticationApiError(code, message))
+        putExtra(EXTRA_ERROR, SshAuthenticationApiError(code, ErrorText.localize(message) ?: message))
     }
 }

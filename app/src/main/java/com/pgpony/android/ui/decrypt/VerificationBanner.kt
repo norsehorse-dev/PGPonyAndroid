@@ -45,12 +45,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
 import com.pgpony.android.crypto.VerificationResult
 import com.pgpony.android.data.TrustLevel
+import com.pgpony.android.i18n.ErrorText
 
 /**
  * Render a 4-state verification banner. `onTapUnknownSigner` is called
@@ -101,7 +103,8 @@ fun VerificationBanner(
                 iconTint = RedTint,
                 bg = RedBg,
                 title = stringResource(R.string.verify_banner_invalid_title),
-                subtitle = result.reason
+                // 4.6.2: the reason comes from the crypto layer in English.
+                subtitle = ErrorText.localize(LocalContext.current, result.reason)
             )
         }
         is VerificationResult.UnknownSigner -> {

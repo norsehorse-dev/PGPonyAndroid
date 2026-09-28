@@ -305,7 +305,7 @@ private fun ImportSuccessBody(state: SignerLookupState.ImportSuccess, onDismiss:
             )
         }
         Text(
-            "${state.previewUserId} has been added to your keyring. " +
+            stringResource(R.string.signer_lookup_imported_user_format, state.previewUserId) + " " +
                     stringResource(R.string.signer_lookup_imported_body),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant

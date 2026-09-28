@@ -413,7 +413,7 @@ private fun SigningKeyRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = key.userName.ifBlank { key.userEmail.ifBlank { "(no name)" } },
+                    text = key.userName.ifBlank { key.userEmail.ifBlank { stringResource(R.string.sign_as_sheet_no_name) } },
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -489,7 +489,7 @@ private fun EmptyState() {
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Generate or import a private key first in the Keyring tab.",
+            text = stringResource(R.string.sign_as_sheet_empty_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

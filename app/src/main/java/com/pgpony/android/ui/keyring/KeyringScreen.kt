@@ -182,7 +182,7 @@ fun KeyringScreen(
                         SmallFloatingActionButton(
                             onClick = { fabExpanded = false; bumpFab(); viewModel.showImport() },
                             containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        ) { Icon(Icons.Filled.Download, "Import Key") }
+                        ) { Icon(Icons.Filled.Download, stringResource(R.string.import_button_import_key)) }
                         Spacer(modifier = Modifier.height(8.dp))
                         SmallFloatingActionButton(
                             onClick = {
@@ -191,7 +191,7 @@ fun KeyringScreen(
                                 viewModel.showGenerate()
                             },
                             containerColor = MaterialTheme.colorScheme.secondaryContainer
-                        ) { Icon(Icons.Filled.Add, "Generate Key") }
+                        ) { Icon(Icons.Filled.Add, stringResource(R.string.keyring_fab_generate_key)) }
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                     FloatingActionButton(
@@ -244,9 +244,9 @@ fun KeyringScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("No keys yet", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.keyring_empty_title), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Tap + to generate or import a key",
+                        stringResource(R.string.keyring_empty_subtitle),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

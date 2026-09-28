@@ -7,6 +7,9 @@
   → PGPony. Listing matches the seven values-XX folders we ship: English (en),
   German (de), Spanish (es), French (fr), Japanese (ja), Portuguese-Brazil
   (pt-BR), Russian (ru).
+  4.6.2 adds Turkish (tr), Ukrainian (uk) and Simplified Chinese (zh-Hans, folder
+  values-b+zh+Hans). values-ko ships too but stays unlisted until its
+  translation is complete.
 
   android:defaultLocale="en" tells the system to fall back to English when
   the user's preferred language isn't supported — same fallback Android
@@ -26,4 +29,7 @@
     <locale android:name="ja" />
     <locale android:name="ru" />
     <locale android:name="pt-BR" />
+    <locale android:name="tr" />
+    <locale android:name="uk" />
+    <locale android:name="zh-Hans" />
 </locale-config>

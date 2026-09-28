@@ -47,6 +47,7 @@ import com.pgpony.android.crypto.card.CardPinCache
 import com.pgpony.android.crypto.card.CardSigningService
 import com.pgpony.android.crypto.card.OpenPgpCardException
 import com.pgpony.android.crypto.card.OpenPgpCardSession
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.nfc.OpenPgpCardReader
 import kotlinx.coroutines.runBlocking
 import org.openintents.openpgp.util.OpenPgpApi
@@ -276,7 +277,7 @@ class ProviderCardOpActivity : ComponentActivity() {
     private fun performOperationInner(session: OpenPgpCardSession): ProviderCardOpStore.CompletedOp {
         working.value = true
         val op = ProviderCardOpStore.getPending(opKey)
-            ?: throw OpenPgpCardException.Malformed("Operation expired — try again from your mail app")
+            ?: throw OpenPgpCardException.Malformed(getString(R.string.err_operation_expired_try_again_from_mail))
         val app = application as PGPonyApp
         val repo = app.keyRepository
         val pinBytes = currentPin.toByteArray(Charsets.UTF_8)
@@ -413,7 +414,7 @@ class ProviderCardOpActivity : ComponentActivity() {
                 )
             }
 
-            else -> throw OpenPgpCardException.Malformed("Unsupported card operation: ${op.action}")
+            else -> throw OpenPgpCardException.Malformed(getString(R.string.err_unsupported_card_operation, op.action))
         }
     }
 
@@ -459,7 +460,7 @@ class ProviderCardOpActivity : ComponentActivity() {
                     is OpenPgpCardException.TagLost ->
                         errorText.value = getString(R.string.provider_cardop_tag_lost)
                     else ->
-                        errorText.value = e.message
+                        errorText.value = ErrorText.localize(this, e.message)
                             ?: getString(R.string.provider_cardop_generic_error)
                 }
                 statusText.value = getString(R.string.provider_cardop_waiting)
