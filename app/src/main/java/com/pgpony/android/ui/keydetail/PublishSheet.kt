@@ -58,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -73,6 +74,7 @@ import com.pgpony.android.keyserver.ServerCopy
 import com.pgpony.android.crypto.CertificateBindings
 import com.pgpony.android.data.KeyPublicationStore
 import com.pgpony.android.data.repository.KeyRepository
+import com.pgpony.android.i18n.ErrorText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -291,7 +293,10 @@ private fun ServerRow(
                     MaterialTheme.colorScheme.error
                 )
                 is PublishOutcome.Failed -> InlineNote(
-                    stringResource(R.string.publish_failed_format, o.message),
+                    stringResource(
+                        R.string.publish_failed_format,
+                        ErrorText.localize(LocalContext.current, o.message) ?: o.message
+                    ),
                     MaterialTheme.colorScheme.error
                 )
             }

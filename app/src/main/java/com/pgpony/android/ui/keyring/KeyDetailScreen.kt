@@ -204,8 +204,8 @@ fun KeyDetailScreen(
     LaunchedEffect(state.needsRecovery, state.showRecoveryDialog) {
         if (state.needsRecovery && !state.showRecoveryDialog) {
             val res = snackbarHostState.showSnackbar(
-                message = "This key's secure storage was reset by the device. Restore access?",
-                actionLabel = "Restore",
+                message = context.getString(R.string.key_detail_recovery_snackbar),
+                actionLabel = context.getString(R.string.key_detail_recovery_restore),
                 duration = SnackbarDuration.Long
             )
             if (res == SnackbarResult.ActionPerformed) viewModel.showRecoveryDialog()
@@ -1005,21 +1005,17 @@ fun KeyDetailScreen(
         val recoveryPass = remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { if (!state.isRecovering) viewModel.dismissRecoveryDialog() },
-            title = { Text("Restore key access") },
+            title = { Text(stringResource(R.string.key_detail_recovery_title)) },
             text = {
                 Column {
-                    Text(
-                        "This key's secure storage was reset by the device, so the app " +
-                            "can't read the key right now. Enter the key's passphrase to " +
-                            "restore access. This does not change your key."
-                    )
+                    Text(stringResource(R.string.key_detail_recovery_body))
                     Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = recoveryPass.value,
                         onValueChange = { recoveryPass.value = it },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
-                        label = { Text("Passphrase") }
+                        label = { Text(stringResource(R.string.encrypt_passphrase_label)) }
                     )
                     state.recoveryError?.let {
                         Spacer(Modifier.height(8.dp))
@@ -1031,7 +1027,12 @@ fun KeyDetailScreen(
                 TextButton(
                     enabled = recoveryPass.value.isNotEmpty() && !state.isRecovering,
                     onClick = { viewModel.submitRecovery(recoveryPass.value) }
-                ) { Text(if (state.isRecovering) "Restoring\u2026" else "Restore") }
+                ) {
+                    Text(
+                        if (state.isRecovering) stringResource(R.string.key_detail_recovery_restoring)
+                        else stringResource(R.string.key_detail_recovery_restore)
+                    )
+                }
             },
             dismissButton = {
                 TextButton(

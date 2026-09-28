@@ -18,11 +18,13 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pgpony.android.PGPonyApp
+import com.pgpony.android.R
 import com.pgpony.android.backup.BackupError
 import com.pgpony.android.backup.BackupKind
 import com.pgpony.android.backup.BackupService
 import com.pgpony.android.backup.CrockfordBase32
 import com.pgpony.android.backup.MergeReport
+import com.pgpony.android.i18n.ErrorText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -97,14 +99,14 @@ class BackupViewModel : ViewModel() {
                 val bytes = service.exportBackup(canonical)
                 withContext(Dispatchers.IO) {
                     (resolver.openOutputStream(uri)
-                        ?: throw IllegalStateException("Couldn't open the file for writing"))
+                        ?: throw IllegalStateException(PGPonyApp.instance.getString(R.string.backup_error_open_for_writing)))
                         .use { it.write(bytes); it.flush() }
                 }
                 _state.value = _state.value.copy(working = false, phase = Phase.BackupDone)
             } catch (e: BackupError) {
-                _state.value = _state.value.copy(working = false, error = e.message)
+                _state.value = _state.value.copy(working = false, error = ErrorText.localize(e.message))
             } catch (e: Exception) {
-                _state.value = _state.value.copy(working = false, error = e.message ?: "Backup failed")
+                _state.value = _state.value.copy(working = false, error = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.backup_error_backup_failed))
             }
         }
     }
@@ -139,9 +141,9 @@ class BackupViewModel : ViewModel() {
                     service.restoreBackup(bytes, _state.value.restoreCode)
                 _state.value = _state.value.copy(working = false, phase = Phase.RestoreDone, report = report)
             } catch (e: BackupError) {
-                _state.value = _state.value.copy(working = false, error = e.message)
+                _state.value = _state.value.copy(working = false, error = ErrorText.localize(e.message))
             } catch (e: Exception) {
-                _state.value = _state.value.copy(working = false, error = e.message ?: "Restore failed")
+                _state.value = _state.value.copy(working = false, error = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.backup_error_restore_failed))
             }
         }
     }

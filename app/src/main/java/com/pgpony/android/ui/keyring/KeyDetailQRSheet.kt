@@ -115,8 +115,9 @@ fun KeyDetailQRSheet(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            val publicKeyFallback = stringResource(R.string.key_detail_type_public_key)
             Text(
-                text = key.userName.ifBlank { key.userEmail.ifBlank { "Public Key" } },
+                text = key.userName.ifBlank { key.userEmail.ifBlank { publicKeyFallback } },
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -140,7 +141,7 @@ fun KeyDetailQRSheet(
             } else {
                 Image(
                     bitmap = qrBitmap.asImageBitmap(),
-                    contentDescription = "QR code for ${key.userEmail}",
+                    contentDescription = stringResource(R.string.key_detail_qr_image_cd, key.userEmail),
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
@@ -229,7 +230,7 @@ fun KeyDetailQRSheet(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Copy")
+                    Text(stringResource(R.string.common_button_copy))
                 }
                 Button(
                     onClick = onShare,
@@ -241,7 +242,7 @@ fun KeyDetailQRSheet(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Share")
+                    Text(stringResource(R.string.common_button_share))
                 }
             }
 

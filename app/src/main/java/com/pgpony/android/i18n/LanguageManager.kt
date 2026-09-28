@@ -60,7 +60,10 @@ enum class SupportedLanguage(val tag: String, val nativeName: String) {
     FR("fr", "Français"),
     JA("ja", "日本語"),
     PT_BR("pt-BR", "Português (Brasil)"),
-    RU("ru", "Русский");
+    RU("ru", "Русский"),
+    TR("tr", "Türkçe"),
+    UK("uk", "Українська"),
+    ZH_HANS("zh-Hans", "简体中文");
 
     companion object {
         /**
@@ -95,8 +98,24 @@ enum class SupportedLanguage(val tag: String, val nativeName: String) {
                 "ja" -> JA
                 "pt" -> PT_BR
                 "ru" -> RU
+                "tr" -> TR
+                "uk" -> UK
+                "zh" -> if (isTraditionalChinese(normalized)) null else ZH_HANS
                 else -> null
             }
+        }
+
+        /**
+         * 4.6.2: Chinese snaps to Simplified only when the tag does not ask for
+         * Traditional. "zh", "zh-CN", "zh-SG" and "zh-Hans-*" resolve to ZH_HANS;
+         * "zh-Hant-*", "zh-TW", "zh-HK" and "zh-MO" resolve to nothing, so those
+         * users keep the English fallback instead of being handed Simplified text.
+         */
+        private fun isTraditionalChinese(tag: String): Boolean {
+            val parts = tag.split('-').drop(1).map { it.lowercase() }
+            if ("hans" in parts) return false
+            if ("hant" in parts) return true
+            return parts.any { it == "tw" || it == "hk" || it == "mo" }
         }
     }
 }

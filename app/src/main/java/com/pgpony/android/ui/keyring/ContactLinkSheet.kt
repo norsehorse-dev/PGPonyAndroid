@@ -56,6 +56,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -163,8 +164,9 @@ private fun ContactRow(
         ContactInitialsAvatar(name = contact.displayName)
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
+            val noName = stringResource(R.string.contact_link_sheet_no_name)
             Text(
-                text = contact.displayName.ifBlank { contact.emails.firstOrNull() ?: "(no name)" },
+                text = contact.displayName.ifBlank { contact.emails.firstOrNull() ?: noName },
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
@@ -172,7 +174,12 @@ private fun ContactRow(
             val emailSummary = if (contact.emails.size <= 1) {
                 contact.emails.firstOrNull().orEmpty()
             } else {
-                "${contact.emails.first()} (+${contact.emails.size - 1} more)"
+                pluralStringResource(
+                    R.plurals.contact_link_sheet_email_summary,
+                    contact.emails.size - 1,
+                    contact.emails.first(),
+                    contact.emails.size - 1
+                )
             }
             if (emailSummary.isNotBlank()) {
                 Text(

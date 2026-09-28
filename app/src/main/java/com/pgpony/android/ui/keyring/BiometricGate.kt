@@ -46,6 +46,7 @@ import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import com.pgpony.android.R
 
 // ── Availability check ────────────────────────────────────────────────
 
@@ -145,7 +146,7 @@ object BiometricGate {
         // similar fallback button instead). Only set it for the
         // biometric-only paths on older APIs.
         if (authenticators and DEVICE_CREDENTIAL == 0) {
-            builder.setNegativeButtonText("Cancel")
+            builder.setNegativeButtonText(activity.getString(R.string.common_button_cancel))
         }
 
         prompt.authenticate(builder.build())

@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -325,7 +326,7 @@ private fun ExistingKeysIndicator(count: Int) {
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    if (count == 1) stringResource(R.string.onboarding_page_already_have_keys_one) else stringResource(R.string.onboarding_page_already_have_keys_other_format, count),
+                    pluralStringResource(R.plurals.onboarding_page_already_have_keys_count, count, count),
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Text(

@@ -62,6 +62,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.MainActivity
 import com.pgpony.android.R
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.intent.ShareIntentContent
 import androidx.core.content.FileProvider
 import com.pgpony.android.ui.util.ScratchFiles
@@ -204,7 +205,7 @@ fun ShareTargetScreen(
                                     cardActivity.endCardOperation()
                                     result
                                         .onSuccess { vm.onCardDecryptSuccess(String(it.data, Charsets.UTF_8)) }
-                                        .onFailure { e -> vm.onCardDecryptFailure(e.message ?: cardDecFailedMsg) }
+                                        .onFailure { e -> vm.onCardDecryptFailure(ErrorText.localize(context, e.message) ?: cardDecFailedMsg) }
                                 }
                                 if (!started) vm.onCardDecryptFailure(cardNfcUnavailMsg)
                             }
@@ -402,7 +403,7 @@ fun ShareInputPreview(content: ShareIntentContent) {
                     Text(
                         text = stringResource(
                             R.string.share_target_input_label_file_format,
-                            content.filename ?: "(unnamed)",
+                            content.filename ?: stringResource(R.string.share_target_file_unnamed),
                         ),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -480,7 +481,7 @@ private fun ShareRootContent(
         is ShareIntentContent.Text -> stringResource(R.string.share_target_root_subtitle_text)
         is ShareIntentContent.PgpFile -> stringResource(
             R.string.share_target_root_subtitle_file_format,
-            content.filename ?: "(unnamed)",
+            content.filename ?: stringResource(R.string.share_target_file_unnamed),
         )
         ShareIntentContent.Empty -> ""
     }
@@ -1058,7 +1059,7 @@ private fun ShareErrorContent(
     onDismiss: () -> Unit,
 ) {
     Text(
-        text = message ?: stringResource(R.string.share_target_error_generic_format, "unknown"),
+        text = message ?: stringResource(R.string.share_target_error_generic_format, stringResource(R.string.share_target_error_unknown_detail)),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.error,
     )

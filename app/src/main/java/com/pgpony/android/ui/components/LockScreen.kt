@@ -70,6 +70,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pgpony.android.R
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.ui.keyring.BiometricAvailability
 import com.pgpony.android.ui.keyring.BiometricGate
 import kotlinx.coroutines.delay
@@ -325,6 +326,6 @@ private fun triggerAuthenticate(
         // its fragment) if invoked at a bad lifecycle moment. Surface it as
         // a normal error so the screen never gets stuck on "Authenticating…"
         // — the Unlock button stays available and the next ON_RESUME retries.
-        onError(e.message ?: activity.getString(R.string.lock_error_biometric_unavailable))
+        onError(ErrorText.localize(activity, e.message) ?: activity.getString(R.string.lock_error_biometric_unavailable))
     }
 }

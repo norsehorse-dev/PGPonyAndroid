@@ -41,6 +41,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.pgpony.android.ui.util.ScratchFiles
 import com.pgpony.android.R
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.MainActivity
 import java.io.File
 
@@ -124,7 +126,7 @@ stringResource(R.string.file_enc_result_title),
                 val count = state.selectedRecipients.size
                 FileStatusBadge(
                     icon = Icons.Filled.Person,
-                    label = if (count == 1) "1 recipient" else "$count recipients",
+                    label = pluralStringResource(R.plurals.pass_store_recipients, count, count),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (signed) {
@@ -308,7 +310,7 @@ stringResource(R.string.file_enc_result_badge_can_decrypt),
                             }
                             saveStatus = SaveStatus.Saved
                         } catch (e: Exception) {
-                            saveStatus = SaveStatus.Error(e.message ?: context.getString(R.string.file_enc_result_save_failed_default))
+                            saveStatus = SaveStatus.Error(ErrorText.localize(context, e.message) ?: context.getString(R.string.file_enc_result_save_failed_default))
                         }
                     }
                 },
@@ -367,7 +369,7 @@ stringResource(R.string.file_enc_result_badge_can_decrypt),
                             Intent.createChooser(send, context.getString(R.string.file_enc_result_share_chooser_title))
                         )
                     } catch (e: Exception) {
-                        saveStatus = SaveStatus.Error(e.message ?: context.getString(R.string.file_enc_result_share_failed_default))
+                        saveStatus = SaveStatus.Error(ErrorText.localize(context, e.message) ?: context.getString(R.string.file_enc_result_share_failed_default))
                     }
                 },
                 modifier = Modifier.fillMaxWidth()

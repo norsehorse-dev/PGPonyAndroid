@@ -55,6 +55,7 @@ import androidx.core.content.FileProvider
 import androidx.core.content.getSystemService
 import com.pgpony.android.MainActivity
 import com.pgpony.android.R
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.ui.decrypt.VerificationBanner
 import com.pgpony.android.ui.util.ClipboardService
 import com.pgpony.android.ui.util.ScratchFiles
@@ -247,7 +248,7 @@ fun FileDecryptionResultScreen(state: DecryptUiState, onDismiss: () -> Unit) {
                             }
                             saveStatus = DecryptSaveStatus.Saved
                         } catch (e: Exception) {
-                            saveStatus = DecryptSaveStatus.Error(e.message ?: context.getString(R.string.result_file_decrypt_save_failed_fallback))
+                            saveStatus = DecryptSaveStatus.Error(ErrorText.localize(context, e.message) ?: context.getString(R.string.result_file_decrypt_save_failed_fallback))
                         }
                     }
                 },
@@ -288,7 +289,7 @@ fun FileDecryptionResultScreen(state: DecryptUiState, onDismiss: () -> Unit) {
                             Intent.createChooser(send, context.getString(R.string.result_file_decrypt_share_chooser))
                         )
                     } catch (e: Exception) {
-                        saveStatus = DecryptSaveStatus.Error(e.message ?: context.getString(R.string.result_file_decrypt_share_failed_fallback))
+                        saveStatus = DecryptSaveStatus.Error(ErrorText.localize(context, e.message) ?: context.getString(R.string.result_file_decrypt_share_failed_fallback))
                     }
                 },
                 modifier = Modifier.fillMaxWidth()

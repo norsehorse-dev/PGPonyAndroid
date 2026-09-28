@@ -44,6 +44,7 @@ import com.pgpony.android.ui.util.ScratchFiles
 import androidx.lifecycle.viewModelScope
 import com.pgpony.android.PGPonyApp
 import com.pgpony.android.R
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.crypto.pqc.CompositeDocumentSigner
 import com.pgpony.android.crypto.pqc.CompositeDocumentVerifier
 import com.pgpony.android.crypto.PGPCryptoService
@@ -500,7 +501,9 @@ class BundleAttachmentRef(
     fun openStream(): java.io.InputStream =
         data?.let { java.io.ByteArrayInputStream(it) }
             ?: PGPonyApp.instance.contentResolver.openInputStream(uri!!)
-            ?: throw java.io.IOException("Cannot open attachment: $filename")
+            ?: throw java.io.IOException(
+                PGPonyApp.instance.getString(R.string.encdec_error_cannot_open_attachment_format, filename)
+            )
 
     fun toMimeSource() = com.pgpony.android.crypto.mime.MimeBuilder.MimeSource(
         filename, contentType, ::openStream
@@ -1286,7 +1289,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         }
         val signingKey = s.signingKey ?: run {
             _encryptState.value = s.copy(
-                errorMessage = "No signing key available. Generate or import a key pair first."
+                errorMessage = PGPonyApp.instance.getString(R.string.encdec_error_sign_no_signing_key)
             )
             return
         }
@@ -1405,12 +1408,12 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             } catch (e: SigningError) {
                 _encryptState.value = _encryptState.value.copy(
                     isProcessing = false,
-                    errorMessage = e.message
+                    errorMessage = ErrorText.localize(e.message)
                 )
             } catch (e: Exception) {
                 _encryptState.value = _encryptState.value.copy(
                     isProcessing = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.encdec_error_signing_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.encdec_error_signing_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -1619,7 +1622,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     errorMessage = if (e is OutOfMemoryError) {
                         PGPonyApp.instance.getString(R.string.encdec_error_file_too_large)
                     } else {
-                        PGPonyApp.instance.getString(R.string.encdec_error_encryption_failed_format, e.message ?: "")
+                        PGPonyApp.instance.getString(R.string.encdec_error_encryption_failed_format, ErrorText.detail(e.message) ?: "")
                     }
                 )
             }
@@ -1742,7 +1745,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         val out = ScratchFiles.allocate(PGPonyApp.instance, outName, ScratchFiles.SCOPE_ENCRYPT)
         val resolver = PGPonyApp.instance.contentResolver
         val raw = resolver.openInputStream(uri)
-            ?: throw java.io.IOException("Could not open the selected file")
+            ?: throw java.io.IOException(PGPonyApp.instance.getString(R.string.encdec_error_cannot_open_selected_file))
         val input = ProgressInputStream(
             delegate = raw,
             isCancelled = { job?.isActive == false },
@@ -2026,7 +2029,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     errorMessage = if (e is OutOfMemoryError) {
                         PGPonyApp.instance.getString(R.string.encdec_error_file_too_large)
                     } else {
-                        PGPonyApp.instance.getString(R.string.encdec_error_encryption_failed_format, e.message ?: "")
+                        PGPonyApp.instance.getString(R.string.encdec_error_encryption_failed_format, ErrorText.detail(e.message) ?: "")
                     }
                 )
             }
@@ -2109,7 +2112,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     errorMessage = if (e is OutOfMemoryError) {
                         PGPonyApp.instance.getString(R.string.encdec_error_file_too_large)
                     } else {
-                        PGPonyApp.instance.getString(R.string.encdec_error_encryption_failed_format, e.message ?: "")
+                        PGPonyApp.instance.getString(R.string.encdec_error_encryption_failed_format, ErrorText.detail(e.message) ?: "")
                     }
                 )
             }
@@ -2228,7 +2231,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     errorMessage = if (e is OutOfMemoryError) {
                         PGPonyApp.instance.getString(R.string.encdec_error_file_too_large)
                     } else {
-                        PGPonyApp.instance.getString(R.string.encdec_error_encryption_failed_format, e.message ?: "")
+                        PGPonyApp.instance.getString(R.string.encdec_error_encryption_failed_format, ErrorText.detail(e.message) ?: "")
                     }
                 )
             }
@@ -2574,7 +2577,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     errorMessage = if (e is OutOfMemoryError) {
                         PGPonyApp.instance.getString(R.string.encdec_error_file_too_large)
                     } else {
-                        PGPonyApp.instance.getString(R.string.encdec_error_encryption_failed_format, e.message ?: "")
+                        PGPonyApp.instance.getString(R.string.encdec_error_encryption_failed_format, ErrorText.detail(e.message) ?: "")
                     }
                 )
             }
@@ -3124,7 +3127,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 )
             } else {
                 VerificationResult.Invalid(
-                    reason = "Composite signature did not verify",
+                    reason = PGPonyApp.instance.getString(R.string.encdec_verify_composite_invalid),
                     signerKeyID = claimedFp?.take(16),
                     signedContent = content
                 )
@@ -3192,7 +3195,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 )
             } else {
                 VerificationResult.Invalid(
-                    reason = "Composite signature did not verify",
+                    reason = PGPonyApp.instance.getString(R.string.encdec_verify_composite_invalid),
                     signerKeyID = claimedFp?.take(16),
                     signedContent = null
                 )
@@ -3233,7 +3236,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     )
                 } else {
                     VerificationResult.Invalid(
-                        reason = "Composite signature did not verify",
+                        reason = PGPonyApp.instance.getString(R.string.encdec_verify_composite_invalid),
                         signerKeyID = claimedFp?.take(16),
                         signedContent = content
                     )
@@ -3569,7 +3572,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             s, effectiveDecryptInput(s.inputText).toByteArray(Charsets.UTF_8),
                             DecryptFailKind.NO_KEY,
                             PGPonyApp.instance.getString(
-                                R.string.encdec_error_decryption_failed_format, e.message ?: ""
+                                R.string.encdec_error_decryption_failed_format, ErrorText.detail(e.message) ?: ""
                             )
                         )
                     )
@@ -3577,8 +3580,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             } catch (e: Exception) {
                 _decryptState.value = _decryptState.value.copy(
                     isProcessing = false,
-                    errorMessage = if (e is com.pgpony.android.crypto.PGPCryptoError.MessageIncomplete) e.message
-                        else PGPonyApp.instance.getString(R.string.encdec_error_decryption_failed_format, e.message ?: "")
+                    errorMessage = if (e is com.pgpony.android.crypto.PGPCryptoError.MessageIncomplete) ErrorText.localize(e.message)
+                        else PGPonyApp.instance.getString(R.string.encdec_error_decryption_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -3661,7 +3664,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     )
                 } else {
                     VerificationResult.Invalid(
-                        reason = "Composite signature did not verify",
+                        reason = PGPonyApp.instance.getString(R.string.encdec_verify_composite_invalid),
                         signerKeyID = claimedFp?.take(16),
                         signedContent = null
                     )
@@ -3761,7 +3764,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     )
                 } else {
                     VerificationResult.Invalid(
-                        reason = "Composite signature did not verify",
+                        reason = PGPonyApp.instance.getString(R.string.encdec_verify_composite_invalid),
                         signerKeyID = claimedFp?.take(16),
                         signedContent = null
                     )
@@ -4505,7 +4508,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         MimeEnvelope.armoredPayloadOffset(it)
                     } ?: -1L
                     val raw = resolver.openInputStream(uri)
-                        ?: throw java.io.IOException("Could not open the selected file")
+                        ?: throw java.io.IOException(PGPonyApp.instance.getString(R.string.encdec_error_cannot_open_selected_file))
                     if (envelopeOffset > 0) {
                         var remaining = envelopeOffset
                         while (remaining > 0) {
@@ -4652,7 +4655,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     _decryptState.value = _decryptState.value.copy(
                         isProcessing = false,
                         errorMessage = PGPonyApp.instance.getString(
-                            R.string.encdec_error_decryption_failed_format, e.message ?: ""
+                            R.string.encdec_error_decryption_failed_format, ErrorText.detail(e.message) ?: ""
                         )
                     )
                 }
@@ -4673,9 +4676,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     errorMessage = when {
                         e is OutOfMemoryError ->
                             PGPonyApp.instance.getString(R.string.encdec_error_file_too_large)
-                        e is com.pgpony.android.crypto.PGPCryptoError.MessageIncomplete -> e.message
+                        e is com.pgpony.android.crypto.PGPCryptoError.MessageIncomplete -> ErrorText.localize(e.message)
                         else ->
-                            PGPonyApp.instance.getString(R.string.encdec_error_decryption_failed_format, e.message ?: "")
+                            PGPonyApp.instance.getString(R.string.encdec_error_decryption_failed_format, ErrorText.detail(e.message) ?: "")
                     }
                 )
             }
@@ -4835,7 +4838,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             s, effectiveDecryptFileBytes(bytes),
                             DecryptFailKind.NO_KEY,
                             PGPonyApp.instance.getString(
-                                R.string.encdec_error_decryption_failed_format, e.message ?: ""
+                                R.string.encdec_error_decryption_failed_format, ErrorText.detail(e.message) ?: ""
                             )
                         )
                     )
@@ -4843,8 +4846,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             } catch (e: Exception) {
                 _decryptState.value = _decryptState.value.copy(
                     isProcessing = false,
-                    errorMessage = if (e is com.pgpony.android.crypto.PGPCryptoError.MessageIncomplete) e.message
-                        else PGPonyApp.instance.getString(R.string.encdec_error_decryption_failed_format, e.message ?: "")
+                    errorMessage = if (e is com.pgpony.android.crypto.PGPCryptoError.MessageIncomplete) ErrorText.localize(e.message)
+                        else PGPonyApp.instance.getString(R.string.encdec_error_decryption_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -4990,7 +4993,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             } catch (e: Exception) {
                 _decryptState.value = _decryptState.value.copy(
                     signerLookupState = SignerLookupState.Failed(
-                        e.message ?: PGPonyApp.instance.getString(R.string.encdec_error_keyserver_network)
+                        ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.encdec_error_keyserver_network)
                     )
                 )
                 return@launch
@@ -5008,7 +5011,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             } catch (e: Exception) {
                 _decryptState.value = _decryptState.value.copy(
                     signerLookupState = SignerLookupState.Failed(
-                        PGPonyApp.instance.getString(R.string.encdec_error_keyserver_parse_format, e.message ?: "")
+                        PGPonyApp.instance.getString(R.string.encdec_error_keyserver_parse_format, ErrorText.detail(e.message) ?: "")
                     )
                 )
                 return@launch
@@ -5051,7 +5054,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             } catch (e: Exception) {
                 _decryptState.value = _decryptState.value.copy(
                     signerLookupState = SignerLookupState.Failed(
-                        "Could not import key: ${e.message}"
+                        PGPonyApp.instance.getString(
+                            R.string.encdec_error_signer_import_failed_format, ErrorText.detail(e.message) ?: ""
+                        )
                     )
                 )
             }
@@ -5367,7 +5372,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 _encryptState.value = _encryptState.value.copy(
                     signFileProcessing = false,
                     errorMessage = PGPonyApp.instance.getString(
-                        R.string.sign_file_error_failed_format, e.message ?: e.javaClass.simpleName
+                        R.string.sign_file_error_failed_format, ErrorText.detail(e.message) ?: e.javaClass.simpleName
                     ),
                 )
             }

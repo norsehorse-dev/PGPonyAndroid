@@ -42,6 +42,7 @@ import com.pgpony.android.PGPonyApp
 import com.pgpony.android.R
 import com.pgpony.android.crypto.card.CardSigningService
 import com.pgpony.android.crypto.card.OpenPgpCardException
+import com.pgpony.android.i18n.ErrorText
 
 private sealed class SignState {
     data object Form : SignState()
@@ -81,7 +82,7 @@ fun CardSignScreen(onBack: () -> Unit) {
             session.select()
             val ard = session.getApplicationRelatedData()
             val fp = ard.sigFingerprint
-                ?: throw OpenPgpCardException.Malformed("This card has no signature key.")
+                ?: throw OpenPgpCardException.Malformed(context.getString(R.string.card_sign_no_sig_key))
             // 3.1.0 Phase 7 (A1/A3): the SIG-slot fingerprint is a SUBKEY
             // on offline-primary layouts, so loading the ring by fp
             // directly fails even when the key IS paired. Resolve the
@@ -99,7 +100,7 @@ fun CardSignScreen(onBack: () -> Unit) {
             val pubRing = (entity?.let { repo.loadPublicKeyRing(it.fingerprint) })
                 ?: repo.loadPublicKeyRing(fp)
                 ?: throw OpenPgpCardException.Malformed(
-                    "Pair this card's public key into your keyring first (import the matching public key), then try again."
+                    context.getString(R.string.card_sign_pair_first_import)
                 )
             // 3.1.0 Phase 7 (A3): sign metadata carries the [S]-slot key,
             // not the ring primary.
@@ -112,7 +113,7 @@ fun CardSignScreen(onBack: () -> Unit) {
         }) { result ->
             result
                 .onSuccess { state.value = SignState.Result(it) }
-                .onFailure { e -> state.value = SignState.Failed(e.message ?: "Signing failed") }
+                .onFailure { e -> state.value = SignState.Failed(ErrorText.localize(context, e.message) ?: context.getString(R.string.card_sign_failed_generic)) }
         }
     }
 

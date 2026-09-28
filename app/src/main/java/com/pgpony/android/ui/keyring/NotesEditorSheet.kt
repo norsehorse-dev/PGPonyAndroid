@@ -130,7 +130,7 @@ stringResource(R.string.notes_editor_explainer),
                     },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Save")
+                    Text(stringResource(R.string.common_button_save))
                 }
             }
 

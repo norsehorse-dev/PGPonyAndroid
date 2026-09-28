@@ -1,5 +1,7 @@
 import java.util.Properties
 import java.io.FileInputStream
+import javax.xml.parsers.DocumentBuilderFactory
+import org.w3c.dom.Element
 
 plugins {
     id("com.android.application")
@@ -474,6 +476,102 @@ dependencies {
     // createAndroidComposeRule<ComponentActivity> can launch it.
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
+
+// 4.6.2: fail the build when a translation's format arguments do not match English.
+// For every values-<qualifier>/strings.xml under src/main/res, each <string> is
+// compared with the same key in values/strings.xml:
+//   - a <string> must use exactly the same set of format arguments (%1$s, %2$d...)
+//     as English. A missing argument drops information, an extra one or a changed
+//     type (s vs d) can crash String.format at runtime;
+//   - each <plurals> item may use only arguments that appear in the English plural,
+//     and "other" must keep all of them;
+//   - a plural must provide every quantity its language needs (table below; "other"
+//     for everything not listed);
+//   - a key that does not exist in values/ is an error.
+// A string missing from a translation is fine: Android falls back to English.
+// Wired in front of preBuild, so it runs on every build, F-Droid's included. It only
+// reads resources and never changes the APK. It lives here rather than in a separate
+// script plugin because lint's Kotlin analysis crashes on a second .gradle.kts file.
+val stringFormatResDir: File = file("src/main/res")
+val stringFormatMarker = layout.buildDirectory.file("stringFormatCheck/ok")
+
+val checkStringFormats = tasks.register("checkStringFormats") {
+    group = "verification"
+    description = "Compares the format arguments of every translated string with values/."
+    val resDir = stringFormatResDir
+    val marker = stringFormatMarker
+    inputs.dir(resDir).withPropertyName("res")
+    outputs.file(marker).withPropertyName("marker")
+    doLast {
+        val spec = Regex("""%(?:(\d+)\$)?[-#+ 0,(]*\d*(?:\.\d+)?([a-zA-Z%])""")
+        val required = mapOf(
+            "uk" to listOf("one", "few", "many", "other"),
+            "ru" to listOf("one", "few", "many", "other"),
+            "tr" to listOf("one", "other"),
+        )
+
+        fun specs(text: String): Set<String> = spec.findAll(text)
+            .filter { it.groupValues[2] != "%" }
+            .map { (it.groupValues[1].ifEmpty { "?" }) + "$" + it.groupValues[2].lowercase() }
+            .toSet()
+
+        fun elements(parent: org.w3c.dom.Node, tag: String): List<Element> {
+            val list = parent.childNodes
+            return (0 until list.length).map { list.item(it) }
+                .filterIsInstance<Element>().filter { it.tagName == tag }
+        }
+
+        fun load(f: File): Map<String, Element> {
+            val factory = DocumentBuilderFactory.newInstance()
+            factory.isExpandEntityReferences = false
+            val root = factory.newDocumentBuilder().parse(f).documentElement
+            return (elements(root, "string") + elements(root, "plurals"))
+                .associateBy { it.getAttribute("name") }
+        }
+
+        val base = load(File(resDir, "values/strings.xml"))
+        val errors = mutableListOf<String>()
+        val localeDirs = resDir.listFiles { d -> d.isDirectory && d.name.startsWith("values-") }
+            ?.sortedBy { it.name }.orEmpty()
+        for (dir in localeDirs) {
+            val file = File(dir, "strings.xml")
+            if (!file.exists()) continue
+            val qualifier = dir.name.removePrefix("values-")
+            for ((key, el) in load(file)) {
+                val en = base[key]
+                val where = "${dir.name}/strings.xml: $key"
+                if (en == null) { errors += "$where is not in values/strings.xml"; continue }
+                if (en.tagName != el.tagName) { errors += "$where is a ${el.tagName}, English is a ${en.tagName}"; continue }
+                if (el.tagName == "string") {
+                    val want = specs(en.textContent)
+                    val got = specs(el.textContent)
+                    if (got != want) errors += "$where uses ${got.sorted()}, English uses ${want.sorted()}"
+                } else {
+                    val allowed = elements(en, "item").flatMap { specs(it.textContent) }.toSet()
+                    val items = elements(el, "item")
+                    for (item in items) {
+                        val q = item.getAttribute("quantity")
+                        val got = specs(item.textContent)
+                        if (!allowed.containsAll(got)) errors += "$where[$q] uses ${got.sorted()}, English allows ${allowed.sorted()}"
+                        if (q == "other" && !got.containsAll(allowed)) errors += "$where[other] must keep ${allowed.sorted()}"
+                    }
+                    val have = items.map { it.getAttribute("quantity") }.toSet()
+                    for (q in required[qualifier] ?: listOf("other")) {
+                        if (q !in have) errors += "$where is missing the \"$q\" quantity"
+                    }
+                }
+            }
+        }
+        if (errors.isNotEmpty()) {
+            throw GradleException(
+                "String format check failed (${errors.size}):\n" + errors.joinToString("\n") { "  $it" }
+            )
+        }
+        marker.get().asFile.apply { parentFile.mkdirs(); writeText("ok\n") }
+    }
+}
+
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(checkStringFormats) }
 
 // Forward selected -D properties to the forked unit-test JVM. Gradle does NOT
 // propagate command-line system properties to the test JVM by default, so the

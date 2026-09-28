@@ -96,7 +96,6 @@ import com.pgpony.android.crypto.UserIdService
 import com.pgpony.android.data.PGPKeyEntity
 import com.pgpony.android.data.TrustLevel
 import com.pgpony.android.ui.components.TrustBadge
-import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
@@ -648,7 +647,7 @@ private fun TrustLevelRow(trust: TrustLevel, onClick: () -> Unit) {
         ) {
             TrustBadge(trust)
             Text(
-                text = trust.displayName,
+                text = trust.localizedName(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1241,7 +1240,7 @@ fun DangerZoneSection(
  * by LoadedBody (or whichever screen-level Composable owns section
  * order) when [key].isRevoked is true. Three pieces of info:
  *   • "REVOKED" label (eyebrow text in red)
- *   • Revoked-on date (epoch ms → formatted via the same SimpleDateFormat
+ *   • Revoked-on date (epoch ms → formatted via the same date formatter
  *     used elsewhere in this file)
  *   • Reason — pulled from the enum's displayName, falls back to
  *     "No reason specified" if the field is null (pre-cached cert case
@@ -1308,9 +1307,9 @@ fun RevokedBanner(key: PGPKeyEntity) {
 
 // ── Date formatter ────────────────────────────────────────────────────
 
-/** "Jan 5, 2026" — matches iOS formatted(date: .abbreviated, time: .omitted). */
+/** "Jan 5, 2026" in English; 4.6.2: the medium date style of the user's locale. */
 private fun formatDate(epochMillis: Long): String {
-    val fmt = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+    val fmt = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM, Locale.getDefault())
     return fmt.format(Date(epochMillis))
 }
 

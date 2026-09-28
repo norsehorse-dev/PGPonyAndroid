@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -414,7 +415,7 @@ private fun BulkScanBanner(state: ContactsUiState, viewModel: ContactsViewModel)
                     )
                     Spacer(modifier = Modifier.weight(1f))
                     TextButton(onClick = { viewModel.cancelBulkScan() }) {
-                        Text("Cancel", style = MaterialTheme.typography.labelSmall)
+                        Text(stringResource(R.string.common_button_cancel), style = MaterialTheme.typography.labelSmall)
                     }
                 }
                 if (state.bulkScanTotal > 0) {
@@ -425,7 +426,7 @@ private fun BulkScanBanner(state: ContactsUiState, viewModel: ContactsViewModel)
                 }
             } else if (state.bulkScanFinished) {
                 Text(
-                    if (state.bulkScanFound == 1) stringResource(R.string.contacts_scan_complete_one_format, state.bulkScanFound) else stringResource(R.string.contacts_scan_complete_many_format, state.bulkScanFound),
+                    pluralStringResource(R.plurals.contacts_scan_complete_count, state.bulkScanFound, state.bulkScanFound),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )

@@ -25,10 +25,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.pgpony.android.R
 
 /**
  * Drop-in tooltip for any screen. Renders once ever, persists dismissal in
@@ -104,7 +106,7 @@ fun Tooltip(
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            "Tip",
+                            stringResource(R.string.tooltip_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -123,7 +125,7 @@ fun Tooltip(
                             containerColor = Color(0xFF8B5CF6)
                         )
                     ) {
-                        Text("Got it")
+                        Text(stringResource(R.string.tooltip_button_got_it))
                     }
                 }
             }

@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.MainActivity
 import com.pgpony.android.R
+import com.pgpony.android.i18n.ErrorText
 
 private const val PW1_MIN = 6
 private const val PW3_MIN = 8
@@ -65,7 +66,7 @@ fun CardManagementScreen(onBack: () -> Unit, onDone: () -> Unit = {}) {
         val started = activity?.startCardOperation(operation) { result ->
             result
                 .onSuccess { opState.value = OpState.Done(doneMsg) }
-                .onFailure { e -> opState.value = OpState.Failed(e.message ?: failGeneric) }
+                .onFailure { e -> opState.value = OpState.Failed(ErrorText.localize(context, e.message) ?: failGeneric) }
         } ?: false
         if (started != true) {
             opState.value = OpState.Failed(failGeneric)

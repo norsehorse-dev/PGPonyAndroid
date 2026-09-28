@@ -295,7 +295,7 @@ private fun AttachmentRow(
                     maxLines = 1
                 )
                 Text(
-                    "${attachment.contentType} · ${formatAttachmentSize(attachment.size)}",
+                    "${attachment.contentType} · ${formatAttachmentSize(LocalContext.current, attachment.size)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
@@ -388,11 +388,9 @@ private fun shareAttachments(context: Context, attachments: List<AttachmentItem>
     }
 }
 
-private fun formatAttachmentSize(bytes: Long): String = when {
-    bytes >= 1_048_576 -> "%.1f MB".format(bytes / 1_048_576.0)
-    bytes >= 1024 -> "%.0f KB".format(bytes / 1024.0)
-    else -> "$bytes B"
-}
+// 4.6.2: the system formatter uses the user's locale for the number and unit.
+private fun formatAttachmentSize(context: Context, bytes: Long): String =
+    android.text.format.Formatter.formatShortFileSize(context, bytes)
 
 private tailrec fun Context.findStructuredResultMainActivity(): MainActivity? = when (this) {
     is MainActivity -> this

@@ -94,7 +94,7 @@ object KeyShareIntents {
         val sendIntent = Intent(Intent.ACTION_SEND).apply {
             type = "application/pgp-keys"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "$keyOwnerLabel — PGP Public Key")
+            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.share_intent_subject_public_key, keyOwnerLabel))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         val chooser = Intent.createChooser(sendIntent, context.getString(R.string.share_intent_chooser_public_key))
@@ -174,7 +174,7 @@ object KeyShareIntents {
         val sendIntent = Intent(Intent.ACTION_SEND).apply {
             type = "application/pgp-keys"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "$keyOwnerLabel — Key Revocation Certificate")
+            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.share_intent_subject_revocation_cert, keyOwnerLabel))
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         val chooser = Intent.createChooser(sendIntent, context.getString(R.string.share_intent_chooser_revocation_cert))
@@ -264,7 +264,7 @@ object KeyShareIntents {
             // destination we shouldn't be encouraging anyway.
             type = "application/pgp-keys"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "$keyOwnerLabel — PGP PRIVATE KEY (sensitive)")
+            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.share_intent_subject_private_key, keyOwnerLabel))
             // Receiving app needs read access to the content:// URI
             // for the duration of its Activity. Without this flag the
             // target gets a SecurityException on first read.

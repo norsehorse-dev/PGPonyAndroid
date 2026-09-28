@@ -57,6 +57,7 @@ import com.pgpony.android.crypto.PGPCryptoService
 import com.pgpony.android.ui.util.ScratchFiles
 import com.pgpony.android.data.PGPKeyEntity
 import com.pgpony.android.data.repository.KeyRepository
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.intent.ShareIntentContent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -429,7 +430,7 @@ class ShareTargetViewModel(
                 val out = withContext(Dispatchers.IO) {
                     val dest = ScratchFiles.allocate(PGPonyApp.instance, outName, ScratchFiles.SCOPE_QUICK)
                     val input = PGPonyApp.instance.contentResolver.openInputStream(uri)
-                        ?: throw java.io.IOException("Could not open the shared file")
+                        ?: throw java.io.IOException(PGPonyApp.instance.getString(R.string.share_target_error_open_shared_file))
                     input.use { source ->
                         dest.outputStream().buffered().use { sink ->
                             PGPCryptoService.shared.encryptStream(
@@ -459,7 +460,7 @@ class ShareTargetViewModel(
                 _state.update {
                     it.copy(
                         phase = ShareTargetPhase.Error,
-                        errorMessage = e.message ?: PGPonyApp.instance.getString(
+                        errorMessage = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(
                             R.string.share_target_error_no_input
                         ),
                     )
@@ -501,7 +502,7 @@ class ShareTargetViewModel(
                             com.pgpony.android.crypto.mime.MimeEnvelope.armoredPayloadOffset(it)
                         } ?: -1L
                     val input = PGPonyApp.instance.contentResolver.openInputStream(uri)
-                        ?: throw java.io.IOException("Could not open the shared file")
+                        ?: throw java.io.IOException(PGPonyApp.instance.getString(R.string.share_target_error_open_shared_file))
                     if (envelopeOffset > 0) {
                         var remaining = envelopeOffset
                         while (remaining > 0) {
@@ -558,7 +559,7 @@ class ShareTargetViewModel(
                 _state.update {
                     it.copy(
                         phase = ShareTargetPhase.Error,
-                        errorMessage = e.message ?: PGPonyApp.instance.getString(
+                        errorMessage = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(
                             R.string.share_target_error_no_input
                         ),
                     )
@@ -686,7 +687,7 @@ class ShareTargetViewModel(
                         phase = ShareTargetPhase.Error,
                         errorMessage = PGPonyApp.instance.getString(
                             R.string.share_target_error_generic_format,
-                            e.message ?: e.javaClass.simpleName,
+                            ErrorText.detail(e.message) ?: e.javaClass.simpleName,
                         ),
                     )
                 }
@@ -794,7 +795,7 @@ class ShareTargetViewModel(
                         phase = ShareTargetPhase.Error,
                         errorMessage = PGPonyApp.instance.getString(
                             R.string.share_target_error_generic_format,
-                            e.message ?: e.javaClass.simpleName,
+                            ErrorText.detail(e.message) ?: e.javaClass.simpleName,
                         ),
                     )
                 }
@@ -934,7 +935,7 @@ class ShareTargetViewModel(
                         phase = ShareTargetPhase.Error,
                         errorMessage = PGPonyApp.instance.getString(
                             R.string.share_target_error_generic_format,
-                            e.message ?: e.javaClass.simpleName,
+                            ErrorText.detail(e.message) ?: e.javaClass.simpleName,
                         ),
                     )
                 }

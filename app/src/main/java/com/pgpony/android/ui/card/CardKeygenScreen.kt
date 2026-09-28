@@ -27,6 +27,7 @@ import com.pgpony.android.MainActivity
 import com.pgpony.android.PGPonyApp
 import com.pgpony.android.R
 import com.pgpony.android.crypto.card.CardKeygenService
+import com.pgpony.android.i18n.ErrorText
 import kotlinx.coroutines.launch
 
 private const val PW1_MIN = 6
@@ -81,11 +82,11 @@ fun CardKeygenScreen(onBack: () -> Unit, onDone: () -> Unit = {}) {
                             repo.importGeneratedCardKey(r.publicKeyBinary, r.cardInfo)
                             state.value = KeygenState.Done(r.primaryFingerprintHex, r.subkeyFingerprintHex)
                         } catch (e: Exception) {
-                            state.value = KeygenState.Failed(e.message ?: saveFail)
+                            state.value = KeygenState.Failed(ErrorText.localize(context, e.message) ?: saveFail)
                         }
                     }
                 }
-                .onFailure { e -> state.value = KeygenState.Failed(e.message ?: genFail) }
+                .onFailure { e -> state.value = KeygenState.Failed(ErrorText.localize(context, e.message) ?: genFail) }
         } ?: false
         if (started != true) state.value = KeygenState.Failed(genFail)
     }

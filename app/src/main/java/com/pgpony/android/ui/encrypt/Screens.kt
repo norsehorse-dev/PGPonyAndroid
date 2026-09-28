@@ -71,6 +71,7 @@ import com.pgpony.android.crypto.card.CardLinkKind
 import com.pgpony.android.PGPonyApp
 import com.pgpony.android.R
 import com.pgpony.android.data.PGPKeyEntity
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.crypto.card.CardSigningService
 import com.pgpony.android.crypto.card.CardDecryptService
 import com.pgpony.android.ui.components.ReadOnlyTextOutput
@@ -729,7 +730,7 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
                                 cardActivity?.endCardOperation()
                                 result
                                     .onSuccess { viewModel.onCardEncryptFileSuccess(it) }
-                                    .onFailure { e -> viewModel.onCardSignFailure(e.message ?: cardSignFailedMsg) }
+                                    .onFailure { e -> viewModel.onCardSignFailure(ErrorText.localize(encryptContext, e.message) ?: cardSignFailedMsg) }
                             }
                         } else if (state.mode == EncryptMode.BUNDLE) {
                             // 4.1.0 Phase 15. The Bundle card route. The two
@@ -768,7 +769,7 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
                                 cardActivity?.endCardOperation()
                                 result
                                     .onSuccess { viewModel.onCardBundleSuccess(it) }
-                                    .onFailure { e -> viewModel.onCardSignFailure(e.message ?: cardSignFailedMsg) }
+                                    .onFailure { e -> viewModel.onCardSignFailure(ErrorText.localize(encryptContext, e.message) ?: cardSignFailedMsg) }
                             }
                         } else {
                             // SIGN clear-signs; TEXT encrypts-and-signs.
@@ -825,7 +826,7 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
                                 cardActivity?.endCardOperation()
                                 result
                                     .onSuccess { viewModel.onCardSignSuccess(it) }
-                                    .onFailure { e -> viewModel.onCardSignFailure(e.message ?: cardSignFailedMsg) }
+                                    .onFailure { e -> viewModel.onCardSignFailure(ErrorText.localize(encryptContext, e.message) ?: cardSignFailedMsg) }
                             }
                         }
                         if (started != true) {
@@ -2560,15 +2561,10 @@ internal fun StreamProgressRow(
     }
 }
 
-internal fun formatFileSize(bytes: Long): String {
-    if (bytes < 1000) return "$bytes B"
-    val kb = bytes / 1000.0
-    if (kb < 1000) return "%.1f KB".format(kb)
-    val mb = kb / 1000.0
-    if (mb < 1000) return "%.1f MB".format(mb)
-    val gb = mb / 1000.0
-    return "%.1f GB".format(gb)
-}
+// 4.6.2: the system formatter uses the user's locale for the number and unit.
+@androidx.compose.runtime.Composable
+internal fun formatFileSize(bytes: Long): String =
+    android.text.format.Formatter.formatShortFileSize(LocalContext.current, bytes)
 
 // ── Phase A10c: decrypt file picker UI ─────────────────────────────────
 //
@@ -3720,7 +3716,14 @@ fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
                             count = DecryptMode.entries.size
                         )
                     ) {
-                        Text(m.displayName)
+                        // 4.6.2: localized label instead of the enum's English displayName.
+                        Text(
+                            when (m) {
+                                DecryptMode.TEXT -> stringResource(R.string.decrypt_mode_text)
+                                DecryptMode.FILE -> stringResource(R.string.decrypt_mode_file)
+                                DecryptMode.VERIFY -> stringResource(R.string.decrypt_mode_verify)
+                            }
+                        )
                     }
                 }
             }
@@ -3957,7 +3960,7 @@ fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
                                 decryptActivity?.endCardOperation()
                                 result
                                     .onSuccess { viewModel.onCardDecryptFileSuccess(it) }
-                                    .onFailure { e -> viewModel.onCardDecryptFailure(e.message ?: cardDecFailedMsg) }
+                                    .onFailure { e -> viewModel.onCardDecryptFailure(ErrorText.localize(context, e.message) ?: cardDecFailedMsg) }
                             }
                         } else {
                             val msg = state.inputText
@@ -3981,7 +3984,7 @@ fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
                                 decryptActivity?.endCardOperation()
                                 result
                                     .onSuccess { viewModel.onCardDecryptSuccess(it) }
-                                    .onFailure { e -> viewModel.onCardDecryptFailure(e.message ?: cardDecFailedMsg) }
+                                    .onFailure { e -> viewModel.onCardDecryptFailure(ErrorText.localize(context, e.message) ?: cardDecFailedMsg) }
                             }
                         }
                         if (started != true) {

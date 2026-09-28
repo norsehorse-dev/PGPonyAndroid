@@ -14,6 +14,7 @@
 
 package com.pgpony.android.ui.keyring
 
+import com.pgpony.android.R
 import com.pgpony.android.crypto.CertificateBindings
 import com.pgpony.android.crypto.SubkeyCapability
 
@@ -81,9 +82,15 @@ internal object SubkeyRows {
         16 -> "ElGamal"
         17 -> "DSA"
         1, 2, 3 -> rsaBits(s)?.let { "RSA $it" } ?: "RSA"
-        8 -> if (s.version == 5) libreKemLabel(s) else "Subkey"
-        else -> "Subkey"
+        8 -> if (s.version == 5) libreKemLabel(s) else genericLabel()
+        else -> genericLabel()
     }
+
+    // 4.6.2: the fallback label is shown on Key Detail, so it is localized.
+    // Unit tests have no Application, so they get the English label.
+    private fun genericLabel(): String =
+        com.pgpony.android.i18n.ErrorText.appContext()
+            ?.getString(R.string.key_detail_subkey_label_generic) ?: "Subkey"
 
     private fun libreKemLabel(s: CertificateBindings.SubkeyState): String {
         val curve = runCatching {

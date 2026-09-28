@@ -29,6 +29,7 @@ import com.pgpony.android.contacts.ContactsService
 import com.pgpony.android.data.PGPKeyEntity
 import com.pgpony.android.data.repository.ImportResolution
 import com.pgpony.android.data.repository.KeyRepository
+import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.network.KeyServerRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -154,7 +155,7 @@ class ContactsViewModel(
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     isLoading = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.contacts_vm_error_load_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.contacts_vm_error_load_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -181,7 +182,7 @@ class ContactsViewModel(
                 }
                 if (count > 0) {
                     _state.value = _state.value.copy(
-                        successMessage = if (count == 1) PGPonyApp.instance.getString(R.string.contacts_vm_status_linked_one_format, count) else PGPonyApp.instance.getString(R.string.contacts_vm_status_linked_many_format, count)
+                        successMessage = PGPonyApp.instance.resources.getQuantityString(R.plurals.contacts_vm_status_linked_count, count, count)
                     )
                     refreshContacts()
                 } else {
@@ -191,7 +192,7 @@ class ContactsViewModel(
                 }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
-                    errorMessage = PGPonyApp.instance.getString(R.string.contacts_vm_error_auto_match_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.contacts_vm_error_auto_match_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -216,7 +217,7 @@ class ContactsViewModel(
                             PGPonyApp.instance.getString(R.string.import_result_already_in_keyring)
                         ImportResolution.MERGED_NEW_MATERIAL ->
                             PGPonyApp.instance.getString(R.string.import_result_merged)
-                        else -> "Key found and imported for $contactName"
+                        else -> PGPonyApp.instance.getString(R.string.contacts_vm_status_key_imported_format, contactName)
                     }
                     _state.value = _state.value.copy(
                         discoveringEmail = null,
@@ -233,7 +234,7 @@ class ContactsViewModel(
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     discoveringEmail = null,
-                    errorMessage = PGPonyApp.instance.getString(R.string.contacts_vm_error_search_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.contacts_vm_error_search_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }
@@ -295,7 +296,7 @@ class ContactsViewModel(
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     bulkScanActive = false,
-                    errorMessage = PGPonyApp.instance.getString(R.string.contacts_vm_error_bulk_scan_failed_format, e.message ?: "")
+                    errorMessage = PGPonyApp.instance.getString(R.string.contacts_vm_error_bulk_scan_failed_format, ErrorText.detail(e.message) ?: "")
                 )
             }
         }

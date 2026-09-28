@@ -1,0 +1,30 @@
+PGPony 是一款 Android 上的 OpenPGP 应用。加密、解密、签名和验证消息与文件，管理你的密钥环，并通过 NFC 使用硬件安全密钥，全部在设备本地完成。
+
+功能：
+
+- 加密、解密、签名和验证文本与文件
+- 后量子加密：ML-KEM-768 + X25519（Kyber）组合密钥，同时支持 IETF 草案（v6）和 LibrePGP / GnuPG 2.5（v5）两种格式
+- OpenPGP 提供程序服务：让 PGPony 作为 Thunderbird for Android、K-9 Mail 和 Password Store 的加密引擎（兼容 OpenKeychain 的 API）
+- 生成现代密钥，包括 RFC 9580（OpenPGP v6）Ed25519 和 X25519，并以 Argon2id 保护口令
+- 通过 NFC 使用硬件安全密钥，包括 YubiKey 5 NFC 和 Token2，支持卡上生成密钥、解密、签名、PIN 管理和恢复出厂设置
+- 读取你的 pass 密码库条目，包括受硬件密钥保护的条目
+- 加密的密钥环备份与恢复，并可导入 OpenKeychain 备份
+- PGP/MIME 电子邮件：解密带附件的邮件，撰写加密的 .eml
+- 通过 WKD 和 keys.openpgp.org 验证型密钥服务器发现密钥；可选经由 Orbot 走 Tor 网络
+- 可选的联系人集成，方便选择收件人
+- 二维码导入与扫描密钥
+- 默认签名密钥、生物识别锁和安全屏幕保护
+
+后量子加密的限制：
+
+后量子 OpenPGP 仍在标准化过程中，因此各工具之间的支持有限：
+
+- LibrePGP 格式（v5）的密钥目前可与 GnuPG 2.5 及以上版本互通：消息可双向加密和解密，公钥也能正常导入。GnuPG 目前还无法从任何应用导入后量子私钥，因为它使用专有的内部格式存储私钥。
+- IETF 格式（v6）的密钥实现了 draft-ietf-openpgp-pqc，并已通过该草案官方测试向量的验证。但当前的 Sequoia（sq）预览版实现的是另一个草案修订版，暂时无法读取这些密钥；GnuPG 完全不支持这种格式。
+- 传统密钥（RSA、Ed25519、v4 和 v6）不受影响。
+
+PGPony 没有账户、广告、分析或跟踪。F-Droid 版本不含任何 Google 服务，可在去 Google 化的设备上完整运行。
+
+加密核心作为开源项目单独发布（PGPonyCore-Kotlin），完整的应用源代码以 Apache-2.0 许可证提供。
+
+本页及应用的简体中文翻译大部分由机器生成，欢迎指正。
