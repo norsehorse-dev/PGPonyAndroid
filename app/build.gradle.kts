@@ -254,8 +254,11 @@ android {
         // Quick Action, SSH authentication service (#68), key-server merge and
         // the security review remediation. versionCode 460 so it installs over
         // 4.5.3.
-        versionCode = 461
-        versionName = "4.6.1"
+        // 4.6.2: Simplified Chinese, Ukrainian and Turkish join the picker; Korean
+        // gains the strings its translator has finished so far; text and error
+        // messages that were hardcoded in English become translatable.
+        versionCode = 462
+        versionName = "4.6.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
