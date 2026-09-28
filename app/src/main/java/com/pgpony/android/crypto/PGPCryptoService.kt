@@ -214,7 +214,11 @@ data class DecryptResult(
     /** item 11 (#54 Finding C): signer trust grade. VERIFIED only when the
      *  crypto check passed AND the signer key is unrevoked, unexpired, and
      *  sign-flagged. [signatureVerified] is now (signerStatus == VERIFIED). */
-    val signerStatus: SignerStatus = SignerStatus.NONE
+    val signerStatus: SignerStatus = SignerStatus.NONE,
+    /** 4.7.0 (#64, SOP): every signature packet in the message, encoded, in
+     *  order. The fields above grade only the first; a caller that reports each
+     *  signature (the SOP wrapper) verifies these against [data] itself. */
+    val signaturePackets: List<ByteArray> = emptyList()
 )
 
 /**
@@ -238,7 +242,9 @@ data class DecryptStreamResult(
      *  [compositeInlineBytes] via CompositeDocumentVerifier. */
     val compositeInline: Boolean = false,
     val compositeInlineBytes: ByteArray? = null,
-    val compositeClaimedSignerFp: String? = null
+    val compositeClaimedSignerFp: String? = null,
+    /** 4.7.0 (#64, SOP): see [DecryptResult.signaturePackets]. */
+    val signaturePackets: List<ByteArray> = emptyList()
 )
 
 
@@ -2427,6 +2433,7 @@ class PGPCryptoService private constructor() {
         var bytesWritten = 0L
         var wroteLiteral = false
         var filename: String? = null
+        val signaturePackets = mutableListOf<ByteArray>()
         var signerStatus = SignerStatus.NONE
         var signerKeyID: String? = null
         var onePassSig: PGPOnePassSignature? = null
@@ -2476,6 +2483,7 @@ class PGPCryptoService private constructor() {
                     }
                 }
                 is PGPSignatureList -> {
+                    obj.forEach { signaturePackets.add(it.encoded) }
                     if (obj.size() > 0) {
                         hasSignature = true
                         if (signatureKeyIDRaw == null) signatureKeyIDRaw = obj[0].keyID
@@ -2510,7 +2518,8 @@ class PGPCryptoService private constructor() {
             signerKeyID = signerKeyID,
             hasSignature = hasSignature,
             signatureKeyIDRaw = signatureKeyIDRaw,
-            signerStatus = signerStatus
+            signerStatus = signerStatus,
+            signaturePackets = signaturePackets
         )
     }
 
@@ -2775,6 +2784,7 @@ class PGPCryptoService private constructor() {
     ): DecryptResult {
         var literalData: ByteArray? = null
         var filename: String? = null
+        val signaturePackets = mutableListOf<ByteArray>()
         var signerStatus = SignerStatus.NONE
         var signerKeyID: String? = null
         var onePassSig: PGPOnePassSignature? = null
@@ -2829,6 +2839,7 @@ class PGPCryptoService private constructor() {
                     literalData = buffer.toByteArray()
                 }
                 is PGPSignatureList -> {
+                    obj.forEach { signaturePackets.add(it.encoded) }
                     // P2b-1: a signature packet counts as "signed" even
                     // without a preceding one-pass header (older
                     // sig-then-literal layouts) and even when unheld.
@@ -2874,7 +2885,8 @@ class PGPCryptoService private constructor() {
             filename = filename,
             hasSignature = hasSignature,
             signatureKeyIDRaw = signatureKeyIDRaw,
-            signerStatus = signerStatus
+            signerStatus = signerStatus,
+            signaturePackets = signaturePackets
         )
     }
 
@@ -2892,7 +2904,9 @@ class PGPCryptoService private constructor() {
         secretKeyRing: PGPSecretKeyRing,
         passphrase: String,
         detached: Boolean = false,
-        armor: Boolean = true
+        armor: Boolean = true,
+        // 4.7.0 (#64, SOP): a canonical text signature (type 0x01) over the data.
+        textMode: Boolean = false
     ): ByteArray {
         try {
             val signingKey = pickSigningSecretKey(secretKeyRing)
@@ -2910,7 +2924,7 @@ class PGPCryptoService private constructor() {
                 ),
                 signingKey.publicKey
             )
-            sigGen.init(PGPSignature.BINARY_DOCUMENT, privateKey)
+            sigGen.init(if (textMode) PGPSignature.CANONICAL_TEXT_DOCUMENT else PGPSignature.BINARY_DOCUMENT, privateKey)
 
             // Add issuer fingerprint subpacket
             val subpacketGen = PGPSignatureSubpacketGenerator()

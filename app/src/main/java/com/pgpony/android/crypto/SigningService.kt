@@ -166,14 +166,17 @@ class SigningService private constructor() {
         passphrase: String? = null,
         hashAlgorithm: Int = DEFAULT_HASH_ALGORITHM,
         armor: Boolean = true,
-        signingKeyId: Long? = null
+        signingKeyId: Long? = null,
+        // 4.7.0 (#64, SOP): a canonical text signature (type 0x01). BouncyCastle
+        // canonicalizes line endings to CRLF while hashing, so [data] is passed as-is.
+        textMode: Boolean = false
     ): ByteArray {
         val signingKey = pickSigningKey(secretKeyRing, signingKeyId)
         val sigGen = buildSignatureGenerator(
             signingKey = signingKey,
             passphrase = passphrase,
             hashAlgorithm = hashAlgorithm,
-            signatureType = PGPSignature.BINARY_DOCUMENT
+            signatureType = if (textMode) PGPSignature.CANONICAL_TEXT_DOCUMENT else PGPSignature.BINARY_DOCUMENT
         )
 
         sigGen.update(data, 0, data.size)
