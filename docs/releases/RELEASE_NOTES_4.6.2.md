@@ -59,13 +59,13 @@ can no longer reach the app as a crash. The check only reads the string files an
 Whole-file SHA-256 (is this download the published file):
 
 ```
-<APK_SHA256>
+856ab53741eac9154474a5e4ea8c728b82d4f4652d468f4ce5a083fc7b3cc743
 ```
 
 Content hash (for rebuilders; excludes signature, see docs/REPRODUCIBLE_BUILDS_PLAYBOOK.md):
 
 ```
-<CONTENT_HASH>
+6c94aa270a854d6344d6fca678142969aa3015e914862efc271041254109ea25
 ```
 
 The APK is signed with the NorseHorse release key
