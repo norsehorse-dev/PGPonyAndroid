@@ -206,33 +206,7 @@ review together with the card code it extends.
 
 ## 14. Simplified Chinese (zh-Hans)
 
-Priority: medium (localization). Origin: a user, by email, Sep 26 2026.
-
-Requested: a Simplified Chinese interface.
-
-Approach: NorseHorse does not read Chinese, so this is mostly machine translation. PGPony iOS already has a
-zh-Hans translation done by a Chinese-speaking tester; reuse those strings wherever the Android string has the
-same meaning (key terms first: encrypt, decrypt, sign, verify, key pair, subkey, fingerprint, keyring, trust
-levels, passphrase), so the vocabulary matches iOS, and machine-translate the rest (about 1,570 strings and 6
-plurals as of 4.6.1). Say plainly in the release notes and the reply that the translation is mostly machine-made,
-and invite corrections.
-
-Work:
-
-- New resource folder values-b+zh+Hans (script qualifier, so it covers zh-CN, zh-SG and any other Simplified
-  locale, not only mainland China). Keep format arguments (%1$s, %1$d), escapes (\', \n) and XML entities
-  intact; run the string-resource lint and a format-argument check against values/.
-- Add zh-Hans to res/xml/locales_config.xml and to the in-app picker (i18n/LanguageManager: "简体中文").
-- Plurals: Chinese uses only the "other" form.
-- Fastlane: fastlane/metadata/android/zh-CN/ (title, short and full description; changelogs can stay English
-  until someone reviews them), and the Play listing translation.
-- Check layouts for text overflow is not the issue it is for German; check instead that CJK fonts render in the
-  QR/Exchange and monospace fingerprint views.
-- Ask the iOS translator, and the user who asked, to review the most-used screens (Encrypt, Decrypt, Keyring,
-  Key Detail, Settings, the share dialog) before the release.
-
-Related: values-ko exists but is not in locales_config, and much of it is still English. Either finish Korean the
-same way or remove the folder, so the picker and the resources agree.
+Moved to 4.6.2 (docs/planning/PLANNING_4.6.2.md), a translations-only release with Ukrainian and Turkish.
 
 
 ## 15. ML-DSA keys cannot sign a package (#72)
@@ -328,6 +302,53 @@ Desktop 3.0.0 stage 2, which ported this code and tested it on its own.
 Test: AddSubkeyLifetimeTest, UserIdRevokeTieTest. On device: add a subkey with "1 year" and check its
 expiry in Key Detail and in `gpg --list-keys`; add a User ID and revoke it at once; set a post-quantum
 signing default and encrypt to a composite ML-DSA key.
+
+## 17. Messages from GpgFrontend to a PGPony ML-DSA-65 key do not decrypt (#73)
+
+Priority: high (bug, interop). Origin: Hxs2fJKjYZ (#73), on 4.6.1.
+
+Reported: with an ML-DSA-65 v6 key generated in PGPony and one generated in GpgFrontend (latest), PGPony encrypts
+to the GpgFrontend key and GpgFrontend decrypts it, but a message GpgFrontend encrypts to the PGPony key fails in
+PGPony with "Decryption failed: no held composite secret key for any of the 1 composite recipients in this
+message". So PGPony parsed the composite (algo 35) PKESK, then found no held key matching its recipient.
+
+Candidate cause, from reading CompositeDecryptor (confirm against the reporter's message before fixing):
+
+- findRawCompositeByKeyId, used when the PKESK is version 3 (recipient named by an 8-octet key ID, SEIPDv1),
+  compares the key ID with the LAST 8 octets of the subkey fingerprint. That is right for a v4 fingerprint but
+  wrong for v6: RFC 9580 defines a v6 key ID as the FIRST 8 octets of the 32-octet fingerprint. A PGPony v6
+  composite key is always read from its raw ring (BouncyCastle cannot load the ML-DSA primary), so a v3 PKESK
+  addressed to it can never match. Check whether PGPony's own mixed v4/v6 messages (4.6.0 item 14 sends v3
+  PKESKs there) hit the same miss for an ML-DSA recipient; the existing tests may only cover BouncyCastle-held
+  keys, which take the other lookup.
+- Both lookups (by key ID and by fingerprint) check only CompositeKeyFacade.parse(ring).encryptionSubkey, the
+  first ML-KEM subkey. A key with more than one ML-KEM subkey (4.6.0 item 19 allows it) misses any message
+  addressed to the others.
+- Less likely: GpgFrontend addresses the PKESK with a different form of the fingerprint (with or without the key
+  version octet), or uses an anonymous recipient; the anonymous path trials every held key, so that one should
+  already work.
+
+Reporter's data (Sep 27 2026): GpgFrontend's built-in rPGP engine sends a VERSION 3 PKESK (recipient key ID
+06E6E9D9B8C7E936, ML-KEM-768+X25519) with a version 1 SEIPD to the v6 key. That is exactly the key-ID lookup path
+described above, so the v3 path is confirmed as the one in use. The public key attached to the comment is a
+different temporary key: its encryption subkey's v6 fingerprint is AE1329ADF434118F...FE346018, which matches the
+recipient ID by neither the leading nor the trailing 8 octets, so it is not the key that message was encrypted to.
+A matched pair (message plus the public key it was encrypted to) is still needed for the regression fixture; the
+fix itself does not wait on it.
+
+Work:
+
+- Ask the reporter for a packet dump of a failing message (`gpg --list-packets` or `sq packet dump`; no secret
+  key needed) and the PGPony public key, and add both as a test fixture.
+- Key ID by version: first 8 octets for a v6 key, last 8 for v4, in findRawCompositeByKeyId and anywhere else a
+  key ID is derived by hand (grep copyOfRange(fp.size - 8)).
+- Match against every ML-KEM subkey of a held key, not only the first, in both lookups.
+- Make the failure name what it looked for: the recipient key ID or fingerprint from the PKESK and the held
+  composite keys it tried, so a report like this points at the cause directly.
+- Interop test in the suite: a v3 PKESK + SEIPDv1 message and a v6 PKESK + SEIPDv2 message to a PGPony
+  ML-DSA-65 key, one to a key with two ML-KEM subkeys, and the reporter's fixture. Then check both directions
+  against GpgFrontend on device.
+
 
 ## Release process notes (learned in 4.6.0)
 
