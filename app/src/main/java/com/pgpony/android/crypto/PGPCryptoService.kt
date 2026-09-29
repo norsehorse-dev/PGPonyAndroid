@@ -1837,6 +1837,12 @@ class PGPCryptoService private constructor() {
         // the UI can name which of the user's keys actually decrypted.
         var decryptingKeyId: Long? = null
         try {
+            // 3.0.0 (5d-2): the message must be well formed (MessageGrammar):
+            // ESKs, one encrypted data packet and nothing after it, with ESKs
+            // of an unknown version or algorithm, or of the wrong version for
+            // the encrypted data, skipped. A message that needed no change is
+            // passed on exactly as given.
+            val encryptedData = outerChecked(encryptedData)
             // Phase 2b: a composite (ML-KEM+X25519, algo 35) PKESK can't be
             // parsed by BouncyCastle (its PKESK reader throws on the unknown
             // algorithm), so try the hand-rolled composite path first. It
@@ -1983,7 +1989,11 @@ class PGPCryptoService private constructor() {
                 }
                 return bufOut.toByteArray()
             }
-            fun parsePlain(plainBytes: ByteArray): DecryptResult {
+            fun parsePlain(decrypted: ByteArray): DecryptResult {
+                // 3.0.0 (5d-2): the decrypted content must be one well-formed
+                // message (no second literal, no stray packets after it);
+                // signatures of an unknown version or algorithm are dropped.
+                val plainBytes = plaintextChecked(decrypted)
                 if (com.pgpony.android.crypto.pqc.CompositeDocumentVerifier.isCompositeInline(plainBytes)) {
                     val content = com.pgpony.android.crypto.pqc.CompositeDocumentVerifier.inlineContent(plainBytes)
                         ?: throw PGPCryptoError.DecryptionFailed("No literal data in composite inline message")
@@ -3484,6 +3494,37 @@ class PGPCryptoService private constructor() {
         if (!key.isMasterKey && !key.publicKey.signatures.hasNext()) return true
         val report = runCatching { CertificateBindings.analyze(ring.encoded) }.getOrNull() ?: return true
         return report.mayDecryptWith(fingerprintHex(key.publicKey))
+    }
+
+    /**
+     * 3.0.0 (5d-2): [input] (armored or binary) checked by
+     * MessageGrammar.normalizeOuter. The input itself when it needed no
+     * change, otherwise the rewritten binary message.
+     */
+    private fun outerChecked(input: ByteArray): ByteArray {
+        // A cleartext signed message is not a packet sequence; it keeps its own path.
+        val head = String(input, 0, minOf(input.size, 256), Charsets.ISO_8859_1)
+        if (head.contains("-----BEGIN PGP SIGNED MESSAGE-----")) return input
+        val binary = if (isArmored(input)) {
+            runCatching { ArmoredInputStream(ByteArrayInputStream(input)).readBytes() }.getOrNull() ?: return input
+        } else input
+        val checked = try {
+            MessageGrammar.normalizeOuter(binary)
+        } catch (e: MessageGrammar.Truncated) {
+            throw PGPCryptoError.MessageIncomplete()
+        } catch (e: MessageGrammar.Malformed) {
+            throw PGPCryptoError.DecryptionFailed("Malformed message: ${e.message}")
+        }
+        return if (checked === binary) input else checked
+    }
+
+    /** 3.0.0 (5d-2): decrypted content checked by MessageGrammar.normalizePlaintext. */
+    private fun plaintextChecked(plain: ByteArray): ByteArray = try {
+        MessageGrammar.normalizePlaintext(plain)
+    } catch (e: MessageGrammar.Truncated) {
+        throw PGPCryptoError.DecryptionFailed("Malformed message: truncated packet")
+    } catch (e: MessageGrammar.Malformed) {
+        throw PGPCryptoError.DecryptionFailed("Malformed message: ${e.message}")
     }
 
     /** Find a public key by key ID across multiple key rings. */
