@@ -218,7 +218,13 @@ data class DecryptResult(
     /** 4.7.0 (#64, SOP): every signature packet in the message, encoded, in
      *  order. The fields above grade only the first; a caller that reports each
      *  signature (the SOP wrapper) verifies these against [data] itself. */
-    val signaturePackets: List<ByteArray> = emptyList()
+    val signaturePackets: List<ByteArray> = emptyList(),
+    /** 3.0.0 (5d-3): label of the signer key ("RSA 1024", "DSA") when the
+     *  signature verified but the key is weak; the screen warns about it. */
+    val signerWeakKey: String? = null,
+    /** 3.0.0 (5d-3): label of the held key that decrypted the message when
+     *  that key is weak; the screen warns about it. */
+    val decryptionWeakKey: String? = null
 )
 
 /**
@@ -244,7 +250,9 @@ data class DecryptStreamResult(
     val compositeInlineBytes: ByteArray? = null,
     val compositeClaimedSignerFp: String? = null,
     /** 4.7.0 (#64, SOP): see [DecryptResult.signaturePackets]. */
-    val signaturePackets: List<ByteArray> = emptyList()
+    val signaturePackets: List<ByteArray> = emptyList(),
+    /** 3.0.0 (5d-3): see [DecryptResult.signerWeakKey]. */
+    val signerWeakKey: String? = null
 )
 
 
@@ -754,6 +762,8 @@ class PGPCryptoService private constructor() {
             val secretRing = PGPSecretKeyRing(
                 ByteArrayInputStream(normalizedBytes), JcaKeyFingerprintCalculator()
             )
+            // 3.0.0 (5d-3): refuse a protection RFC 9580 forbids (KeyPolicy).
+            KeyPolicy.requireAcceptableProtection(secretRing)
             val masterKey = secretRing.publicKey
             val fingerprint = fingerprintHex(masterKey)
             val userID = masterKey.userIDs.asSequence().firstOrNull() ?: "Unknown"
@@ -771,6 +781,8 @@ class PGPCryptoService private constructor() {
                 publicKeyRing = publicRing,
                 secretKeyRing = secretRing
             )
+        } catch (e: KeyPolicy.RefusedProtection) {
+            throw PGPCryptoError.ImportFailed(e.message ?: "refused key protection")
         } catch (_: Exception) {
             // Not a secret key — try public
         }
@@ -815,6 +827,8 @@ class PGPCryptoService private constructor() {
         // Try binary secret key ring
         try {
             val secretRing = PGPSecretKeyRing(bytes, JcaKeyFingerprintCalculator())
+            // 3.0.0 (5d-3): refuse a protection RFC 9580 forbids (KeyPolicy).
+            KeyPolicy.requireAcceptableProtection(secretRing)
             val masterKey = secretRing.publicKey
             val publicRing = PGPPublicKeyRing(
                 secretRing.publicKeys.asSequence().map { it }.toList()
@@ -828,6 +842,8 @@ class PGPCryptoService private constructor() {
                 publicKeyRing = publicRing,
                 secretKeyRing = secretRing
             )
+        } catch (e: KeyPolicy.RefusedProtection) {
+            throw PGPCryptoError.ImportFailed(e.message ?: "refused key protection")
         } catch (_: Exception) { }
 
         // Try binary public key ring (4.6.0 item 17.1: verified components only)
@@ -1183,8 +1199,10 @@ class PGPCryptoService private constructor() {
             val compositeRequested = compositeSignSecret != null && compositeSignSuite != null &&
                 compositeSignerFingerprint != null
             val signComposite = compositeRequested && (allRecipientsV6 || compositeSignInSeipdV1)
+            // 3.0.0 (5d-3): the strongest cipher every recipient lists
+            // (RecipientPreferences); AES-256 when none limits it.
             val encBuilder = org.bouncycastle.openpgp.operator.bc.BcPGPDataEncryptorBuilder(
-                SymmetricKeyAlgorithmTags.AES_256
+                RecipientPreferences.cipherFor(recipientPublicKeys)
             )
             val encGen = if (allRecipientsV6) {
                 encBuilder
@@ -1202,7 +1220,7 @@ class PGPCryptoService private constructor() {
             // Add each recipient's encryption subkey
             for (ring in recipientPublicKeys) {
                 val encKey = findEncryptionKey(ring, recipientSubkeyChoices[fingerprintHex(ring.publicKey)])
-                    ?: throw PGPCryptoError.EncryptionFailed("No encryption subkey found for ${fingerprintHex(ring.publicKey)}")
+                    ?: throw noEncryptionKey(ring)
                 if (com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(encKey.algorithm) != null) {
                     encryptedGen.addMethod(
                         com.pgpony.android.crypto.pqc.CompositeEncryptionMethodGenerator(encKey)
@@ -1321,7 +1339,8 @@ class PGPCryptoService private constructor() {
 
                 sigGen = PGPSignatureGenerator(
                     org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder(
-                        signingKey.publicKey.algorithm, HashAlgorithmTags.SHA256
+                        // 3.0.0 (5d-3): the strongest hash every recipient lists.
+                        signingKey.publicKey.algorithm, RecipientPreferences.hashFor(recipientPublicKeys)
                     ),
                     signingKey.publicKey
                 )
@@ -1478,7 +1497,8 @@ class PGPCryptoService private constructor() {
             }
             sigGen = PGPSignatureGenerator(
                 org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder(
-                    signingKey.publicKey.algorithm, HashAlgorithmTags.SHA256
+                    // 3.0.0 (5d-3): the strongest hash every recipient lists.
+                    signingKey.publicKey.algorithm, RecipientPreferences.hashFor(recipientPublicKeys)
                 ),
                 signingKey.publicKey
             )
@@ -1511,7 +1531,7 @@ class PGPCryptoService private constructor() {
                         it.publicKey.version == org.bouncycastle.bcpg.PublicKeyPacket.VERSION_6
                     })
             val encBuilder = org.bouncycastle.openpgp.operator.bc.BcPGPDataEncryptorBuilder(
-                SymmetricKeyAlgorithmTags.AES_256
+                RecipientPreferences.cipherFor(recipientPublicKeys) // 3.0.0 (5d-3)
             )
             val encGen = if (allRecipientsV6) {
                 encBuilder
@@ -1526,9 +1546,7 @@ class PGPCryptoService private constructor() {
             val encryptedGen = PGPEncryptedDataGenerator(encGen)
             for (ring in recipientPublicKeys) {
                 val encKey = findEncryptionKey(ring, recipientSubkeyChoices[fingerprintHex(ring.publicKey)])
-                    ?: throw PGPCryptoError.EncryptionFailed(
-                        "No encryption subkey found for ${fingerprintHex(ring.publicKey)}"
-                    )
+                    ?: throw noEncryptionKey(ring)
                 if (com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(encKey.algorithm) != null) {
                     encryptedGen.addMethod(
                         com.pgpony.android.crypto.pqc.CompositeEncryptionMethodGenerator(encKey)
@@ -2065,7 +2083,10 @@ class PGPCryptoService private constructor() {
                     )
                 }
             }
-            return result.copy(decryptingKeyIdRaw = decryptingKeyId)
+            val weakDecryptor = decryptingKeyId?.let { id ->
+                secretKeyRings.firstNotNullOfOrNull { r -> r.getPublicKey(id)?.let { KeyPolicy.weakLabel(it, r.publicKey) } }
+            }
+            return result.copy(decryptingKeyIdRaw = decryptingKeyId, decryptionWeakKey = weakDecryptor)
 
         } catch (e: com.pgpony.android.crypto.pqc.CompositeSecretKeyMaterial.ProtectedKeyException) {
             // #26 (RC4): a locked composite key surfaces as "passphrase required"
@@ -2459,6 +2480,7 @@ class PGPCryptoService private constructor() {
         var filename: String? = null
         val signaturePackets = mutableListOf<ByteArray>()
         var signerStatus = SignerStatus.NONE
+        var signerWeakKey: String? = null
         var signerKeyID: String? = null
         var onePassSig: PGPOnePassSignature? = null
         var hasSignature = false
@@ -2525,6 +2547,9 @@ class PGPCryptoService private constructor() {
                         } else {
                             SignerStatus.INVALID
                         }
+                        if (signerStatus == SignerStatus.VERIFIED) {
+                            signerWeakKey = weakSignerLabel(obj[0].keyID, verificationKeys)
+                        }
                     } else if (obj.size() > 0) {
                         signerStatus = SignerStatus.UNKNOWN_SIGNER
                     }
@@ -2543,7 +2568,8 @@ class PGPCryptoService private constructor() {
             hasSignature = hasSignature,
             signatureKeyIDRaw = signatureKeyIDRaw,
             signerStatus = signerStatus,
-            signaturePackets = signaturePackets
+            signaturePackets = signaturePackets,
+            signerWeakKey = signerWeakKey
         )
     }
 
@@ -2810,6 +2836,7 @@ class PGPCryptoService private constructor() {
         var filename: String? = null
         val signaturePackets = mutableListOf<ByteArray>()
         var signerStatus = SignerStatus.NONE
+        var signerWeakKey: String? = null
         var signerKeyID: String? = null
         var onePassSig: PGPOnePassSignature? = null
         // P2b-1: track signature PRESENCE and the raw signing key id
@@ -2884,6 +2911,9 @@ class PGPCryptoService private constructor() {
                         } else {
                             SignerStatus.INVALID
                         }
+                        if (signerStatus == SignerStatus.VERIFIED) {
+                            signerWeakKey = weakSignerLabel(obj[0].keyID, verificationKeys)
+                        }
                     } else if (obj.size() > 0) {
                         signerStatus = SignerStatus.UNKNOWN_SIGNER
                     }
@@ -2910,7 +2940,8 @@ class PGPCryptoService private constructor() {
             hasSignature = hasSignature,
             signatureKeyIDRaw = signatureKeyIDRaw,
             signerStatus = signerStatus,
-            signaturePackets = signaturePackets
+            signaturePackets = signaturePackets,
+            signerWeakKey = signerWeakKey
         )
     }
 
@@ -3294,6 +3325,7 @@ class PGPCryptoService private constructor() {
         while (iterator.hasNext()) {
             val secretKey = iterator.next()
             val pub = secretKey.publicKey
+            if (KeyPolicy.isWeak(pub, ring.publicKey)) continue // 3.0.0 (5d-3): weak keys are read-only
             val caps = SubkeyCapability.fromPgpPublicKey(pub, detectAlgorithm(pub), pub.isMasterKey)
             if (SubkeyCapability.hasCapability(caps, SubkeyCapability.Sign)) {
                 if (!pub.isMasterKey) return secretKey       // prefer a signing subkey
@@ -3313,6 +3345,7 @@ class PGPCryptoService private constructor() {
         while (it.hasNext()) {
             val sk = it.next()
             val pub = sk.publicKey
+            if (KeyPolicy.isWeak(pub, ring.publicKey)) continue // 3.0.0 (5d-3): weak keys are read-only
             val caps = SubkeyCapability.fromPgpPublicKey(pub, detectAlgorithm(pub), pub.isMasterKey)
             if (SubkeyCapability.hasCapability(caps, SubkeyCapability.Sign)) {
                 if (pub.isMasterKey) primary = sk else subs.add(sk)
@@ -3487,7 +3520,29 @@ class PGPCryptoService private constructor() {
      * marks for encryption (see CertificateBindings.Report.mayDecryptWith);
      * a ring that cannot be analysed keeps the old behaviour.
      */
+    /** The error for a recipient without a usable encryption key. 3.0.0
+     *  (5d-3): when the only candidate is a weak key, the message says so. */
+    private fun noEncryptionKey(ring: PGPPublicKeyRing): PGPCryptoError.EncryptionFailed {
+        val fp = fingerprintHex(ring.publicKey)
+        val weak = ring.publicKeys.asSequence().filter { it.isEncryptionKey }
+            .firstNotNullOfOrNull { KeyPolicy.weakLabel(it, ring.publicKey) }
+        return if (weak != null) {
+            PGPCryptoError.EncryptionFailed(
+                "$fp only has a weak encryption key ($weak). PGPony no longer encrypts to RSA keys under " +
+                    "${KeyPolicy.MIN_RSA_BITS} bits, DSA or ElGamal"
+            )
+        } else {
+            PGPCryptoError.EncryptionFailed("No encryption subkey found for $fp")
+        }
+    }
+
+    /** 3.0.0 (5d-3): the weak-key label of the signer [keyID] in [rings], or null. */
+    private fun weakSignerLabel(keyID: Long, rings: List<PGPPublicKeyRing>?): String? =
+        rings?.firstNotNullOfOrNull { r -> r.getPublicKey(keyID)?.let { KeyPolicy.weakLabel(it, r.publicKey) } }
+
     private fun mayDecryptWith(ring: PGPSecretKeyRing, key: PGPSecretKey): Boolean {
+        // 3.0.0 (5d-3): a weak key still decrypts old mail, except for strict callers.
+        if (KeyPolicy.strict && KeyPolicy.isWeak(key.publicKey, ring.publicKey)) return false
         // A subkey carrying no signature at all sits on a carrier ring built
         // for decryption (CompositeKeyFacade.classicalDecryptionRing), whose
         // subkeys were already chosen from the real certificate.
@@ -3628,7 +3683,7 @@ internal fun enforceArgon2Policy(s2k: org.bouncycastle.bcpg.S2K?) {
     // small-heap phone. Never reject at or below our own encrypt parameters
     // (ARGON2_SELF_MEM_EXP), so no legitimate message is turned away.
     val requestedKiB = 1L shl m
-    val budgetKiB = (Runtime.getRuntime().maxMemory() / 1024.0 * SecurityLimits.KDF_HEAP_FRACTION).toLong()
+    val budgetKiB = (Runtime.getRuntime().maxMemory() / 1024.0 * SecurityLimits.kdfHeapFraction).toLong()
     if (m > SecurityLimits.ARGON2_SELF_MEM_EXP && requestedKiB > budgetKiB)
         throw PGPCryptoError.ResourceLimitExceeded("Argon2 memory 2^$m KiB will not fit this device")
 }

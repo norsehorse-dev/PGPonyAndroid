@@ -25,6 +25,13 @@ object SecurityLimits {
     // fraction of the JVM max heap.
     const val KDF_HEAP_FRACTION = 0.5
 
+    // 3.0.0 (5d-3): the fraction the device check above actually uses. The
+    // desktop app, which starts its JVM with a heap sized for it, raises this
+    // so an Argon2 cost of up to 2 GiB (the usual RFC 9580 ceiling) fits when
+    // the machine has the memory. Android keeps KDF_HEAP_FRACTION.
+    @Volatile
+    var kdfHeapFraction: Double = KDF_HEAP_FRACTION
+
     // Finding B (11B): decompression-bomb caps.
     // Compression nesting depth. Legitimate messages nest 0-2; deep nesting
     // overflows the recursion stack.

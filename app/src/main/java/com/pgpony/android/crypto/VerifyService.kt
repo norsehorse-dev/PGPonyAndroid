@@ -86,7 +86,10 @@ sealed class VerificationResult {
         /** 3.0.0 (5d-1): fingerprint of the key (primary or subkey) the
          *  signature verified under, hex uppercase; null from callers that
          *  do not resolve it. */
-        val signingKeyFingerprint: String? = null
+        val signingKeyFingerprint: String? = null,
+        /** 3.0.0 (5d-3): label of the signing key ("RSA 1024", "DSA") when it
+         *  is weak; the signature still counts, and the screen warns. */
+        val signerWeakKey: String? = null
     ) : VerificationResult()
 
     /** Signature present, signer in keyring, but verification failed. */
@@ -249,7 +252,9 @@ class VerifyService private constructor() {
             signerFingerprint = signerFingerprint,
             signerName = signerName,
             signerEmail = signerEmail,
-            signedContent = components.cleartext
+            signedContent = components.cleartext,
+            signingKeyFingerprint = bytesToHex(signerKey.fingerprint),
+            signerWeakKey = weakLabelOf(signerKey, publicKeyRings)
         )
     }
 
@@ -376,7 +381,9 @@ class VerifyService private constructor() {
             signerFingerprint = signerFingerprint,
             signerName = signerName,
             signerEmail = signerEmail,
-            signedContent = null
+            signedContent = null,
+            signingKeyFingerprint = bytesToHex(signerKey.fingerprint),
+            signerWeakKey = weakLabelOf(signerKey, publicKeyRings)
         )
     }
 
@@ -450,7 +457,8 @@ class VerifyService private constructor() {
             signerName = signerName,
             signerEmail = signerEmail,
             signedContent = null,
-            signingKeyFingerprint = bytesToHex(signerKey.fingerprint)
+            signingKeyFingerprint = bytesToHex(signerKey.fingerprint),
+            signerWeakKey = weakLabelOf(signerKey, publicKeyRings)
         )
     }
 
@@ -602,6 +610,10 @@ class VerifyService private constructor() {
         // No angle brackets — treat as either a bare email or a bare name.
         return if (userId.contains("@")) null to userId.trim() else userId.trim() to null
     }
+
+    /** 3.0.0 (5d-3): the weak-key label of [key] or of the primary it belongs to. */
+    private fun weakLabelOf(key: PGPPublicKey, rings: List<PGPPublicKeyRing>): String? =
+        KeyPolicy.weakLabel(key, rings.firstOrNull { it.getPublicKey(key.keyID) != null }?.publicKey)
 
     private fun bytesToHex(bytes: ByteArray): String =
         bytes.joinToString("") { "%02X".format(it) }

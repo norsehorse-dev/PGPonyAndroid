@@ -62,6 +62,10 @@ enum class SignerStatus {
     WEAK_SIGNATURE,
     /** 3.0.0: the signature claims to be older than the key that made it. */
     PREDATES_KEY,
+    /** 3.0.0: a valid signature from a weak key (RSA under 2048 bits, DSA),
+     *  reported only when KeyPolicy.strict is set; otherwise such a signature
+     *  is VERIFIED and the caller shows the weak-key warning. */
+    WEAK_KEY,
     /** 3.0.0: no self-signature made the signer's certificate valid at the
      *  time of the signature (a binding that had expired, say). */
     NOT_VALID_AT_TIME
@@ -95,6 +99,20 @@ object SignerEvaluator {
         val ring = view.ring
         val report = view.report
         val signingKey = ring.getPublicKey(keyID) ?: return SignerStatus.UNBOUND_SIGNER
+        val graded = grade(ring, report, signingKey, sigCreationTime)
+        // 3.0.0 (5d-3): a weak signing key is read-only; strict callers refuse it.
+        if (graded == SignerStatus.VERIFIED && KeyPolicy.strict && KeyPolicy.isWeak(signingKey, ring.publicKey)) {
+            return SignerStatus.WEAK_KEY
+        }
+        return graded
+    }
+
+    private fun grade(
+        ring: PGPPublicKeyRing,
+        report: CertificateBindings.Report?,
+        signingKey: PGPPublicKey,
+        sigCreationTime: Date
+    ): SignerStatus {
         val primary = ring.publicKey
         val at = sigCreationTime.time
         if (report != null && report.supported) {
@@ -174,6 +192,8 @@ object SignerEvaluator {
      * primary (fail closed for subkeys).
      */
     fun isUsableEncryptionKey(view: CertificateBindings.Verified, key: PGPPublicKey, now: Date = Date()): Boolean {
+        // 3.0.0 (5d-3): weak keys are read-only; nothing new is encrypted to them.
+        if (KeyPolicy.isWeak(key, view.ring.publicKey)) return false
         val ring = view.ring
         val report = view.report
         val primary = ring.publicKey
@@ -198,6 +218,7 @@ object SignerEvaluator {
         SignerStatus.UNBOUND_SIGNER  -> "Signer key is not certified by the key it claims to belong to"
         SignerStatus.WEAK_SIGNATURE  -> "Signature uses an algorithm or date that is no longer accepted"
         SignerStatus.PREDATES_KEY    -> "Signature is dated before the key that made it existed"
+        SignerStatus.WEAK_KEY        -> "Signer key is too weak to trust (RSA under 2048 bits, or DSA)"
         SignerStatus.NOT_VALID_AT_TIME -> "Signer key was not valid when it signed"
         SignerStatus.NONE            -> "No signature present"
         SignerStatus.VERIFIED        -> "Verified"
