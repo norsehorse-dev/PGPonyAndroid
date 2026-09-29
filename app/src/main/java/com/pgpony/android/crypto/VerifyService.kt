@@ -82,7 +82,11 @@ sealed class VerificationResult {
          *  by an unconfirmed/rogue import (the crypto check passes for both).
          *  Null means the caller did not resolve trust; the banner then keeps
          *  the plain "Verified" state, so untouched callers do not regress. */
-        val signerTrust: TrustLevel? = null
+        val signerTrust: TrustLevel? = null,
+        /** 3.0.0 (5d-1): fingerprint of the key (primary or subkey) the
+         *  signature verified under, hex uppercase; null from callers that
+         *  do not resolve it. */
+        val signingKeyFingerprint: String? = null
     ) : VerificationResult()
 
     /** Signature present, signer in keyring, but verification failed. */
@@ -124,6 +128,9 @@ class VerifyService private constructor() {
         private const val BEGIN_MESSAGE = "-----BEGIN PGP MESSAGE-----"
         private const val BEGIN_SIGNED = "-----BEGIN PGP SIGNED MESSAGE-----"
         private const val BEGIN_SIGNATURE = "-----BEGIN PGP SIGNATURE-----"
+
+        /** 3.0.0 (5d-1): keys tried beyond those an issuer subpacket names. */
+        private const val MAX_TRIAL_KEYS = 64
     }
 
     // ── Input classification ──────────────────────────────────────────
@@ -400,39 +407,37 @@ class VerifyService private constructor() {
         val keyIdHex = String.format("%016X", sig.keyID)
         val claimedFingerprint = extractClaimedFingerprint(sig)
 
-        val signerKey = findSignerKey(sig.keyID, publicKeyRings)
-            ?: return VerificationResult.UnknownSigner(
+        var failure: Exception? = null
+        val (signerKey, claimed) = findVerifyingKey(sig, publicKeyRings) { key ->
+            try {
+                sig.init(BcPGPContentVerifierBuilderProvider(), key)
+                sig.update(signedBytes)
+                sig.verify()
+            } catch (e: Exception) {
+                failure = e
+                false
+            }
+        }
+        if (signerKey == null) {
+            if (!claimed) return VerificationResult.UnknownSigner(
                 signerKeyID = keyIdHex,
                 claimedFingerprint = claimedFingerprint,
                 signedContent = null
             )
-
-        val verified = try {
-            sig.init(BcPGPContentVerifierBuilderProvider(), signerKey)
-            sig.update(signedBytes)
-            sig.verify()
-        } catch (e: Exception) {
             return VerificationResult.Invalid(
-                reason = "Verification error: ${e.message}",
-                signerKeyID = keyIdHex,
-                signedContent = null
-            )
-        }
-
-        if (!verified) {
-            return VerificationResult.Invalid(
-                reason = "Signature does not match the supplied content",
+                reason = failure?.let { "Verification error: ${it.message}" }
+                    ?: "Signature does not match the supplied content",
                 signerKeyID = keyIdHex,
                 signedContent = null
             )
         }
 
         val (signerName, signerEmail, signerFingerprint) =
-            resolveSignerIdentity(sig.keyID, publicKeyRings)
+            resolveSignerIdentity(signerKey.keyID, publicKeyRings)
 
         // item 11 (Finding C): downgrade a valid signature from a revoked,
         // expired, or non-signing key so it never shows as Verified.
-        SignerEvaluator.evaluate(sig, publicKeyRings).let { st ->
+        SignerEvaluator.evaluate(sig, signerKey.keyID, publicKeyRings).let { st ->
             if (st != SignerStatus.VERIFIED) return VerificationResult.Invalid(
                 reason = SignerEvaluator.reason(st),
                 signerKeyID = keyIdHex,
@@ -444,8 +449,43 @@ class VerifyService private constructor() {
             signerFingerprint = signerFingerprint,
             signerName = signerName,
             signerEmail = signerEmail,
-            signedContent = null
+            signedContent = null,
+            signingKeyFingerprint = bytesToHex(signerKey.fingerprint)
         )
+    }
+
+    /**
+     * 3.0.0 (5d-1): the key among [rings] that [sig] verifies under, by
+     * [check], and whether any supplied key matched the signature's issuer.
+     * Issuer subpackets are unauthenticated hints (a signature can carry a
+     * wrong one next to the right one, or only a wrong one), so every key
+     * they name is tried first, in every ring and not only the first ring
+     * listing the key ID; when none verifies, every other key of the same
+     * algorithm is tried, up to [MAX_TRIAL_KEYS]. The key that verifies is
+     * the signer, whatever the subpackets said.
+     */
+    private fun findVerifyingKey(
+        sig: PGPSignature,
+        rings: List<PGPPublicKeyRing>,
+        check: (PGPPublicKey) -> Boolean
+    ): Pair<PGPPublicKey?, Boolean> {
+        val ids = LinkedHashSet<Long>()
+        val fps = ArrayList<ByteArray>()
+        ids.add(sig.keyID)
+        for (v in listOfNotNull(sig.hashedSubPackets, sig.unhashedSubPackets)) {
+            for (p in v.toArray()) {
+                when (p) {
+                    is org.bouncycastle.bcpg.sig.IssuerKeyID -> ids.add(p.keyID)
+                    is org.bouncycastle.bcpg.sig.IssuerFingerprint -> fps.add(p.fingerprint)
+                }
+            }
+        }
+        val all = rings.flatMap { it.publicKeys.asSequence().toList() }
+        val named = all.filter { k -> k.keyID in ids || fps.any { it.contentEquals(k.fingerprint) } }
+        for (k in named) if (check(k)) return k to true
+        val others = all.filter { k -> k !in named && k.algorithm == sig.keyAlgorithm }.take(MAX_TRIAL_KEYS)
+        for (k in others) if (check(k)) return k to true
+        return null to named.isNotEmpty()
     }
 
     // ── Helpers ───────────────────────────────────────────────────────

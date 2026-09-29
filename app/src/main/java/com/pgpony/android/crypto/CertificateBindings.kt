@@ -37,6 +37,19 @@
 // (an obsolete algorithm such as Elgamal-sign); analyze() then reports
 // supported = false and sanitize() returns the input unchanged, so a key the
 // app cannot evaluate is never damaged in storage.
+//
+// 3.0.0 (checkpoint 5d-1, from the OpenPGP interoperability test suite): the
+// report keeps every verified self-signature and revocation with its times, so
+// a signer can be judged at the time it signed (Report.signerValidityAt): a
+// signature older than its key is rejected, a self-signature must be alive
+// then, hard revocations apply at every time and soft ones (superseded,
+// retired, User ID no longer valid) only from when they were made. A self-
+// signature without a hashed creation time, or with a critical subpacket or
+// notation it does not understand, does not verify. An empty key flags
+// subpacket grants nothing. sanitize() rejects a certificate carrying an
+// unknown critical packet, and skips a classical subkey or a third-party
+// certification Bouncy Castle cannot read instead of failing the whole
+// certificate.
 
 package com.pgpony.android.crypto
 
@@ -78,11 +91,39 @@ object CertificateBindings {
 
     // Signature subpacket types.
     private const val SP_CREATION_TIME = 2
+    private const val SP_SIG_EXPIRATION = 3
     private const val SP_KEY_EXPIRATION = 9
     private const val SP_KEY_FLAGS = 27
     private const val SP_ISSUER_KEY_ID = 16
+    private const val SP_NOTATION = 20
+    private const val SP_REVOCATION_REASON = 29
     private const val SP_EMBEDDED_SIGNATURE = 32
     private const val SP_ISSUER_FINGERPRINT = 33
+
+    /**
+     * 3.0.0 (5d-1): the signature subpacket types this code knows (RFC 9580
+     * 5.2.3.7 and the LibrePGP additions). A hashed subpacket marked critical
+     * whose type is not listed makes the signature invalid (RFC 9580
+     * 5.2.3.7), and so does a critical notation, since no notation name is
+     * interpreted here. Unknown types that are not critical are ignored.
+     */
+    internal val KNOWN_SUBPACKETS = setOf(
+        2, 3, 4, 5, 6, 7, 9, 11, 12, 16, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
+        34, 35, 37, 38, 39
+    )
+
+    /**
+     * Revocation reasons that do not reach back in time (RFC 9580 5.2.3.31):
+     * superseded (1), retired (3) and User ID no longer valid (32). A key
+     * revoked for one of these stays valid for signatures made before the
+     * revocation. Every other reason, and no reason at all, is a hard
+     * revocation: the key may have been compromised, so it is invalid at every
+     * point in time.
+     */
+    private val SOFT_REVOCATION_REASONS = setOf(1, 3, 32)
+
+    /** Classical public-key algorithms whose key material Bouncy Castle parses. */
+    private val BC_CLASSICAL_ALGORITHMS = setOf(1, 2, 3, 16, 17, 18, 19, 20, 22, 25, 26, 27, 28)
 
     /** Public-key algorithms this object can verify a signature from. */
     private val VERIFIABLE_ALGORITHMS = setOf(1, 3, 17, 19, 22, 27, 28, 30, 31)
@@ -103,6 +144,73 @@ object CertificateBindings {
     private const val MAX_HASHED_BYTES = 32L * 1024 * 1024
     private const val MAX_SELF_SIGS_PER_COMPONENT = 32
 
+    /**
+     * 3.0.0 (5d-1): one verified self-signature, kept so validity can be
+     * judged at the time a signature was made rather than only now. For a
+     * subkey it is a 0x18 binding; for the primary a 0x1F direct-key
+     * signature or a User ID self-certification.
+     */
+    data class SelfSig(
+        val createdMs: Long,
+        /** Signature expiration (subpacket 3), epoch ms; null = none. */
+        val sigExpiresAtMs: Long? = null,
+        /** Key expiration this signature sets, epoch ms; null = none. */
+        val keyExpiresAtMs: Long? = null,
+        /** Key flags (first octet); null = no key flags subpacket, 0 = present but empty. */
+        val keyFlags: Int? = null,
+        /** Subkey bindings: a verified 0x19 back-signature is embedded. */
+        val backSigned: Boolean = false,
+        /** Expiration of that back-signature, epoch ms; null = none. */
+        val backSigExpiresAtMs: Long? = null
+    ) {
+        /** Created at or before [t] and not yet expired at [t]. */
+        fun aliveAt(t: Long): Boolean = createdMs <= t && (sigExpiresAtMs == null || t < sigExpiresAtMs)
+    }
+
+    /** 3.0.0 (5d-1): one verified revocation signature. */
+    data class Revocation(
+        val createdMs: Long,
+        val sigExpiresAtMs: Long? = null,
+        /** Reason code (subpacket 29); null = no reason given. */
+        val reason: Int? = null
+    ) {
+        /** A hard revocation (see [SOFT_REVOCATION_REASONS]) applies at every point in time. */
+        val hard: Boolean get() = reason !in SOFT_REVOCATION_REASONS
+
+        /** Does this revocation make a key revoked at [t]? A soft one only once
+         *  made and while its own signature has not expired. */
+        fun inEffectAt(t: Long): Boolean =
+            hard || (createdMs <= t && (sigExpiresAtMs == null || t < sigExpiresAtMs))
+    }
+
+    /** 3.0.0 (5d-1): a User ID with its verified self-certifications and revocations. */
+    data class UserIdState(
+        val userId: String,
+        val certifications: List<SelfSig>,
+        val revocations: List<Revocation>
+    ) {
+        /** A User ID revocation takes effect when made and ends when its
+         *  signature expires, whatever its reason: it withdraws a claim about a
+         *  name, never the key material. */
+        fun revokedAt(t: Long): Boolean =
+            revocations.any { it.createdMs <= t && (it.sigExpiresAtMs == null || t < it.sigExpiresAtMs) }
+    }
+
+    /** 3.0.0 (5d-1): the outcome of [Report.signerValidityAt]. */
+    enum class SignerValidity {
+        VALID,
+        /** The signature is older than the key that made it (or its primary). */
+        PREDATES_KEY,
+        /** No self-signature makes the key valid at that time. */
+        NOT_VALID,
+        EXPIRED,
+        REVOKED,
+        /** The key's flags at that time exclude signing. */
+        NOT_SIGNING,
+        /** A subkey without a verified binding and back-signature at that time. */
+        UNBOUND
+    }
+
     data class SubkeyState(
         val fingerprintHex: String,
         val keyId: Long,
@@ -111,11 +219,12 @@ object CertificateBindings {
         val bound: Boolean,
         /** A verified 0x18 embeds a 0x19 back-signature that verifies under the subkey. */
         val backSigned: Boolean,
-        /** A 0x28 revocation from the primary verifies. */
+        /** A 0x28 revocation from the primary verifies and is in effect now. */
         val revoked: Boolean,
         /** Expiry from the newest verified 0x18, epoch ms; null = none. */
         val expiresAtMs: Long? = null,
-        /** Key flags (first octet) from the newest verified 0x18; null = none. */
+        /** Key flags (first octet) from the newest verified 0x18; null = no
+         *  key flags subpacket, 0 = an empty one. */
         val keyFlags: Int? = null,
         /** Key creation time, epoch ms. */
         val createdAtMs: Long = 0L,
@@ -123,7 +232,11 @@ object CertificateBindings {
         val version: Int = 4,
         /** The subkey's public key packet body, for callers that need to read
          *  its material (a LibrePGP composite's curve, say). */
-        val publicBody: ByteArray = ByteArray(0)
+        val publicBody: ByteArray = ByteArray(0),
+        /** 3.0.0 (5d-1): every verified 0x18 binding. */
+        val bindings: List<SelfSig> = emptyList(),
+        /** 3.0.0 (5d-1): every verified 0x28 revocation. */
+        val revocations: List<Revocation> = emptyList()
     )
 
     data class Report(
@@ -131,13 +244,22 @@ object CertificateBindings {
         val supported: Boolean,
         val primaryFingerprintHex: String,
         val primaryKeyId: Long,
+        /** A verified 0x20 revocation is in effect now. */
         val primaryRevoked: Boolean,
         val subkeys: List<SubkeyState>,
         /** Raw User ID strings (UTF-8, lenient) that carry a verified
-         *  self-certification and no verified revocation. */
+         *  self-certification and no revocation in effect now. */
         val certifiedUserIds: Set<String>,
         /** Primary expiry from its newest verified self-signature, epoch ms; null = none. */
-        val primaryExpiresAtMs: Long? = null
+        val primaryExpiresAtMs: Long? = null,
+        /** 3.0.0 (5d-1): primary key creation time, epoch ms. */
+        val primaryCreatedAtMs: Long = 0L,
+        /** 3.0.0 (5d-1): every verified 0x1F direct-key signature. */
+        val directKeySigs: List<SelfSig> = emptyList(),
+        /** 3.0.0 (5d-1): every verified 0x20 revocation. */
+        val primaryRevocations: List<Revocation> = emptyList(),
+        /** 3.0.0 (5d-1): every User ID with at least one verified self-signature. */
+        val userIds: List<UserIdState> = emptyList()
     ) {
         /** Subkey state by fingerprint (hex, any case). Key IDs are not used:
          *  a v3 key ID is attacker-choosable, fingerprints are not. */
@@ -152,13 +274,36 @@ object CertificateBindings {
 
         /** May the key with fingerprint [fpHex] receive a message at [nowMs]? The
          *  primary must be usable; a subkey must also be bound, unrevoked and
-         *  unexpired. Unsupported primaries are left to the caller. */
+         *  unexpired, and its key flags must allow encryption (3.0.0: a key
+         *  flags subpacket without either encryption flag, including an empty
+         *  one, rules the subkey out). Unsupported primaries are left to the
+         *  caller. */
         fun isUsableEncryptionKey(fpHex: String, nowMs: Long): Boolean {
             if (!supported) return true
             if (!isPrimaryUsable(nowMs)) return false
-            if (isPrimary(fpHex)) return true
+            if (isPrimary(fpHex)) return flagsAllowEncryption(activePrimarySig(nowMs)?.keyFlags)
             val s = subkeyByFingerprint(fpHex) ?: return false
-            return s.bound && !s.revoked && (s.expiresAtMs == null || nowMs < s.expiresAtMs)
+            return s.bound && !s.revoked && (s.expiresAtMs == null || nowMs < s.expiresAtMs) &&
+                flagsAllowEncryption(s.keyFlags)
+        }
+
+        /**
+         * 3.0.0 (5d-1): may the secret half of [fpHex] decrypt a message
+         * addressed to it? Revocation and expiry do not matter here (old mail
+         * must stay readable), but the key must be one the certificate marks
+         * for encryption: a subkey needs a verified binding, and a key flags
+         * subpacket that names neither encryption flag rules the key out. A
+         * key with no key flags subpacket at all (older software) is allowed.
+         * A subkey this parser could not read is left to the caller.
+         */
+        fun mayDecryptWith(fpHex: String): Boolean {
+            if (!supported) return true
+            if (isPrimary(fpHex)) {
+                val newest = (directKeySigs + userIds.flatMap { it.certifications }).maxByOrNull { it.createdMs }
+                return flagsAllowEncryption(newest?.keyFlags)
+            }
+            val s = subkeyByFingerprint(fpHex) ?: return true
+            return s.bound && flagsAllowEncryption(s.keyFlags)
         }
 
         /** A key that may speak for the primary as a signer: the primary, or a
@@ -169,7 +314,76 @@ object CertificateBindings {
             val s = subkeyByFingerprint(fpHex) ?: return false
             return s.bound && s.backSigned
         }
+
+        /**
+         * 3.0.0 (5d-1): the primary self-signature in force at [t]. Direct-key
+         * signatures and the certification of every User ID not revoked at [t]
+         * compete; the newest one that is alive at [t] wins. Null when none is
+         * (the certificate is not valid at [t]).
+         */
+        fun activePrimarySig(t: Long): SelfSig? {
+            val candidates = ArrayList<SelfSig>()
+            activeAt(directKeySigs, t)?.let { candidates.add(it) }
+            for (u in userIds) {
+                if (u.revokedAt(t)) continue
+                activeAt(u.certifications, t)?.let { candidates.add(it) }
+            }
+            return candidates.maxByOrNull { it.createdMs }
+        }
+
+        /**
+         * 3.0.0 (5d-1): is [fpHex] a valid signer for a signature made at [t]?
+         * The key and its primary must exist by [t]; a hard revocation of
+         * either rules the key out at every time, a soft one from the moment
+         * it was made; a self-signature must make the primary (and a subkey)
+         * valid at [t], and the key flags and expiry come from that
+         * self-signature; a signing subkey needs a back-signature alive at [t].
+         */
+        fun signerValidityAt(fpHex: String, t: Long): SignerValidity {
+            if (!supported) return SignerValidity.VALID
+            if (t < primaryCreatedAtMs) return SignerValidity.PREDATES_KEY
+            val sub = if (isPrimary(fpHex)) null else (subkeyByFingerprint(fpHex) ?: return SignerValidity.UNBOUND)
+            if (sub != null && t < sub.createdAtMs) return SignerValidity.PREDATES_KEY
+            if (primaryRevocations.any { it.inEffectAt(t) }) return SignerValidity.REVOKED
+            val primarySig = activePrimarySig(t) ?: return SignerValidity.NOT_VALID
+            primarySig.keyExpiresAtMs?.let { if (t >= it) return SignerValidity.EXPIRED }
+            if (sub == null) {
+                return if (flagsAllowSigning(primarySig.keyFlags)) SignerValidity.VALID else SignerValidity.NOT_SIGNING
+            }
+            if (sub.revocations.any { it.inEffectAt(t) }) return SignerValidity.REVOKED
+            if (sub.bindings.isEmpty()) return SignerValidity.UNBOUND
+            val binding = activeAt(sub.bindings, t) ?: return SignerValidity.NOT_VALID
+            binding.keyExpiresAtMs?.let { if (t >= it) return SignerValidity.EXPIRED }
+            if (!flagsAllowSigning(binding.keyFlags)) return SignerValidity.NOT_SIGNING
+            if (!binding.backSigned) return SignerValidity.UNBOUND
+            binding.backSigExpiresAtMs?.let { if (t >= it) return SignerValidity.UNBOUND }
+            return SignerValidity.VALID
+        }
     }
+
+    /**
+     * The self-signature among [sigs] in force at [t]: the newest one made at
+     * or before [t], which must still be alive then. When every one is newer
+     * than [t] (a certificate re-signed later and exported with only its
+     * newest self-signatures, as GnuPG's minimal export does), the oldest one
+     * stands in for the period before it, as long as it has not expired by
+     * [t]; signatures made before the key itself are caught separately.
+     */
+    private fun activeAt(sigs: List<SelfSig>, t: Long): SelfSig? {
+        if (sigs.isEmpty()) return null
+        val made = sigs.filter { it.createdMs <= t }
+        if (made.isEmpty()) {
+            val oldest = sigs.minBy { it.createdMs }
+            return oldest.takeIf { it.sigExpiresAtMs == null || t < it.sigExpiresAtMs }
+        }
+        return made.maxBy { it.createdMs }.takeIf { it.aliveAt(t) }
+    }
+
+    /** Key flags allow signing: no key flags subpacket (older software) or the sign flag. */
+    private fun flagsAllowSigning(flags: Int?): Boolean = flags == null || flags and 0x02 != 0
+
+    /** Key flags allow encryption: no key flags subpacket, or either encryption flag. */
+    private fun flagsAllowEncryption(flags: Int?): Boolean = flags == null || flags and 0x0C != 0
 
     // ── Packet model ──────────────────────────────────────────────────
 
@@ -244,6 +458,12 @@ object CertificateBindings {
     private fun be32(b: ByteArray, off: Int): Int =
         ((b[off].toInt() and 0xFF) shl 24) or ((b[off + 1].toInt() and 0xFF) shl 16) or
             ((b[off + 2].toInt() and 0xFF) shl 8) or (b[off + 3].toInt() and 0xFF)
+
+    /** Packet types RFC 9580 defines (4.3), padding included. */
+    private val KNOWN_PACKET_TAGS = (1..14).toSet() + (17..21)
+
+    /** An unknown packet type in the critical range (0 to 39). */
+    internal fun isCriticalUnknownTag(tag: Int) = tag < 40 && tag !in KNOWN_PACKET_TAGS
 
     internal fun isKeyTag(tag: Int) = tag == TAG_PUBLIC_KEY || tag == TAG_SECRET_KEY
     internal fun isSubkeyTag(tag: Int) = tag == TAG_PUBLIC_SUBKEY || tag == TAG_SECRET_SUBKEY
@@ -388,9 +608,22 @@ object CertificateBindings {
             return id
         }
 
-        /** Key flags (hashed subpacket 27), first octet, or null. */
+        /** Key flags (hashed subpacket 27), first octet; 0 for an empty
+         *  subpacket (3.0.0: an empty one grants nothing), null when absent. */
         val keyFlags: Int? = subpackets(hashed).firstOrNull { it.first == SP_KEY_FLAGS }?.second
+            ?.let { if (it.isEmpty()) 0 else it[0].toInt() and 0xFF }
+
+        /** Signature expiration (hashed subpacket 3), seconds after creation; null for none or 0. */
+        val sigExpirySeconds: Long? = subpackets(hashed).firstOrNull { it.first == SP_SIG_EXPIRATION }?.second
+            ?.takeIf { it.size == 4 }?.let { be32(it, 0).toLong() and 0xFFFFFFFFL }?.takeIf { it > 0 }
+
+        /** Revocation reason code (hashed subpacket 29), or null. */
+        val revocationReason: Int? = subpackets(hashed).firstOrNull { it.first == SP_REVOCATION_REASON }?.second
             ?.takeIf { it.isNotEmpty() }?.let { it[0].toInt() and 0xFF }
+
+        /** 3.0.0 (5d-1): a hashed subpacket is marked critical but not
+         *  understood here (an unknown type, or any notation). */
+        val hasCriticalUnknown: Boolean = criticalHashedTypes(hashed).any { it == SP_NOTATION || it !in KNOWN_SUBPACKETS }
 
         /** Key expiration (hashed subpacket 9), seconds after key creation, or null. */
         val keyExpirySeconds: Long? = subpackets(hashed).firstOrNull { it.first == SP_KEY_EXPIRATION }?.second
@@ -419,7 +652,15 @@ object CertificateBindings {
     }
 
     /** Subpacket (type without the critical bit, body) pairs. Malformed tails are dropped. */
-    private fun subpackets(area: ByteArray): List<Pair<Int, ByteArray>> {
+    private fun subpackets(area: ByteArray): List<Pair<Int, ByteArray>> =
+        rawSubpackets(area).map { (type, body) -> (type and 0x7F) to body }
+
+    /** Types (without the flag) of the subpackets in [area] that carry the critical bit. */
+    internal fun criticalHashedTypes(area: ByteArray): List<Int> =
+        rawSubpackets(area).filter { it.first and 0x80 != 0 }.map { it.first and 0x7F }
+
+    /** Subpacket (type octet including the critical bit, body) pairs. Malformed tails are dropped. */
+    private fun rawSubpackets(area: ByteArray): List<Pair<Int, ByteArray>> {
         val out = ArrayList<Pair<Int, ByteArray>>()
         var i = 0
         while (i < area.size) {
@@ -436,7 +677,7 @@ object CertificateBindings {
                 }
             }
             if (len < 1 || i + len > area.size) return out
-            val type = area[i].toInt() and 0x7F
+            val type = area[i].toInt() and 0xFF
             out.add(type to area.copyOfRange(i + 1, i + len))
             i += len
         }
@@ -495,6 +736,11 @@ object CertificateBindings {
             4 -> if (sig.version != 4) return false
             5 -> if (sig.version != 5 && sig.version != 4) return false
         }
+        // 3.0.0 (5d-1): a self-signature needs a hashed creation time, and a
+        // critical subpacket it does not understand invalidates it (RFC 9580
+        // 5.2.3.7, 5.2.3.11).
+        if (sig.createdMs == null) return false
+        if (sig.hasCriticalUnknown) return false
         if (!SignaturePolicy.isAcceptableCertificationDigest(sig.hashAlg, sig.createdMs)) return false
         val composite = CompositeSignSuite.forAlgId(signer.algorithm)
         if (composite != null) {
@@ -590,12 +836,16 @@ object CertificateBindings {
         val primary = parsed.primary
         val supported = primary.algorithm in VERIFIABLE_ALGORITHMS
         val primaryFrame = runCatching { primary.hashFraming() }.getOrNull() ?: return null
+        val primaryCreated = keyCreatedMs(primary)
         if (!supported) {
-            return Report(false, primary.fingerprintHex, primary.keyId, false, emptyList(), emptySet())
+            return Report(
+                false, primary.fingerprintHex, primary.keyId, false, emptyList(), emptySet(),
+                primaryCreatedAtMs = primaryCreated
+            )
         }
+        val now = System.currentTimeMillis()
         val keyBudget = Budget()
         val idBudget = Budget()
-        val primaryCreated = keyCreatedMs(primary)
         // Newest verified self-signature over the primary (direct-key or a User
         // ID certification): where the primary's expiry is read from.
         var newestSelf: SigBody? = null
@@ -603,78 +853,121 @@ object CertificateBindings {
             val cur = newestSelf
             if (cur == null || (s.createdMs ?: 0L) >= (cur.createdMs ?: 0L)) newestSelf = s
         }
-        var primaryRevoked = false
+        val directKeySigs = ArrayList<SelfSig>()
+        val primaryRevocations = ArrayList<Revocation>()
         val primaryCheck = selfSigsToCheck(parsed.primarySigs, primary)
         for ((i, b) in parsed.primarySigs.withIndex()) {
             if (i !in primaryCheck) continue
             val s = sigOrNull(b) ?: continue
             when (s.type) {
-                SIG_KEY_REVOCATION -> if (!primaryRevoked && keyBudget.verify(s, primary, primaryFrame)) primaryRevoked = true
-                SIG_DIRECT_KEY -> if (keyBudget.verify(s, primary, primaryFrame)) considerSelf(s)
+                SIG_KEY_REVOCATION -> if (keyBudget.verify(s, primary, primaryFrame)) primaryRevocations.add(revocationOf(s))
+                SIG_DIRECT_KEY -> if (keyBudget.verify(s, primary, primaryFrame)) {
+                    considerSelf(s)
+                    directKeySigs.add(selfSigOf(s, primaryCreated))
+                }
             }
         }
         val subkeys = ArrayList<SubkeyState>()
         val uids = LinkedHashSet<String>()
+        val userIds = ArrayList<UserIdState>()
         for (c in parsed.components) {
             if (isSubkeyTag(c.tag)) {
                 val pub = publicPart(c.tag, c.body) ?: continue
                 val sub = runCatching { KeyBody(pub) }.getOrNull() ?: continue
                 val prefix = primaryFrame + (runCatching { sub.hashFraming() }.getOrNull() ?: continue)
-                var bound = false
+                val subCreated = keyCreatedMs(sub)
                 var backSigned = false
-                var revoked = false
                 var newestBinding: SigBody? = null
+                val bindings = ArrayList<SelfSig>()
+                val revocations = ArrayList<Revocation>()
                 val check = selfSigsToCheck(c.sigs, primary)
                 for ((i, b) in c.sigs.withIndex()) {
                     if (i !in check) continue
                     val s = sigOrNull(b) ?: continue
                     when (s.type) {
                         SIG_SUBKEY_BINDING -> if (keyBudget.verify(s, primary, prefix)) {
-                            bound = true
                             val nb = newestBinding
                             if (nb == null || (s.createdMs ?: 0L) >= (nb.createdMs ?: 0L)) newestBinding = s
-                            if (!backSigned) backSigned = s.embeddedSignatures().any { e ->
-                                val back = sigOrNull(e) ?: return@any false
-                                back.type == SIG_PRIMARY_BINDING && keyBudget.verify(back, sub, prefix)
-                            }
+                            // The back-signature that verifies; when several do, the
+                            // one that stays alive longest.
+                            val back = s.embeddedSignatures().mapNotNull { e ->
+                                sigOrNull(e)?.takeIf { it.type == SIG_PRIMARY_BINDING && keyBudget.verify(it, sub, prefix) }
+                            }.maxByOrNull { sigExpiresAt(it) ?: Long.MAX_VALUE }
+                            if (back != null) backSigned = true
+                            bindings.add(
+                                selfSigOf(s, subCreated).copy(
+                                    backSigned = back != null,
+                                    backSigExpiresAtMs = back?.let { sigExpiresAt(it) }
+                                )
+                            )
                         }
-                        SIG_SUBKEY_REVOCATION -> if (!revoked && keyBudget.verify(s, primary, prefix)) revoked = true
+                        SIG_SUBKEY_REVOCATION -> if (keyBudget.verify(s, primary, prefix)) revocations.add(revocationOf(s))
                     }
                 }
                 subkeys.add(
                     SubkeyState(
-                        sub.fingerprintHex, sub.keyId, sub.algorithm, bound, backSigned, revoked,
-                        expiresAtMs = expiryOf(keyCreatedMs(sub), newestBinding),
+                        sub.fingerprintHex, sub.keyId, sub.algorithm, bindings.isNotEmpty(), backSigned,
+                        revoked = revocations.any { it.inEffectAt(now) },
+                        expiresAtMs = expiryOf(subCreated, newestBinding),
                         keyFlags = newestBinding?.keyFlags,
-                        createdAtMs = keyCreatedMs(sub),
+                        createdAtMs = subCreated,
                         version = sub.version,
-                        publicBody = pub
+                        publicBody = pub,
+                        bindings = bindings,
+                        revocations = revocations
                     )
                 )
             } else {
                 val prefix = primaryFrame + idFraming(c.tag, c.body)
-                var certified = false
-                var uidRevoked = false
+                val certifications = ArrayList<SelfSig>()
+                val revocations = ArrayList<Revocation>()
                 val check = selfSigsToCheck(c.sigs, primary)
                 for ((i, b) in c.sigs.withIndex()) {
                     if (i !in check) continue
                     val s = sigOrNull(b) ?: continue
                     when (s.type) {
                         in SIG_CERT_GENERIC..SIG_CERT_POSITIVE -> if (idBudget.verify(s, primary, prefix)) {
-                            certified = true
                             considerSelf(s)
+                            certifications.add(selfSigOf(s, primaryCreated))
                         }
-                        SIG_CERT_REVOCATION -> if (!uidRevoked && idBudget.verify(s, primary, prefix)) uidRevoked = true
+                        SIG_CERT_REVOCATION -> if (idBudget.verify(s, primary, prefix)) revocations.add(revocationOf(s))
                     }
                 }
-                if (certified && !uidRevoked && c.tag == TAG_USER_ID) uids.add(String(c.body, Charsets.UTF_8))
+                if (c.tag != TAG_USER_ID || certifications.isEmpty()) continue
+                val state = UserIdState(String(c.body, Charsets.UTF_8), certifications, revocations)
+                userIds.add(state)
+                if (!state.revokedAt(now)) uids.add(state.userId)
             }
         }
         return Report(
-            true, primary.fingerprintHex, primary.keyId, primaryRevoked, subkeys, uids,
-            primaryExpiresAtMs = expiryOf(primaryCreated, newestSelf)
+            true, primary.fingerprintHex, primary.keyId,
+            primaryRevoked = primaryRevocations.any { it.inEffectAt(now) },
+            subkeys = subkeys,
+            certifiedUserIds = uids,
+            primaryExpiresAtMs = expiryOf(primaryCreated, newestSelf),
+            primaryCreatedAtMs = primaryCreated,
+            directKeySigs = directKeySigs,
+            primaryRevocations = primaryRevocations,
+            userIds = userIds
         )
     }
+
+    /** When [s] itself expires (signature expiration subpacket), epoch ms, or null. */
+    private fun sigExpiresAt(s: SigBody): Long? {
+        val created = s.createdMs ?: return null
+        return s.sigExpirySeconds?.let { created + it * 1000L }
+    }
+
+    /** A verified self-signature over a key created at [keyCreated], as a [SelfSig]. */
+    private fun selfSigOf(s: SigBody, keyCreated: Long): SelfSig = SelfSig(
+        createdMs = s.createdMs ?: 0L,
+        sigExpiresAtMs = sigExpiresAt(s),
+        keyExpiresAtMs = expiryOf(keyCreated, s),
+        keyFlags = s.keyFlags
+    )
+
+    private fun revocationOf(s: SigBody): Revocation =
+        Revocation(createdMs = s.createdMs ?: 0L, sigExpiresAtMs = sigExpiresAt(s), reason = s.revocationReason)
 
     /**
      * The certificate in [raw] with every unbound component and every failing
@@ -684,6 +977,12 @@ object CertificateBindings {
      */
     fun sanitize(raw: ByteArray): ByteArray {
         val parsed = parse(raw) ?: return raw
+        // 3.0.0 (5d-1): a packet of an unknown type in the critical range
+        // (below 40, RFC 9580 4.3) makes the certificate unreadable; nothing
+        // of it is kept. Unknown non-critical packets are carried along.
+        if ((parsed.primaryOther + parsed.components.flatMap { it.other }).any { isCriticalUnknownTag(it.tag) }) {
+            return ByteArray(0)
+        }
         val primary = parsed.primary
         if (primary.algorithm !in VERIFIABLE_ALGORITHMS) return raw
         val primaryFrame = runCatching { primary.hashFraming() }.getOrNull() ?: return raw
@@ -718,6 +1017,12 @@ object CertificateBindings {
                     c.other.forEach { out.write(frame(it.tag, it.body)) }
                     continue
                 }
+                // 3.0.0 (5d-1): a public subkey of a classical algorithm whose
+                // material Bouncy Castle cannot read (an unknown curve with an
+                // opaque encoding, say) is skipped rather than making the whole
+                // certificate unreadable. Algorithms the app reads itself
+                // (composite ML-KEM and ML-DSA) are not in the set and stay.
+                if (c.tag == TAG_PUBLIC_SUBKEY && sub.algorithm in BC_CLASSICAL_ALGORITHMS && bcKey(pub) == null) continue
                 val prefix = primaryFrame + subFrame
                 val check = selfSigsToCheck(c.sigs, primary)
                 val keep = c.sigs.filterIndexed { i, b ->
@@ -746,8 +1051,11 @@ object CertificateBindings {
                         // Third-party certification or revocation: cannot be
                         // checked here and carries no authority over the
                         // certificate's own capabilities; kept for display.
+                        // 3.0.0 (5d-1): unless Bouncy Castle cannot read it (an
+                        // unknown public-key algorithm, say), which would make
+                        // the whole certificate unreadable; it is dropped.
                         !self && (s.type in SIG_CERT_GENERIC..SIG_CERT_POSITIVE || s.type == SIG_CERT_REVOCATION) ->
-                            keep.add(b)
+                            if (bcSignature(b) != null) keep.add(b)
                     }
                 }
                 if (!certified) continue
@@ -774,6 +1082,56 @@ object CertificateBindings {
         }
         cur?.let { out.add(it.toByteArray()) }
         return out
+    }
+
+    /**
+     * 3.0.0 (5d-1): primary fingerprints (hex, uppercase) of the certificates
+     * in [raw] (binary) that carry a packet of an unknown type in the critical
+     * range. Such a certificate must be rejected as a whole; Bouncy Castle's
+     * object factory would otherwise drop the packet silently.
+     */
+    fun certificatesWithCriticalUnknownPackets(raw: ByteArray): Set<String> =
+        splitCertificates(raw).mapNotNull { cert ->
+            if (packets(cert).none { isCriticalUnknownTag(it.tag) }) return@mapNotNull null
+            parse(cert)?.primary?.fingerprintHex
+        }.toSet()
+
+    /**
+     * 3.0.0 (5d-1): a transferable secret key whose primary is a Public-Key
+     * packet while its subkeys are Secret-Subkey packets (the primary secret
+     * kept offline, RFC 9580 10.2 allows the mix) is rewritten so the primary
+     * becomes a GNU "no private key" stub, the form Bouncy Castle reads as a
+     * secret key ring whose primary cannot be used. Every other certificate
+     * in [raw] (binary, possibly several) is passed through unchanged, and the
+     * input itself is returned when nothing needed rewriting.
+     */
+    fun stubStrippedPrimary(raw: ByteArray): ByteArray {
+        val certs = splitCertificates(raw)
+        if (certs.none { needsStub(it) }) return raw
+        val out = ByteArrayOutputStream(raw.size + 32)
+        for (cert in certs) {
+            if (!needsStub(cert)) { out.write(cert); continue }
+            val pkts = packets(cert)
+            val body = pkts.first().body
+            // S2K usage 254, no cipher, GNU extension (type 101, mode 1). v6
+            // frames the fields with a count octet and an S2K length octet.
+            val stub = when (body[0].toInt() and 0xFF) {
+                6 -> byteArrayOf(0xFE.toByte(), 8, 0, 6, 101, 0, 'G'.code.toByte(), 'N'.code.toByte(), 'U'.code.toByte(), 1)
+                else -> byteArrayOf(0xFE.toByte(), 0, 101, 0, 'G'.code.toByte(), 'N'.code.toByte(), 'U'.code.toByte(), 1)
+            }
+            out.write(frame(TAG_SECRET_KEY, body + stub))
+            for (p in pkts.drop(1)) out.write(frame(p.tag, p.body))
+        }
+        return out.toByteArray()
+    }
+
+    /** A v4 or v6 certificate with a public primary and at least one secret subkey. */
+    private fun needsStub(cert: ByteArray): Boolean {
+        val pkts = packets(cert)
+        val first = pkts.firstOrNull() ?: return false
+        if (first.tag != TAG_PUBLIC_KEY || first.body.isEmpty()) return false
+        val v = first.body[0].toInt() and 0xFF
+        return (v == 4 || v == 6) && pkts.any { it.tag == TAG_SECRET_SUBKEY }
     }
 
     /** The bare address in a User ID ("Name <a@b>" or "a@b"), ASCII-lowercased. */

@@ -744,7 +744,9 @@ class PGPCryptoService private constructor() {
         // GnuPG / sq / PGPony-iOS) omits the condLen + checksum octets that
         // BouncyCastle requires internally. LibrePGPV5Interop.toBcFormat adds
         // them back; it's a byte-exact no-op for every other key type.
-        val rawBytes = dearmorToBytes(armoredText)
+        // 3.0.0 (5d-1): a public primary with secret subkeys becomes a stub
+        // secret primary (CertificateBindings.stubStrippedPrimary).
+        val rawBytes = CertificateBindings.stubStrippedPrimary(dearmorToBytes(armoredText))
         val normalizedBytes = LibrePGPV5Interop.toBcFormat(rawBytes)
 
         // Try as secret key ring first
@@ -807,10 +809,12 @@ class PGPCryptoService private constructor() {
         if (armored) {
             return importArmoredKey(String(data))
         }
+        // 3.0.0 (5d-1): a public primary with secret subkeys is read as a key.
+        val bytes = CertificateBindings.stubStrippedPrimary(data)
 
         // Try binary secret key ring
         try {
-            val secretRing = PGPSecretKeyRing(data, JcaKeyFingerprintCalculator())
+            val secretRing = PGPSecretKeyRing(bytes, JcaKeyFingerprintCalculator())
             val masterKey = secretRing.publicKey
             val publicRing = PGPPublicKeyRing(
                 secretRing.publicKeys.asSequence().map { it }.toList()
@@ -828,7 +832,7 @@ class PGPCryptoService private constructor() {
 
         // Try binary public key ring (4.6.0 item 17.1: verified components only)
         try {
-            val publicRing = PGPPublicKeyRing(CertificateBindings.sanitized(data), JcaKeyFingerprintCalculator())
+            val publicRing = PGPPublicKeyRing(CertificateBindings.sanitized(bytes), JcaKeyFingerprintCalculator())
             val masterKey = publicRing.publicKey
             return ImportResult(
                 fingerprint = fingerprintHex(masterKey),
@@ -1023,18 +1027,28 @@ class PGPCryptoService private constructor() {
      */
     fun explodeToArmoredKeys(data: ByteArray): List<String> {
         return try {
-            val input = if (isArmored(data)) {
-                ArmoredInputStream(ByteArrayInputStream(data))
-            } else {
-                ByteArrayInputStream(data)
+            // 3.0.0 (5d-1): a certificate carrying an unknown critical packet is
+            // left out; the object factory below would drop the packet and
+            // hand back the rest as if it were sound.
+            val binary = runCatching {
+                if (isArmored(data)) ArmoredInputStream(ByteArrayInputStream(data)).readBytes() else data
+            }.getOrDefault(data)
+            val rejected = runCatching {
+                CertificateBindings.certificatesWithCriticalUnknownPackets(binary)
+            }.getOrDefault(emptySet())
+            val stubbed = runCatching { CertificateBindings.stubStrippedPrimary(binary) }.getOrDefault(binary)
+            val input = when {
+                stubbed !== binary -> ByteArrayInputStream(stubbed)
+                isArmored(data) -> ArmoredInputStream(ByteArrayInputStream(data))
+                else -> ByteArrayInputStream(data)
             }
             val factory = JcaPGPObjectFactory(input)
             val out = ArrayList<String>()
             var obj = factory.nextObject()
             while (obj != null) {
                 when (obj) {
-                    is PGPSecretKeyRing -> out.add(armorSecretKeyRing(obj))
-                    is PGPPublicKeyRing -> out.add(armorPublicKeyRing(obj))
+                    is PGPSecretKeyRing -> if (fingerprintHex(obj.publicKey) !in rejected) out.add(armorSecretKeyRing(obj))
+                    is PGPPublicKeyRing -> if (fingerprintHex(obj.publicKey) !in rejected) out.add(armorPublicKeyRing(obj))
                 }
                 obj = factory.nextObject()
             }
@@ -3419,14 +3433,25 @@ class PGPCryptoService private constructor() {
                 // Unlocked fine, wrong key for this packet. Expected during
                 // a wildcard trial; silent by design.
                 null
+            } catch (e: RuntimeException) {
+                // 3.0.0 (5d-1): during a wildcard trial the wrong key can fail
+                // below PGPException (an RSA key shorter than the packet's
+                // value raises DataLengthException). That is the same "not
+                // this key" outcome; the next candidate is tried.
+                if (obj.keyID == WILDCARD_KEY_ID) null else throw e
             }
         }
 
-        // Pass 1 — addressed packets. Unchanged behaviour and cost.
+        // Pass 1: addressed packets. 3.0.0 (5d-1): every held ring carrying
+        // the key ID is considered, and only a key the certificate marks for
+        // encryption may open a packet (CertificateBindings.Report.mayDecryptWith).
         for (obj in pkesks) {
             if (obj.keyID == WILDCARD_KEY_ID) continue
-            val secretKey = findSecretKey(obj.keyID, secretKeyRings) ?: continue
-            attempt(obj, secretKey)?.let { return it }
+            for (ring in secretKeyRings) {
+                val secretKey = ring.getSecretKey(obj.keyID) ?: continue
+                if (!mayDecryptWith(ring, secretKey)) continue
+                attempt(obj, secretKey)?.let { return it }
+            }
         }
 
         // Pass 2 — hidden recipients. Try every encryption-capable key we
@@ -3436,6 +3461,7 @@ class PGPCryptoService private constructor() {
             for (ring in secretKeyRings) {
                 for (candidate in ring.secretKeys) {
                     if (!candidate.publicKey.isEncryptionKey) continue
+                    if (!mayDecryptWith(ring, candidate)) continue
                     attempt(obj, candidate)?.let { return it }
                 }
             }
@@ -3446,12 +3472,18 @@ class PGPCryptoService private constructor() {
         return null
     }
 
-    private fun findSecretKey(keyID: Long, rings: List<PGPSecretKeyRing>): PGPSecretKey? {
-        for (ring in rings) {
-            val key = ring.getSecretKey(keyID)
-            if (key != null) return key
-        }
-        return null
+    /**
+     * 3.0.0 (5d-1): may [key] from [ring] decrypt? Only a key its certificate
+     * marks for encryption (see CertificateBindings.Report.mayDecryptWith);
+     * a ring that cannot be analysed keeps the old behaviour.
+     */
+    private fun mayDecryptWith(ring: PGPSecretKeyRing, key: PGPSecretKey): Boolean {
+        // A subkey carrying no signature at all sits on a carrier ring built
+        // for decryption (CompositeKeyFacade.classicalDecryptionRing), whose
+        // subkeys were already chosen from the real certificate.
+        if (!key.isMasterKey && !key.publicKey.signatures.hasNext()) return true
+        val report = runCatching { CertificateBindings.analyze(ring.encoded) }.getOrNull() ?: return true
+        return report.mayDecryptWith(fingerprintHex(key.publicKey))
     }
 
     /** Find a public key by key ID across multiple key rings. */

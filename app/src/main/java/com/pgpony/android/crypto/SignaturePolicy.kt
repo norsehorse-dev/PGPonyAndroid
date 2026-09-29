@@ -20,10 +20,15 @@
 // A signature whose creation time lies far in the future is refused as well
 // (more than a day ahead of the device clock, to tolerate clock skew), and
 // v3 signatures are refused (no signer in the app produces or needs them).
+//
+// 3.0.0 (5d-1): a data signature also needs its creation time in the hashed
+// area, and a critical hashed subpacket that is not understood (an unknown
+// type, or any notation) makes it invalid, as RFC 9580 5.2.3.7 requires.
 
 package com.pgpony.android.crypto
 
 import org.bouncycastle.bcpg.HashAlgorithmTags
+import org.bouncycastle.bcpg.SignatureSubpacketTags
 import org.bouncycastle.openpgp.PGPSignature
 import java.util.Date
 
@@ -67,8 +72,24 @@ object SignaturePolicy {
      */
     fun isAcceptableDataSignature(sig: PGPSignature, now: Date = Date()): Boolean {
         if (sig.version < 4) return false
+        // 3.0.0 (5d-1): the creation time must be in the hashed area (one in
+        // the unhashed area is not covered by the signature), and a hashed
+        // subpacket marked critical that is not understood (an unknown type,
+        // or any notation) invalidates the signature (RFC 9580 5.2.3.7).
+        val hashed = sig.hashedSubPackets ?: return false
+        if (hashed.signatureCreationTime == null) return false
+        if (hasCriticalUnknown(sig)) return false
         val created = sig.creationTime
         if (isFromTheFuture(created, now)) return false
         return isAcceptableDataDigest(sig.hashAlgorithm, created.time)
+    }
+
+    /** A hashed subpacket of [sig] is critical and not understood (see
+     *  CertificateBindings.KNOWN_SUBPACKETS; every notation counts). */
+    fun hasCriticalUnknown(sig: PGPSignature): Boolean {
+        val hashed = sig.hashedSubPackets ?: return false
+        return hashed.toArray().any {
+            it.isCritical && (it.type == SignatureSubpacketTags.NOTATION_DATA || it.type !in CertificateBindings.KNOWN_SUBPACKETS)
+        }
     }
 }
