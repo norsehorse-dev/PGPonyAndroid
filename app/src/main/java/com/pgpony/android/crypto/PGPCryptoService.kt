@@ -1160,7 +1160,13 @@ class PGPCryptoService private constructor() {
         // to the Encrypt screen's prompt. True (the default, and the OpenPGP
         // provider's behavior, since the calling app asked for a signature)
         // keeps it.
-        compositeSignInSeipdV1: Boolean = true
+        compositeSignInSeipdV1: Boolean = true,
+        // 3.0.0 (5d-4): a complete signed message (one-pass signatures, the
+        // literal data and the signatures) built by the caller, for signers
+        // this function cannot combine itself (several signing keys, a text-
+        // mode signature). When set, it is encrypted as it stands: [data] and
+        // every signing parameter above are ignored.
+        presignedInline: ByteArray? = null
     ): ByteArray {
         val outputStream = ByteArrayOutputStream()
         val armoredOut = if (armor) ArmoredOutputStream(outputStream).stripVersion() else null
@@ -1196,8 +1202,8 @@ class PGPCryptoService private constructor() {
             // ([compositeSignatureInSeipdV1]); on "Send unsigned" the caller
             // passes compositeSignInSeipdV1 = false and the signature is left
             // out, the message still encrypted to every recipient.
-            val compositeRequested = compositeSignSecret != null && compositeSignSuite != null &&
-                compositeSignerFingerprint != null
+            val compositeRequested = presignedInline == null && compositeSignSecret != null &&
+                compositeSignSuite != null && compositeSignerFingerprint != null
             val signComposite = compositeRequested && (allRecipientsV6 || compositeSignInSeipdV1)
             // 3.0.0 (5d-3): the strongest cipher every recipient lists
             // (RecipientPreferences); AES-256 when none limits it.
@@ -1257,7 +1263,9 @@ class PGPCryptoService private constructor() {
             // When a composite signer is supplied, write the whole inline one-pass
             // signed payload (OPS + Literal + Signature) through the raw-bytes
             // composite path and skip the BC signing block entirely.
-            if (signComposite) {
+            if (presignedInline != null) {
+                compOut.write(presignedInline)
+            } else if (signComposite) {
                 compOut.write(
                     com.pgpony.android.crypto.pqc.CompositeDocumentSigner.signInline(
                         compositeSignSuite!!, compositeSignSecret!!, compositeSignerFingerprint!!,
@@ -1580,7 +1588,7 @@ class PGPCryptoService private constructor() {
                         org.bouncycastle.openpgp.operator.bc.BcPBEKeyEncryptionMethodGenerator(
                             messagePassword.toCharArray(),
                             org.bouncycastle.bcpg.S2K.Argon2Params.memoryConstrainedParameters()
-                        )
+                        ).setSecureRandom(SecureRandom())
                     } else {
                         org.bouncycastle.openpgp.operator.bc.BcPBEKeyEncryptionMethodGenerator(
                             messagePassword.toCharArray(),
@@ -1736,10 +1744,13 @@ class PGPCryptoService private constructor() {
                 // Argon2id S2K (type 4). 64 MiB memory-constrained params —
                 // NOT the 2 GiB no-arg default. A fresh 16-byte salt is
                 // generated inside Argon2Params from the platform SecureRandom.
+                // 3.0.0 (5d-4): the generator needs its own SecureRandom; a v6
+                // SKESK (with AEAD) draws its IV from it, and without one the
+                // rfc9580 password profile failed with a null random.
                 org.bouncycastle.openpgp.operator.bc.BcPBEKeyEncryptionMethodGenerator(
                     passphrase.toCharArray(),
                     org.bouncycastle.bcpg.S2K.Argon2Params.memoryConstrainedParameters()
-                )
+                ).setSecureRandom(SecureRandom())
             } else {
                 // Iterated-salted SHA-256 S2K (type 3) at the max single-byte
                 // count (0xFF) for GnuPG 2.2.x-compatible output.
@@ -2483,6 +2494,8 @@ class PGPCryptoService private constructor() {
         var signerWeakKey: String? = null
         var signerKeyID: String? = null
         var onePassSig: PGPOnePassSignature? = null
+        var onePassIndex = 0
+        var onePassCount = 1
         var hasSignature = false
         var signatureKeyIDRaw: Long? = null
 
@@ -2502,15 +2515,21 @@ class PGPCryptoService private constructor() {
                         signatureKeyIDRaw = obj[0].keyID
                     }
                     if (obj.size() > 0 && verificationKeys != null) {
-                        val ops = obj[0]
-                        val signerPubKey = findPublicKey(ops.keyID, verificationKeys)
-                        if (signerPubKey != null) {
+                        // 3.0.0 (5d-4): a message signed by several keys carries one
+                        // one-pass packet per signer; verify the first whose key is
+                        // held, not only the first.
+                        for (i in 0 until obj.size()) {
+                            val ops = obj[i]
+                            val signerPubKey = findPublicKey(ops.keyID, verificationKeys) ?: continue
                             ops.init(
                                 org.bouncycastle.openpgp.operator.bc.BcPGPContentVerifierBuilderProvider(),
                                 signerPubKey
                             )
                             onePassSig = ops
+                            onePassIndex = i
+                            onePassCount = obj.size()
                             signerKeyID = String.format("%016X", ops.keyID)
+                            break
                         }
                     }
                 }
@@ -2541,14 +2560,18 @@ class PGPCryptoService private constructor() {
                         // trailing signature must name the same key, and the
                         // grade covers the signature itself (document type,
                         // digest policy) as well as the signer's binding.
-                        val sameKey = obj[0].keyID == onePassSig!!.keyID
-                        signerStatus = if (sameKey && onePassSig!!.verify(obj[0])) {
-                            SignerEvaluator.evaluate(obj[0], verificationKeys ?: emptyList())
+                        // 3.0.0 (5d-4): the signatures come in the reverse order of
+                        // their one-pass packets (RFC 9580 5.4), so the one-pass
+                        // packet at index i pairs with the signature at n - 1 - i.
+                        val sig = if (obj.size() == onePassCount) obj[onePassCount - 1 - onePassIndex] else obj[0]
+                        val sameKey = sig.keyID == onePassSig!!.keyID
+                        signerStatus = if (sameKey && onePassSig!!.verify(sig)) {
+                            SignerEvaluator.evaluate(sig, verificationKeys ?: emptyList())
                         } else {
                             SignerStatus.INVALID
                         }
                         if (signerStatus == SignerStatus.VERIFIED) {
-                            signerWeakKey = weakSignerLabel(obj[0].keyID, verificationKeys)
+                            signerWeakKey = weakSignerLabel(sig.keyID, verificationKeys)
                         }
                     } else if (obj.size() > 0) {
                         signerStatus = SignerStatus.UNKNOWN_SIGNER
@@ -2839,6 +2862,8 @@ class PGPCryptoService private constructor() {
         var signerWeakKey: String? = null
         var signerKeyID: String? = null
         var onePassSig: PGPOnePassSignature? = null
+        var onePassIndex = 0
+        var onePassCount = 1
         // P2b-1: track signature PRESENCE and the raw signing key id
         // independently of whether we hold the signer's key, so the
         // provider can report KEY_MISSING (unknown signer) instead of
@@ -2861,15 +2886,21 @@ class PGPCryptoService private constructor() {
                         signatureKeyIDRaw = obj[0].keyID
                     }
                     if (obj.size() > 0 && verificationKeys != null) {
-                        val ops = obj[0]
-                        val signerPubKey = findPublicKey(ops.keyID, verificationKeys)
-                        if (signerPubKey != null) {
+                        // 3.0.0 (5d-4): a message signed by several keys carries one
+                        // one-pass packet per signer; verify the first whose key is
+                        // held, not only the first.
+                        for (i in 0 until obj.size()) {
+                            val ops = obj[i]
+                            val signerPubKey = findPublicKey(ops.keyID, verificationKeys) ?: continue
                             ops.init(
                                 org.bouncycastle.openpgp.operator.bc.BcPGPContentVerifierBuilderProvider(),
                                 signerPubKey
                             )
                             onePassSig = ops
+                            onePassIndex = i
+                            onePassCount = obj.size()
                             signerKeyID = String.format("%016X", ops.keyID)
+                            break
                         }
                     }
                 }
@@ -2905,14 +2936,18 @@ class PGPCryptoService private constructor() {
                         // trailing signature must name the same key, and the
                         // grade covers the signature itself (document type,
                         // digest policy) as well as the signer's binding.
-                        val sameKey = obj[0].keyID == onePassSig!!.keyID
-                        signerStatus = if (sameKey && onePassSig!!.verify(obj[0])) {
-                            SignerEvaluator.evaluate(obj[0], verificationKeys ?: emptyList())
+                        // 3.0.0 (5d-4): the signatures come in the reverse order of
+                        // their one-pass packets (RFC 9580 5.4), so the one-pass
+                        // packet at index i pairs with the signature at n - 1 - i.
+                        val sig = if (obj.size() == onePassCount) obj[onePassCount - 1 - onePassIndex] else obj[0]
+                        val sameKey = sig.keyID == onePassSig!!.keyID
+                        signerStatus = if (sameKey && onePassSig!!.verify(sig)) {
+                            SignerEvaluator.evaluate(sig, verificationKeys ?: emptyList())
                         } else {
                             SignerStatus.INVALID
                         }
                         if (signerStatus == SignerStatus.VERIFIED) {
-                            signerWeakKey = weakSignerLabel(obj[0].keyID, verificationKeys)
+                            signerWeakKey = weakSignerLabel(sig.keyID, verificationKeys)
                         }
                     } else if (obj.size() > 0) {
                         signerStatus = SignerStatus.UNKNOWN_SIGNER

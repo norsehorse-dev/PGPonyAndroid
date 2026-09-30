@@ -7,7 +7,8 @@
 // SKESK/SEIPD packet bytes:
 //
 //   - Argon2id S2K + SEIPDv1 round-trips for text and file (the defaults).
-//   - SEIPDv2 (AEAD/OCB) round-trips when useAead = true.
+//   - SEIPDv2 (AEAD/OCB) round-trips when useAead = true, and with Argon2
+//     writes a v6 SKESK (3.0.0 5d-4).
 //   - Iterated-salted S2K round-trips when useArgon2 = false (GnuPG 2.2.x
 //     interop posture).
 //   - Wrong passphrase surfaces as the typed InvalidPassphrase.
@@ -77,21 +78,25 @@ class SymmetricEncryptionTest {
 
     @Test
     fun `seipdv2 aead round-trips`() {
-        // v6 SKESK + AEAD/OCB via the PBE method generator is not yet verified
-        // on-device. The shipping Password UI uses the SEIPDv1 default, so this
-        // path is a future toggle (master plan §10.2). Rather than fail the
-        // build on an unsurfaced path, surface the real root cause and SKIP via
-        // an assumption when AEAD encrypt throws. See PHASE_3.0.0-A1_NOTES.
+        // 3.0.0 (5d-4): this path used to fail with a null SecureRandom inside
+        // the PBE method generator (a v6 SKESK draws its AEAD IV from it) and
+        // the test skipped itself. The generator now gets its own random.
         val plaintext = "aead ocb container"
-        val ct = try {
-            svc.encryptSymmetric(plaintext.toByteArray(), passphrase = pass, useAead = true)
-        } catch (e: Throwable) {
-            val chain = generateSequence<Throwable>(e) { it.cause }
-                .joinToString(" <- ") { "${it::class.java.simpleName}: ${it.message}" }
-            System.err.println("[A1] AEAD symmetric deferred — root cause chain: $chain")
-            org.junit.Assume.assumeNoException("v6 SKESK + AEAD PBE path deferred (see notes)", e)
-            return
-        }
+        val ct = svc.encryptSymmetric(plaintext.toByteArray(), passphrase = pass, useAead = true)
+        val result = svc.decrypt(ct, secretKeyRings = emptyList(), passphrase = pass)
+        assertEquals(plaintext, String(result.data))
+    }
+
+    @Test
+    fun `argon2 with aead writes a v6 skesk and round-trips`() {
+        // The SOP rfc9580 password profile: SKESKv6 (Argon2 S2K) + SEIPDv2.
+        val plaintext = "rfc9580 password profile"
+        val ct = svc.encryptSymmetric(plaintext.toByteArray(), passphrase = pass, armor = false, useAead = true, useArgon2 = true)
+        // New-format packet tag 3 (SKESK), one-octet length, then version 6.
+        assertEquals(0xC3, ct[0].toInt() and 0xFF)
+        assertEquals(6, ct[2].toInt())
+        // S2K type 4 (Argon2) after version, count, cipher, AEAD mode, S2K length.
+        assertEquals(4, ct[7].toInt())
         val result = svc.decrypt(ct, secretKeyRings = emptyList(), passphrase = pass)
         assertEquals(plaintext, String(result.data))
     }

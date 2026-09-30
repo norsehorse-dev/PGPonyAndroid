@@ -274,6 +274,8 @@ class CardDecryptService private constructor() {
         var signatureVerified = false
         var signerKeyID: String? = null
         var onePassSig: PGPOnePassSignature? = null
+        var onePassIndex = 0
+        var onePassCount = 1
 
         var obj = factory.nextObject()
         while (obj != null) {
@@ -289,13 +291,19 @@ class CardDecryptService private constructor() {
                 is PGPOnePassSignatureList -> {
                     if (obj.size() > 0) {
                         hadSignature = true
-                        val ops = obj[0]
-                        signerKeyID = String.format("%016X", ops.keyID)
-                        val signerPubKey = verificationKeys?.let { findPublicKey(ops.keyID, it) }
-                        if (signerPubKey != null) {
+                        signerKeyID = String.format("%016X", obj[0].keyID)
+                        // 3.0.0 (5d-4): with several signers, verify the first
+                        // one-pass packet whose key is held, not only the first.
+                        for (i in 0 until obj.size()) {
+                            val ops = obj[i]
+                            val signerPubKey = verificationKeys?.let { findPublicKey(ops.keyID, it) } ?: continue
                             ops.init(BcPGPContentVerifierBuilderProvider(), signerPubKey)
                             onePassSig = ops
+                            onePassIndex = i
+                            onePassCount = obj.size()
+                            signerKeyID = String.format("%016X", ops.keyID)
                             signerKnown = true
+                            break
                         }
                     }
                 }
@@ -320,7 +328,9 @@ class CardDecryptService private constructor() {
                         // 4.6.0 (item 17.1): graded like the software path, so a
                         // valid signature from an unbound, revoked or expired
                         // signer (or a weak digest) is not reported as verified.
-                        val sig = obj[0]
+                        // 3.0.0 (5d-4): signatures come in the reverse order of
+                        // their one-pass packets (RFC 9580 5.4).
+                        val sig = if (obj.size() == onePassCount) obj[onePassCount - 1 - onePassIndex] else obj[0]
                         signatureVerified = sig.keyID == onePassSig.keyID &&
                             onePassSig.verify(sig) &&
                             com.pgpony.android.crypto.SignerEvaluator.evaluate(
