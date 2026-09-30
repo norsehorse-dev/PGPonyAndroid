@@ -1,0 +1,167 @@
+{
+ "description": "PGPony pairing invites (docs/PAIRING_PROTOCOL.md, section 8). valid: each uri parses to the listed addresses (as written back) and h (hex of the 16-byte host key hash); canonical is what the parsed invite writes; pk_H, when given, is the host key whose SHA-256 prefix h is. invalid: each uri must be refused.",
+ "valid": [
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKWg",
+   "addresses": [
+    "192.168.1.20:49152"
+   ],
+   "h": "67ca2ffd6fe9efab3d76e37c34990a5a",
+   "pk_H": "79a631eede1bf9c98f12032cdeadd0e7a079398fc786b88cc846ec89af85a51a",
+   "canonical": "pgpony-pair:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKWg"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:49152,10.0.0.5:5000,[fd00::1]:49152&h=Z8ov_W_p76s9duN8NJkKWg",
+   "addresses": [
+    "192.168.1.20:49152",
+    "10.0.0.5:5000",
+    "[fd00::1]:49152"
+   ],
+   "h": "67ca2ffd6fe9efab3d76e37c34990a5a",
+   "pk_H": "79a631eede1bf9c98f12032cdeadd0e7a079398fc786b88cc846ec89af85a51a",
+   "canonical": "pgpony-pair:1?a=192.168.1.20:49152,10.0.0.5:5000,[fd00::1]:49152&h=Z8ov_W_p76s9duN8NJkKWg"
+  },
+  {
+   "uri": "pgpony-pair:1?h=Z8ov_W_p76s9duN8NJkKWg&a=192.168.1.20:49152",
+   "addresses": [
+    "192.168.1.20:49152"
+   ],
+   "h": "67ca2ffd6fe9efab3d76e37c34990a5a",
+   "canonical": "pgpony-pair:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "members in either order"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKWg&x=later",
+   "addresses": [
+    "192.168.1.20:49152"
+   ],
+   "h": "67ca2ffd6fe9efab3d76e37c34990a5a",
+   "canonical": "pgpony-pair:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "unknown members are ignored"
+  },
+  {
+   "uri": "  pgpony-pair:1?a=[FD00::ABCD]:1&h=Z8ov_W_p76s9duN8NJkKWg\n",
+   "addresses": [
+    "[fd00::abcd]:1"
+   ],
+   "h": "67ca2ffd6fe9efab3d76e37c34990a5a",
+   "canonical": "pgpony-pair:1?a=[fd00::abcd]:1&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "surrounding space trimmed, IPv6 lowercased"
+  },
+  {
+   "uri": "PGPONY-PAIR:1?a=255.255.255.255:65535&h=Z8ov_W_p76s9duN8NJkKWg",
+   "addresses": [
+    "255.255.255.255:65535"
+   ],
+   "h": "67ca2ffd6fe9efab3d76e37c34990a5a",
+   "canonical": "pgpony-pair:1?a=255.255.255.255:65535&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "scheme is case-insensitive"
+  }
+ ],
+ "invalid": [
+  {
+   "uri": "pgpony-pair:2?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "another version"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:49152",
+   "why": "no h"
+  },
+  {
+   "uri": "pgpony-pair:1?h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "no a"
+  },
+  {
+   "uri": "pgpony-pair:1?a=&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "empty a"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKWg&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "h twice"
+  },
+  {
+   "uri": "pgpony-pair:1?a=1.2.3.4:5&a=1.2.3.4:6&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "a twice"
+  },
+  {
+   "uri": "pgpony-pair:1?a=pgpony.local:49152&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "a name, not an address"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "no port"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:0&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "port 0"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:65536&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "port too large"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:049152&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "port with a leading zero"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.256:49152&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "octet too large"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.01.20:49152&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "octet with a leading zero"
+  },
+  {
+   "uri": "pgpony-pair:1?a=fd00::1:49152&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "IPv6 without brackets"
+  },
+  {
+   "uri": "pgpony-pair:1?a=[fe80::1%en0]:49152&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "IPv6 zone"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:49152,&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "empty address in the list"
+  },
+  {
+   "uri": "pgpony-pair:1?a=10.0.0.1:1,10.0.0.2:1,10.0.0.3:1,10.0.0.4:1,10.0.0.5:1,10.0.0.6:1,10.0.0.7:1,10.0.0.8:1,10.0.0.9:1&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "nine addresses"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKWg=",
+   "why": "h padded"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKW",
+   "why": "h too short"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKWjM",
+   "why": "h too long"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKW+",
+   "why": "h not base64url"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:49152&h&x",
+   "why": "member without ="
+  },
+  {
+   "uri": "https://pgpony.app/?a=192.168.1.20:49152",
+   "why": "not an invite"
+  },
+  {
+   "uri": "pgpony-pa\u0131r:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "scheme with a dotless i: case is ASCII only"
+  },
+  {
+   "uri": "PGPONY-PA\u0130R:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKWg",
+   "why": "scheme with a dotted capital I: case is ASCII only"
+  },
+  {
+   "uri": "pgpony-pair:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKWh",
+   "why": "h with non-zero unused bits"
+  }
+ ]
+}

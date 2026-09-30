@@ -1,0 +1,20 @@
+{
+  "description": "PGPony pairing protocol v1 (docs/PAIRING_PROTOCOL.md): one attempt with fixed X25519 secrets and nonces. Byte strings are lowercase hex; the sealed messages are the ENVELOPE payloads (seq || ciphertext || tag).",
+  "sk_J": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+  "sk_H": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+  "pk_J": "07a37cbc142093c8b755dc1b10e86cb426374ad16aa853ed0bdfc0b2b86d1c7c",
+  "pk_H": "79a631eede1bf9c98f12032cdeadd0e7a079398fc786b88cc846ec89af85a51a",
+  "n_J": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+  "n_H": "c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+  "commit": "a81677b23a30f981fd36bbdb5dbe2c4f44a9b0a8ee26d19b37e16e7eed61ec57",
+  "Z": "ae4440cc8d7faddb2894172b78e3d745cafa0098bcc10d7ee0fda08fa85a9a2e",
+  "T": "f2a45141e237ecf2b111d29727b1b78b084157ff5379aa9065aa217b735c7c4d",
+  "K": "f2f8a25d17b4b44f907fcb1373ace7ff74c38adfe0cb27f6feb346b69fe990d5",
+  "k_HJ": "2730002d95347913243b20fbfebbefe989276b69c866bbcf2cec669fed40c9ef",
+  "k_JH": "c682ee1211f79983607db74a1a0885e3f25cdbb5e2c890d8edffa1b207c7a630",
+  "code": "425 311",
+  "host_msg_0_plaintext": "017b226e616d65223a22686f7374222c22617070223a22766563746f7273227d",
+  "host_msg_0_sealed": "000000000000000074fbeaf2e5467ece2c9d8a1e60c36de9877ac1cddf79350ac950e421666ca517db90c037dc1d4cd213ae5a8e024cb065",
+  "joiner_msg_0_plaintext": "017b226e616d65223a226a6f696e6572222c22617070223a22766563746f7273227d",
+  "joiner_msg_0_sealed": "00000000000000008894f4acd4d2b55f0c0d952b93fdf748001be43a60b413c3bbaa91b4e749654cf979fd015d760cf3c80c8e5f899d788b238d"
+}
