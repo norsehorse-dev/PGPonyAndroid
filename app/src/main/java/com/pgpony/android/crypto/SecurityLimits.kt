@@ -39,9 +39,21 @@ object SecurityLimits {
     // Total decrypted plaintext buffered IN MEMORY (the message decrypt path).
     // Large files use the streaming path instead.
     const val MAX_MESSAGE_PLAINTEXT_BYTES = 128L * 1024 * 1024
-    // Total decrypted plaintext written by the STREAMING path (files). Generous;
-    // stops a runaway zlib bomb without rejecting a real large attachment.
-    const val MAX_STREAM_PLAINTEXT_BYTES = 8L * 1024 * 1024 * 1024
+    // Total decrypted plaintext written by the STREAMING path (files). The
+    // expansion bound below is what stops compression bombs, so this only caps
+    // a runaway stream; it is high enough that any file or folder PGPony can
+    // encrypt also decrypts.
+    const val MAX_STREAM_PLAINTEXT_BYTES = 1024L * 1024 * 1024 * 1024
+
+    // Expansion bound for the STREAMING path. Past the first
+    // STREAM_EXPANSION_FREE_BYTES of output, the plaintext written may be at
+    // most MAX_STREAM_EXPANSION_RATIO times the decrypted packet bytes read so
+    // far. One layer of ZIP/ZLIB tops out near 1032:1, so a deflate-compressed
+    // file of any size always passes; only bzip2 of extremely repetitive data
+    // or nested compression goes beyond it, which is how a few kilobytes are
+    // made to expand into gigabytes.
+    const val STREAM_EXPANSION_FREE_BYTES = 64L * 1024 * 1024
+    const val MAX_STREAM_EXPANSION_RATIO = 1100L
 
     // 4.6.0 (item 17.7): the most an OpenPGP API caller may hand the provider
     // as input in one call. The provider buffers input whole (it sniffs the
@@ -51,6 +63,6 @@ object SecurityLimits {
     // 4.6.0: a .zip that wraps a message. The payload is ciphertext, so it gets
     // the streaming path's bound; the entry count stops an archive of millions
     // of tiny entries from spinning the scan.
-    const val MAX_ZIP_PAYLOAD_BYTES = MAX_STREAM_PLAINTEXT_BYTES
+    const val MAX_ZIP_PAYLOAD_BYTES = 8L * 1024 * 1024 * 1024
     const val MAX_ZIP_ENTRIES = 1000
 }

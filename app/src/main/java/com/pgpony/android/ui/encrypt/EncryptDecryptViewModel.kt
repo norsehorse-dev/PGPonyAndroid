@@ -47,6 +47,10 @@ import com.pgpony.android.R
 import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.crypto.pqc.CompositeDocumentSigner
 import com.pgpony.android.crypto.pqc.CompositeDocumentVerifier
+import com.pgpony.android.crypto.pqc.CompositeSignerGate
+import com.pgpony.android.crypto.SignerEvaluator
+import com.pgpony.android.crypto.SignerStatus
+import com.pgpony.android.data.KeyDeduplicationService
 import com.pgpony.android.crypto.PGPCryptoService
 import com.pgpony.android.crypto.SignedInputType
 import com.pgpony.android.crypto.SigningError
@@ -2940,42 +2944,26 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     }
 
     /**
-     * Build a VerificationResult from a card-decrypt result, mirroring the
-     * software path's buildVerificationResultForEncrypted: Unsigned when no
-     * signature, Verified (with signer identity from the keyring) when it
-     * checks out, UnknownSigner when the signer isn't in the keyring, and
-     * Invalid when a known signer's signature fails to verify.
+     * Build a VerificationResult from a card-decrypt result with the same
+     * graded mapping as the software path (gradedDecryptVerification):
+     * the card walker grades the signer exactly like the software walker
+     * (CardDecryptResult.signerStatus), so a revoked, expired or unbound
+     * signer is shown with its reason instead of as "not in keyring", and
+     * the signer is identified by fingerprint.
      */
     private suspend fun buildVerificationResultForCard(
         result: com.pgpony.android.crypto.card.CardDecryptResult,
         plaintext: String
-    ): VerificationResult {
-        if (!result.hadSignature) return VerificationResult.Unsigned(plaintext)
-        val signerKeyId = result.signerKeyID
-        if (signerKeyId == null || !result.signerKnown) {
-            return VerificationResult.UnknownSigner(
-                signerKeyID = signerKeyId ?: "",
-                claimedFingerprint = null,
-                signedContent = null
-            )
-        }
-        if (!result.signatureVerified) {
-            return VerificationResult.Invalid(
-                reason = PGPonyApp.instance.getString(R.string.encdec_error_signer_not_in_keyring),
-                signerKeyID = signerKeyId,
-                signedContent = null
-            )
-        }
-        val signer = resolveSignerEntity(signerKeyId)
-        return VerificationResult.Verified(
-            signerKeyID = signerKeyId,
-            signerFingerprint = signer?.fingerprint ?: "",
-            signerName = signer?.userName?.ifBlank { null },
-            signerEmail = signer?.userEmail?.ifBlank { null },
-            signerTrust = signer?.trustLevel,
-            signedContent = null
-        )
-    }
+    ): VerificationResult = gradedDecryptVerification(
+        status = result.signerStatus,
+        hasSignature = result.hadSignature,
+        signerKeyID = result.signerKeyID,
+        signatureKeyIDRaw = result.signatureKeyIDRaw,
+        signingKeyFingerprint = result.signingKeyFingerprint,
+        signerPrimaryFingerprint = result.signerPrimaryFingerprint,
+        signerWeakKey = result.signerWeakKey,
+        unsignedContent = plaintext
+    )
 
     fun onCardDecryptFailure(message: String) {
         _decryptState.value = _decryptState.value.copy(
@@ -3081,81 +3069,63 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     /**
      * 4.4.0 RC3 (#30/#31): verify a clear-signed message whose signature is a
      * composite ML-DSA + EdDSA signature. BouncyCastle throws on the algo-30/31
-     * packet, so composite messages are verified through CompositeDocumentVerifier
-     * against the stored composite public keys. Returns null when the message is
-     * not composite, so the caller falls back to the BouncyCastle path.
+     * packet, so composite messages are verified through CompositeSignerGate
+     * against the stored composite certificates. Returns null when the message
+     * is not composite, so the caller falls back to the BouncyCastle path.
+     *
+     * A2 (ENGINE-4): the gate grades the signature's own policy and the signer
+     * (revoked, expired, not sign-capable, unbound ...) like the classical
+     * path, and identifies the signer by the key that verified, not by the
+     * issuer subpacket.
      */
     private suspend fun compositeClearSignedResult(armored: String): VerificationResult? {
         if (!CompositeDocumentVerifier.isCompositeCleartext(armored)) return null
-        val content = CompositeDocumentVerifier.cleartextContent(armored)
-        val claimedFp = CompositeDocumentVerifier.claimedSignerOfCleartext(armored)
-
-        // Load every composite cert and its signing components (primary + any
-        // composite subkeys). sequoia signs with a dedicated signing subkey,
-        // PGPony's own keys sign with the primary, so match the signature's
-        // issuer fingerprint to whichever component actually made it.
-        val certs = withContext(Dispatchers.IO) {
-            repo.getAllKeys()
-                .filter { it.algorithm.isCompositeSign }
-                .mapNotNull { e -> repo.loadCompositePublicInfo(e.fingerprint)?.let { e to it } }
+        val certs = compositeSignerCerts()
+        val graded = withContext(Dispatchers.Default) {
+            CompositeSignerGate.verifyCleartext(certs.map { it.second }, armored)
         }
-        val matched: Pair<com.pgpony.android.data.PGPKeyEntity, com.pgpony.android.crypto.pqc.CompositeKeyFacade.CompositeComponent>? =
-            run {
-                for ((entity, info) in certs) {
-                    for (component in info.compositeSigners) {
-                        if (component.fingerprintHex.equals(claimedFp, ignoreCase = true)) {
-                            return@run entity to component
-                        }
-                    }
-                }
-                null
-            }
-
-        if (matched != null) {
-            val (entity, component) = matched
-            val ok = withContext(Dispatchers.Default) {
-                CompositeDocumentVerifier.verifyCleartext(component.publicMaterial, armored).valid
-            }
-            return if (ok) {
-                VerificationResult.Verified(
-                    signerKeyID = claimedFp?.take(16) ?: entity.longKeyId,
-                    signerFingerprint = entity.fingerprint,
-                    signerName = entity.userName.ifBlank { null },
-                    signerEmail = entity.userEmail.ifBlank { null },
-                    signerTrust = entity.trustLevel,
-                    signedContent = content
-                )
-            } else {
-                VerificationResult.Invalid(
-                    reason = PGPonyApp.instance.getString(R.string.encdec_verify_composite_invalid),
-                    signerKeyID = claimedFp?.take(16),
-                    signedContent = content
-                )
-            }
-        }
-        return VerificationResult.UnknownSigner(
-            signerKeyID = claimedFp?.take(16) ?: "",
-            claimedFingerprint = claimedFp,
-            signedContent = content
-        )
+        val content = graded.content?.let { String(it, Charsets.UTF_8) }
+            ?: CompositeDocumentVerifier.cleartextContent(armored)
+        return compositeVerificationResult(graded, certs, content)
     }
 
-    /** Find the composite cert + component whose fingerprint matches [claimedFp]. */
-    private suspend fun resolveCompositeSigner(
-        claimedFp: String?
-    ): Pair<com.pgpony.android.data.PGPKeyEntity, com.pgpony.android.crypto.pqc.CompositeKeyFacade.CompositeComponent>? {
-        if (claimedFp == null) return null
-        val certs = withContext(Dispatchers.IO) {
-            repo.getAllKeys()
-                .filter { it.algorithm.isCompositeSign }
-                .mapNotNull { e -> repo.loadCompositePublicInfo(e.fingerprint)?.let { e to it } }
+    /**
+     * A2 (ENGINE-4): every stored composite signing certificate with its row,
+     * raw bytes as stored, in the order CompositeSignerGate's certIndex uses.
+     */
+    private suspend fun compositeSignerCerts(): List<Pair<PGPKeyEntity, ByteArray>> =
+        withContext(Dispatchers.IO) { repo.loadCompositeSignerCerts() }
+
+    /**
+     * A2 (ENGINE-4): [graded] as the banner's VerificationResult, with the
+     * display identity of the certificate at [CompositeSignerGate.Graded.certIndex].
+     * Only VERIFIED becomes Verified. A signature whose math failed keeps the
+     * existing localized "composite signature invalid" wording; a valid
+     * signature from a key that does not pass carries the grade's reason.
+     */
+    private fun compositeVerificationResult(
+        graded: CompositeSignerGate.Graded,
+        certs: List<Pair<PGPKeyEntity, ByteArray>>,
+        signedContent: String?
+    ): VerificationResult {
+        val entity = certs.getOrNull(graded.certIndex)?.first
+        val mapped = CompositeSignerGate.toVerificationResult(
+            graded,
+            signerName = entity?.userName?.ifBlank { null },
+            signerEmail = entity?.userEmail?.ifBlank { null },
+            signerTrust = entity?.trustLevel,
+            signedContent = signedContent
+        )
+        return when (mapped) {
+            is VerificationResult.Verified ->
+                if (entity != null) mapped.copy(signerFingerprint = entity.fingerprint) else mapped
+            is VerificationResult.Invalid ->
+                if (mapped.signerStatus == null) {
+                    mapped.copy(reason = PGPonyApp.instance.getString(R.string.encdec_verify_composite_invalid))
+                } else mapped
+            is VerificationResult.UnknownSigner -> mapped
+            is VerificationResult.Unsigned -> mapped
         }
-        for ((entity, info) in certs) {
-            for (component in info.compositeSigners) {
-                if (component.fingerprintHex.equals(claimedFp, ignoreCase = true)) return entity to component
-            }
-        }
-        return null
     }
 
     /**
@@ -3163,6 +3133,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      * at [signedUri]. Returns null when the signature is not composite, so the
      * caller falls back to the BouncyCastle detached-verify path. The signed
      * content is read whole (composite verify hashes the full document).
+     * A2 (ENGINE-4): graded by CompositeSignerGate.
      */
     private suspend fun compositeDetachedFileResult(
         sig: ByteArray,
@@ -3177,77 +3148,29 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             signerKeyID = null,
             signedContent = null
         )
-        val claimedFp = CompositeDocumentVerifier.claimedSignerOfDetached(sig)
-        val matched = resolveCompositeSigner(claimedFp)
-        if (matched != null) {
-            val (entity, component) = matched
-            val ok = withContext(Dispatchers.Default) {
-                CompositeDocumentVerifier.verifyDetached(component.publicMaterial, sigPacket, data).valid
-            }
-            return if (ok) {
-                VerificationResult.Verified(
-                    signerKeyID = claimedFp?.take(16) ?: entity.longKeyId,
-                    signerFingerprint = entity.fingerprint,
-                    signerName = entity.userName.ifBlank { null },
-                    signerEmail = entity.userEmail.ifBlank { null },
-                    signerTrust = entity.trustLevel,
-                    signedContent = null
-                )
-            } else {
-                VerificationResult.Invalid(
-                    reason = PGPonyApp.instance.getString(R.string.encdec_verify_composite_invalid),
-                    signerKeyID = claimedFp?.take(16),
-                    signedContent = null
-                )
-            }
+        val certs = compositeSignerCerts()
+        val graded = withContext(Dispatchers.Default) {
+            CompositeSignerGate.verifyDetached(certs.map { it.second }, sig, data)
         }
-        return VerificationResult.UnknownSigner(
-            signerKeyID = claimedFp?.take(16) ?: "",
-            claimedFingerprint = claimedFp,
-            signedContent = null
-        )
+        return compositeVerificationResult(graded, certs, null)
     }
 
     /**
      * 4.4.0 RC3 (#30/#31): verify an inline one-pass composite signed message
      * (One-Pass Signature + Literal Data + composite Signature) and surface its
-     * literal content.
+     * literal content. A2 (ENGINE-4): graded by CompositeSignerGate, which also
+     * requires the one-pass packet to match the signature.
      */
     private fun verifyCompositeInlinePath(message: ByteArray) {
         viewModelScope.launch {
             _decryptState.value = _decryptState.value.copy(isProcessing = true, errorMessage = null)
-            val content = CompositeDocumentVerifier.inlineContent(message)
-                ?.let { String(it, Charsets.UTF_8) }
-            val claimedFp = CompositeDocumentVerifier.claimedSignerOfInline(message)
-            val matched = resolveCompositeSigner(claimedFp)
-            val result: VerificationResult = if (matched != null) {
-                val (entity, component) = matched
-                val ok = withContext(Dispatchers.Default) {
-                    CompositeDocumentVerifier.verifyInline(component.publicMaterial, message).valid
-                }
-                if (ok) {
-                    VerificationResult.Verified(
-                        signerKeyID = claimedFp?.take(16) ?: entity.longKeyId,
-                        signerFingerprint = entity.fingerprint,
-                        signerName = entity.userName.ifBlank { null },
-                        signerEmail = entity.userEmail.ifBlank { null },
-                        signerTrust = entity.trustLevel,
-                        signedContent = content
-                    )
-                } else {
-                    VerificationResult.Invalid(
-                        reason = PGPonyApp.instance.getString(R.string.encdec_verify_composite_invalid),
-                        signerKeyID = claimedFp?.take(16),
-                        signedContent = content
-                    )
-                }
-            } else {
-                VerificationResult.UnknownSigner(
-                    signerKeyID = claimedFp?.take(16) ?: "",
-                    claimedFingerprint = claimedFp,
-                    signedContent = content
-                )
+            val certs = compositeSignerCerts()
+            val graded = withContext(Dispatchers.Default) {
+                CompositeSignerGate.verifyInline(certs.map { it.second }, message)
             }
+            val content = (graded.content ?: CompositeDocumentVerifier.inlineContent(message))
+                ?.let { String(it, Charsets.UTF_8) }
+            val result = compositeVerificationResult(graded, certs, content)
             _decryptState.value = _decryptState.value.copy(
                 outputText = content.orEmpty(),
                 isProcessing = false,
@@ -3588,24 +3511,6 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     }
 
     /**
-     * Map a DecryptResult into the same VerificationResult shape the
-     * clear-signed path produces, so VerificationBanner can render both
-     * uniformly. The signer's user ID is looked up from the local keyring
-     * by 16-hex-char key ID (matches the last 16 chars of a v4 fingerprint).
-     */
-    /**
-     * V6-6: Resolve the local key entity that produced a signature with key
-     * ID [signerKeyId]. First tries a direct primary-key match (the fast path
-     * for v4 keys that sign with the primary). That misses for v6 keys and any
-     * key signing with a dedicated subkey — the signature carries the subkey's
-     * key ID, which no primary record equals — so it then walks the cached
-     * public key rings with BC's getPublicKey(keyId) (which matches subkeys)
-     * and maps the owning ring's primary key ID back to the stored entity.
-     * Mirrors VerifyService.resolveSignerIdentity so the decrypt banner names a
-     * subkey signer the same way detached verification already does. Returns
-     * null when the signer isn't local (caller then shows the key ID alone).
-     */
-    /**
      * #57: fill [VerificationResult.Verified.signerTrust] for a
      * VerifyService-produced result, which has no DB access, by looking up the
      * signer key's local trust level. Idempotent and total: a non-Verified
@@ -3624,108 +3529,140 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         return r.copy(signerTrust = trust)
     }
 
-    private suspend fun resolveSignerEntity(signerKeyId: String): PGPKeyEntity? {
-        val all = repo.getAllKeys()
-        all.firstOrNull { it.longKeyId.equals(signerKeyId, ignoreCase = true) }?.let { return it }
-        val keyIdLong = signerKeyId.toULongOrNull(16)?.toLong() ?: return null
-        // 4.6.0 (item 17.1): the owner is the certificate the signing key is
-        // validly bound to, not merely the first ring that lists it.
-        val ownerPrimaryKeyId = (com.pgpony.android.crypto.SignerEvaluator.signerRing(keyIdLong, verifyRingsCache)
-            ?: verifyRingsCache.firstOrNull { ring -> ring.getPublicKey(keyIdLong) != null })
-            ?.let { String.format("%016X", it.publicKey.keyID) }
-            ?: return null
-        return all.firstOrNull { it.longKeyId.equals(ownerPrimaryKeyId, ignoreCase = true) }
+    /**
+     * The local key entity that made a verified decrypt signature. The engine
+     * reports the primary fingerprint of the certificate that validly carries
+     * the key that verified ([signerPrimaryFingerprint]) and that key's own
+     * fingerprint ([signingKeyFingerprint]); the owner is looked up by those,
+     * never by the 64-bit key ID, so another certificate holding a key with
+     * the same key ID can never lend its name. Null when the signer has no
+     * row (the banner then shows the key ID alone).
+     */
+    private suspend fun resolveSignerByFingerprint(
+        signerPrimaryFingerprint: String?,
+        signingKeyFingerprint: String?
+    ): PGPKeyEntity? {
+        val primary = signerPrimaryFingerprint ?: signingKeyFingerprint?.let { fp ->
+            // No primary reported: find the ring that validly binds exactly
+            // this key (matched by fingerprint) among the cached rings.
+            withContext(Dispatchers.Default) {
+                val key = verifyRingsCache.firstNotNullOfOrNull { ring ->
+                    ring.publicKeys.asSequence().firstOrNull { k ->
+                        org.bouncycastle.util.encoders.Hex.toHexString(k.fingerprint).equals(fp, ignoreCase = true)
+                    }
+                }
+                key?.let { SignerEvaluator.signerRing(it, verifyRingsCache) }
+                    ?.let { org.bouncycastle.util.encoders.Hex.toHexString(it.publicKey.fingerprint) }
+            }
+        } ?: return null
+        val target = KeyDeduplicationService.normalize(primary)
+        return repo.getAllKeys().firstOrNull { KeyDeduplicationService.normalize(it.fingerprint) == target }
+    }
+
+    /**
+     * Map the signer grade of a decrypt (in memory, streamed or on a card)
+     * into the VerificationResult the banner renders. Every SignerStatus is
+     * handled: VERIFIED is the only green state; UNKNOWN_SIGNER (and a
+     * signature with no grade) is the yellow lookup state; INVALID is a
+     * failed check; every other grade (revoked, expired key, expired
+     * signature, not a signing key, unbound, weak, predates the key, not
+     * valid at the time) is a valid signature that must not be trusted and
+     * is shown as Invalid with the engine's reason, which the banner
+     * localizes through ErrorText.
+     */
+    private suspend fun gradedDecryptVerification(
+        status: SignerStatus,
+        hasSignature: Boolean,
+        signerKeyID: String?,
+        signatureKeyIDRaw: Long?,
+        signingKeyFingerprint: String?,
+        signerPrimaryFingerprint: String?,
+        signerWeakKey: String?,
+        unsignedContent: String
+    ): VerificationResult {
+        val rawKeyId = signatureKeyIDRaw?.let { String.format("%016X", it) }
+        val keyId = signerKeyID ?: rawKeyId
+        return when (status) {
+            SignerStatus.NONE ->
+                if (hasSignature) {
+                    VerificationResult.UnknownSigner(
+                        signerKeyID = keyId ?: "",
+                        claimedFingerprint = null,
+                        signedContent = null
+                    )
+                } else {
+                    VerificationResult.Unsigned(unsignedContent)
+                }
+            // 4.1.0 Phase 14b: a signature from a key that is not held is the
+            // yellow lookup state, never Unsigned. claimedFingerprint stays
+            // null because the decrypt results do not carry the issuer
+            // fingerprint subpacket; the lookup falls back to the key ID.
+            SignerStatus.UNKNOWN_SIGNER -> VerificationResult.UnknownSigner(
+                signerKeyID = rawKeyId ?: signerKeyID ?: "",
+                claimedFingerprint = null,
+                signedContent = null
+            )
+            SignerStatus.VERIFIED -> {
+                val signer = resolveSignerByFingerprint(signerPrimaryFingerprint, signingKeyFingerprint)
+                VerificationResult.Verified(
+                    signerKeyID = keyId ?: "",
+                    signerFingerprint = signer?.fingerprint ?: signerPrimaryFingerprint ?: "",
+                    signerName = signer?.userName?.ifBlank { null },
+                    signerEmail = signer?.userEmail?.ifBlank { null },
+                    signerTrust = signer?.trustLevel,
+                    signedContent = null,
+                    signingKeyFingerprint = signingKeyFingerprint,
+                    signerWeakKey = signerWeakKey
+                )
+            }
+            SignerStatus.INVALID -> VerificationResult.Invalid(
+                reason = SignerEvaluator.reason(SignerStatus.INVALID),
+                signerKeyID = keyId,
+                signedContent = null
+            )
+            SignerStatus.REVOKED_KEY,
+            SignerStatus.EXPIRED_KEY,
+            SignerStatus.EXPIRED_SIGNATURE,
+            SignerStatus.NOT_SIGNING_KEY,
+            SignerStatus.UNBOUND_SIGNER,
+            SignerStatus.WEAK_SIGNATURE,
+            SignerStatus.PREDATES_KEY,
+            SignerStatus.WEAK_KEY,
+            SignerStatus.NOT_VALID_AT_TIME -> VerificationResult.Invalid(
+                reason = SignerEvaluator.reason(status),
+                signerKeyID = keyId,
+                signedContent = null,
+                signerStatus = status,
+                signingKeyFingerprint = signingKeyFingerprint,
+                signerFingerprint = signerPrimaryFingerprint
+            )
+        }
     }
 
     private suspend fun buildVerificationResultForEncrypted(
         result: com.pgpony.android.crypto.DecryptResult
     ): VerificationResult {
         // #30/#31: the decrypt path extracted an inline composite (ML-DSA + EdDSA)
-        // signature that BouncyCastle cannot parse. Verify it against the stored
-        // composite public key here, mirroring verifyCompositeInlinePath.
-        if (result.compositeInline && result.compositeInlineBytes != null) {
-            val claimedFp = result.compositeClaimedSignerFp
-            val matched = resolveCompositeSigner(claimedFp)
-            if (matched != null) {
-                val (entity, component) = matched
-                val ok = withContext(Dispatchers.Default) {
-                    CompositeDocumentVerifier.verifyInline(
-                        component.publicMaterial, result.compositeInlineBytes
-                    ).valid
-                }
-                return if (ok) {
-                    VerificationResult.Verified(
-                        signerKeyID = claimedFp?.take(16) ?: entity.longKeyId,
-                        signerFingerprint = entity.fingerprint,
-                        signerName = entity.userName.ifBlank { null },
-                        signerEmail = entity.userEmail.ifBlank { null },
-                        signerTrust = entity.trustLevel,
-                        signedContent = null
-                    )
-                } else {
-                    VerificationResult.Invalid(
-                        reason = PGPonyApp.instance.getString(R.string.encdec_verify_composite_invalid),
-                        signerKeyID = claimedFp?.take(16),
-                        signedContent = null
-                    )
-                }
+        // signature that BouncyCastle cannot parse. A2 (ENGINE-4): grade it
+        // with CompositeSignerGate against the stored composite certificates,
+        // as verifyCompositeInlinePath does.
+        val inline = result.compositeInlineBytes
+        if (result.compositeInline && inline != null) {
+            val certs = compositeSignerCerts()
+            val graded = withContext(Dispatchers.Default) {
+                CompositeSignerGate.verifyInline(certs.map { it.second }, inline)
             }
-            return VerificationResult.UnknownSigner(
-                signerKeyID = claimedFp?.take(16) ?: "",
-                claimedFingerprint = claimedFp,
-                signedContent = null
-            )
+            return compositeVerificationResult(graded, certs, null)
         }
-        val signerKeyId = result.signerKeyID
-        if (signerKeyId == null) {
-            // 4.1.0 Phase 14b. This returned Unsigned, which is a false
-            // statement whenever the message carried a signature from
-            // someone whose key is not in the keyring: signerKeyID is
-            // only populated when findPublicKey located the signer, so
-            // "not in my keyring" and "not signed" arrived here looking
-            // identical. hasSignature and signatureKeyIDRaw were added in
-            // 4.0.0 Phase P2b-1 to tell them apart for the provider API
-            // (RESULT_NO_SIGNATURE vs RESULT_KEY_MISSING) and this screen
-            // never used them.
-            //
-            // UnknownSigner is the right state and it already exists:
-            // yellow banner, tappable, opens the signer lookup so the
-            // certificate can be fetched and the signature re-checked.
-            // buildVerificationResultForCard has done exactly this since
-            // HW Phase 3; its own doc comment says it mirrors the
-            // software path, which turned out not to be true.
-            //
-            // claimedFingerprint stays null because the decrypt results
-            // do not carry the issuer-fingerprint subpacket. The lookup
-            // falls back to the key ID, which is what UnknownSigner
-            // documents for old signatures.
-            if (result.hasSignature) {
-                return VerificationResult.UnknownSigner(
-                    signerKeyID = result.signatureKeyIDRaw
-                        ?.let { String.format("%016X", it) } ?: "",
-                    claimedFingerprint = null,
-                    signedContent = null
-                )
-            }
-            return VerificationResult.Unsigned(result.plaintext)
-        }
-        if (!result.signatureVerified) {
-            return VerificationResult.Invalid(
-                reason = PGPonyApp.instance.getString(R.string.encdec_error_signer_not_in_keyring),
-                signerKeyID = signerKeyId,
-                signedContent = null
-            )
-        }
-        // Verified — resolve the signer (primary key, or a signing subkey via
-        // its owning ring) to a local entity for name/email/fingerprint.
-        val signer = resolveSignerEntity(signerKeyId)
-        return VerificationResult.Verified(
-            signerKeyID = signerKeyId,
-            signerFingerprint = signer?.fingerprint ?: "",
-            signerName = signer?.userName?.ifBlank { null },
-            signerEmail = signer?.userEmail?.ifBlank { null },
-            signerTrust = signer?.trustLevel,
-            signedContent = null
+        return gradedDecryptVerification(
+            status = result.signerStatus,
+            hasSignature = result.hasSignature,
+            signerKeyID = result.signerKeyID,
+            signatureKeyIDRaw = result.signatureKeyIDRaw,
+            signingKeyFingerprint = result.signingKeyFingerprint,
+            signerPrimaryFingerprint = result.signerPrimaryFingerprint,
+            signerWeakKey = result.signerWeakKey,
+            unsignedContent = result.plaintext
         )
     }
 
@@ -3739,91 +3676,23 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     private suspend fun buildVerificationResultForStream(
         result: com.pgpony.android.crypto.DecryptStreamResult
     ): VerificationResult {
-        // #30/#31: the streamed decrypt extracted an inline composite
-        // (ML-DSA + EdDSA) signature BouncyCastle cannot parse. Verify it
-        // against the stored composite public key here, mirroring
-        // buildVerificationResultForEncrypted (the text path).
-        if (result.compositeInline && result.compositeInlineBytes != null) {
-            val claimedFp = result.compositeClaimedSignerFp
-            val matched = resolveCompositeSigner(claimedFp)
-            if (matched != null) {
-                val (entity, component) = matched
-                val ok = withContext(Dispatchers.Default) {
-                    CompositeDocumentVerifier.verifyInline(
-                        component.publicMaterial, result.compositeInlineBytes
-                    ).valid
-                }
-                return if (ok) {
-                    VerificationResult.Verified(
-                        signerKeyID = claimedFp?.take(16) ?: entity.longKeyId,
-                        signerFingerprint = entity.fingerprint,
-                        signerName = entity.userName.ifBlank { null },
-                        signerEmail = entity.userEmail.ifBlank { null },
-                        signerTrust = entity.trustLevel,
-                        signedContent = null
-                    )
-                } else {
-                    VerificationResult.Invalid(
-                        reason = PGPonyApp.instance.getString(R.string.encdec_verify_composite_invalid),
-                        signerKeyID = claimedFp?.take(16),
-                        signedContent = null
-                    )
-                }
+        val inline = result.compositeInlineBytes
+        if (result.compositeInline && inline != null) {
+            val certs = compositeSignerCerts()
+            val graded = withContext(Dispatchers.Default) {
+                CompositeSignerGate.verifyInline(certs.map { it.second }, inline)
             }
-            return VerificationResult.UnknownSigner(
-                signerKeyID = claimedFp?.take(16) ?: "",
-                claimedFingerprint = claimedFp,
-                signedContent = null
-            )
+            return compositeVerificationResult(graded, certs, null)
         }
-        val signerKeyId = result.signerKeyID
-        if (signerKeyId == null) {
-            // 4.1.0 Phase 14b. This returned Unsigned, which is a false
-            // statement whenever the message carried a signature from
-            // someone whose key is not in the keyring: signerKeyID is
-            // only populated when findPublicKey located the signer, so
-            // "not in my keyring" and "not signed" arrived here looking
-            // identical. hasSignature and signatureKeyIDRaw were added in
-            // 4.0.0 Phase P2b-1 to tell them apart for the provider API
-            // (RESULT_NO_SIGNATURE vs RESULT_KEY_MISSING) and this screen
-            // never used them.
-            //
-            // UnknownSigner is the right state and it already exists:
-            // yellow banner, tappable, opens the signer lookup so the
-            // certificate can be fetched and the signature re-checked.
-            // buildVerificationResultForCard has done exactly this since
-            // HW Phase 3; its own doc comment says it mirrors the
-            // software path, which turned out not to be true.
-            //
-            // claimedFingerprint stays null because the decrypt results
-            // do not carry the issuer-fingerprint subpacket. The lookup
-            // falls back to the key ID, which is what UnknownSigner
-            // documents for old signatures.
-            if (result.hasSignature) {
-                return VerificationResult.UnknownSigner(
-                    signerKeyID = result.signatureKeyIDRaw
-                        ?.let { String.format("%016X", it) } ?: "",
-                    claimedFingerprint = null,
-                    signedContent = null
-                )
-            }
-            return VerificationResult.Unsigned("")
-        }
-        if (!result.signatureVerified) {
-            return VerificationResult.Invalid(
-                reason = PGPonyApp.instance.getString(R.string.encdec_error_signer_not_in_keyring),
-                signerKeyID = signerKeyId,
-                signedContent = null
-            )
-        }
-        val signer = resolveSignerEntity(signerKeyId)
-        return VerificationResult.Verified(
-            signerKeyID = signerKeyId,
-            signerFingerprint = signer?.fingerprint ?: "",
-            signerName = signer?.userName?.ifBlank { null },
-            signerEmail = signer?.userEmail?.ifBlank { null },
-            signerTrust = signer?.trustLevel,
-            signedContent = null
+        return gradedDecryptVerification(
+            status = result.signerStatus,
+            hasSignature = result.hasSignature,
+            signerKeyID = result.signerKeyID,
+            signatureKeyIDRaw = result.signatureKeyIDRaw,
+            signingKeyFingerprint = result.signingKeyFingerprint,
+            signerPrimaryFingerprint = result.signerPrimaryFingerprint,
+            signerWeakKey = result.signerWeakKey,
+            unsignedContent = ""
         )
     }
 

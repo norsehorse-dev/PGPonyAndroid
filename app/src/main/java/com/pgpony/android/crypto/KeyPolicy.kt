@@ -14,7 +14,10 @@
 // through Argon2 must be protected with AEAD (S2K usage 253); a v6 key may
 // not use the legacy forms (usage 255, the implicit MD5 form, or a Simple
 // S2K). Such a key is refused at import, the one place every secret key
-// enters the app, with a message that names the problem.
+// enters the app, with a message that names the problem. So is a key whose
+// Argon2 cost (memory, passes, parallelism) exceeds the hard ceilings in
+// SecurityLimits; every unlock checks the same ceilings again
+// (SecretKeyUnlock), together with the device's own memory budget.
 
 package com.pgpony.android.crypto
 
@@ -82,6 +85,13 @@ object KeyPolicy {
         if (s2k != null && s2k.type == S2K.GNU_DUMMY_S2K) return
         if (s2k != null && s2k.type == S2K.ARGON_2 && usage != 253) {
             throw RefusedProtection("the key is protected with Argon2 but without AEAD, which RFC 9580 forbids")
+        }
+        if (s2k != null && s2k.type == S2K.ARGON_2 && (
+                s2k.memorySizeExponent > SecurityLimits.ARGON2_MAX_MEM_EXP ||
+                    s2k.passes > SecurityLimits.ARGON2_MAX_PASSES ||
+                    s2k.parallelism > SecurityLimits.ARGON2_MAX_PARALLELISM)
+        ) {
+            throw RefusedProtection("the key's Argon2 passphrase settings exceed what this app allows")
         }
         if (key.publicKey.version == 6) {
             when {

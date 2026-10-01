@@ -2,6 +2,12 @@
 // Phase 3 of the pairing protocol (docs/PAIRING_PROTOCOL.md, section 5): sealed messages inside
 // ENVELOPE frames, and the offer and item messages that move keys and backups. The session keys
 // live only here and are wiped on close.
+//
+// The session also keeps the offer rules of section 5: one OFFER open in each direction (a second
+// one before the first was answered and its RESULTs sent is a protocol error), an ANSWER only for
+// an open offer and only with ids it listed (each once), one item for each accepted id, a RESULT
+// only for an accepted id. An item goes out as one unbroken run of ITEM_BEGIN, ITEM_DATA and
+// ITEM_END: nothing else is sent in between.
 
 package com.pgpony.android.pair
 
@@ -130,6 +136,16 @@ class PairSession internal constructor(
     private var receiveSeq = 0L
     @Volatile private var closed = false
 
+    // Offer bookkeeping (section 5), guarded by [state]. Received: the open offer's ids until this
+    // side answers, then the accepted ids until their RESULTs go out. Sent: whether our offer
+    // waits for its ANSWER, then the accepted ids until their RESULTs arrive.
+    private val state = Any()
+    private var receivedOffer: Set<Int>? = null
+    private val resultsOwed = HashSet<Int>()
+    // Accepted ids whose item has not arrived yet: each comes once.
+    private val itemsDue = HashSet<Int>()
+    private var sentOffer: Set<Int>? = null
+    private val resultsAwaited = HashSet<Int>()
 
     companion object {
         const val INFO: Byte = 0x01
@@ -164,7 +180,7 @@ class PairSession internal constructor(
 
     private fun receiveRaw(): Pair<Byte, ByteArray> {
         try {
-            val (type, payload) = wire.readFrame()
+            val (type, payload) = wire.withDeadline(PairProtocol.CONFIRM_TIMEOUT_MS.toLong()) { wire.readFrame() }
             if (type != PairFrames.ENVELOPE) throw PairException(PairFailure.PROTOCOL, "unexpected frame")
             val plaintext = PairCrypto.open(receiveKey, receiveSeq++, payload)
             if (plaintext.isEmpty() || plaintext.size > MAX_PLAINTEXT) throw PairException(PairFailure.PROTOCOL, "bad message")
@@ -187,17 +203,49 @@ class PairSession internal constructor(
 
     fun sendInfo(info: PairInfo) = send(INFO, encode(info.toJson()))
 
+    /**
+     * Offers items. Only one offer is open at a time: the next one may follow once the other side
+     * answered this one and sent a RESULT for every item it accepted.
+     */
     fun sendOffer(offer: PairOffer) {
         require(offer.items.size in 1..MAX_OFFER_ITEMS)
         require(offer.items.all { it.kind in PairItem.KINDS && it.size in 0..MAX_ITEM_BYTES })
+        require(offer.items.map { it.id }.toSet().size == offer.items.size) { "item ids are distinct" }
+        synchronized(state) {
+            check(sentOffer == null && resultsAwaited.isEmpty()) { "the previous offer is still open" }
+            // Recorded before the write: the answer may arrive before send() returns.
+            sentOffer = offer.items.map { it.id }.toSet()
+        }
         send(OFFER, encode(offer.toJson()))
     }
 
-    fun sendAnswer(answer: PairAnswer) = send(ANSWER, encode(answer.toJson()))
+    /** Answers the open offer from the other side with the ids this user accepted (may be none). */
+    fun sendAnswer(answer: PairAnswer) {
+        synchronized(state) {
+            val open = receivedOffer
+            check(open != null) { "there is no offer to answer" }
+            require(open.containsAll(answer.accept)) { "only ids the offer listed" }
+            require(answer.accept.toSet().size == answer.accept.size) { "each id once" }
+            receivedOffer = null
+            resultsOwed.addAll(answer.accept)
+            itemsDue.addAll(answer.accept)
+        }
+        send(ANSWER, encode(answer.toJson()))
+    }
 
-    fun sendResult(result: PairResult) = send(RESULT, encode(result.toJson()))
+    /** Reports what became of an accepted item. */
+    fun sendResult(result: PairResult) {
+        synchronized(state) {
+            check(resultsOwed.remove(result.id)) { "no result is owed for item ${result.id}" }
+        }
+        send(RESULT, encode(result.toJson()))
+    }
 
-    /** One accepted item: ITEM_BEGIN, ITEM_DATA pieces, ITEM_END. [progress] gets bytes sent. */
+    /**
+     * One accepted item: ITEM_BEGIN, ITEM_DATA pieces, ITEM_END. [progress] gets bytes sent. The
+     * whole item holds the send lock, so no other message lands inside it.
+     */
+    @Synchronized
     fun sendItem(id: Int, bytes: ByteArray, progress: (Long) -> Unit = {}) {
         require(bytes.size <= MAX_ITEM_BYTES)
         val idb = intBytes(id)
@@ -213,6 +261,21 @@ class PairSession internal constructor(
     }
 
     fun sendBye() = runCatching { send(BYE, ByteArray(0)) }.let { }
+
+    /**
+     * Ends the session without blocking the caller (a UI thread): BYE goes out best effort on a
+     * background thread, and the connection is closed after at most [graceMs] whatever happened
+     * to it. A peer that stopped reading therefore can never hold the caller, an item in flight
+     * stops, and the socket is always closed.
+     */
+    fun endAsync(graceMs: Long = 2_000) {
+        val bye = Thread({ sendBye() }, "pgpony-pair-bye").apply { isDaemon = true }
+        Thread({
+            bye.start()
+            runCatching { bye.join(graceMs) }
+            close()
+        }, "pgpony-pair-end").apply { isDaemon = true }.start()
+    }
 
     // ── Receiving ──────────────────────────────────────────────────────
 
@@ -233,10 +296,38 @@ class PairSession internal constructor(
                         offer.items.any { it.size !in 0..MAX_ITEM_BYTES } ||
                         offer.items.map { it.id }.toSet().size != offer.items.size
                     ) protocolError("bad offer")
+                    val open = synchronized(state) {
+                        if (receivedOffer != null || resultsOwed.isNotEmpty()) true
+                        else {
+                            receivedOffer = offer.items.map { it.id }.toSet()
+                            false
+                        }
+                    }
+                    if (open) protocolError("a second offer while the first is still open")
                     return PairMessage.Offer(offer)
                 }
-                ANSWER -> return PairMessage.Answer(decode(body, PairAnswer::fromJson))
-                RESULT -> return PairMessage.Result(decode(body, PairResult::fromJson))
+                ANSWER -> {
+                    val answer = decode(body, PairAnswer::fromJson)
+                    val ok = synchronized(state) {
+                        val offered = sentOffer
+                        if (offered == null || !offered.containsAll(answer.accept) ||
+                            answer.accept.toSet().size != answer.accept.size
+                        ) false
+                        else {
+                            sentOffer = null
+                            resultsAwaited.addAll(answer.accept)
+                            true
+                        }
+                    }
+                    if (!ok) protocolError("an answer that does not fit the offer")
+                    return PairMessage.Answer(answer)
+                }
+                RESULT -> {
+                    val result = decode(body, PairResult::fromJson)
+                    val ok = synchronized(state) { resultsAwaited.remove(result.id) }
+                    if (!ok) protocolError("a result for an item that was not accepted")
+                    return PairMessage.Result(result)
+                }
                 BYE -> {
                     close()
                     return PairMessage.Bye
@@ -245,6 +336,7 @@ class PairSession internal constructor(
                     if (body.size != 12) protocolError("bad item header")
                     val id = readInt(body, 0)
                     val size = body.copyOfRange(4, 12).fold(0L) { acc, b -> (acc shl 8) or (b.toLong() and 0xFF) }
+                    if (!synchronized(state) { itemsDue.remove(id) }) protocolError("an item that was not accepted, or one that came twice")
                     val announced = expectedItems[id] ?: protocolError("an item that was not accepted")
                     if (size != announced || size > MAX_ITEM_BYTES) protocolError("item size does not match the offer")
                     return PairMessage.Item(id, receiveItemBody(id, size.toInt(), itemProgress))

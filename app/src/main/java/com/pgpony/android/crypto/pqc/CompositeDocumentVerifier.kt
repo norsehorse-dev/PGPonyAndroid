@@ -7,6 +7,13 @@
 // with [isCompositeSignature] BEFORE handing bytes to BouncyCastle and route
 // them here instead. This covers composite signatures made by a composite
 // primary AND by a composite signing subkey; both are algo-30 packets.
+//
+// The verify functions here take one key's public material, so they can check
+// the math and the signature's own policy (document type, hashed creation
+// time, future dating, signature expiry, critical subpackets, digest) but not
+// the signer: [Result.valid] never means "trustworthy signer". Callers that
+// report a verdict use CompositeSignerGate, which grades the signer against
+// its certificate (revocation, expiry, key flags, binding) as well.
 
 package com.pgpony.android.crypto.pqc
 
@@ -17,9 +24,17 @@ object CompositeDocumentVerifier {
     private const val TAG_SIGNATURE = 2
 
     data class Result(
+        /** The math verified and the signature's own policy passed. The
+         *  signer is NOT graded here (see CompositeSignerGate). */
         val valid: Boolean,
         val content: ByteArray? = null,
-        val signerFingerprint: ByteArray? = null
+        val signerFingerprint: ByteArray? = null,
+        /** Non-null when the math verified but the signature's own policy
+         *  failed (WEAK_SIGNATURE, EXPIRED_SIGNATURE, INVALID for a non
+         *  document type). */
+        val policyStatus: com.pgpony.android.crypto.SignerStatus? = null,
+        /** Hashed creation time, epoch ms, when present. */
+        val createdMs: Long? = null
     )
 
     /** True if the first signature or one-pass packet in [raw] is composite (algo 30/31). */
@@ -36,7 +51,7 @@ object CompositeDocumentVerifier {
     /** Verify a detached (binary) composite signature over [data]. */
     fun verifyDetached(compositePublic: ByteArray, sigPacket: ByteArray, data: ByteArray): Result {
         val (_, body) = CompositeSigPacket.firstPacket(sigPacket)
-        return verifyParsed(compositePublic, CompositeSigPacket.parse(body), data)
+        return verifyParsed(compositePublic, body, data)
     }
 
     /** Verify a detached composite signature supplied as ASCII armor. */
@@ -122,11 +137,11 @@ object CompositeDocumentVerifier {
         val packets = walk(decompress(message))
         val literal = packets.firstOrNull { it.tag == TAG_LITERAL }
             ?: return Result(false)
-        val sig = packets.lastOrNull { it.tag == TAG_SIGNATURE }
-            ?: return Result(false)
+        val sig = packets.lastOrNull {
+            it.tag == TAG_SIGNATURE && it.body.size > 2 && CompositeSignSuite.forAlgId(it.body[2].toInt() and 0xFF) != null
+        } ?: return Result(false)
         val data = literalData(literal.body)
-        val parsed = CompositeSigPacket.parse(sig.body)
-        return verifyParsed(compositePublic, parsed, data).copy(content = data)
+        return verifyParsed(compositePublic, sig.body, data).copy(content = data)
     }
 
     /** Verify a cleartext signed message, returning the recovered text bytes. */
@@ -154,8 +169,7 @@ object CompositeDocumentVerifier {
         val documentData = CompositeSigPacket.canonicalizeCleartext(recovered)
         val sigPacket = CompositeSigPacket.dearmor(sigBlock)
         val (_, body) = CompositeSigPacket.firstPacket(sigPacket)
-        val parsed = CompositeSigPacket.parse(body)
-        return verifyParsed(compositePublic, parsed, documentData)
+        return verifyParsed(compositePublic, body, documentData)
             .copy(content = recovered.toByteArray(Charsets.UTF_8))
     }
 
@@ -197,9 +211,18 @@ object CompositeDocumentVerifier {
         return textLines.joinToString("\n") { if (it.startsWith("- ")) it.substring(2) else it }
     }
 
+    /**
+     * The signature block of a cleartext message: from the first line after
+     * the framing line that is exactly the armor header, as [verifyCleartext]
+     * finds it (a dash-escaped copy inside the signed text does not count).
+     */
     private fun extractCleartextSignature(message: String): String? {
-        val i = message.indexOf("-----BEGIN PGP SIGNATURE-----")
-        return if (i < 0) null else message.substring(i)
+        val lines = message.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        val begin = lines.indexOfFirst { it.trim() == "-----BEGIN PGP SIGNED MESSAGE-----" }
+        if (begin < 0) return null
+        val at = (begin + 1 until lines.size).firstOrNull { lines[it].trim() == "-----BEGIN PGP SIGNATURE-----" }
+            ?: return null
+        return lines.subList(at, lines.size).joinToString("\n")
     }
 
     /** Normalize a detached signature (armored or binary) to raw packet bytes. */
@@ -223,9 +246,10 @@ object CompositeDocumentVerifier {
 
     private fun verifyParsed(
         compositePublic: ByteArray,
-        parsed: CompositeSigPacket.Parsed,
+        sigBody: ByteArray,
         rawData: ByteArray
     ): Result {
+        val parsed = CompositeSigPacket.parse(sigBody)
         val suite = CompositeSignSuite.forAlgId(parsed.pubAlgo) ?: return Result(false)
         // A text signature hashes the CRLF-canonicalized document.
         val data = if (parsed.sigType == CompositeSigPacket.TYPE_TEXT) {
@@ -234,8 +258,20 @@ object CompositeDocumentVerifier {
             rawData
         }
         val ok = CompositeSigPacket.verifyDocumentSignature(suite, compositePublic, parsed, data)
-        return Result(ok, signerFingerprint = CompositeSigPacket.issuerFingerprintOf(parsed))
+        val policy = if (ok) CompositeSignerGate.policyStatus(sigBody) else null
+        return Result(
+            ok && policy == null,
+            signerFingerprint = CompositeSigPacket.issuerFingerprintOf(parsed),
+            policyStatus = policy,
+            createdMs = com.pgpony.android.crypto.CertificateBindings.sigOrNull(sigBody)?.createdMs
+        )
     }
+
+    /** The packets of [raw] as (tag, body) pairs, partial lengths joined. */
+    internal fun packetsOf(raw: ByteArray): List<Pair<Int, ByteArray>> = walk(raw).map { it.tag to it.body }
+
+    /** The content of a Literal Data packet body. */
+    internal fun literalContent(body: ByteArray): ByteArray = literalData(body)
 
     /** Literal Data packet body -> the raw literal content. */
     private fun literalData(body: ByteArray): ByteArray {

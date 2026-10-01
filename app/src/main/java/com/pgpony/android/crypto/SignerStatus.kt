@@ -30,6 +30,12 @@
 // PREDATES_KEY, one made while no self-signature made the certificate valid is
 // NOT_VALID_AT_TIME, and a soft revocation (superseded, retired) no longer
 // reaches back to signatures made before it. Hard revocations still do.
+//
+// The signer is graded by the exact key the signature verified under, matched
+// by fingerprint, so another certificate holding a key with the same 64-bit
+// key ID can never lend its grade or its identity. A data signature whose own
+// expiration time has passed is EXPIRED_SIGNATURE. A certificate whose primary
+// algorithm has no verifier here vouches for no subkey (only its primary).
 
 package com.pgpony.android.crypto
 
@@ -68,7 +74,9 @@ enum class SignerStatus {
     WEAK_KEY,
     /** 3.0.0: no self-signature made the signer's certificate valid at the
      *  time of the signature (a binding that had expired, say). */
-    NOT_VALID_AT_TIME
+    NOT_VALID_AT_TIME,
+    /** The data signature's own expiration time (subpacket 3) has passed. */
+    EXPIRED_SIGNATURE
 }
 
 object SignerEvaluator {
@@ -150,9 +158,76 @@ object SignerEvaluator {
      * [signerKeyID], which need not be the key its issuer subpacket names.
      */
     fun evaluate(sig: PGPSignature, signerKeyID: Long, rings: List<PGPPublicKeyRing>): SignerStatus {
-        if (sig.signatureType !in DOCUMENT_TYPES) return SignerStatus.INVALID
-        if (!SignaturePolicy.isAcceptableDataSignature(sig)) return SignerStatus.WEAK_SIGNATURE
+        signaturePolicyStatus(sig)?.let { return it }
         return evaluate(signerKeyID, sig.creationTime, rings)
+    }
+
+    /**
+     * Full grade for a data signature that verified under exactly [signerKey].
+     * The signer is found by that key's fingerprint, never by its key ID, so
+     * the grade (and [signerRing]) always describe the key that made the
+     * signature. Prefer this over the key ID overloads.
+     */
+    fun evaluate(sig: PGPSignature, signerKey: PGPPublicKey, rings: List<PGPPublicKeyRing>): SignerStatus {
+        signaturePolicyStatus(sig)?.let { return it }
+        return evaluateKey(signerKey, sig.creationTime, rings)
+    }
+
+    /** The status the signature's own properties force, or null when they pass. */
+    private fun signaturePolicyStatus(sig: PGPSignature): SignerStatus? {
+        if (sig.signatureType !in DOCUMENT_TYPES) return SignerStatus.INVALID
+        if (SignaturePolicy.isExpired(sig)) return SignerStatus.EXPIRED_SIGNATURE
+        if (!SignaturePolicy.isAcceptableDataSignature(sig)) return SignerStatus.WEAK_SIGNATURE
+        return null
+    }
+
+    /**
+     * Grade the signer key [signerKey] (matched by fingerprint) for a
+     * signature made at [sigCreationTime]. As [evaluate] by key ID otherwise.
+     */
+    fun evaluateKey(signerKey: PGPPublicKey, sigCreationTime: Date, rings: List<PGPPublicKeyRing>): SignerStatus {
+        val fp = signerKey.fingerprint
+        val containing = rings.filter { it.getPublicKey(fp) != null }
+        if (containing.isEmpty()) return SignerStatus.UNKNOWN_SIGNER
+        val view = validSignerView(signerKey, containing)
+        if (view == null) {
+            val bound = containing.asSequence().map { CertificateBindings.verified(it) }.firstOrNull { v ->
+                v.ring.getPublicKey(fp) != null && v.report?.subkeyByFingerprint(fpHex(signerKey))?.bound == true
+            }
+            val key = bound?.ring?.getPublicKey(fp)
+            return if (key != null && !hasSignFlag(key)) SignerStatus.NOT_SIGNING_KEY else SignerStatus.UNBOUND_SIGNER
+        }
+        val signingKey = view.ring.getPublicKey(fp) ?: return SignerStatus.UNBOUND_SIGNER
+        val graded = grade(view.ring, view.report, signingKey, sigCreationTime)
+        if (graded == SignerStatus.VERIFIED && KeyPolicy.strict && KeyPolicy.isWeak(signingKey, view.ring.publicKey)) {
+            return SignerStatus.WEAK_KEY
+        }
+        return graded
+    }
+
+    /**
+     * The verified view of the ring among [rings] that validly carries
+     * exactly [signerKey] (same fingerprint) as a signer, or null.
+     */
+    fun validSignerView(signerKey: PGPPublicKey, rings: List<PGPPublicKeyRing>): CertificateBindings.Verified? {
+        val fp = signerKey.fingerprint
+        for (r in rings) {
+            if (r.getPublicKey(fp) == null) continue
+            val v = CertificateBindings.verified(r)
+            val report = v.report ?: continue
+            if (v.ring.getPublicKey(fp) == null) continue
+            if (report.isValidSignerKey(fpHex(signerKey))) return v
+        }
+        return null
+    }
+
+    /** The original ring that validly carries exactly [signerKey] as a signer, for identity display. */
+    fun signerRing(signerKey: PGPPublicKey, rings: List<PGPPublicKeyRing>): PGPPublicKeyRing? {
+        val v = validSignerView(signerKey, rings) ?: return null
+        val primaryFp = v.ring.publicKey.fingerprint
+        val fp = signerKey.fingerprint
+        return rings.firstOrNull { it.publicKey.fingerprint.contentEquals(primaryFp) && it.getPublicKey(fp) != null }
+            ?: v.ring
     }
 
     /** Uppercase hex fingerprint of [key], the identity the reports use. */
@@ -164,7 +239,7 @@ object SignerEvaluator {
      * itself, or a bound, back-signed subkey), as its verified view. Null
      * when no ring binds the key. A certificate that cannot be analysed at
      * all does not qualify (fail closed); one whose primary algorithm has no
-     * verifier here keeps the pre-4.6.0 behaviour.
+     * verifier here qualifies only for its primary key.
      */
     fun validSignerView(keyID: Long, rings: List<PGPPublicKeyRing>): CertificateBindings.Verified? {
         for (r in rings) {
@@ -200,7 +275,9 @@ object SignerEvaluator {
         if (report != null && report.supported) {
             return report.isUsableEncryptionKey(fpHex(key), now.time)
         }
-        if (report == null && !key.isMasterKey) return false
+        // A certificate that cannot be analysed, or whose primary algorithm
+        // has no verifier, binds no subkey this app can check: primary only.
+        if (!key.isMasterKey) return false
         if (primary.hasRevocation()) return false
         if (!key.isMasterKey && key.hasRevocation()) return false
         if (isExpiredAt(primary, now)) return false
@@ -220,6 +297,7 @@ object SignerEvaluator {
         SignerStatus.PREDATES_KEY    -> "Signature is dated before the key that made it existed"
         SignerStatus.WEAK_KEY        -> "Signer key is too weak to trust (RSA under 2048 bits, or DSA)"
         SignerStatus.NOT_VALID_AT_TIME -> "Signer key was not valid when it signed"
+        SignerStatus.EXPIRED_SIGNATURE -> "Signature has expired"
         SignerStatus.NONE            -> "No signature present"
         SignerStatus.VERIFIED        -> "Verified"
     }

@@ -251,7 +251,7 @@ object IntentHandler {
      */
     private fun isDetachedSignature(text: String): Boolean =
         text.contains("-----BEGIN PGP SIGNATURE-----") &&
-            !text.contains("-----BEGIN PGP SIGNED MESSAGE-----")
+            !ClearSignedInput.isClearSigned(text)
 
     /**
      * 3.1.0 Phase 1 Fix1 — true when [bytes] starts with an OpenPGP
@@ -702,7 +702,7 @@ object IntentHandler {
         }
 
         val armoredMessage = headStr.contains("-----BEGIN PGP MESSAGE-----") ||
-            headStr.contains("-----BEGIN PGP SIGNED MESSAGE-----")
+            ClearSignedInput.isClearSigned(headStr)
         val looksEncrypted = armoredMessage ||
             headStr.contains("multipart/encrypted", ignoreCase = true) ||
             try {
@@ -770,7 +770,7 @@ object IntentHandler {
                     filename = filename,
                     armoredText = if (carryArmored) trimmed else null,
                     looksLikePgpMessage = trimmed.contains("-----BEGIN PGP MESSAGE-----")
-                        || trimmed.contains("-----BEGIN PGP SIGNED MESSAGE-----"),
+                        || ClearSignedInput.isClearSigned(trimmed),
                     looksLikePgpKey = isKey,
                     // 3.1.0 Phase 1 Fix3 — armored standalone SIGNATURE block.
                     looksLikeDetachedSignature = isDetachedSignature(trimmed),
@@ -824,7 +824,9 @@ object IntentHandler {
             trimmed.contains("-----BEGIN PGP MESSAGE-----") ->
                 IntentAction.DecryptText(trimmed)
 
-            trimmed.contains("-----BEGIN PGP SIGNED MESSAGE-----") ->
+            // A1 (ENGINE-1): clear-signed by its first armor line, not by
+            // a substring that an armor header value could carry.
+            ClearSignedInput.isClearSigned(trimmed) ->
                 IntentAction.DecryptText(trimmed)
 
             // 3.1.0 Phase 1 (C1) — a standalone detached signature block
@@ -855,7 +857,7 @@ object IntentHandler {
         return ShareIntentContent.Text(
             text = trimmed,
             looksLikePgpMessage = trimmed.contains("-----BEGIN PGP MESSAGE-----")
-                || trimmed.contains("-----BEGIN PGP SIGNED MESSAGE-----"),
+                || ClearSignedInput.isClearSigned(trimmed),
             looksLikePgpKey = trimmed.contains("-----BEGIN PGP PUBLIC KEY BLOCK-----")
                 || trimmed.contains("-----BEGIN PGP PRIVATE KEY BLOCK-----"),
         )

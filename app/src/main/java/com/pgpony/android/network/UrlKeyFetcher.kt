@@ -3,8 +3,8 @@
 //
 // The fetch goes through the shared proxy-aware client, so offline mode and
 // the Off / Orbot / Custom proxy setting apply to it like any key-server
-// lookup. Only https is fetched (plain http only for a .onion address, where
-// Tor already encrypts the path); redirects are followed by hand, at most
+// lookup. Only https is fetched (plain http only for a .onion address while a
+// proxy is set, where Tor already encrypts the path); redirects are followed by hand, at most
 // MAX_REDIRECTS of them, and each hop must meet the same rule, so a link can
 // never be bounced to plain http. The body is read with the key-response cap.
 //
@@ -18,6 +18,7 @@
 
 package com.pgpony.android.network
 
+import com.pgpony.android.PGPonyApp
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.HttpResponse
@@ -40,20 +41,31 @@ object UrlKeyFetcher {
         data class Failed(val message: String) : Result()
     }
 
-    /** Parse [input] as a link this fetcher may follow, or null. */
-    fun allowedUri(input: String): URI? {
+    /**
+     * Parse [input] as a link this fetcher may follow, or null. Plain http is
+     * allowed only for a .onion address and only when [onionReachable] (a
+     * proxy is set); an https .onion link likewise needs a proxy.
+     */
+    fun allowedUri(input: String, onionReachable: Boolean = true): URI? {
         val uri = runCatching { URI(input.trim()) }.getOrNull() ?: return null
-        val host = uri.host?.lowercase() ?: return null
+        val host = uri.host?.lowercase()?.trimEnd('.') ?: return null
+        val onion = host.endsWith(".onion")
+        if (onion && !onionReachable) return null
         return when (uri.scheme?.lowercase()) {
             "https" -> uri
-            "http" -> if (host.endsWith(".onion")) uri else null
+            "http" -> if (onion) uri else null
             else -> null
         }
     }
 
+    // True when a proxy is set. Read fresh per fetch; unknown counts as off.
+    private fun proxyActive(): Boolean =
+        runCatching { ProxyPrefs.config(PGPonyApp.instance).enabled }.getOrDefault(false)
+
     suspend fun fetch(input: String): Result {
         if (OfflineMode.isEnabled()) return Result.Offline
-        var uri = allowedUri(input) ?: return Result.NotHttps
+        val onionReachable = proxyActive()
+        var uri = allowedUri(input, onionReachable) ?: return Result.NotHttps
         val client = HttpClientFactory.client().config { followRedirects = false }
         try {
             repeat(MAX_REDIRECTS + 1) {
@@ -65,7 +77,7 @@ object UrlKeyFetcher {
                     val location = response.headers["Location"] ?: return Result.HttpError(status.value)
                     val next = runCatching { uri.resolve(location) }.getOrNull()
                         ?: return Result.HttpError(status.value)
-                    uri = allowedUri(next.toString()) ?: return Result.NotHttps
+                    uri = allowedUri(next.toString(), onionReachable) ?: return Result.NotHttps
                     return@repeat
                 }
                 if (!status.isSuccess()) return Result.HttpError(status.value)

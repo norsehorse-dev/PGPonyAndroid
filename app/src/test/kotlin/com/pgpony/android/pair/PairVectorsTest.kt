@@ -5,6 +5,7 @@
 //   v1-vectors.json  the derivations of one attempt
 //   v1-session.json  every byte of one whole session, both directions, with fixed randomness
 //   v1-invites.json  QR invites that must parse, with their fields, and ones that must not
+//   v1-peers.json    connection sources a host lets through to phase 1, and ones it closes
 
 package com.pgpony.android.pair
 
@@ -17,6 +18,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -48,8 +50,12 @@ class PairVectorsTest {
         val nJ = v.bytes("n_J")
         val nH = v.bytes("n_H")
         assertEquals(v.str("commit"), hex(PairCrypto.commit(nH, h.public, j.public)))
-        val t = PairCrypto.transcript(j.public, h.public, nJ, nH)
+        val version = v.bytes("version").single()
+        assertEquals(PairProtocol.VERSION, version)
+        val t = PairCrypto.transcript(j.public, h.public, nJ, nH, version)
         assertEquals(v.str("T"), hex(t))
+        // The version is part of T: another version gives another code.
+        assertNotEquals(hex(t), hex(PairCrypto.transcript(j.public, h.public, nJ, nH, 2)))
         val z = PairCrypto.agree(v.bytes("sk_H"), j.public)!!
         assertEquals(v.str("Z"), hex(z))
         assertEquals(v.str("Z"), hex(PairCrypto.agree(v.bytes("sk_J"), h.public)!!))
@@ -113,10 +119,38 @@ class PairVectorsTest {
             c["pk_H"]?.let {
                 assertEquals(invite, PairInvite.forHostKey(unhex(it.jsonPrimitive.content), invite.addresses))
             }
+            c["address_bytes"]?.let { list ->
+                assertEquals(list.jsonArray.map { it.jsonPrimitive.content }, invite.addresses.map { hex(it.bytes()) })
+                // The socket address is built from those bytes, with no lookup. (The JDK turns an
+                // IPv4-mapped IPv6 address into the IPv4 address it carries: its last 4 bytes.)
+                invite.addresses.forEach {
+                    val built = it.socketAddress().address.address
+                    assertEquals(hex(it.bytes()).takeLast(2 * built.size), hex(built))
+                }
+            }
+            invite.addresses.forEach { it.socketAddress() }
         }
         for (bad in v.getValue("invalid").jsonArray.map { it.jsonObject }) {
             assertNull(bad.str("why"), PairInvite.parse(bad.str("uri")))
         }
+    }
+
+    @Test
+    fun peersClassifyAsListed() {
+        val v = resource("v1-peers.json")
+        val subnets = v.getValue("subnets").jsonArray.map { it.jsonObject }.map {
+            PairPeer.Subnet(PairInvite.hostBytes(it.str("address"))!!, it.getValue("prefix").jsonPrimitive.int)
+        }
+        for ((key, expected) in listOf("allowed" to true, "refused" to false)) {
+            for (c in v.getValue(key).jsonArray.map { it.jsonObject }) {
+                val bytes = PairInvite.hostBytes(c.str("address"))
+                assertNotNull(c.str("address"), bytes)
+                assertEquals(c.str("address") + ": " + c.str("why"), expected, PairPeer.isAllowed(bytes!!, subnets))
+            }
+        }
+        // Without the subnets only the always-local ranges pass.
+        assertTrue(PairPeer.isAllowed(PairInvite.hostBytes("192.168.1.5")!!))
+        assertTrue(!PairPeer.isAllowed(PairInvite.hostBytes("203.0.113.200")!!))
     }
 
     @Test

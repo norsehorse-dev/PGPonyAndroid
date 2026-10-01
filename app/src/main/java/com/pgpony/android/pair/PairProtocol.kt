@@ -3,10 +3,12 @@
 // one blocking stream pair.
 //
 // Usage, on each side: PairProtocol.host(...) or PairProtocol.join(...) runs phase 1 and returns
-// a PairAttempt holding the comparison code. The UI shows the code; the user's answer is
-// confirm() (phase 2, returns the session) or reject(). Meanwhile the attempt already watches for
-// the other side's answer, so a refusal over there reaches peerRefused without waiting for this
-// user. Every call blocks: run them off the main thread (Dispatchers.IO on Android).
+// a PairAttempt holding the comparison code. The joiner shows the code and asks whether the other
+// screen shows the same; the host asks its user to type the code the joiner shows and checks it
+// with matchesTypedCode (section 4). The user's answer is confirm() (phase 2, returns the
+// session) or reject(). Meanwhile the attempt already watches for the other side's answer, so a
+// refusal over there reaches peerRefused without waiting for this user. Every call blocks: run
+// them off the main thread (Dispatchers.IO on Android).
 
 package com.pgpony.android.pair
 
@@ -41,9 +43,15 @@ object PairProtocol {
     const val NONCE_H: Byte = 0x44
     const val ABORT: Byte = 0x4F
 
-    /** Phase 1 frame timeout and the time the users get to compare the code (section 3). */
+    /**
+     * Phase 1 frame deadline and the time the users get to compare the code (section 3). Each is
+     * a wall-clock limit on a whole frame, not only on each read.
+     */
     const val FRAME_TIMEOUT_MS = 30_000
     const val CONFIRM_TIMEOUT_MS = 300_000
+
+    /** The longest phase 2 frame: HELLO, HELLO_ACK and NO_MATCH are 48 bytes. */
+    internal const val PHASE2_MAX_FRAME = 48L
 
     /**
      * Runs phase 1 as the host. [setTimeout] sets the read timeout of the underlying socket;
@@ -63,7 +71,8 @@ object PairProtocol {
         val wire = PairWire(input, output, close)
         try {
             setTimeout(FRAME_TIMEOUT_MS)
-            if (!wire.readExact(4).contentEquals(MAGIC)) throw PairException(PairFailure.PROTOCOL, "not a PGPony pairing connection")
+            val magic = wire.withDeadline(FRAME_TIMEOUT_MS.toLong()) { wire.readExact(4) }
+            if (!magic.contentEquals(MAGIC)) throw PairException(PairFailure.PROTOCOL, "not a PGPony pairing connection")
             wire.writeRaw(MAGIC)
             val join = expect(wire, JOIN, 33)
             if (join[0] != VERSION) {
@@ -94,12 +103,18 @@ object PairProtocol {
         input: InputStream, output: OutputStream, setTimeout: (Int) -> Unit, close: () -> Unit,
         expectedHostKeyHash: ByteArray?, random: PairRandom
     ): PairAttempt {
+        // An empty hash would match any host key and a longer one none: only the invite's 16 bytes.
+        if (expectedHostKeyHash != null && expectedHostKeyHash.size != PairInvite.HASH_BYTES) {
+            runCatching { close() }
+            throw IllegalArgumentException("the expected host key hash is ${PairInvite.HASH_BYTES} bytes")
+        }
         val wire = PairWire(input, output, close)
         val keyPair = PairCrypto.keyPair(random.bytes(32))
         try {
             setTimeout(FRAME_TIMEOUT_MS)
             wire.writeRaw(MAGIC)
-            if (!wire.readExact(4).contentEquals(MAGIC)) throw PairException(PairFailure.PROTOCOL, "not a PGPony pairing host")
+            val magic = wire.withDeadline(FRAME_TIMEOUT_MS.toLong()) { wire.readExact(4) }
+            if (!magic.contentEquals(MAGIC)) throw PairException(PairFailure.PROTOCOL, "not a PGPony pairing host")
             wire.writeFrame(JOIN, byteArrayOf(VERSION) + keyPair.public)
             val accept = expect(wire, ACCEPT, 64)
             val pkH = accept.copyOfRange(0, 32)
@@ -136,7 +151,7 @@ object PairProtocol {
             abort(wire, PairFailure.HANDSHAKE)
             throw PairException(PairFailure.HANDSHAKE, "the other side sent an invalid key")
         }
-        val t = PairCrypto.transcript(pkJ, pkH, nJ, nH)
+        val t = PairCrypto.transcript(pkJ, pkH, nJ, nH, VERSION)
         val keys = PairCrypto.derive(z, t)
         z.fill(0)
         setTimeout(CONFIRM_TIMEOUT_MS)
@@ -144,7 +159,7 @@ object PairProtocol {
     }
 
     private fun expect(wire: PairWire, type: Byte, size: Int): ByteArray {
-        val (t, payload) = wire.readFrame()
+        val (t, payload) = wire.withDeadline(FRAME_TIMEOUT_MS.toLong()) { wire.readFrame(maxOf(size, 1).toLong()) }
         if (t == ABORT && payload.size == 1) {
             val f = PairFailure.ofReason(payload[0].toInt())
             throw PairException(f, "the other side ended the pairing (${f.name.lowercase()})")
@@ -179,14 +194,16 @@ class PairAttempt internal constructor(
 ) {
     /** The other side's answer: its phase 2 frame, read as soon as it arrives. */
     private val peerAnswer: CompletableFuture<Pair<Byte, ByteArray>> = CompletableFuture.supplyAsync({
-        val first = wire.readExact(1)[0]
-        if (first == 'P'.code.toByte()) {
-            if (!wire.readExact(3).contentEquals("DR1".toByteArray(Charsets.US_ASCII))) {
-                throw PairException(PairFailure.PROTOCOL, "unexpected data")
+        wire.withDeadline(PairProtocol.CONFIRM_TIMEOUT_MS.toLong()) {
+            val first = wire.readExact(1)[0]
+            if (first == 'P'.code.toByte()) {
+                if (!wire.readExact(3).contentEquals("DR1".toByteArray(Charsets.US_ASCII))) {
+                    throw PairException(PairFailure.PROTOCOL, "unexpected data")
+                }
+                wire.readFrame(PairProtocol.PHASE2_MAX_FRAME)
+            } else {
+                wire.readFrameAfterType(first, PairProtocol.PHASE2_MAX_FRAME)
             }
-            wire.readFrame()
-        } else {
-            wire.readFrameAfterType(first)
         }
     }, { r -> Thread(r, "pgpony-pair-read").apply { isDaemon = true }.start() })
 
@@ -218,6 +235,21 @@ class PairAttempt internal constructor(
             null
         } ?: return null
         return refusedBy(frame)
+    }
+
+    /**
+     * Whether [typed], the code this user typed from the other screen, is this attempt's code.
+     * Spaces and hyphens between the digits are ignored; anything else makes it a mismatch.
+     * Compared in constant time. The host asks for the code this way instead of a "same code"
+     * button, so its user cannot confirm without reading the other screen (section 4).
+     */
+    fun matchesTypedCode(typed: String): Boolean {
+        val t = typed.trim()
+        if (t.any { !(it in '0'..'9' || it == ' ' || it == '-') }) return false
+        val digits = t.filter { it in '0'..'9' }
+        if (digits.length != 6) return false
+        val own = code.filter { it in '0'..'9' }
+        return PairFrames.constantTimeEquals(digits.toByteArray(Charsets.US_ASCII), own.toByteArray(Charsets.US_ASCII))
     }
 
     /** This user says the codes match: phase 2. Returns the session or throws. */

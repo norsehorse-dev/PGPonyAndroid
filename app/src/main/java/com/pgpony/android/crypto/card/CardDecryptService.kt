@@ -14,21 +14,18 @@
 
 package com.pgpony.android.crypto.card
 
-import org.bouncycastle.openpgp.PGPCompressedData
 import org.bouncycastle.openpgp.PGPEncryptedDataList
 import org.bouncycastle.openpgp.PGPException
-import org.bouncycastle.openpgp.PGPLiteralData
+import com.pgpony.android.crypto.ContentWalker
+import com.pgpony.android.crypto.MessageGrammar
 import com.pgpony.android.crypto.PGPCryptoError
 import com.pgpony.android.crypto.SecurityLimits
-import org.bouncycastle.openpgp.PGPOnePassSignature
-import org.bouncycastle.openpgp.PGPOnePassSignatureList
+import com.pgpony.android.crypto.SignerStatus
 import org.bouncycastle.openpgp.PGPPublicKey
 import org.bouncycastle.openpgp.PGPPublicKeyEncryptedData
 import org.bouncycastle.openpgp.PGPPublicKeyRing
-import org.bouncycastle.openpgp.PGPSignatureList
 import org.bouncycastle.openpgp.PGPUtil
 import org.bouncycastle.openpgp.jcajce.JcaPGPObjectFactory
-import org.bouncycastle.openpgp.operator.bc.BcPGPContentVerifierBuilderProvider
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 
@@ -177,13 +174,23 @@ class CardDecryptService private constructor() {
             // is where the card operation happens for an addressed message.
             val clear = clearStream
                 ?: chosen.getDataStream(CardPublicKeyDataDecryptorFactory(session, chosenKey))
-            val result = readLiteralAndVerify(JcaPGPObjectFactory(clear), verificationKeys)
 
-            // INTEGRITY GATE. readLiteralAndVerify has fully read the plaintext,
-            // so the SEIPD protection can now be checked: reject a legacy
-            // unprotected packet (isIntegrityProtected() == false), and validate
-            // SEIPDv1's MDC / confirm SEIPDv2's AEAD tag via verify(). Without
-            // this a tampered message would pass as a clean card decrypt.
+            // A legacy packet without integrity protection is refused before
+            // its content is read.
+            val aead = chosen.isAEAD()
+            val protected = chosen.isIntegrityProtected() || aead
+            if (!protected) {
+                throw OpenPgpCardException.Malformed("Message has no integrity protection and was rejected.")
+            }
+
+            // The whole decrypted packet stream is read first (bounded), so the
+            // integrity check below runs before any of the content is parsed.
+            val plain = readCapped(clear)
+
+            // INTEGRITY GATE. The plaintext has been fully read, so the SEIPD
+            // protection can now be checked: validate SEIPDv1's MDC / confirm
+            // SEIPDv2's AEAD tag via verify(). Without this a tampered message
+            // would pass as a clean card decrypt.
 // 3.1.0 Phase 7 Fix2 (origin: Token2 test, gpg 2.5 message):
             // GnuPG with AEAD-capable keys emits the LibrePGP "tag 20"
             // OCB packet. BC's isIntegrityProtected() is tag-18-only
@@ -193,23 +200,36 @@ class CardDecryptService private constructor() {
             // gate. So: tag 20 counts as protected, and skips the
             // MDC-oriented verify(). SEIPDv2 (isAEAD + tag 18) keeps
             // using verify(), which BC short-circuits to true.
-            val aead = chosen.isAEAD()
-            val protected = chosen.isIntegrityProtected() || aead
-            val intact = protected && try {
+            val intact = try {
                 if (aead && !chosen.isIntegrityProtected()) true else chosen.verify()
             } catch (ie: PGPException) { false }
             if (!intact) {
                 throw OpenPgpCardException.Malformed(
-                    if (!protected) "Message has no integrity protection and was rejected."
-                    else "Integrity check failed - the message may have been tampered with."
+                    "Integrity check failed - the message may have been tampered with."
                 )
             }
-            return result
+            return readContent(plain, verificationKeys)
         } catch (e: PGPException) {
             val cause = e.cause
             if (cause is OpenPgpCardException) throw cause
             throw OpenPgpCardException.Communication(e.message ?: "Decryption failed", e)
         }
+    }
+
+    /** The decrypted packet stream [clear], read whole up to the in-memory cap. */
+    private fun readCapped(clear: java.io.InputStream): ByteArray {
+        val out = ByteArrayOutputStream()
+        val buf = ByteArray(1 shl 16)
+        var total = 0L
+        while (true) {
+            val n = clear.read(buf)
+            if (n < 0) break
+            total += n
+            if (total > SecurityLimits.MAX_MESSAGE_PLAINTEXT_BYTES)
+                throw PGPCryptoError.ResourceLimitExceeded("decrypted message exceeds size cap")
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
     }
 
     /**
@@ -248,107 +268,46 @@ class CardDecryptService private constructor() {
         return null
     }
 
-    private fun findPublicKey(keyID: Long, rings: List<PGPPublicKeyRing>): PGPPublicKey? {
-        for (ring in rings) {
-            ring.getPublicKey(keyID)?.let { return it }
-        }
-        return null
-    }
-
     /**
-     * Walk the decrypted packet stream: recover the literal data and, if an
-     * embedded one-pass signature is present and [verificationKeys] is given,
-     * verify it against the signer's key. Mirrors PGPCryptoService's software
-     * verification loop so the Decrypt tab shows the same verified-signer
-     * banner whether the message was decrypted in software or on the card.
+     * The decrypted packet bytes [plain] read into a result: checked against
+     * the message grammar (MessageGrammar, the same check the software path
+     * runs), then walked by the shared [ContentWalker], so the card path
+     * returns the one literal and the same graded signer status as a software
+     * decrypt. Any structural problem is [OpenPgpCardException.Malformed].
      */
-    private fun readLiteralAndVerify(
-        factory: JcaPGPObjectFactory,
-        verificationKeys: List<PGPPublicKeyRing>?,
-        depth: Int = 0
+    internal fun readContent(
+        plain: ByteArray,
+        verificationKeys: List<PGPPublicKeyRing>?
     ): CardDecryptResult {
-        var data: ByteArray? = null
-        var filename: String? = null
-        var hadSignature = false
-        var signerKnown = false
-        var signatureVerified = false
-        var signerKeyID: String? = null
-        var onePassSig: PGPOnePassSignature? = null
-        var onePassIndex = 0
-        var onePassCount = 1
-
-        var obj = factory.nextObject()
-        while (obj != null) {
-            when (obj) {
-                // GnuPG/BC wrap the whole signed structure (one-pass sig +
-                // literal + signature) inside the compressed packet, so
-                // recursing re-reads them together — same as the software path.
-                is PGPCompressedData -> {
-                    if (depth >= SecurityLimits.MAX_DECOMPRESSION_DEPTH)
-                        throw PGPCryptoError.ResourceLimitExceeded("compression nesting exceeds depth cap")
-                    return readLiteralAndVerify(JcaPGPObjectFactory(obj.dataStream), verificationKeys, depth + 1)
-                }
-                is PGPOnePassSignatureList -> {
-                    if (obj.size() > 0) {
-                        hadSignature = true
-                        signerKeyID = String.format("%016X", obj[0].keyID)
-                        // 3.0.0 (5d-4): with several signers, verify the first
-                        // one-pass packet whose key is held, not only the first.
-                        for (i in 0 until obj.size()) {
-                            val ops = obj[i]
-                            val signerPubKey = verificationKeys?.let { findPublicKey(ops.keyID, it) } ?: continue
-                            ops.init(BcPGPContentVerifierBuilderProvider(), signerPubKey)
-                            onePassSig = ops
-                            onePassIndex = i
-                            onePassCount = obj.size()
-                            signerKeyID = String.format("%016X", ops.keyID)
-                            signerKnown = true
-                            break
-                        }
-                    }
-                }
-                is PGPLiteralData -> {
-                    filename = com.pgpony.android.crypto.LiteralFilename.sanitize(obj.fileName) // 4.6.0 (item 17.3)
-                    val out = ByteArrayOutputStream()
-                    val buf = ByteArray(4096)
-                    var len: Int
-                    var total = 0L
-                    val ins = obj.inputStream
-                    while (ins.read(buf).also { len = it } >= 0) {
-                        total += len
-                        if (total > SecurityLimits.MAX_MESSAGE_PLAINTEXT_BYTES)
-                            throw PGPCryptoError.ResourceLimitExceeded("decrypted message exceeds size cap")
-                        out.write(buf, 0, len)
-                        onePassSig?.update(buf, 0, len)
-                    }
-                    data = out.toByteArray()
-                }
-                is PGPSignatureList -> {
-                    if (onePassSig != null && obj.size() > 0) {
-                        // 4.6.0 (item 17.1): graded like the software path, so a
-                        // valid signature from an unbound, revoked or expired
-                        // signer (or a weak digest) is not reported as verified.
-                        // 3.0.0 (5d-4): signatures come in the reverse order of
-                        // their one-pass packets (RFC 9580 5.4).
-                        val sig = if (obj.size() == onePassCount) obj[onePassCount - 1 - onePassIndex] else obj[0]
-                        signatureVerified = sig.keyID == onePassSig.keyID &&
-                            onePassSig.verify(sig) &&
-                            com.pgpony.android.crypto.SignerEvaluator.evaluate(
-                                sig, verificationKeys ?: emptyList()
-                            ) == com.pgpony.android.crypto.SignerStatus.VERIFIED
-                    }
-                }
-            }
-            obj = factory.nextObject()
+        val checked = try {
+            MessageGrammar.normalizePlaintext(plain)
+        } catch (e: MessageGrammar.Truncated) {
+            throw OpenPgpCardException.Malformed("The decrypted message is malformed (truncated packet).")
+        } catch (e: MessageGrammar.Malformed) {
+            throw OpenPgpCardException.Malformed("The decrypted message is malformed (${e.message}).")
         }
-        val d = data ?: throw OpenPgpCardException.Malformed("No readable content after decryption.")
+        val sink = ContentWalker.MemorySink()
+        val walked = ContentWalker.walk(
+            JcaPGPObjectFactory(ByteArrayInputStream(checked)),
+            verificationKeys,
+            sink,
+            malformed = { OpenPgpCardException.Malformed("The decrypted message is malformed ($it).") },
+            noLiteral = { OpenPgpCardException.Malformed("No readable content after decryption.") }
+        )
         return CardDecryptResult(
-            data = d,
-            filename = filename,
-            hadSignature = hadSignature,
-            signerKnown = signerKnown,
-            signatureVerified = signatureVerified,
-            signerKeyID = signerKeyID
+            data = sink.bytes(),
+            filename = walked.filename,
+            hadSignature = walked.hasSignature,
+            signerKnown = walked.signerKnown,
+            signatureVerified = walked.signerStatus == SignerStatus.VERIFIED,
+            signerKeyID = walked.signerKeyID
+                ?: walked.firstOnePassKeyID?.let { String.format("%016X", it) },
+            signerStatus = walked.signerStatus,
+            signerWeakKey = walked.signerWeakKey,
+            signatureKeyIDRaw = walked.signatureKeyIDRaw,
+            signaturePackets = walked.signaturePackets,
+            signingKeyFingerprint = walked.signingKeyFingerprint,
+            signerPrimaryFingerprint = walked.signerPrimaryFingerprint
         )
     }
 }
@@ -362,6 +321,23 @@ data class CardDecryptResult(
     val filename: String?,
     val hadSignature: Boolean = false,
     val signerKnown: Boolean = false,
+    /** True only when [signerStatus] is VERIFIED. */
     val signatureVerified: Boolean = false,
-    val signerKeyID: String? = null
+    val signerKeyID: String? = null,
+    /** The signer grade, exactly as the software path reports it
+     *  (DecryptResult.signerStatus): verified, unknown signer, invalid,
+     *  revoked, expired, and so on. Callers show this, not a bare boolean. */
+    val signerStatus: SignerStatus = SignerStatus.NONE,
+    /** Label of the signer key when it verified but is weak ("RSA 1024"). */
+    val signerWeakKey: String? = null,
+    /** Raw key id from the signature packets, held or not. */
+    val signatureKeyIDRaw: Long? = null,
+    /** Every signature packet in the message, encoded, in order. */
+    val signaturePackets: List<ByteArray> = emptyList(),
+    /** Fingerprint (hex uppercase) of the exact key the graded signature
+     *  verified under; null when no held key's signature verified. */
+    val signingKeyFingerprint: String? = null,
+    /** Primary fingerprint (hex uppercase) of the certificate that validly
+     *  holds that key; null when unknown. */
+    val signerPrimaryFingerprint: String? = null
 )

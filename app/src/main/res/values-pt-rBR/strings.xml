@@ -2458,6 +2458,17 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="err_signer_key_not_certified_by_key">A chave do signatário não é certificada pela chave à qual afirma pertencer</string>
     <string name="err_signer_key_not_keyring">A chave do signatário não está no seu chaveiro</string>
     <string name="err_signer_key_was_expired_when_signed">A chave do signatário estava expirada quando assinou</string>
+    <string name="err_signature_has_expired">A assinatura expirou</string>
+    <string name="err_signature_predates_key">A assinatura tem data anterior à chave que a fez</string>
+    <string name="err_signer_key_not_valid_when_signed">A chave do signatário não era válida quando assinou</string>
+    <string name="err_signer_key_too_weak">A chave do signatário é fraca demais para ser confiável (RSA abaixo de 2048 bits, ou DSA)</string>
+    <string name="err_secret_needs_passphrase_contact">A chave privada de %1$s está protegida por uma frase-senha, e o PGPony precisa desbloqueá-la para confirmar que pertence ao contato que você já tem. O contato existente não foi alterado e nada foi importado.</string>
+    <string name="err_secret_wrong_passphrase_contact">A frase-senha não desbloqueou a chave privada de %1$s. O contato existente não foi alterado e nada foi importado.</string>
+    <string name="err_secret_not_this_contact">A chave privada não pertence ao contato %1$s que você já tem. O contato existente não foi alterado e nada foi importado.</string>
+    <string name="err_secret_material_mismatch_contact">O material da chave privada não corresponde ao contato %1$s que você já tem. O contato existente não foi alterado e nada foi importado.</string>
+    <string name="err_secret_no_material_contact">A chave de %1$s não contém material de chave privada utilizável (apenas marcadores de uma chave offline ou de hardware). O contato existente não foi alterado e nada foi importado.</string>
+    <string name="err_secret_unproven_contact">O PGPony não conseguiu testar se a chave privada pertence ao contato %1$s que você já tem. O contato existente não foi alterado e nada foi importado.</string>
+    <string name="err_secret_unreadable_contact">Não foi possível ler a chave privada de %1$s. O contato existente não foi alterado e nada foi importado.</string>
     <string name="err_signing_failed">Falha na assinatura</string>
     <string name="err_signing_failed_2">Falha na assinatura: %1$s</string>
     <string name="err_signing_key_has_expired_enable_allow">A chave de assinatura expirou. Ative \"Permitir chaves expiradas\" nos ajustes do PGPony para assinar com ela.</string>

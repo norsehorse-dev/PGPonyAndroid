@@ -13,8 +13,6 @@ package com.pgpony.android.crypto.ssh
 import org.bouncycastle.crypto.params.AsymmetricKeyParameter
 import org.bouncycastle.openpgp.PGPException
 import org.bouncycastle.openpgp.PGPSecretKeyRing
-import org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyDecryptorBuilder
-import org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider
 import org.bouncycastle.openpgp.operator.bc.BcPGPKeyConverter
 
 object SshSigningKey {
@@ -37,8 +35,13 @@ object SshSigningKey {
         }
         val protected = secret.s2KUsage.toInt() != 0
         if (protected && passphrase.isNullOrEmpty()) return Unlock.NeedsPassphrase
-        val decryptor = BcPBESecretKeyDecryptorBuilder(BcPGPDigestCalculatorProvider())
-            .build((passphrase ?: "").toCharArray())
+        // An Argon2 S2K outside the policy is refused before any KDF runs.
+        try {
+            com.pgpony.android.crypto.enforceArgon2Policy(secret.s2K)
+        } catch (e: com.pgpony.android.crypto.PGPCryptoError.ResourceLimitExceeded) {
+            return Unlock.Missing(e.message ?: "The key's passphrase protection exceeds the allowed cost")
+        }
+        val decryptor = com.pgpony.android.crypto.SecretKeyUnlock.decryptor(passphrase)
         val priv = try {
             secret.extractPrivateKey(decryptor)
         } catch (e: PGPException) {

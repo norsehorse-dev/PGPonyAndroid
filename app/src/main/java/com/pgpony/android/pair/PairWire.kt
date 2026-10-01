@@ -11,6 +11,9 @@ import java.io.DataInputStream
 import java.io.EOFException
 import java.io.InputStream
 import java.io.OutputStream
+import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The PonyDirect LAN identify handshake and ENVELOPE frame, byte for byte as PonyDirect's
@@ -70,7 +73,11 @@ fun interface PairRandom {
     }
 }
 
-/** The framed byte stream both phases run over. */
+/**
+ * The framed byte stream both phases run over. The socket's read timeout only bounds each read
+ * call, so a peer sending one byte at a time could hold a frame open for ever; [withDeadline]
+ * bounds a whole frame (or any other step) by closing the connection when it runs out.
+ */
 internal class PairWire(input: InputStream, private val output: OutputStream, private val onClose: () -> Unit) {
     private val input = DataInputStream(input)
 
@@ -87,14 +94,37 @@ internal class PairWire(input: InputStream, private val output: OutputStream, pr
         throw PairException(PairFailure.CLOSED, "the other side closed the connection")
     }
 
-    /** One frame whose type byte was already read. */
-    fun readFrameAfterType(type: Byte): Pair<Byte, ByteArray> {
+    /**
+     * One frame whose type byte was already read. A declared length above [maxLength] is refused
+     * before anything is allocated for it.
+     */
+    fun readFrameAfterType(type: Byte, maxLength: Long = MAX_FRAME): Pair<Byte, ByteArray> {
         val len = readExact(4).fold(0L) { acc, b -> (acc shl 8) or (b.toLong() and 0xFF) }
-        if (len > MAX_FRAME) throw PairException(PairFailure.PROTOCOL, "frame too long")
+        if (len > minOf(maxLength, MAX_FRAME)) throw PairException(PairFailure.PROTOCOL, "frame too long")
         return type to readExact(len.toInt())
     }
 
-    fun readFrame(): Pair<Byte, ByteArray> = readFrameAfterType(readExact(1)[0])
+    fun readFrame(maxLength: Long = MAX_FRAME): Pair<Byte, ByteArray> = readFrameAfterType(readExact(1)[0], maxLength)
+
+    /**
+     * Runs [block] (reads) with a wall-clock limit of [ms]. When the limit passes the connection
+     * is closed, which ends any read in progress, and the step fails as a timeout.
+     */
+    fun <T> withDeadline(ms: Long, block: () -> T): T {
+        val fired = AtomicBoolean(false)
+        val timer = DEADLINES.schedule({
+            fired.set(true)
+            close()
+        }, ms, TimeUnit.MILLISECONDS)
+        try {
+            return block()
+        } catch (e: Exception) {
+            if (fired.get()) throw PairException(PairFailure.TIMEOUT, "the other side stopped answering")
+            throw e
+        } finally {
+            timer.cancel(false)
+        }
+    }
 
     fun close() {
         runCatching { onClose() }
@@ -102,5 +132,9 @@ internal class PairWire(input: InputStream, private val output: OutputStream, pr
 
     companion object {
         const val MAX_FRAME = 1_048_576L + 65_536L
+
+        private val DEADLINES = ScheduledThreadPoolExecutor(1) { r ->
+            Thread(r, "pgpony-pair-deadline").apply { isDaemon = true }
+        }.apply { removeOnCancelPolicy = true }
     }
 }

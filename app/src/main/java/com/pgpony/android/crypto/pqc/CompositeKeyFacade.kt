@@ -68,7 +68,12 @@ object CompositeKeyFacade {
         val compositePublic: ByteArray,
         val compositeSecret: ByteArray?,
         val encryptionSubkey: SubkeyInfo?,
-        /** Every composite-signing component (primary + composite subkeys). */
+        /** The composite-signing components (the primary, plus composite
+         *  subkeys with a verified binding and back-signature that are not
+         *  revoked now). A structural list for picking which key to verify
+         *  with or sign with: it is NOT a validity filter (the primary is
+         *  listed even when revoked, expired or not sign flagged). Grade a
+         *  verified signature with CompositeSignerGate. */
         val compositeSigners: List<CompositeComponent>
     )
 
@@ -434,7 +439,10 @@ object CompositeKeyFacade {
             val algId = pb[1 + 4].toInt() and 0xFF
             val compSuite = CompositeSignSuite.forAlgId(algId) ?: return@mapNotNull null
             val fpHex = v6Fingerprint(pb).joinToString("") { "%02x".format(it) }
-            if (checked() && !fpHex.equals(primaryFpHex, ignoreCase = true)) {
+            if (!fpHex.equals(primaryFpHex, ignoreCase = true)) {
+                // A subkey speaks for the primary only with checked bindings;
+                // a certificate that cannot be analysed offers its primary only.
+                if (!checked()) return@mapNotNull null
                 val st = subState(fpHex) ?: return@mapNotNull null
                 if (!st.bound || !st.backSigned || st.revoked) return@mapNotNull null
             }

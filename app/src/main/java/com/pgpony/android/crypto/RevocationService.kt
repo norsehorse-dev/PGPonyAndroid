@@ -50,9 +50,7 @@ import org.bouncycastle.openpgp.PGPSignatureGenerator
 import org.bouncycastle.openpgp.PGPSignatureList
 import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator
 import org.bouncycastle.openpgp.jcajce.JcaPGPObjectFactory
-import org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyDecryptorBuilder
 import org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder
-import org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 
@@ -135,10 +133,11 @@ class RevocationService private constructor() {
                 "No primary secret key in supplied ring"
             )
 
-        // 1. Unlock the private key.
+        // 1. Unlock the private key (an Argon2 S2K outside the policy is
+        //    refused before any KDF runs).
+        enforceArgon2Policy(secretKey.s2K)
         val privateKey = try {
-            val decryptor = BcPBESecretKeyDecryptorBuilder(BcPGPDigestCalculatorProvider())
-                .build((passphrase ?: "").toCharArray())
+            val decryptor = com.pgpony.android.crypto.SecretKeyUnlock.decryptor(passphrase)
             secretKey.extractPrivateKey(decryptor)
         } catch (e: PGPException) {
             // Same s2KUsage disambiguation pattern SigningService uses
@@ -283,9 +282,9 @@ class RevocationService private constructor() {
             )
         }
 
+        enforceArgon2Policy(primary.s2K)
         val privateKey = try {
-            val decryptor = BcPBESecretKeyDecryptorBuilder(BcPGPDigestCalculatorProvider())
-                .build((passphrase ?: "").toCharArray())
+            val decryptor = com.pgpony.android.crypto.SecretKeyUnlock.decryptor(passphrase)
             primary.extractPrivateKey(decryptor)
         } catch (e: PGPException) {
             if (primary.s2KUsage.toInt() != 0) {

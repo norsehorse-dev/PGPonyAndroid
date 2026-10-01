@@ -207,7 +207,8 @@ data class DecryptResult(
     /** #30/#31: set when the decrypted inner payload is an inline one-pass
      *  COMPOSITE (ML-DSA + EdDSA) signed message. BouncyCastle cannot parse
      *  those, so [data] holds the extracted literal and the caller verifies the
-     *  signature over [compositeInlineBytes] via CompositeDocumentVerifier. */
+     *  signature over [compositeInlineBytes] with CompositeSignerGate.verifyInline,
+     *  which also grades the signer. */
     val compositeInline: Boolean = false,
     val compositeInlineBytes: ByteArray? = null,
     val compositeClaimedSignerFp: String? = null,
@@ -224,7 +225,14 @@ data class DecryptResult(
     val signerWeakKey: String? = null,
     /** 3.0.0 (5d-3): label of the held key that decrypted the message when
      *  that key is weak; the screen warns about it. */
-    val decryptionWeakKey: String? = null
+    val decryptionWeakKey: String? = null,
+    /** Fingerprint (hex uppercase) of the exact key the graded signature
+     *  verified under; null when no held key's signature verified. Identify
+     *  the signer by this, not by [signerKeyID]. */
+    val signingKeyFingerprint: String? = null,
+    /** Primary fingerprint (hex uppercase) of the certificate that validly
+     *  holds that key; null when unknown. */
+    val signerPrimaryFingerprint: String? = null
 )
 
 /**
@@ -245,14 +253,19 @@ data class DecryptStreamResult(
      *  COMPOSITE (ML-DSA + EdDSA) signed message. BouncyCastle cannot parse
      *  those, so the streaming path (like [DecryptResult]) hands the extracted
      *  literal to [output] and the caller verifies the signature over
-     *  [compositeInlineBytes] via CompositeDocumentVerifier. */
+     *  [compositeInlineBytes] with CompositeSignerGate.verifyInline, which
+     *  also grades the signer. */
     val compositeInline: Boolean = false,
     val compositeInlineBytes: ByteArray? = null,
     val compositeClaimedSignerFp: String? = null,
     /** 4.7.0 (#64, SOP): see [DecryptResult.signaturePackets]. */
     val signaturePackets: List<ByteArray> = emptyList(),
     /** 3.0.0 (5d-3): see [DecryptResult.signerWeakKey]. */
-    val signerWeakKey: String? = null
+    val signerWeakKey: String? = null,
+    /** See [DecryptResult.signingKeyFingerprint]. */
+    val signingKeyFingerprint: String? = null,
+    /** See [DecryptResult.signerPrimaryFingerprint]. */
+    val signerPrimaryFingerprint: String? = null
 )
 
 
@@ -2048,6 +2061,11 @@ class PGPCryptoService private constructor() {
             // its own wrong-passphrase remapping (usedSymmetric), and the DoS
             // size cap stays a distinct, size-only signal.
             val integrityProtected = integrityObj?.let { it.isIntegrityProtected() || it.isAEAD() } ?: false
+            // No integrity protection at all (tag 9): refused before its
+            // content is even parsed. There is no setting that allows it.
+            if (integrityObj != null && !integrityProtected) {
+                throw PGPCryptoError.IntegrityCheckFailed("Message has no integrity protection and was rejected")
+            }
             val result = if (integrityProtected && !usedSymmetric) {
                 try {
                     parsePlain(readDecrypted())
@@ -2154,6 +2172,21 @@ class PGPCryptoService private constructor() {
      * data flows to [output] in 64 KiB chunks instead of being buffered.
      * Armor detection is handled by PGPUtil.getDecoderStream, which
      * sniffs the stream head. Does not close [input]/[output].
+     *
+     * Contract for callers. Unless [releaseOnlyWhenVerified] is set, the
+     * plaintext reaches [output] WHILE it is decrypted, before the message's
+     * integrity (the SEIPDv1 MDC, checked after the last byte) and its
+     * structure (one literal, signatures that close their one-pass packets)
+     * have been confirmed. Every failure throws: the call returns normally
+     * only when the integrity check passed and the content was well formed,
+     * and it never returns a result after a failed MDC or AEAD check. So a
+     * caller must write [output] to a private temporary file (or a buffer)
+     * and publish it, or show its signature status, only after this call
+     * returns; on any exception it must discard what was written. A caller
+     * whose [output] is read by something else as it is written (a pipe, a
+     * provider client) passes [releaseOnlyWhenVerified] = true instead.
+     * A message without integrity protection (tag 9, no MDC) is refused
+     * before any plaintext is written.
      */
     fun decryptStream(
         input: java.io.InputStream,
@@ -2300,6 +2333,12 @@ class PGPCryptoService private constructor() {
             // gate throws (public-key path only), so it is indistinguishable
             // from an MDC failure.
             val integrityProtected = integrityObj?.let { it.isIntegrityProtected() || it.isAEAD() } ?: false
+            // A message with no integrity protection at all is refused before
+            // any of its plaintext is written; the gate below would refuse it
+            // anyway, but only after the output had been filled.
+            if (integrityObj != null && !integrityProtected) {
+                throw PGPCryptoError.IntegrityCheckFailed("Message has no integrity protection and was rejected")
+            }
             // 4.6.0 (item 17.2): AEAD releases only authenticated chunks, so it
             // streams straight through; everything else is held until the gate.
             val hold = if (releaseOnlyWhenVerified && integrityObj?.isAEAD() != true) {
@@ -2475,124 +2514,31 @@ class PGPCryptoService private constructor() {
     }
 
     /**
-     * P2d — the streaming twin of [processDecryptedContent]: identical
-     * packet walk (compressed recursion FIRST, then signature packets —
-     * the R5 decompress-before-verify rule) but literal data is written
-     * to [output] as it's read instead of being buffered.
+     * P2d: the streaming twin of [processDecryptedContent]: the same
+     * [ContentWalker] walk, with the literal data written to [output] as it
+     * is read instead of being buffered. [consumed] reports the packet bytes
+     * read so far, for the expansion bound of [ContentWalker.StreamSink].
      */
     private fun streamDecryptedContent(
         factory: JcaPGPObjectFactory,
         verificationKeys: List<PGPPublicKeyRing>?,
         output: java.io.OutputStream,
-        depth: Int = 0
+        consumed: () -> Long = { Long.MAX_VALUE / SecurityLimits.MAX_STREAM_EXPANSION_RATIO }
     ): DecryptStreamResult {
-        var bytesWritten = 0L
-        var wroteLiteral = false
-        var filename: String? = null
-        val signaturePackets = mutableListOf<ByteArray>()
-        var signerStatus = SignerStatus.NONE
-        var signerWeakKey: String? = null
-        var signerKeyID: String? = null
-        var onePassSig: PGPOnePassSignature? = null
-        var onePassIndex = 0
-        var onePassCount = 1
-        var hasSignature = false
-        var signatureKeyIDRaw: Long? = null
-
-        var obj = factory.nextObject()
-        while (obj != null) {
-            when (obj) {
-                is PGPCompressedData -> {
-                    if (depth >= SecurityLimits.MAX_DECOMPRESSION_DEPTH)
-                        throw PGPCryptoError.ResourceLimitExceeded("compression nesting exceeds depth cap")
-                    return streamDecryptedContent(
-                        JcaPGPObjectFactory(obj.dataStream), verificationKeys, output, depth + 1
-                    )
-                }
-                is PGPOnePassSignatureList -> {
-                    if (obj.size() > 0) {
-                        hasSignature = true
-                        signatureKeyIDRaw = obj[0].keyID
-                    }
-                    if (obj.size() > 0 && verificationKeys != null) {
-                        // 3.0.0 (5d-4): a message signed by several keys carries one
-                        // one-pass packet per signer; verify the first whose key is
-                        // held, not only the first.
-                        for (i in 0 until obj.size()) {
-                            val ops = obj[i]
-                            val signerPubKey = findPublicKey(ops.keyID, verificationKeys) ?: continue
-                            ops.init(
-                                org.bouncycastle.openpgp.operator.bc.BcPGPContentVerifierBuilderProvider(),
-                                signerPubKey
-                            )
-                            onePassSig = ops
-                            onePassIndex = i
-                            onePassCount = obj.size()
-                            signerKeyID = String.format("%016X", ops.keyID)
-                            break
-                        }
-                    }
-                }
-                is PGPLiteralData -> {
-                    wroteLiteral = true
-                    filename = LiteralFilename.sanitize(obj.fileName) // 4.6.0 (item 17.3)
-                    val litStream = obj.inputStream
-                    val buf = ByteArray(1 shl 16)
-                    var len: Int
-                    while (litStream.read(buf).also { len = it } >= 0) {
-                        output.write(buf, 0, len)
-                        onePassSig?.update(buf, 0, len)
-                        bytesWritten += len
-                        if (bytesWritten > SecurityLimits.MAX_STREAM_PLAINTEXT_BYTES)
-                            throw PGPCryptoError.ResourceLimitExceeded("decrypted stream exceeds size cap")
-                    }
-                }
-                is PGPSignatureList -> {
-                    obj.forEach { signaturePackets.add(it.encoded) }
-                    if (obj.size() > 0) {
-                        hasSignature = true
-                        if (signatureKeyIDRaw == null) signatureKeyIDRaw = obj[0].keyID
-                    }
-                    if (onePassSig != null && obj.size() > 0) {
-                        // item 11 (Finding C): a passing crypto check is graded
-                        // against the signer key's revocation / expiry / flags.
-                        // 4.6.0 (item 17.1): the one-pass header and the
-                        // trailing signature must name the same key, and the
-                        // grade covers the signature itself (document type,
-                        // digest policy) as well as the signer's binding.
-                        // 3.0.0 (5d-4): the signatures come in the reverse order of
-                        // their one-pass packets (RFC 9580 5.4), so the one-pass
-                        // packet at index i pairs with the signature at n - 1 - i.
-                        val sig = if (obj.size() == onePassCount) obj[onePassCount - 1 - onePassIndex] else obj[0]
-                        val sameKey = sig.keyID == onePassSig!!.keyID
-                        signerStatus = if (sameKey && onePassSig!!.verify(sig)) {
-                            SignerEvaluator.evaluate(sig, verificationKeys ?: emptyList())
-                        } else {
-                            SignerStatus.INVALID
-                        }
-                        if (signerStatus == SignerStatus.VERIFIED) {
-                            signerWeakKey = weakSignerLabel(sig.keyID, verificationKeys)
-                        }
-                    } else if (obj.size() > 0) {
-                        signerStatus = SignerStatus.UNKNOWN_SIGNER
-                    }
-                }
-            }
-            obj = factory.nextObject()
-        }
-        if (!wroteLiteral) {
-            throw PGPCryptoError.DecryptionFailed("No literal data found in decrypted message")
-        }
+        val sink = ContentWalker.StreamSink(output, consumed)
+        val walked = ContentWalker.walk(factory, verificationKeys, sink)
         return DecryptStreamResult(
-            bytesWritten = bytesWritten,
-            filename = filename,
-            signatureVerified = signerStatus == SignerStatus.VERIFIED,
-            signerKeyID = signerKeyID,
-            hasSignature = hasSignature,
-            signatureKeyIDRaw = signatureKeyIDRaw,
-            signerStatus = signerStatus,
-            signaturePackets = signaturePackets,
-            signerWeakKey = signerWeakKey
+            bytesWritten = walked.bytes,
+            filename = walked.filename,
+            signatureVerified = walked.signerStatus == SignerStatus.VERIFIED,
+            signerKeyID = walked.signerKeyID,
+            hasSignature = walked.hasSignature,
+            signatureKeyIDRaw = walked.signatureKeyIDRaw,
+            signerStatus = walked.signerStatus,
+            signaturePackets = walked.signaturePackets,
+            signerWeakKey = walked.signerWeakKey,
+            signingKeyFingerprint = walked.signingKeyFingerprint,
+            signerPrimaryFingerprint = walked.signerPrimaryFingerprint
         )
     }
 
@@ -2621,7 +2567,10 @@ class PGPCryptoService private constructor() {
     ): DecryptStreamResult {
         val V = com.pgpony.android.crypto.pqc.CompositeDocumentVerifier
         val headLimit = 1 shl 16
-        val bin = java.io.BufferedInputStream(decryptedStream, headLimit)
+        // Counts the packet bytes read (before decompression) for the
+        // streaming expansion bound.
+        val counted = ContentWalker.CountingInput(decryptedStream)
+        val bin = java.io.BufferedInputStream(counted, headLimit)
         bin.mark(headLimit)
         val head = readHead(bin, headLimit)
         bin.reset()
@@ -2631,7 +2580,7 @@ class PGPCryptoService private constructor() {
             false
         }
         if (!looksComposite) {
-            return streamDecryptedContent(JcaPGPObjectFactory(bin), verificationKeys, output)
+            return streamDecryptedContent(JcaPGPObjectFactory(bin), verificationKeys, output) { counted.count }
         }
         // Composite inline: buffer the whole inner content (bounded), then route
         // to the composite verifier, mirroring [decrypt]'s parsePlain.
@@ -2647,7 +2596,8 @@ class PGPCryptoService private constructor() {
             bufOut.write(chunk, 0, n)
             n = bin.read(chunk)
         }
-        val plainBytes = bufOut.toByteArray()
+        // The same grammar check [decrypt] applies before its composite test.
+        val plainBytes = plaintextChecked(bufOut.toByteArray())
         if (!V.isCompositeInline(plainBytes)) {
             // Head matched a composite one-pass packet but the full message is
             // not a valid composite inline (e.g. truncated): fall back to the
@@ -2850,115 +2800,17 @@ class PGPCryptoService private constructor() {
         }
     }
 
+    /**
+     * The decrypted (or signed-only) content read by [ContentWalker] into
+     * memory: one literal, its signatures checked and graded.
+     */
     private fun processDecryptedContent(
         factory: JcaPGPObjectFactory,
-        verificationKeys: List<PGPPublicKeyRing>?,
-        depth: Int = 0
+        verificationKeys: List<PGPPublicKeyRing>?
     ): DecryptResult {
-        var literalData: ByteArray? = null
-        var filename: String? = null
-        val signaturePackets = mutableListOf<ByteArray>()
-        var signerStatus = SignerStatus.NONE
-        var signerWeakKey: String? = null
-        var signerKeyID: String? = null
-        var onePassSig: PGPOnePassSignature? = null
-        var onePassIndex = 0
-        var onePassCount = 1
-        // P2b-1: track signature PRESENCE and the raw signing key id
-        // independently of whether we hold the signer's key, so the
-        // provider can report KEY_MISSING (unknown signer) instead of
-        // conflating it with "not signed".
-        var hasSignature = false
-        var signatureKeyIDRaw: Long? = null
-
-        var obj = factory.nextObject()
-        while (obj != null) {
-            when (obj) {
-                is PGPCompressedData -> {
-                    if (depth >= SecurityLimits.MAX_DECOMPRESSION_DEPTH)
-                        throw PGPCryptoError.ResourceLimitExceeded("compression nesting exceeds depth cap")
-                    val compFactory = JcaPGPObjectFactory(obj.dataStream)
-                    return processDecryptedContent(compFactory, verificationKeys, depth + 1)
-                }
-                is PGPOnePassSignatureList -> {
-                    if (obj.size() > 0) {
-                        hasSignature = true
-                        signatureKeyIDRaw = obj[0].keyID
-                    }
-                    if (obj.size() > 0 && verificationKeys != null) {
-                        // 3.0.0 (5d-4): a message signed by several keys carries one
-                        // one-pass packet per signer; verify the first whose key is
-                        // held, not only the first.
-                        for (i in 0 until obj.size()) {
-                            val ops = obj[i]
-                            val signerPubKey = findPublicKey(ops.keyID, verificationKeys) ?: continue
-                            ops.init(
-                                org.bouncycastle.openpgp.operator.bc.BcPGPContentVerifierBuilderProvider(),
-                                signerPubKey
-                            )
-                            onePassSig = ops
-                            onePassIndex = i
-                            onePassCount = obj.size()
-                            signerKeyID = String.format("%016X", ops.keyID)
-                            break
-                        }
-                    }
-                }
-                is PGPLiteralData -> {
-                    filename = LiteralFilename.sanitize(obj.fileName) // 4.6.0 (item 17.3)
-                    val litStream = obj.inputStream
-                    val buffer = ByteArrayOutputStream()
-                    val buf = ByteArray(4096)
-                    var len: Int
-                    var total = 0L
-                    while (litStream.read(buf).also { len = it } >= 0) {
-                        total += len
-                        if (total > SecurityLimits.MAX_MESSAGE_PLAINTEXT_BYTES)
-                            throw PGPCryptoError.ResourceLimitExceeded("decrypted message exceeds size cap")
-                        buffer.write(buf, 0, len)
-                        onePassSig?.update(buf, 0, len)
-                    }
-                    literalData = buffer.toByteArray()
-                }
-                is PGPSignatureList -> {
-                    obj.forEach { signaturePackets.add(it.encoded) }
-                    // P2b-1: a signature packet counts as "signed" even
-                    // without a preceding one-pass header (older
-                    // sig-then-literal layouts) and even when unheld.
-                    if (obj.size() > 0) {
-                        hasSignature = true
-                        if (signatureKeyIDRaw == null) signatureKeyIDRaw = obj[0].keyID
-                    }
-                    if (onePassSig != null && obj.size() > 0) {
-                        // item 11 (Finding C): a passing crypto check is graded
-                        // against the signer key's revocation / expiry / flags.
-                        // 4.6.0 (item 17.1): the one-pass header and the
-                        // trailing signature must name the same key, and the
-                        // grade covers the signature itself (document type,
-                        // digest policy) as well as the signer's binding.
-                        // 3.0.0 (5d-4): the signatures come in the reverse order of
-                        // their one-pass packets (RFC 9580 5.4), so the one-pass
-                        // packet at index i pairs with the signature at n - 1 - i.
-                        val sig = if (obj.size() == onePassCount) obj[onePassCount - 1 - onePassIndex] else obj[0]
-                        val sameKey = sig.keyID == onePassSig!!.keyID
-                        signerStatus = if (sameKey && onePassSig!!.verify(sig)) {
-                            SignerEvaluator.evaluate(sig, verificationKeys ?: emptyList())
-                        } else {
-                            SignerStatus.INVALID
-                        }
-                        if (signerStatus == SignerStatus.VERIFIED) {
-                            signerWeakKey = weakSignerLabel(sig.keyID, verificationKeys)
-                        }
-                    } else if (obj.size() > 0) {
-                        signerStatus = SignerStatus.UNKNOWN_SIGNER
-                    }
-                }
-            }
-            obj = factory.nextObject()
-        }
-
-        val data = literalData
-            ?: throw PGPCryptoError.DecryptionFailed("No literal data found in decrypted message")
+        val sink = ContentWalker.MemorySink()
+        val walked = ContentWalker.walk(factory, verificationKeys, sink)
+        val data = sink.bytes()
 
         val plaintext = try {
             String(data, Charsets.UTF_8)
@@ -2969,14 +2821,16 @@ class PGPCryptoService private constructor() {
         return DecryptResult(
             plaintext = plaintext,
             data = data,
-            signatureVerified = signerStatus == SignerStatus.VERIFIED,
-            signerKeyID = signerKeyID,
-            filename = filename,
-            hasSignature = hasSignature,
-            signatureKeyIDRaw = signatureKeyIDRaw,
-            signerStatus = signerStatus,
-            signaturePackets = signaturePackets,
-            signerWeakKey = signerWeakKey
+            signatureVerified = walked.signerStatus == SignerStatus.VERIFIED,
+            signerKeyID = walked.signerKeyID,
+            filename = walked.filename,
+            hasSignature = walked.hasSignature,
+            signatureKeyIDRaw = walked.signatureKeyIDRaw,
+            signerStatus = walked.signerStatus,
+            signaturePackets = walked.signaturePackets,
+            signerWeakKey = walked.signerWeakKey,
+            signingKeyFingerprint = walked.signingKeyFingerprint,
+            signerPrimaryFingerprint = walked.signerPrimaryFingerprint
         )
     }
 
@@ -3069,12 +2923,15 @@ class PGPCryptoService private constructor() {
      * never presented as a decrypted result.
      */
     private fun signedOnly(message: ByteArray, verificationKeys: List<PGPPublicKeyRing>?): DecryptResult? {
-        val input = if (isArmored(message)) {
-            ArmoredInputStream(ByteArrayInputStream(message))
+        val binary = if (isArmored(message)) {
+            ArmoredInputStream(ByteArrayInputStream(message)).use { it.readBytes() }
         } else {
-            ByteArrayInputStream(message)
+            message
         }
-        val result = processDecryptedContent(JcaPGPObjectFactory(input), verificationKeys)
+        // The full message grammar runs here whatever the caller checked, then
+        // the shared content walk enforces it again on the parsed objects.
+        val checked = plaintextChecked(binary)
+        val result = processDecryptedContent(JcaPGPObjectFactory(ByteArrayInputStream(checked)), verificationKeys)
         return result.takeIf { it.hasSignature }
     }
 
@@ -3592,11 +3449,21 @@ class PGPCryptoService private constructor() {
      * change, otherwise the rewritten binary message.
      */
     private fun outerChecked(input: ByteArray): ByteArray {
-        // A cleartext signed message is not a packet sequence; it keeps its own path.
-        val head = String(input, 0, minOf(input.size, 256), Charsets.ISO_8859_1)
-        if (head.contains("-----BEGIN PGP SIGNED MESSAGE-----")) return input
+        // A cleartext signed message is not a packet sequence and never comes
+        // here: callers send it to VerifyService. Say so plainly rather than
+        // failing on its text as a broken packet.
+        if (isClearSigned(input)) {
+            throw PGPCryptoError.DecryptionFailed(
+                "This is a clear-signed message, not an encrypted one. Verify it instead."
+            )
+        }
         val binary = if (isArmored(input)) {
-            runCatching { ArmoredInputStream(ByteArrayInputStream(input)).readBytes() }.getOrNull() ?: return input
+            try {
+                ArmoredInputStream(ByteArrayInputStream(input)).use { it.readBytes() }
+            } catch (e: Exception) {
+                if (looksIncomplete(e)) throw PGPCryptoError.MessageIncomplete()
+                throw PGPCryptoError.DecryptionFailed("Malformed message: the armor could not be read")
+            }
         } else input
         val checked = try {
             MessageGrammar.normalizeOuter(binary)
@@ -3606,6 +3473,15 @@ class PGPCryptoService private constructor() {
             throw PGPCryptoError.DecryptionFailed("Malformed message: ${e.message}")
         }
         return if (checked === binary) input else checked
+    }
+
+    /** True when the first non-blank line of [input] is the clear-signed
+     *  armor line. Only the start counts: the same text inside an armor
+     *  header (a Comment, say) does not make a message clear-signed. */
+    private fun isClearSigned(input: ByteArray): Boolean {
+        val head = String(input, 0, minOf(input.size, 512), Charsets.ISO_8859_1)
+        val first = head.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() } ?: return false
+        return first == "-----BEGIN PGP SIGNED MESSAGE-----"
     }
 
     /** 3.0.0 (5d-2): decrypted content checked by MessageGrammar.normalizePlaintext. */
@@ -3780,5 +3656,291 @@ internal fun enforceSkeskArgon2Policy(message: ByteArray) {
     } catch (e: PGPCryptoError.ResourceLimitExceeded) {
         throw e
     } catch (e: Exception) {
+    }
+}
+
+// ── Content walker ─────────────────────────────────────────────────────────
+//
+// The one walk over decrypted (or signed, unencrypted) content that every
+// path shares: the in-memory decrypt, the streaming decrypt (files, CLI) and
+// the smart-card decrypt. It reads the RFC 9580 message grammar on Bouncy
+// Castle's objects as they arrive:
+//
+//   [compressed data, holding the rest of a message]
+//   one-pass signatures and prefixed signatures, in any order
+//   exactly ONE literal data packet
+//   signatures that close the one-pass signatures, innermost first
+//
+// Marker, padding and trust packets, and unknown packets of a non-critical
+// type (40 and up), are skipped. Everything else is a malformed message: a
+// second literal, a one-pass signature or compressed packet after the
+// literal, a signature with no one-pass signature left to close, a one-pass
+// signature that is never closed, or any other packet. Each rule is checked
+// when the object arrives, so a streaming caller never receives a byte of a
+// literal packet that breaks it. The signer status comes from the one-pass
+// signature that was verified, never from whichever signature list came last,
+// so it can only be VERIFIED when that signature covers the one literal.
+internal object ContentWalker {
+
+    /** Where the literal data goes. */
+    interface Sink {
+        /** Called once, before the first byte of the literal data. */
+        fun begin(filename: String?) {}
+        fun write(buf: ByteArray, off: Int, len: Int)
+    }
+
+    /** What the walk found; the literal data itself went to the sink. */
+    class Outcome(
+        val filename: String?,
+        val bytes: Long,
+        val signerStatus: SignerStatus,
+        /** Key id (hex) of the held signer whose one-pass signature was checked. */
+        val signerKeyID: String?,
+        /** Key id of the first one-pass signature, held or not. */
+        val firstOnePassKeyID: Long?,
+        val hasSignature: Boolean,
+        val signatureKeyIDRaw: Long?,
+        val signaturePackets: List<ByteArray>,
+        val signerWeakKey: String?,
+        /** Fingerprint of the exact key the graded signature verified under. */
+        val signingKeyFingerprint: String? = null,
+        /** Primary fingerprint of the certificate validly holding that key. */
+        val signerPrimaryFingerprint: String? = null
+    ) {
+        val signerKnown: Boolean get() = signerKeyID != null
+    }
+
+    /** A sink that keeps the literal data in memory, up to [cap] bytes. */
+    class MemorySink(private val cap: Long = SecurityLimits.MAX_MESSAGE_PLAINTEXT_BYTES) : Sink {
+        private val out = ByteArrayOutputStream()
+        private var total = 0L
+        override fun write(buf: ByteArray, off: Int, len: Int) {
+            total += len
+            if (total > cap) throw PGPCryptoError.ResourceLimitExceeded("decrypted message exceeds size cap")
+            out.write(buf, off, len)
+        }
+        fun bytes(): ByteArray = out.toByteArray()
+    }
+
+    /**
+     * A sink that passes the literal data on to [output] as it arrives. It
+     * stops at [SecurityLimits.MAX_STREAM_PLAINTEXT_BYTES], and, once past
+     * [SecurityLimits.STREAM_EXPANSION_FREE_BYTES], when the output grows to
+     * more than [SecurityLimits.MAX_STREAM_EXPANSION_RATIO] times [consumed]
+     * (the packet bytes read so far, before decompression).
+     */
+    class StreamSink(
+        private val output: java.io.OutputStream,
+        private val consumed: () -> Long
+    ) : Sink {
+        var total = 0L
+            private set
+        override fun write(buf: ByteArray, off: Int, len: Int) {
+            total += len
+            if (total > SecurityLimits.MAX_STREAM_PLAINTEXT_BYTES)
+                throw PGPCryptoError.ResourceLimitExceeded("decrypted stream exceeds size cap")
+            if (total > SecurityLimits.STREAM_EXPANSION_FREE_BYTES &&
+                total > SecurityLimits.MAX_STREAM_EXPANSION_RATIO * maxOf(1L, consumed())
+            ) {
+                throw PGPCryptoError.ResourceLimitExceeded("decompressed data expands too far")
+            }
+            output.write(buf, off, len)
+        }
+    }
+
+    /** Counts the bytes read through it (the packet stream before decompression). */
+    class CountingInput(input: java.io.InputStream) : java.io.FilterInputStream(input) {
+        @Volatile var count = 0L
+            private set
+        override fun read(): Int {
+            val b = super.read()
+            if (b >= 0) count++
+            return b
+        }
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            val n = super.read(b, off, len)
+            if (n > 0) count += n
+            return n
+        }
+        override fun skip(n: Long): Long {
+            val s = super.skip(n)
+            if (s > 0) count += s
+            return s
+        }
+        override fun markSupported(): Boolean = false
+    }
+
+    private class State(
+        val keys: List<PGPPublicKeyRing>?,
+        val sink: Sink,
+        val malformed: (String) -> Exception
+    ) {
+        var literalSeen = false
+        var filename: String? = null
+        var bytes = 0L
+        /** One-pass signatures read and not yet closed, outermost first. */
+        val open = ArrayList<PGPOnePassSignature>()
+        var verifier: PGPOnePassSignature? = null
+        var verifierKey: PGPPublicKey? = null
+        var verifierStatus: SignerStatus? = null
+        var signingKeyFingerprint: String? = null
+        var signerPrimaryFingerprint: String? = null
+        var signerKeyID: String? = null
+        var firstOnePassKeyID: Long? = null
+        var hasSignature = false
+        var signatureKeyIDRaw: Long? = null
+        val signaturePackets = ArrayList<ByteArray>()
+        var signerWeakKey: String? = null
+    }
+
+    /**
+     * Walk the content [factory] reads. [malformed] builds the error for a
+     * grammar violation and [noLiteral] the one for content without literal
+     * data; both default to [PGPCryptoError.DecryptionFailed].
+     */
+    fun walk(
+        factory: PGPObjectFactory,
+        verificationKeys: List<PGPPublicKeyRing>?,
+        sink: Sink,
+        malformed: (String) -> Exception = { PGPCryptoError.DecryptionFailed("Malformed message: $it") },
+        noLiteral: () -> Exception = { PGPCryptoError.DecryptionFailed("No literal data found in decrypted message") }
+    ): Outcome {
+        val st = State(verificationKeys, sink, malformed)
+        walkLevel(factory, st, 0, noLiteral)
+        val status = when {
+            st.verifier != null -> st.verifierStatus ?: SignerStatus.INVALID
+            st.hasSignature -> SignerStatus.UNKNOWN_SIGNER
+            else -> SignerStatus.NONE
+        }
+        return Outcome(
+            filename = st.filename,
+            bytes = st.bytes,
+            signerStatus = status,
+            signerKeyID = st.signerKeyID,
+            firstOnePassKeyID = st.firstOnePassKeyID,
+            hasSignature = st.hasSignature,
+            signatureKeyIDRaw = st.signatureKeyIDRaw,
+            signaturePackets = st.signaturePackets,
+            signerWeakKey = if (status == SignerStatus.VERIFIED) st.signerWeakKey else null,
+            signingKeyFingerprint = st.signingKeyFingerprint,
+            signerPrimaryFingerprint = st.signerPrimaryFingerprint
+        )
+    }
+
+    /** One message level: the top level, or the content of a compressed packet. */
+    private fun walkLevel(factory: PGPObjectFactory, st: State, depth: Int, noLiteral: () -> Exception) {
+        // One-pass signatures opened outside this level stay open past its end;
+        // the ones opened inside must be closed inside.
+        val base = st.open.size
+        var obj = factory.nextObject()
+        while (obj != null) {
+            when (obj) {
+                is PGPMarker, is PGPPadding, is PGPTrust -> {}
+                is PGPCompressedData -> {
+                    if (st.literalSeen) throw st.malformed("compressed data after the literal data")
+                    if (depth >= SecurityLimits.MAX_DECOMPRESSION_DEPTH)
+                        throw PGPCryptoError.ResourceLimitExceeded("compression nesting exceeds depth cap")
+                    walkLevel(JcaPGPObjectFactory(obj.dataStream), st, depth + 1, noLiteral)
+                }
+                is PGPOnePassSignatureList -> {
+                    if (st.literalSeen) throw st.malformed("one-pass signature after the literal data")
+                    for (i in 0 until obj.size()) onePass(obj[i], st)
+                }
+                is PGPLiteralData -> {
+                    if (st.literalSeen) throw st.malformed("more than one literal data packet")
+                    st.literalSeen = true
+                    st.filename = LiteralFilename.sanitize(obj.fileName) // 4.6.0 (item 17.3)
+                    st.sink.begin(st.filename)
+                    val litStream = obj.inputStream
+                    val buf = ByteArray(1 shl 16)
+                    while (true) {
+                        val len = litStream.read(buf)
+                        if (len < 0) break
+                        if (len == 0) continue
+                        st.sink.write(buf, 0, len)
+                        st.verifier?.update(buf, 0, len)
+                        st.bytes += len
+                    }
+                }
+                is PGPSignatureList -> {
+                    for (i in 0 until obj.size()) {
+                        val sig = obj[i]
+                        st.signaturePackets.add(sig.encoded)
+                        st.hasSignature = true
+                        if (st.signatureKeyIDRaw == null) st.signatureKeyIDRaw = sig.keyID
+                        // Before the literal: a prefixed signature (the older
+                        // "Signature, Message" layout). It is counted as a
+                        // signature but not verified here.
+                        if (!st.literalSeen) continue
+                        if (st.open.size <= base) throw st.malformed("signature without a matching one-pass signature")
+                        val ops = st.open.removeAt(st.open.size - 1)
+                        if (ops === st.verifier) st.verifierStatus = check(ops, sig, st)
+                    }
+                }
+                is org.bouncycastle.bcpg.Packet -> {
+                    // Unknown or experimental packet types reach here raw.
+                    if (obj.packetTag < 40) throw st.malformed("unknown critical packet type ${obj.packetTag}")
+                }
+                else -> throw st.malformed("unexpected ${obj.javaClass.simpleName} in the message content")
+            }
+            obj = factory.nextObject()
+        }
+        if (!st.literalSeen) throw noLiteral()
+        if (st.open.size != base) throw st.malformed("one-pass signature without its signature")
+    }
+
+    private fun onePass(ops: PGPOnePassSignature, st: State) {
+        st.hasSignature = true
+        if (st.firstOnePassKeyID == null) st.firstOnePassKeyID = ops.keyID
+        if (st.signatureKeyIDRaw == null) st.signatureKeyIDRaw = ops.keyID
+        st.open.add(ops)
+        // 3.0.0 (5d-4): with several signers, verify the first one-pass
+        // packet whose key is held.
+        if (st.verifier == null && st.keys != null) {
+            // A v6 one-pass packet names the key by fingerprint: look it up by
+            // that, so another key with the same 64-bit ID is never chosen.
+            val opsFp = if (ops.version == 6) runCatching { ops.keyIdentifier.fingerprint }.getOrNull() else null
+            val signerPubKey = st.keys.firstNotNullOfOrNull { r ->
+                if (opsFp != null) r.getPublicKey(opsFp) else r.getPublicKey(ops.keyID)
+            } ?: return
+            ops.init(org.bouncycastle.openpgp.operator.bc.BcPGPContentVerifierBuilderProvider(), signerPubKey)
+            st.verifier = ops
+            st.verifierKey = signerPubKey
+            st.signerKeyID = String.format("%016X", ops.keyID)
+        }
+    }
+
+    /**
+     * The one-pass packet is not signed, so everything it states must match
+     * the signature that closes it: the key, the signature type (which picks
+     * the text canonicalization), the hash and public-key algorithms, and the
+     * version. Item 11 (Finding C): a passing check is then graded against the
+     * signer key's revocation, expiry and flags and the signature's own policy.
+     */
+    private fun check(ops: PGPOnePassSignature, sig: PGPSignature, st: State): SignerStatus {
+        val v6 = ops.version == 6
+        val bound = sig.keyID == ops.keyID &&
+            sig.signatureType == ops.signatureType &&
+            sig.hashAlgorithm == ops.hashAlgorithm &&
+            sig.keyAlgorithm == ops.keyAlgorithm &&
+            v6 == (sig.version == 6) &&
+            (!v6 || sig.hasKeyIdentifier(ops.keyIdentifier))
+        val valid = bound && try { ops.verify(sig) } catch (e: PGPException) { false }
+        if (!valid) return SignerStatus.INVALID
+        // Graded and identified by the exact key that verified, by fingerprint.
+        val key = st.verifierKey ?: return SignerStatus.INVALID
+        val rings = st.keys ?: emptyList()
+        val status = SignerEvaluator.evaluate(sig, key, rings)
+        // Only a certificate that validly carries the key names the signer.
+        val validRing = SignerEvaluator.signerRing(key, rings)
+        val ring = validRing ?: rings.firstOrNull { it.getPublicKey(key.fingerprint) != null }
+        st.signingKeyFingerprint = org.bouncycastle.util.encoders.Hex.toHexString(key.fingerprint).uppercase()
+        st.signerPrimaryFingerprint = validRing?.let {
+            org.bouncycastle.util.encoders.Hex.toHexString(it.publicKey.fingerprint).uppercase()
+        }
+        if (status == SignerStatus.VERIFIED) {
+            st.signerWeakKey = KeyPolicy.weakLabel(key, ring?.publicKey)
+        }
+        return status
     }
 }

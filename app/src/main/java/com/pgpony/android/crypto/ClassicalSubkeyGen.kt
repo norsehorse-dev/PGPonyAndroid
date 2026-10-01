@@ -47,7 +47,6 @@ import org.bouncycastle.openpgp.PGPKeyPair
 import org.bouncycastle.openpgp.PGPKeyRingGenerator
 import org.bouncycastle.openpgp.PGPSecretKeyRing
 import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator
-import org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyDecryptorBuilder
 import org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyEncryptorBuilder
 import org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder
 import org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider
@@ -126,8 +125,7 @@ object ClassicalSubkeyGen {
     ): PGPSecretKeyRing {
         val primarySec = secretRing.secretKey
 
-        val decryptor = BcPBESecretKeyDecryptorBuilder(BcPGPDigestCalculatorProvider())
-            .build((passphrase ?: "").toCharArray())
+        val decryptor = com.pgpony.android.crypto.SecretKeyUnlock.decryptor(passphrase)
         val checksumCalc = BcPGPDigestCalculatorProvider().get(HashAlgorithmTags.SHA1)
         val certSigGen = BcPGPContentSignerBuilder(primarySec.publicKey.algorithm, HashAlgorithmTags.SHA256)
         val encryptor = passphrase?.takeIf { it.isNotEmpty() }?.let {

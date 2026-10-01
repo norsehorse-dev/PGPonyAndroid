@@ -62,8 +62,13 @@ object PairCrypto {
     fun commit(nonceHost: ByteArray, pkHost: ByteArray, pkJoiner: ByteArray): ByteArray =
         hmac(nonceHost, LABEL_COMMIT, pkHost, pkJoiner)
 
-    fun transcript(pkJ: ByteArray, pkH: ByteArray, nJ: ByteArray, nH: ByteArray): ByteArray =
-        sha256(LABEL_TRANSCRIPT, pkJ, pkH, nJ, nH)
+    /**
+     * T binds the phase 1 magic and the protocol version the joiner sent and the host accepted,
+     * so two sides that ran different versions (or were steered into one) never share a code.
+     */
+    fun transcript(
+        pkJ: ByteArray, pkH: ByteArray, nJ: ByteArray, nH: ByteArray, version: Byte = PairProtocol.VERSION
+    ): ByteArray = sha256(LABEL_TRANSCRIPT, PairProtocol.MAGIC, byteArrayOf(version), pkJ, pkH, nJ, nH)
 
     /** The three session keys (RFC 5869 HKDF-SHA256, one 32-byte block each). */
     class Keys(val pairKey: ByteArray, val hostToJoiner: ByteArray, val joinerToHost: ByteArray) {

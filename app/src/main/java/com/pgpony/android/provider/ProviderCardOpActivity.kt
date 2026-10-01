@@ -387,7 +387,11 @@ class ProviderCardOpActivity : ComponentActivity() {
                     signatureVerified = result.signatureVerified,
                     signerKeyIdRaw = result.signerKeyID?.let {
                         runCatching { java.lang.Long.parseUnsignedLong(it, 16) }.getOrNull()
-                    }
+                    },
+                    signerStatus = result.signerStatus,
+                    signatureKeyIDRaw = result.signatureKeyIDRaw,
+                    signingKeyFingerprint = result.signingKeyFingerprint,
+                    signerPrimaryFingerprint = result.signerPrimaryFingerprint
                 )
             }
 

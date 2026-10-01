@@ -43,8 +43,6 @@ import org.bouncycastle.openpgp.PGPPublicKeyRing
 import org.bouncycastle.openpgp.PGPSecretKey
 import org.bouncycastle.openpgp.PGPSecretKeyRing
 import org.bouncycastle.openpgp.operator.bc.BcAEADSecretKeyEncryptorBuilder
-import org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyDecryptorBuilder
-import org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider
 import org.bouncycastle.openpgp.operator.bc.BcPGPKeyConverter
 import org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator
 import org.bouncycastle.pqc.crypto.mldsa.MLDSAPrivateKeyParameters
@@ -165,8 +163,7 @@ object CompositeSignSubkeyGen {
         //    carrying the back-signature as an Embedded Signature subpacket.
         val primaryPriv = try {
             secretRing.secretKey.extractPrivateKey(
-                BcPBESecretKeyDecryptorBuilder(BcPGPDigestCalculatorProvider())
-                    .build((passphrase ?: "").toCharArray())
+                com.pgpony.android.crypto.SecretKeyUnlock.decryptor(passphrase)
             )
         } catch (e: PGPException) {
             throw ClassicalSubkeyGen.SubkeyAddError(

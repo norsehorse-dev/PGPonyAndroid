@@ -18,6 +18,8 @@ import com.pgpony.android.crypto.GranularSubkeySpec
 import com.pgpony.android.crypto.V6SubkeyGen
 import com.pgpony.android.crypto.RevocationError
 import com.pgpony.android.crypto.RevocationService
+import com.pgpony.android.crypto.SecretKeyCheck
+import com.pgpony.android.crypto.SecretKeyUnlock
 import com.pgpony.android.crypto.UserIdService
 import com.pgpony.android.crypto.card.CardInfo
 import com.pgpony.android.crypto.pqc.CompositePrimaryKeyGen
@@ -37,6 +39,38 @@ sealed class KeyRepoError(message: String) : Exception(message) {
     class InvalidSubkey(msg: String) : KeyRepoError(msg)
     /** item 16 (#54): the op would leave the key with no usable encryption subkey; the UI confirms, then retries with allowLastEncryptionSubkey. */
     class LastEncryptionSubkey(fp: String) : KeyRepoError("Subkey $fp is the last usable encryption subkey on this key")
+    /**
+     * KEYSTORE-4: a private key arrived for a contact already in the keyring,
+     * and SecretKeyCheck could not prove it is that contact's secret, so
+     * nothing was imported. [match] says why; NEEDS_PASSPHRASE means the
+     * caller may retry with the key's passphrase
+     * (importArmoredKeyDetailed(text, fromAutocrypt, secretPassphrase)).
+     */
+    class SecretNotProven(val fingerprint: String, val match: SecretKeyCheck.SecretMatch) :
+        KeyRepoError(secretNotProvenMessage(fingerprint, match))
+}
+
+/** English text for [KeyRepoError.SecretNotProven], one sentence per reason. */
+private fun secretNotProvenMessage(fp: String, match: SecretKeyCheck.SecretMatch): String {
+    val short = fp.takeLast(8).uppercase()
+    val why = when (match) {
+        SecretKeyCheck.SecretMatch.NEEDS_PASSPHRASE ->
+            "The private key for $short is protected by a passphrase, and PGPony has to unlock it to confirm it belongs to the contact you already have."
+        SecretKeyCheck.SecretMatch.WRONG_PASSPHRASE ->
+            "The passphrase did not unlock the private key for $short."
+        SecretKeyCheck.SecretMatch.PUBLIC_MISMATCH ->
+            "The private key does not belong to the contact $short you already have."
+        SecretKeyCheck.SecretMatch.MATERIAL_MISMATCH ->
+            "The private key material does not match the contact $short you already have."
+        SecretKeyCheck.SecretMatch.NO_SECRET ->
+            "The key for $short carries no usable private key material (only placeholders for an offline or hardware key)."
+        SecretKeyCheck.SecretMatch.UNPROVEN ->
+            "PGPony could not test that the private key belongs to the contact $short you already have."
+        SecretKeyCheck.SecretMatch.UNREADABLE ->
+            "The private key for $short could not be read."
+        SecretKeyCheck.SecretMatch.OK -> "The private key for $short was confirmed."
+    }
+    return "$why The existing contact was left unchanged and nothing was imported."
 }
 
 data class StoredKey(
@@ -462,6 +496,49 @@ class KeyRepository(
     // importArmoredKeyDetailed try this path first and fall through to the
     // BouncyCastle path for every classical key.
 
+    /**
+     * KEYSTORE-4: how a private-key upgrade of an existing public-only row is
+     * proven. [passphrase] unlocks a protected secret; [sameImport] holds the
+     * normalized fingerprints of rows this same import call created a moment
+     * ago (a file holding a public ring and then its secret ring, as an
+     * OpenKeychain backup does), which were never a contact the user held.
+     */
+    private class SecretUpgrade(
+        val passphrase: CharArray? = null,
+        val sameImport: Set<String> = emptySet()
+    )
+
+    /**
+     * KEYSTORE-4: refuse to turn the public-only row [existing] into a key
+     * pair unless [secretBytes] provably holds that row's secret
+     * (SecretKeyCheck.checkSecretForPublic against the stored public key).
+     * Throws [KeyRepoError.SecretNotProven] and leaves everything unchanged
+     * otherwise. A row created earlier in the same import call is not a
+     * held contact and is not checked. The proof (unlock, sign, decrypt)
+     * runs on Dispatchers.Default, since import is called from the main
+     * thread.
+     *
+     * A passphrase-protected secret whose primary matches the stored key and
+     * whose packets all read (NEEDS_PASSPHRASE) is accepted without a
+     * passphrase: refusing it would stop people importing their own
+     * protected key onto a phone that already holds it as a contact, and
+     * there is no import-time passphrase prompt yet. Its material is proved
+     * at the first unlock. Junk, mismatched or unprotected-but-wrong secrets
+     * are still refused.
+     */
+    private suspend fun requireSecretMatchesStored(existing: PGPKeyEntity, secretBytes: ByteArray, upgrade: SecretUpgrade) {
+        if (KeyDeduplicationService.normalize(existing.fingerprint) in upgrade.sameImport) return
+        val storedPublic = store.loadPublicKey(existing.fingerprint)
+            ?: existing.armoredPublicKey?.toByteArray(Charsets.UTF_8)
+            ?: throw KeyRepoError.SecretNotProven(existing.fingerprint, SecretKeyCheck.SecretMatch.UNREADABLE)
+        val match = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            SecretKeyCheck.checkSecretForPublic(secretBytes, storedPublic, upgrade.passphrase)
+        }
+        if (match == SecretKeyCheck.SecretMatch.OK) return
+        if (match == SecretKeyCheck.SecretMatch.NEEDS_PASSPHRASE && upgrade.passphrase == null) return
+        throw KeyRepoError.SecretNotProven(existing.fingerprint, match)
+    }
+
     private fun compositeFromArmored(armoredText: String): Pair<ByteArray, CompositeKeyFacade.Info>? =
         try {
             // 4.6.0 (item 17.1): only components the primary verifiably bound.
@@ -500,7 +577,8 @@ class KeyRepository(
     private suspend fun importCompositeKey(
         bytes: ByteArray,
         info: CompositeKeyFacade.Info,
-        @Suppress("UNUSED_PARAMETER") armoredText: String
+        @Suppress("UNUSED_PARAMETER") armoredText: String,
+        upgrade: SecretUpgrade = SecretUpgrade()
     ): ImportOutcome {
         val fpHex = info.fingerprintHex.uppercase()
         val hasPrivate = CompositeKeyFacade.hasSecret(bytes)
@@ -513,6 +591,8 @@ class KeyRepository(
         val existing = dedup.findExisting(fpHex)
         if (existing != null) {
             if (hasPrivate && !existing.isKeyPair) {
+                // KEYSTORE-4: only a secret that provably matches the held contact.
+                requireSecretMatchesStored(existing, bytes, upgrade)
                 store.storePublicKey(fpHex, publicRing)
                 store.storePrivateKey(fpHex, bytes)
                 val upgraded = existing.copy(isKeyPair = true)
@@ -611,7 +691,7 @@ class KeyRepository(
         )
     }
 
-    private suspend fun importV4Algo35Key(bytes: ByteArray): ImportOutcome {
+    private suspend fun importV4Algo35Key(bytes: ByteArray, upgrade: SecretUpgrade = SecretUpgrade()): ImportOutcome {
         val meta = v4Algo35Meta(bytes)
             ?: throw KeyRepoError.StorageFailed("v4 algo-35 key metadata could not be read")
         val fpHex = meta.fingerprintHex
@@ -625,6 +705,8 @@ class KeyRepository(
         val existing = dedup.findExisting(fpHex)
         if (existing != null) {
             if (hasPrivate && !existing.isKeyPair) {
+                // KEYSTORE-4: only a secret that provably matches the held contact.
+                requireSecretMatchesStored(existing, bytes, upgrade)
                 store.storePublicKey(fpHex, publicRing)
                 store.storePrivateKey(fpHex, bytes)
                 val upgraded = existing.copy(isKeyPair = true)
@@ -727,8 +809,29 @@ class KeyRepository(
      * of a key that exists as Autocrypt-origin promotes it to user-managed,
      * because the user has now brought the key in themselves.
      */
-    suspend fun importArmoredKeyDetailed(armoredText: String, fromAutocrypt: Boolean): ImportOutcome {
-        val outcome = importArmoredKeyDetailedInner(armoredText)
+    suspend fun importArmoredKeyDetailed(armoredText: String, fromAutocrypt: Boolean): ImportOutcome =
+        importDetailedWith(armoredText, fromAutocrypt, SecretUpgrade())
+
+    /**
+     * KEYSTORE-4: as above, with the passphrase of the private key in
+     * [armoredText]. Used to retry after [KeyRepoError.SecretNotProven] with
+     * NEEDS_PASSPHRASE, when a protected private key arrives for a contact
+     * already in the keyring: the passphrase lets SecretKeyCheck prove the
+     * secret belongs to that contact before the row becomes a key pair. The
+     * caller owns [secretPassphrase] and may clear it afterwards.
+     */
+    suspend fun importArmoredKeyDetailed(
+        armoredText: String,
+        fromAutocrypt: Boolean,
+        secretPassphrase: CharArray?
+    ): ImportOutcome = importDetailedWith(armoredText, fromAutocrypt, SecretUpgrade(passphrase = secretPassphrase))
+
+    private suspend fun importDetailedWith(
+        armoredText: String,
+        fromAutocrypt: Boolean,
+        upgrade: SecretUpgrade
+    ): ImportOutcome {
+        val outcome = importArmoredKeyDetailedInner(armoredText, upgrade)
         val e = outcome.entity
         val marked = when {
             fromAutocrypt && outcome.resolution == ImportResolution.INSERTED ->
@@ -740,11 +843,11 @@ class KeyRepository(
         return outcome.copy(entity = marked)
     }
 
-    private suspend fun importArmoredKeyDetailedInner(armoredText: String): ImportOutcome {
+    private suspend fun importArmoredKeyDetailedInner(armoredText: String, upgrade: SecretUpgrade): ImportOutcome {
         compositeFromArmored(armoredText)?.let { (bytes, info) ->
-            return importCompositeKey(bytes, info, armoredText)
+            return importCompositeKey(bytes, info, armoredText, upgrade)
         }
-        v4Algo35FromArmored(armoredText)?.let { return importV4Algo35Key(it) }
+        v4Algo35FromArmored(armoredText)?.let { return importV4Algo35Key(it, upgrade) }
         val importResult = crypto.importArmoredKey(armoredText)
 
         // Check for duplicate — normalized fingerprint identity via
@@ -789,9 +892,13 @@ class KeyRepository(
                 dao.update(merged)
                 return ImportOutcome(merged, ImportResolution.PAIRED_WITH_CARD)
             }
-            // If we're importing a private key for an existing public key, upgrade it
+            // If we're importing a private key for an existing public key, upgrade it,
+            // but only once KEYSTORE-4's check proves the secret is that key's.
             if (importResult.hasPrivateKey && !existing.isKeyPair) {
-                store.storePrivateKey(importResult.fingerprint, importResult.secretKeyRing!!.encoded)
+                val secretBytes = importResult.secretKeyRing?.encoded
+                    ?: throw KeyRepoError.SecretNotProven(existing.fingerprint, SecretKeyCheck.SecretMatch.UNREADABLE)
+                requireSecretMatchesStored(existing, secretBytes, upgrade)
+                store.storePrivateKey(importResult.fingerprint, secretBytes)
                 val upgraded = existing.copy(isKeyPair = true)
                 dao.update(upgraded)
                 return ImportOutcome(upgraded, ImportResolution.UPGRADED_TO_KEY_PAIR)
@@ -893,8 +1000,19 @@ class KeyRepository(
     suspend fun importAllArmoredKeysDetailed(armoredText: String): List<ImportOutcome> {
         val perRing = explodePerRing(armoredText)
         val outcomes = ArrayList<ImportOutcome>(perRing.size)
+        // KEYSTORE-4: a row this call inserts from one ring may take its
+        // secret from a later ring of the same file without a proof (it was
+        // never a contact the user held); every other upgrade is checked.
+        val insertedHere = HashSet<String>()
         for (ring in perRing) {
-            runCatching { importArmoredKeyDetailed(ring) }.getOrNull()?.let { outcomes.add(it) }
+            runCatching {
+                importDetailedWith(ring, false, SecretUpgrade(sameImport = insertedHere))
+            }.getOrNull()?.let {
+                outcomes.add(it)
+                if (it.resolution == ImportResolution.INSERTED) {
+                    insertedHere.add(KeyDeduplicationService.normalize(it.entity.fingerprint))
+                }
+            }
         }
         return outcomes
     }
@@ -1262,6 +1380,16 @@ class KeyRepository(
         // a locked key with no passphrase yields Info with a null compositeSecret.
         return CompositeKeyFacade.parse(data, passphrase)
     }
+
+    /**
+     * A2 (ENGINE-4): every composite signing certificate in the keyring with
+     * its row, as the raw bytes stored, for CompositeSignerGate. The gate's
+     * certIndex points into this list.
+     */
+    suspend fun loadCompositeSignerCerts(): List<Pair<PGPKeyEntity, ByteArray>> =
+        getAllKeys()
+            .filter { it.algorithm.isCompositeSign }
+            .mapNotNull { e -> store.loadPublicKey(e.fingerprint)?.let { e to it } }
 
     /** Composite key metadata + public material from the stored PUBLIC ring. */
     fun loadCompositePublicInfo(fingerprint: String): CompositeKeyFacade.Info? {
@@ -2097,17 +2225,17 @@ class KeyRepository(
     }
 
     /** 4.6.0 (item 19 follow-up): the primary's private key for a hand-built
-     *  v4 ML-KEM signature, or the same passphrase errors the caller's flow uses. */
+     *  v4 ML-KEM signature, or the same passphrase errors the caller's flow uses.
+     *  The unlock goes through SecretKeyUnlock, so an Argon2 S2K outside the
+     *  policy is refused (PGPCryptoError.ResourceLimitExceeded) before any
+     *  key derivation runs. */
     private fun unlockPrimary(
         secRing: PGPSecretKeyRing,
         passphrase: String?,
         onFailure: (Boolean) -> Exception
     ): org.bouncycastle.openpgp.PGPPrivateKey = try {
-        secRing.secretKey.extractPrivateKey(
-            org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyDecryptorBuilder(
-                org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider()
-            ).build((passphrase ?: "").toCharArray())
-        )
+        SecretKeyUnlock.extract(secRing.secretKey, (passphrase ?: "").toCharArray())
+            ?: throw onFailure(passphrase.isNullOrEmpty())
     } catch (e: org.bouncycastle.openpgp.PGPException) {
         throw onFailure(passphrase.isNullOrEmpty())
     }

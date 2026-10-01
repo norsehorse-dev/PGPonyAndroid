@@ -47,7 +47,6 @@ import org.bouncycastle.openpgp.PGPSignature
 import org.bouncycastle.openpgp.PGPSignatureGenerator
 import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator
 import org.bouncycastle.openpgp.operator.bc.BcAEADSecretKeyEncryptorBuilder
-import org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyDecryptorBuilder
 import org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyEncryptorBuilder
 import org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder
 import org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider
@@ -157,8 +156,7 @@ object CompositeKeyGen {
         // 4. Binding signature from the primary.
         val primarySec = secretRing.secretKey
         val primaryPriv = primarySec.extractPrivateKey(
-            BcPBESecretKeyDecryptorBuilder(BcPGPDigestCalculatorProvider())
-                .build((passphrase ?: "").toCharArray())
+            com.pgpony.android.crypto.SecretKeyUnlock.decryptor(passphrase)
         )
         val bindingSigPacket: ByteArray = if (suite.isLibrePgp) {
             // Hand-rolled v4 subkey-binding signature. BC's generateCertification
@@ -275,8 +273,7 @@ object CompositeKeyGen {
         val primarySec = baseSecretRing.secretKey
         val primaryPub = baseSecretRing.publicKey
         val primaryPriv = primarySec.extractPrivateKey(
-            BcPBESecretKeyDecryptorBuilder(BcPGPDigestCalculatorProvider())
-                .build((passphrase ?: "").toCharArray())
+            com.pgpony.android.crypto.SecretKeyUnlock.decryptor(passphrase)
         )
         val bindingSig = buildV4Algo35SubkeyBindingSig(
             primaryPriv, packetBody(primaryPub.encoded), pubBody, ctime,

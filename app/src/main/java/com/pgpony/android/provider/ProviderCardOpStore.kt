@@ -69,7 +69,15 @@ object ProviderCardOpStore {
             val hadSignature: Boolean,
             val signerKnown: Boolean,
             val signatureVerified: Boolean,
-            val signerKeyIdRaw: Long?
+            val signerKeyIdRaw: Long?,
+            /** The card walker's signer grade (CardDecryptResult.signerStatus). */
+            val signerStatus: com.pgpony.android.crypto.SignerStatus = com.pgpony.android.crypto.SignerStatus.NONE,
+            /** Raw key id from the signature packets, held or not. */
+            val signatureKeyIDRaw: Long? = null,
+            /** Fingerprint of the exact key the signature verified under. */
+            val signingKeyFingerprint: String? = null,
+            /** Primary fingerprint of the certificate validly holding that key. */
+            val signerPrimaryFingerprint: String? = null
         ) : CompletedOp()
     }
 

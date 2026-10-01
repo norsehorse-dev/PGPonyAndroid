@@ -2534,6 +2534,17 @@
     <string name="err_signer_key_not_certified_by_key">İmzalayan anahtar, ait olduğunu iddia ettiği anahtar tarafından onaylanmamış</string>
     <string name="err_signer_key_not_keyring">İmzalayan anahtar anahtarlığınızda yok</string>
     <string name="err_signer_key_was_expired_when_signed">İmzalayan anahtarın süresi imzalama anında dolmuştu</string>
+    <string name="err_signature_has_expired">İmzanın süresi doldu</string>
+    <string name="err_signature_predates_key">İmza, onu oluşturan anahtardan daha eski bir tarih taşıyor</string>
+    <string name="err_signer_key_not_valid_when_signed">İmzalayan anahtar imzalama anında geçerli değildi</string>
+    <string name="err_signer_key_too_weak">İmzalayan anahtar güvenilemeyecek kadar zayıf (2048 bitten küçük RSA veya DSA)</string>
+    <string name="err_secret_needs_passphrase_contact">%1$s için özel anahtar bir parola ifadesiyle korunuyor ve PGPony\'nin zaten sahip olduğunuz kişiye ait olduğunu doğrulamak için kilidini açması gerekiyor. Mevcut kişi değiştirilmedi ve hiçbir şey içe aktarılmadı.</string>
+    <string name="err_secret_wrong_passphrase_contact">Parola ifadesi %1$s için özel anahtarın kilidini açmadı. Mevcut kişi değiştirilmedi ve hiçbir şey içe aktarılmadı.</string>
+    <string name="err_secret_not_this_contact">Özel anahtar, zaten sahip olduğunuz %1$s kişisine ait değil. Mevcut kişi değiştirilmedi ve hiçbir şey içe aktarılmadı.</string>
+    <string name="err_secret_material_mismatch_contact">Özel anahtar materyali, zaten sahip olduğunuz %1$s kişisiyle eşleşmiyor. Mevcut kişi değiştirilmedi ve hiçbir şey içe aktarılmadı.</string>
+    <string name="err_secret_no_material_contact">%1$s anahtarı kullanılabilir özel anahtar materyali içermiyor (yalnızca çevrimdışı veya donanım anahtarı için yer tutucular). Mevcut kişi değiştirilmedi ve hiçbir şey içe aktarılmadı.</string>
+    <string name="err_secret_unproven_contact">PGPony, özel anahtarın zaten sahip olduğunuz %1$s kişisine ait olduğunu test edemedi. Mevcut kişi değiştirilmedi ve hiçbir şey içe aktarılmadı.</string>
+    <string name="err_secret_unreadable_contact">%1$s için özel anahtar okunamadı. Mevcut kişi değiştirilmedi ve hiçbir şey içe aktarılmadı.</string>
     <string name="err_signing_failed">İmzalama başarısız oldu</string>
     <string name="err_signing_failed_2">İmzalama başarısız oldu: %1$s</string>
     <string name="err_signing_key_has_expired_enable_allow">İmzalama anahtarının süresi doldu. Bu anahtarla imzalamak için PGPony ayarlarında \"Süresi dolmuş anahtarlara izin ver\" seçeneğini açın.</string>

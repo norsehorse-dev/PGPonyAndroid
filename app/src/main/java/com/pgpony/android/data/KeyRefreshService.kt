@@ -23,9 +23,11 @@
 //      and card backing. Keyservers only ever return public material,
 //      and the merge path never writes secrets — so refreshing a
 //      card-backed or software key pair is safe by construction.
-//   4. Scan the fetched primary for a key-revocation signature
-//      (tag 2, type 0x20) and apply isRevoked / revokedAt /
-//      revocationReason when the upstream copy is revoked.
+//   4. Ask CertificateBindings.verifiedKeyRevocation for a key
+//      revocation (type 0x20) that the primary itself made, that
+//      verifies and that is in effect now, and apply isRevoked /
+//      revokedAt / revocationReason from that revocation only. An
+//      unverified or foreign 0x20 in the fetched copy changes nothing.
 //   5. Stamp lastCheckedAt on the attempt.
 //
 // iOS → Android divergences, all deliberate:
@@ -33,19 +35,17 @@
 //     failure (iOS skips the stamp on generic errors). Android's KS1
 //     check-only path already stamps on error ("Still record the
 //     attempt"), so the refresh follows the platform's own precedent.
-//   • Fingerprint computation and the revocation scan use BouncyCastle
-//     ring APIs directly (PGPCryptoService.importArmoredKey /
-//     getSignaturesOfType) instead of iOS's dual ObjectivePGP + native
-//     packet walk — BC reads every key shape PGPony supports.
+//   • Fingerprint computation uses BouncyCastle ring APIs directly
+//     (PGPCryptoService.importArmoredKey) and the revocation check uses
+//     the engine's verified certificate report instead of iOS's dual
+//     ObjectivePGP + native packet walk.
 
 package com.pgpony.android.data
 
+import com.pgpony.android.crypto.CertificateBindings
 import com.pgpony.android.crypto.PGPCryptoService
 import com.pgpony.android.data.repository.KeyRepository
 import com.pgpony.android.network.KeyServerRepository
-import org.bouncycastle.bcpg.SignatureSubpacketTags
-import org.bouncycastle.openpgp.PGPPublicKeyRing
-import org.bouncycastle.openpgp.PGPSignature
 
 /**
  * Outcome of one refresh attempt. Ordered here roughly by how the UI
@@ -162,20 +162,23 @@ class KeyRefreshService(
             fetchedExpiresAtMs = fetchedExpiresAtMs
         )
 
-        // 4. Revocation scan on the fetched primary. Only applied when
-        //    the row isn't already flagged — a locally revoked key stays
-        //    revoked regardless of what the keyserver says.
+        // 4. Revocation check on the fetched certificate. Only applied
+        //    when the row isn't already flagged; a locally revoked key
+        //    stays revoked regardless of what the keyserver says. Only a
+        //    revocation the primary made, that verifies and that is in
+        //    effect counts (CertificateBindings.verifiedKeyRevocation);
+        //    its own creation time and reason code are recorded.
         var result: PGPKeyEntity = merged
         var revocationApplied = false
         if (!merged.isRevoked) {
-            val revSig = findKeyRevocationSignature(fetchedRing)
-            if (revSig != null) {
-                val reason = revocationReasonCode(revSig)?.let { code ->
+            val rev = CertificateBindings.verifiedKeyRevocation(fetchedRing)
+            if (rev != null) {
+                val reason = rev.reason?.let { code ->
                     RevocationReason.entries.firstOrNull { it.rfcCode == code }
                 }
                 repo.markRevokedFromUpstream(
                     fingerprint = merged.fingerprint,
-                    revokedAtMs = revSig.creationTime?.time ?: System.currentTimeMillis(),
+                    revokedAtMs = if (rev.createdMs > 0L) rev.createdMs else System.currentTimeMillis(),
                     reason = reason
                 )?.let {
                     result = it
@@ -198,38 +201,4 @@ class KeyRefreshService(
     /** Re-read the row so the caller gets post-stamp state. */
     private suspend fun reload(entity: PGPKeyEntity): PGPKeyEntity =
         repo.getByFingerprint(entity.fingerprint) ?: entity
-
-    /**
-     * The first key-revocation signature (tag 2, type 0x20) on the
-     * fetched ring's primary key, or null when the upstream copy isn't
-     * revoked. BC's getSignaturesOfType does the packet filtering iOS's
-     * native walk performs by hand.
-     */
-    private fun findKeyRevocationSignature(ring: PGPPublicKeyRing): PGPSignature? {
-        // 4.6.0 (item 17.1): only a revocation the primary itself made, and
-        // that verifies, counts. The verified view drops every other 0x20.
-        val view = com.pgpony.android.crypto.CertificateBindings.verified(ring)
-        val report = view.report
-        if (report != null && report.supported && !report.primaryRevoked) return null
-        val primary = view.ring.publicKey ?: return null
-        val sigs = primary.getSignaturesOfType(PGPSignature.KEY_REVOCATION) ?: return null
-        while (sigs.hasNext()) {
-            (sigs.next() as? PGPSignature)?.let { return it }
-        }
-        return null
-    }
-
-    /**
-     * RFC 4880 §5.2.3.23 Reason for Revocation code off the signature's
-     * subpackets (hashed preferred, unhashed fallback — same order iOS
-     * scans), or null when the signer didn't include one.
-     */
-    private fun revocationReasonCode(sig: PGPSignature): Int? {
-        val packet = sig.hashedSubPackets
-            ?.getSubpacket(SignatureSubpacketTags.REVOCATION_REASON)
-            ?: sig.unhashedSubPackets
-                ?.getSubpacket(SignatureSubpacketTags.REVOCATION_REASON)
-        return (packet as? org.bouncycastle.bcpg.sig.RevocationReason)
-            ?.revocationReason?.toInt()
-    }
 }

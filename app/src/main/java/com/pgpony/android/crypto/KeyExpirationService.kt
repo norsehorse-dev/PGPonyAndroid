@@ -46,9 +46,7 @@ import org.bouncycastle.openpgp.PGPSignature
 import org.bouncycastle.openpgp.PGPSignatureGenerator
 import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator
 import org.bouncycastle.openpgp.PGPSignatureSubpacketVector
-import org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyDecryptorBuilder
 import org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder
-import org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider
 
 class KeyExpirationService private constructor() {
 
@@ -299,9 +297,10 @@ class KeyExpirationService private constructor() {
         primarySecret: org.bouncycastle.openpgp.PGPSecretKey,
         passphrase: String?
     ): PGPPrivateKey {
+        // An Argon2 S2K outside the policy is refused before any KDF runs.
+        enforceArgon2Policy(primarySecret.s2K)
         return try {
-            val decryptor = BcPBESecretKeyDecryptorBuilder(BcPGPDigestCalculatorProvider())
-                .build((passphrase ?: "").toCharArray())
+            val decryptor = com.pgpony.android.crypto.SecretKeyUnlock.decryptor(passphrase)
             primarySecret.extractPrivateKey(decryptor)
         } catch (e: PGPException) {
             if (passphrase.isNullOrEmpty()) throw ExpirationError.PassphraseRequired()

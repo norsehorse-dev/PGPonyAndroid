@@ -45,6 +45,10 @@ import android.os.ParcelFileDescriptor
 import com.pgpony.android.PGPonyApp
 import com.pgpony.android.crypto.PGPCryptoError
 import com.pgpony.android.crypto.PGPCryptoService
+import com.pgpony.android.crypto.SignerEvaluator
+import com.pgpony.android.crypto.SignerStatus
+import com.pgpony.android.crypto.pqc.CompositeSignerGate
+import com.pgpony.android.data.KeyDeduplicationService
 import com.pgpony.android.crypto.SigningError
 import com.pgpony.android.crypto.SigningService
 import com.pgpony.android.crypto.VerificationResult
@@ -1187,7 +1191,9 @@ class PGPonyOpenPgpService : Service() {
 
         // ── Shape 2: clear-signed text ──────────────────────────────────
         val asText = inputBytes.toString(Charsets.UTF_8)
-        if (asText.contains("-----BEGIN PGP SIGNED MESSAGE-----")) {
+        // A1 (ENGINE-1): routed by the first armor line, not by a substring
+        // anywhere in the input (an armor header value could carry it).
+        if (com.pgpony.android.intent.ClearSignedInput.isClearSigned(asText)) {
             val verification = verifier.verifyClearSigned(asText, publicRings)
             val content = when (verification) {
                 is VerificationResult.Verified -> verification.signedContent
@@ -1404,7 +1410,7 @@ class PGPonyOpenPgpService : Service() {
     }
 
     /**
-     * P2d — signature mapping for a streamed decrypt. Same rules as
+     * P2d: signature mapping for a streamed decrypt. Same rules as
      * signatureResultFromDecrypt but reads DecryptStreamResult's fields.
      */
     private fun signatureResultFromDecryptStream(
@@ -1412,51 +1418,128 @@ class PGPonyOpenPgpService : Service() {
         allEntities: List<com.pgpony.android.data.PGPKeyEntity>,
         senderAddress: String?
     ): OpenPgpSignatureResult {
-        if (!result.hasSignature) {
+        // #30/#31: an inline COMPOSITE (ML-DSA + EdDSA) signature that
+        // BouncyCastle cannot parse. decryptStream extracted the payload;
+        // A2 (ENGINE-4) grades it with CompositeSignerGate against the stored
+        // composite certificates, as EncryptDecryptViewModel does.
+        val inline = result.compositeInlineBytes
+        if (result.compositeInline && inline != null) {
+            return compositeInlineSignatureResult(inline, result.compositeClaimedSignerFp, senderAddress)
+        }
+        if (!result.hasSignature && result.signerStatus == SignerStatus.NONE) {
             return OpenPgpSignatureResult.createWithNoSignature()
         }
-        // #30/#31: an inline COMPOSITE (ML-DSA + EdDSA) signature that
-        // BouncyCastle cannot parse. decryptStream extracted the payload and
-        // the claimed signer fingerprint; verify it against the stored composite
-        // public key here, mirroring EncryptDecryptViewModel's composite path.
-        // Without this the composite signerKeyID is null and the message would
-        // be reported unsigned even though it carries a valid signature.
-        if (result.compositeInline && result.compositeInlineBytes != null) {
-            val claimedFp = result.compositeClaimedSignerFp
-            val match = runBlocking {
-                repo.getAllKeys()
-                    .filter { it.algorithm.isCompositeSign }
-                    .mapNotNull { e -> repo.loadCompositePublicInfo(e.fingerprint)?.let { e to it } }
-                    .firstNotNullOfOrNull { (e, info) ->
-                        info.compositeSigners
-                            .firstOrNull { c -> c.fingerprintHex.equals(claimedFp, ignoreCase = true) }
-                            ?.let { e to it }
-                    }
-            } ?: return OpenPgpSignatureResult.createWithKeyMissing(0L, null)
-            val (entity, component) = match
-            val ok = com.pgpony.android.crypto.pqc.CompositeDocumentVerifier
-                .verifyInline(component.publicMaterial, result.compositeInlineBytes).valid
-            if (!ok) return OpenPgpSignatureResult.createWithInvalidSignature()
-            val compKeyIdRaw = runCatching {
-                java.lang.Long.parseUnsignedLong(claimedFp!!.take(16), 16)
-            }.getOrDefault(0L)
-            return buildValidSignatureResult(entity, compKeyIdRaw, senderAddress)
+        return gradedSignatureResult(
+            status = result.signerStatus,
+            verifierKeyId = parseKeyId(result.signerKeyID),
+            rawKeyId = result.signatureKeyIDRaw,
+            owner = ownerByFingerprint(result.signerPrimaryFingerprint, result.signingKeyFingerprint, allEntities),
+            senderAddress = senderAddress
+        )
+    }
+
+    /** A 16 hex digit key ID as a Long, or null. */
+    private fun parseKeyId(hex: String?): Long? =
+        hex?.let { runCatching { java.lang.Long.parseUnsignedLong(it, 16) }.getOrNull() }
+
+    /**
+     * A2 (GAP-3, LOCAL-IPC-1): the keyring row that owns a verified
+     * signature, found by the primary fingerprint the engine reports for the
+     * certificate that validly carries the verifying key, or (when only the
+     * signing key's fingerprint is known) by the ring that validly binds
+     * exactly that key. Never by the 64-bit key ID, which another certificate
+     * can share.
+     */
+    private fun ownerByFingerprint(
+        signerPrimaryFingerprint: String?,
+        signingKeyFingerprint: String?,
+        allEntities: List<com.pgpony.android.data.PGPKeyEntity>
+    ): com.pgpony.android.data.PGPKeyEntity? {
+        val primary = signerPrimaryFingerprint ?: signingKeyFingerprint?.let { fp ->
+            val rings = allEntities.mapNotNull { e ->
+                runCatching { repo.loadPublicKeyRing(e.fingerprint) }.getOrNull()
+            }
+            val key = rings.firstNotNullOfOrNull { ring ->
+                ring.publicKeys.asSequence().firstOrNull { k ->
+                    org.bouncycastle.util.encoders.Hex.toHexString(k.fingerprint).equals(fp, ignoreCase = true)
+                }
+            }
+            key?.let { SignerEvaluator.signerRing(it, rings) }
+                ?.let { org.bouncycastle.util.encoders.Hex.toHexString(it.publicKey.fingerprint) }
+        } ?: return null
+        val target = KeyDeduplicationService.normalize(primary)
+        return allEntities.firstOrNull { KeyDeduplicationService.normalize(it.fingerprint) == target }
+    }
+
+    /**
+     * The OpenPGP API result for a graded signature (software, streamed,
+     * card or composite). Every SignerStatus is handled: VERIFIED is valid
+     * (confirmed or not by the owner's trust); a revoked or expired signer
+     * key is reported as such when its owner is known; a signature with no
+     * held signer is KEY_MISSING; everything else (a failed check, an
+     * expired signature, a key not allowed to sign, an unbound subkey, a
+     * refused digest or date, a weak key in strict mode, a signature older
+     * than its key or made while the key was not valid) is an invalid
+     * signature. The caller handles "no signature at all" first.
+     */
+    private fun gradedSignatureResult(
+        status: SignerStatus,
+        verifierKeyId: Long?,
+        rawKeyId: Long?,
+        owner: com.pgpony.android.data.PGPKeyEntity?,
+        senderAddress: String?
+    ): OpenPgpSignatureResult {
+        val keyId = verifierKeyId ?: rawKeyId ?: 0L
+        return when (status) {
+            SignerStatus.NONE,
+            SignerStatus.UNKNOWN_SIGNER ->
+                OpenPgpSignatureResult.createWithKeyMissing(rawKeyId ?: keyId, null)
+            SignerStatus.VERIFIED ->
+                buildValidSignatureResult(owner, keyId, senderAddress)
+            SignerStatus.REVOKED_KEY ->
+                if (owner != null) {
+                    buildValidSignatureResult(owner, keyId, senderAddress, OpenPgpSignatureResult.RESULT_INVALID_KEY_REVOKED)
+                } else OpenPgpSignatureResult.createWithInvalidSignature()
+            SignerStatus.EXPIRED_KEY ->
+                if (owner != null) {
+                    buildValidSignatureResult(owner, keyId, senderAddress, OpenPgpSignatureResult.RESULT_INVALID_KEY_EXPIRED)
+                } else OpenPgpSignatureResult.createWithInvalidSignature()
+            SignerStatus.INVALID,
+            SignerStatus.EXPIRED_SIGNATURE,
+            SignerStatus.NOT_SIGNING_KEY,
+            SignerStatus.UNBOUND_SIGNER,
+            SignerStatus.WEAK_SIGNATURE,
+            SignerStatus.WEAK_KEY,
+            SignerStatus.PREDATES_KEY,
+            SignerStatus.NOT_VALID_AT_TIME ->
+                OpenPgpSignatureResult.createWithInvalidSignature()
         }
-        val keyIdRaw = result.signatureKeyIDRaw ?: 0L
-        if (result.signerKeyID == null) {
-            return OpenPgpSignatureResult.createWithKeyMissing(keyIdRaw, null)
-        }
-        if (!result.signatureVerified) {
-            return OpenPgpSignatureResult.createWithInvalidSignature()
-        }
-        // 4.6.0 (item 17.1): attribute the signature to the certificate the
-        // signing key is validly bound to, not the first row whose ring lists it.
-        val candidates = allEntities.mapNotNull { e ->
-            runCatching { repo.loadPublicKeyRing(e.fingerprint) }.getOrNull()?.let { e to it }
-        }
-        val owner = com.pgpony.android.crypto.SignerEvaluator.signerRing(keyIdRaw, candidates.map { it.second })
-        val entity = owner?.let { r -> candidates.firstOrNull { it.second.publicKey.keyID == r.publicKey.keyID }?.first }
-        return buildValidSignatureResult(entity, keyIdRaw, senderAddress)
+    }
+
+    /**
+     * A2 (ENGINE-4): an inline composite signature recovered by a decrypt,
+     * graded by CompositeSignerGate against every stored composite signing
+     * certificate. The owner is the certificate the gate reports
+     * (certIndex), never a match on the claimed issuer fingerprint.
+     */
+    private fun compositeInlineSignatureResult(
+        inline: ByteArray,
+        claimedFp: String?,
+        senderAddress: String?
+    ): OpenPgpSignatureResult {
+        val certs = runBlocking { repo.loadCompositeSignerCerts() }
+        val graded = runCatching {
+            CompositeSignerGate.verifyInline(certs.map { it.second }, inline)
+        }.getOrNull() ?: return OpenPgpSignatureResult.createWithInvalidSignature()
+        val keyId = parseKeyId(graded.signingKeyFingerprint?.take(16))
+            ?: parseKeyId((graded.claimedFingerprint ?: claimedFp)?.take(16))
+        return gradedSignatureResult(
+            status = graded.status,
+            verifierKeyId = keyId,
+            rawKeyId = keyId,
+            owner = certs.getOrNull(graded.certIndex)?.first,
+            senderAddress = senderAddress
+        )
     }
 
     /** Map a VerifyService result to the API's OpenPgpSignatureResult. */
@@ -1471,29 +1554,42 @@ class PGPonyOpenPgpService : Service() {
 
             is VerificationResult.UnknownSigner ->
                 OpenPgpSignatureResult.createWithKeyMissing(
-                    runCatching {
-                        java.lang.Long.parseUnsignedLong(verification.signerKeyID, 16)
-                    }.getOrDefault(0L),
+                    parseKeyId(verification.signerKeyID) ?: 0L,
                     null
                 )
 
-            is VerificationResult.Invalid ->
-                OpenPgpSignatureResult.createWithInvalidSignature()
-
-            is VerificationResult.Verified -> {
-                val entity = allEntities.firstOrNull {
-                    it.fingerprint.equals(verification.signerFingerprint, ignoreCase = true)
-                } ?: allEntities.firstOrNull {
-                    it.longKeyId.equals(verification.signerKeyID, ignoreCase = true)
+            // A2: a signature that verified from a key that does not pass
+            // carries its grade; revoked and expired keys are reported as such.
+            is VerificationResult.Invalid -> {
+                val graded = verification.signerStatus
+                if (graded == null) {
+                    OpenPgpSignatureResult.createWithInvalidSignature()
+                } else {
+                    gradedSignatureResult(
+                        status = graded,
+                        verifierKeyId = parseKeyId(verification.signerKeyID),
+                        rawKeyId = null,
+                        owner = ownerByFingerprint(
+                            verification.signerFingerprint, verification.signingKeyFingerprint, allEntities
+                        ),
+                        senderAddress = senderAddress
+                    )
                 }
+            }
+
+            // The engine guarantees signerFingerprint is the primary of a
+            // certificate that validly holds the verifying key; the owner is
+            // found by it alone (no key ID fallback).
+            is VerificationResult.Verified ->
                 buildValidSignatureResult(
-                    entity = entity,
-                    keyIdRaw = runCatching {
-                        java.lang.Long.parseUnsignedLong(verification.signerKeyID, 16)
-                    }.getOrDefault(0L),
+                    entity = ownerByFingerprint(
+                        verification.signerFingerprint.ifBlank { null },
+                        verification.signingKeyFingerprint,
+                        allEntities
+                    ),
+                    keyIdRaw = parseKeyId(verification.signerKeyID) ?: 0L,
                     senderAddress = senderAddress
                 )
-            }
         }
     }
 
@@ -1503,35 +1599,28 @@ class PGPonyOpenPgpService : Service() {
         allEntities: List<com.pgpony.android.data.PGPKeyEntity>,
         senderAddress: String?
     ): OpenPgpSignatureResult {
-        if (!result.hasSignature) {
+        val inline = result.compositeInlineBytes
+        if (result.compositeInline && inline != null) {
+            return compositeInlineSignatureResult(inline, result.compositeClaimedSignerFp, senderAddress)
+        }
+        if (!result.hasSignature && result.signerStatus == SignerStatus.NONE) {
             return OpenPgpSignatureResult.createWithNoSignature()
         }
-        val keyIdRaw = result.signatureKeyIDRaw ?: 0L
-        // Signer held? (signerKeyID is only populated when the key was
-        // found for verification.)
-        if (result.signerKeyID == null) {
-            return OpenPgpSignatureResult.createWithKeyMissing(
-                keyIdRaw, null
-            )
-        }
-        if (!result.signatureVerified) {
-            return OpenPgpSignatureResult.createWithInvalidSignature()
-        }
-        // Resolve the signer entity: the sig key id may belong to a
-        // signing SUBKEY, so match against each held ring's keys.
-        val entity = allEntities.firstOrNull { candidate ->
-            runCatching {
-                repo.loadPublicKeyRing(candidate.fingerprint)
-                    ?.getPublicKey(keyIdRaw) != null
-            }.getOrNull() == true
-        }
-        return buildValidSignatureResult(entity, keyIdRaw, senderAddress)
+        return gradedSignatureResult(
+            status = result.signerStatus,
+            verifierKeyId = parseKeyId(result.signerKeyID),
+            rawKeyId = result.signatureKeyIDRaw,
+            owner = ownerByFingerprint(result.signerPrimaryFingerprint, result.signingKeyFingerprint, allEntities),
+            senderAddress = senderAddress
+        )
     }
 
     private fun buildValidSignatureResult(
         entity: com.pgpony.android.data.PGPKeyEntity?,
         keyIdRaw: Long,
-        senderAddress: String?
+        senderAddress: String?,
+        /** A2: a status the signer's grade forces (revoked, expired), or null. */
+        forcedStatus: Int? = null
     ): OpenPgpSignatureResult {
         if (entity == null) {
             return OpenPgpSignatureResult.createWithKeyMissing(
@@ -1540,7 +1629,7 @@ class PGPonyOpenPgpService : Service() {
         }
         // Revocation / expiry override validity, matching the reference
         // provider's semantics (and PGPony's own banner rules).
-        val status = when {
+        val status = forcedStatus ?: when {
             entity.isRevoked ->
                 OpenPgpSignatureResult.RESULT_INVALID_KEY_REVOKED
             entity.isExpired ->
@@ -1683,29 +1772,27 @@ class PGPonyOpenPgpService : Service() {
         }
     }
 
-    /** Map a card decrypt's signature state (CardDecryptResult fields). */
+    /**
+     * Map a card decrypt's signature state. The card walker grades the
+     * signer exactly like the software path (CardDecryptResult.signerStatus),
+     * so the same graded mapping applies, with the owner found by
+     * fingerprint.
+     */
     private fun signatureResultFromCardDecrypt(
         dec: ProviderCardOpStore.CompletedOp.Decrypted,
         allEntities: List<com.pgpony.android.data.PGPKeyEntity>,
         senderAddress: String?
     ): OpenPgpSignatureResult {
-        if (!dec.hadSignature) {
+        if (!dec.hadSignature && dec.signerStatus == SignerStatus.NONE) {
             return OpenPgpSignatureResult.createWithNoSignature()
         }
-        val keyIdRaw = dec.signerKeyIdRaw ?: 0L
-        if (!dec.signerKnown) {
-            return OpenPgpSignatureResult.createWithKeyMissing(keyIdRaw, null)
-        }
-        if (!dec.signatureVerified) {
-            return OpenPgpSignatureResult.createWithInvalidSignature()
-        }
-        val entity = allEntities.firstOrNull { candidate ->
-            runCatching {
-                repo.loadPublicKeyRing(candidate.fingerprint)
-                    ?.getPublicKey(keyIdRaw) != null
-            }.getOrNull() == true
-        }
-        return buildValidSignatureResult(entity, keyIdRaw, senderAddress)
+        return gradedSignatureResult(
+            status = dec.signerStatus,
+            verifierKeyId = if (dec.signerKnown) dec.signerKeyIdRaw else null,
+            rawKeyId = dec.signatureKeyIDRaw ?: dec.signerKeyIdRaw,
+            owner = ownerByFingerprint(dec.signerPrimaryFingerprint, dec.signingKeyFingerprint, allEntities),
+            senderAddress = senderAddress
+        )
     }
 
     // ── P2b-2: GET_KEY — public-key export ─────────────────────────────

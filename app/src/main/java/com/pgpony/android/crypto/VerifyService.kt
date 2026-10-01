@@ -67,7 +67,8 @@ sealed class VerificationResult {
 
     /** Signature present, signer in keyring, signature verifies. */
     data class Verified(
-        /** 16 hex chars — RFC 4880 long key ID from the signature packet. */
+        /** 16 hex chars: the long key ID of the key the signature verified
+         *  under (never the unauthenticated issuer subpacket). */
         val signerKeyID: String,
         /** Full fingerprint of the signer's primary key, hex uppercase. */
         val signerFingerprint: String,
@@ -98,7 +99,18 @@ sealed class VerificationResult {
         val signerKeyID: String?,
         /** For clear-signed: the content we attempted to verify, so the UI
          *  can still show it alongside the failure banner. */
-        val signedContent: String?
+        val signedContent: String?,
+        /** The grade when the signature itself verified but the signer or
+         *  the signature's policy did not pass (REVOKED_KEY, EXPIRED_KEY,
+         *  EXPIRED_SIGNATURE ...); null when the cryptographic check failed
+         *  or the input could not be read. */
+        val signerStatus: SignerStatus? = null,
+        /** Fingerprint (hex uppercase) of the key the signature verified
+         *  under, when it did verify; null otherwise. */
+        val signingKeyFingerprint: String? = null,
+        /** Primary fingerprint (hex uppercase) of the certificate that holds
+         *  that key, when known; null otherwise. */
+        val signerFingerprint: String? = null
     ) : VerificationResult()
 
     /** Signature present and structurally valid, but signer's key is not
@@ -139,20 +151,22 @@ class VerifyService private constructor() {
     // ── Input classification ──────────────────────────────────────────
 
     /**
-     * Inspect [text] for PGP armor markers and return the most specific
-     * type it matches. Order matters: clear-signed messages contain BOTH
-     * a SIGNED MESSAGE marker AND a SIGNATURE marker, so we check for
-     * the SIGNED MESSAGE form first to avoid mis-classifying as detached.
+     * Inspect [text] for PGP armor markers and return the type of the one
+     * that comes first. Position decides, not a fixed priority: a clear-signed
+     * message opens with SIGNED MESSAGE and carries a SIGNATURE further down,
+     * while a marker quoted inside another block (a Comment header, signed
+     * text) comes after that block's own header and so never picks the path.
      */
     fun detectInputType(text: String): SignedInputType {
         val t = text.trim()
-        return when {
-            t.isEmpty()                  -> SignedInputType.UNKNOWN
-            t.contains(BEGIN_SIGNED)     -> SignedInputType.CLEAR_SIGNED
-            t.contains(BEGIN_MESSAGE)    -> SignedInputType.ENCRYPTED
-            t.contains(BEGIN_SIGNATURE)  -> SignedInputType.DETACHED_SIGNATURE
-            else                         -> SignedInputType.UNKNOWN
-        }
+        if (t.isEmpty()) return SignedInputType.UNKNOWN
+        val firstHit = listOf(
+            BEGIN_SIGNED to SignedInputType.CLEAR_SIGNED,
+            BEGIN_MESSAGE to SignedInputType.ENCRYPTED,
+            BEGIN_SIGNATURE to SignedInputType.DETACHED_SIGNATURE
+        ).mapNotNull { (marker, type) -> t.indexOf(marker).takeIf { it >= 0 }?.let { it to type } }
+            .minByOrNull { it.first }
+        return firstHit?.second ?: SignedInputType.UNKNOWN
     }
 
     // ── Clear-signed verification ─────────────────────────────────────
@@ -194,8 +208,8 @@ class VerifyService private constructor() {
         val keyIdHex = String.format("%016X", sig.keyID)
         val claimedFingerprint = extractClaimedFingerprint(sig)
 
-        val signerKey = findSignerKey(sig.keyID, publicKeyRings)
-        if (signerKey == null) {
+        val candidates = keysWithId(sig.keyID, publicKeyRings)
+        if (candidates.isEmpty()) {
             return VerificationResult.UnknownSigner(
                 signerKeyID = keyIdHex,
                 claimedFingerprint = claimedFingerprint,
@@ -203,58 +217,73 @@ class VerifyService private constructor() {
             )
         }
 
-        val verified = try {
-            sig.init(BcPGPContentVerifierBuilderProvider(), signerKey)
-            // RFC 9580 §7.1 excludes exactly ONE line terminator — the one
-            // immediately before the signature. ClearSignedParser already
-            // strips it from components.cleartext, and canonicalizeForClearSign
-            // ALSO drops one trailing empty line; feeding the parsed cleartext
-            // straight in therefore double-strips and silently deletes a
-            // genuine trailing blank line from the hash, so any message ending
-            // in a blank line fails to verify (e.g. RFC 9580 A.6, and PGPony's
-            // own such messages). Re-add the single terminator the parser
-            // removed so the canonicalizer excludes exactly one.
-            val canonical = SigningService.shared.canonicalizeForClearSign(components.cleartext + "\n")
-            sig.update(canonical, 0, canonical.size)
-            sig.verify()
-        } catch (e: Exception) {
+        // RFC 9580 §7.1 excludes exactly ONE line terminator: the one
+        // immediately before the signature. ClearSignedParser already
+        // strips it from components.cleartext, and canonicalizeForClearSign
+        // ALSO drops one trailing empty line; feeding the parsed cleartext
+        // straight in therefore double-strips and silently deletes a
+        // genuine trailing blank line from the hash, so any message ending
+        // in a blank line fails to verify (e.g. RFC 9580 A.6, and PGPony's
+        // own such messages). Re-add the single terminator the parser
+        // removed so the canonicalizer excludes exactly one.
+        val canonical = SigningService.shared.canonicalizeForClearSign(components.cleartext + "\n")
+        var failure: Exception? = null
+        // Every held key with the signature's key ID is tried; the one that
+        // verifies is the signer.
+        val signerKey = candidates.firstOrNull { key ->
+            try {
+                sig.init(BcPGPContentVerifierBuilderProvider(), key)
+                sig.update(canonical, 0, canonical.size)
+                sig.verify()
+            } catch (e: Exception) {
+                failure = e
+                false
+            }
+        }
+        if (signerKey == null) {
             return VerificationResult.Invalid(
-                reason = "Verification error: ${e.message}",
+                reason = failure?.let { "Verification error: ${it.message}" }
+                    ?: "Signature does not match the signed content",
                 signerKeyID = keyIdHex,
                 signedContent = components.cleartext
             )
         }
+        return gradedResult(sig, signerKey, publicKeyRings, components.cleartext)
+    }
 
-        if (!verified) {
-            return VerificationResult.Invalid(
-                reason = "Signature does not match the signed content",
-                signerKeyID = keyIdHex,
-                signedContent = components.cleartext
-            )
-        }
-
-        // Resolve identity: walk the rings, find one containing this
-        // signing key, pull its primary key's user ID for display.
-        val (signerName, signerEmail, signerFingerprint) =
-            resolveSignerIdentity(sig.keyID, publicKeyRings)
-
+    /**
+     * The result for [sig], which verified under exactly [signerKey]: the
+     * signer is graded and identified by that key's fingerprint, and the key
+     * ID reported is that key's own, not the issuer subpacket's.
+     */
+    private fun gradedResult(
+        sig: PGPSignature,
+        signerKey: PGPPublicKey,
+        rings: List<PGPPublicKeyRing>,
+        content: String?
+    ): VerificationResult {
+        val keyIdHex = String.format("%016X", signerKey.keyID)
+        val signingFp = bytesToHex(signerKey.fingerprint)
+        val (signerName, signerEmail, signerFingerprint) = resolveSignerIdentity(signerKey, rings)
         // item 11 (Finding C): downgrade a valid signature from a revoked,
         // expired, or non-signing key so it never shows as Verified.
-        SignerEvaluator.evaluate(sig, publicKeyRings).let { st ->
-            if (st != SignerStatus.VERIFIED) return VerificationResult.Invalid(
-                reason = SignerEvaluator.reason(st),
-                signerKeyID = keyIdHex,
-                signedContent = components.cleartext
-            )
-        }
+        val st = SignerEvaluator.evaluate(sig, signerKey, rings)
+        if (st != SignerStatus.VERIFIED) return VerificationResult.Invalid(
+            reason = SignerEvaluator.reason(st),
+            signerKeyID = keyIdHex,
+            signedContent = content,
+            signerStatus = st,
+            signingKeyFingerprint = signingFp,
+            signerFingerprint = signerFingerprint.ifEmpty { null }
+        )
         return VerificationResult.Verified(
             signerKeyID = keyIdHex,
             signerFingerprint = signerFingerprint,
             signerName = signerName,
             signerEmail = signerEmail,
-            signedContent = components.cleartext,
-            signingKeyFingerprint = bytesToHex(signerKey.fingerprint),
-            signerWeakKey = weakLabelOf(signerKey, publicKeyRings)
+            signedContent = content,
+            signingKeyFingerprint = signingFp,
+            signerWeakKey = weakLabelOf(signerKey, rings)
         )
     }
 
@@ -337,8 +366,8 @@ class VerifyService private constructor() {
         val keyIdHex = String.format("%016X", sig.keyID)
         val claimedFingerprint = extractClaimedFingerprint(sig)
 
-        val signerKey = findSignerKey(sig.keyID, publicKeyRings)
-        if (signerKey == null) {
+        val candidates = keysWithId(sig.keyID, publicKeyRings)
+        if (candidates.isEmpty()) {
             drainStream(signedStream, tee, null)
             return VerificationResult.UnknownSigner(
                 signerKeyID = keyIdHex,
@@ -347,10 +376,32 @@ class VerifyService private constructor() {
             )
         }
 
-        val verified = try {
-            sig.init(BcPGPContentVerifierBuilderProvider(), signerKey)
-            drainStream(signedStream, tee, sig)
-            sig.verify()
+        // The stream can be read once, so every held key with the signature's
+        // key ID gets its own copy of the signature, all fed in one pass. A
+        // key that cannot take the signature at all (another version or
+        // algorithm) is skipped, so it cannot stop the others from verifying.
+        var initFailure: Exception? = null
+        val checks = candidates.mapIndexedNotNull { i, key ->
+            try {
+                val s = if (i == 0) sig else parseFirstSignatureBytes(signatureBytes)
+                s.init(BcPGPContentVerifierBuilderProvider(), key)
+                key to s
+            } catch (e: Exception) {
+                initFailure = e
+                null
+            }
+        }
+        if (checks.isEmpty()) {
+            drainStream(signedStream, tee, null)
+            return VerificationResult.Invalid(
+                reason = "Verification error: ${initFailure?.message}",
+                signerKeyID = keyIdHex,
+                signedContent = null
+            )
+        }
+        val match = try {
+            drainStream(signedStream, tee, checks.map { it.second })
+            checks.firstOrNull { (_, s) -> runCatching { s.verify() }.getOrDefault(false) }
         } catch (e: Exception) {
             return VerificationResult.Invalid(
                 reason = "Verification error: ${e.message}",
@@ -358,45 +409,32 @@ class VerifyService private constructor() {
                 signedContent = null
             )
         }
-        if (!verified) {
+        if (match == null) {
             return VerificationResult.Invalid(
                 reason = "Signature does not match the signed content",
                 signerKeyID = keyIdHex,
                 signedContent = null
             )
         }
-        val (signerName, signerEmail, signerFingerprint) =
-            resolveSignerIdentity(sig.keyID, publicKeyRings)
-        // item 11 (Finding C): downgrade a valid signature from a revoked,
-        // expired, or non-signing key so it never shows as Verified.
-        SignerEvaluator.evaluate(sig, publicKeyRings).let { st ->
-            if (st != SignerStatus.VERIFIED) return VerificationResult.Invalid(
-                reason = SignerEvaluator.reason(st),
-                signerKeyID = keyIdHex,
-                signedContent = null
-            )
-        }
-        return VerificationResult.Verified(
-            signerKeyID = keyIdHex,
-            signerFingerprint = signerFingerprint,
-            signerName = signerName,
-            signerEmail = signerEmail,
-            signedContent = null,
-            signingKeyFingerprint = bytesToHex(signerKey.fingerprint),
-            signerWeakKey = weakLabelOf(signerKey, publicKeyRings)
-        )
+        return gradedResult(match.second, match.first, publicKeyRings, null)
     }
 
     private fun drainStream(
         input: java.io.InputStream,
         tee: java.io.OutputStream?,
         sig: PGPSignature?
+    ) = drainStream(input, tee, listOfNotNull(sig))
+
+    private fun drainStream(
+        input: java.io.InputStream,
+        tee: java.io.OutputStream?,
+        sigs: List<PGPSignature>
     ) {
         val buf = ByteArray(1 shl 16)
         while (true) {
             val n = input.read(buf)
             if (n < 0) break
-            sig?.update(buf, 0, n)
+            for (s in sigs) s.update(buf, 0, n)
             tee?.write(buf, 0, n)
         }
     }
@@ -438,28 +476,9 @@ class VerifyService private constructor() {
                 signedContent = null
             )
         }
-
-        val (signerName, signerEmail, signerFingerprint) =
-            resolveSignerIdentity(signerKey.keyID, publicKeyRings)
-
-        // item 11 (Finding C): downgrade a valid signature from a revoked,
-        // expired, or non-signing key so it never shows as Verified.
-        SignerEvaluator.evaluate(sig, signerKey.keyID, publicKeyRings).let { st ->
-            if (st != SignerStatus.VERIFIED) return VerificationResult.Invalid(
-                reason = SignerEvaluator.reason(st),
-                signerKeyID = keyIdHex,
-                signedContent = null
-            )
-        }
-        return VerificationResult.Verified(
-            signerKeyID = keyIdHex,
-            signerFingerprint = signerFingerprint,
-            signerName = signerName,
-            signerEmail = signerEmail,
-            signedContent = null,
-            signingKeyFingerprint = bytesToHex(signerKey.fingerprint),
-            signerWeakKey = weakLabelOf(signerKey, publicKeyRings)
-        )
+        // The key that verified is the signer, whatever the issuer subpackets
+        // said: its own key ID and fingerprint are what is reported.
+        return gradedResult(sig, signerKey, publicKeyRings, null)
     }
 
     /**
@@ -540,20 +559,24 @@ class VerifyService private constructor() {
     }
 
     /**
-     * Search the supplied rings for a public key matching [keyId]. Walks
-     * every ring's full key list (primary + subkeys) because the signer
-     * may have signed with a subkey while the user only knows the primary
-     * fingerprint in their keyring listing.
+     * Every public key among [rings] (primaries and subkeys) whose key ID is
+     * [keyId], distinct by fingerprint, at most [MAX_TRIAL_KEYS]. Usually
+     * one; two different keys can share a 64-bit key ID.
      */
-    private fun findSignerKey(
+    private fun keysWithId(
         keyId: Long,
         rings: List<PGPPublicKeyRing>
-    ): PGPPublicKey? {
+    ): List<PGPPublicKey> {
+        val out = ArrayList<PGPPublicKey>()
         for (ring in rings) {
-            val match = ring.getPublicKey(keyId)
-            if (match != null) return match
+            for (k in ring.publicKeys) {
+                if (k.keyID != keyId) continue
+                if (out.any { it.fingerprint.contentEquals(k.fingerprint) }) continue
+                out.add(k)
+                if (out.size >= MAX_TRIAL_KEYS) return out
+            }
         }
-        return null
+        return out
     }
 
     /**
@@ -577,14 +600,16 @@ class VerifyService private constructor() {
      * but defensive).
      */
     private fun resolveSignerIdentity(
-        keyId: Long,
+        signerKey: PGPPublicKey,
         rings: List<PGPPublicKeyRing>
     ): Triple<String?, String?, String> {
         // 4.6.0 (item 17.1): the identity comes from the certificate the key is
-        // validly bound to, not merely the first ring that lists it.
-        val preferred = SignerEvaluator.signerRing(keyId, rings)
+        // validly bound to, not merely the first ring that lists it. Rings are
+        // matched by the key's fingerprint, never by its key ID.
+        val fp = signerKey.fingerprint
+        val preferred = SignerEvaluator.signerRing(signerKey, rings)
         for (ring in listOfNotNull(preferred) + rings) {
-            if (ring.getPublicKey(keyId) == null) continue
+            if (ring.getPublicKey(fp) == null) continue
             val primary = ring.publicKey
             val userId = primary.userIDs.asSequence().firstOrNull()
             val (name, email) = parseUserId(userId)
@@ -613,7 +638,8 @@ class VerifyService private constructor() {
 
     /** 3.0.0 (5d-3): the weak-key label of [key] or of the primary it belongs to. */
     private fun weakLabelOf(key: PGPPublicKey, rings: List<PGPPublicKeyRing>): String? =
-        KeyPolicy.weakLabel(key, rings.firstOrNull { it.getPublicKey(key.keyID) != null }?.publicKey)
+        KeyPolicy.weakLabel(key, (SignerEvaluator.signerRing(key, rings)
+            ?: rings.firstOrNull { it.getPublicKey(key.fingerprint) != null })?.publicKey)
 
     private fun bytesToHex(bytes: ByteArray): String =
         bytes.joinToString("") { "%02X".format(it) }

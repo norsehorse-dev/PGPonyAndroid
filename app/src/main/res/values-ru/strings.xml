@@ -2541,6 +2541,17 @@
     <string name="err_signer_key_not_certified_by_key">Ключ подписавшего не сертифицирован ключом, которому он якобы принадлежит</string>
     <string name="err_signer_key_not_keyring">Ключа подписавшего нет в вашей связке ключей</string>
     <string name="err_signer_key_was_expired_when_signed">Срок действия ключа подписавшего истёк на момент подписания</string>
+    <string name="err_signature_has_expired">Срок действия подписи истёк</string>
+    <string name="err_signature_predates_key">Подпись датирована временем до создания ключа, которым она сделана</string>
+    <string name="err_signer_key_not_valid_when_signed">Ключ подписавшего не был действителен на момент подписания</string>
+    <string name="err_signer_key_too_weak">Ключ подписавшего слишком слабый, чтобы ему доверять (RSA меньше 2048 бит или DSA)</string>
+    <string name="err_secret_needs_passphrase_contact">Закрытый ключ для %1$s защищён парольной фразой, и PGPony нужно разблокировать его, чтобы убедиться, что он принадлежит уже имеющемуся контакту. Существующий контакт не изменён, ничего не импортировано.</string>
+    <string name="err_secret_wrong_passphrase_contact">Парольная фраза не разблокировала закрытый ключ для %1$s. Существующий контакт не изменён, ничего не импортировано.</string>
+    <string name="err_secret_not_this_contact">Закрытый ключ не принадлежит уже имеющемуся контакту %1$s. Существующий контакт не изменён, ничего не импортировано.</string>
+    <string name="err_secret_material_mismatch_contact">Материал закрытого ключа не совпадает с уже имеющимся контактом %1$s. Существующий контакт не изменён, ничего не импортировано.</string>
+    <string name="err_secret_no_material_contact">Ключ для %1$s не содержит пригодного материала закрытого ключа (только заглушки для офлайн- или аппаратного ключа). Существующий контакт не изменён, ничего не импортировано.</string>
+    <string name="err_secret_unproven_contact">PGPony не смог проверить, что закрытый ключ принадлежит уже имеющемуся контакту %1$s. Существующий контакт не изменён, ничего не импортировано.</string>
+    <string name="err_secret_unreadable_contact">Не удалось прочитать закрытый ключ для %1$s. Существующий контакт не изменён, ничего не импортировано.</string>
     <string name="err_signing_failed">Не удалось подписать</string>
     <string name="err_signing_failed_2">Не удалось подписать: %1$s</string>
     <string name="err_signing_key_has_expired_enable_allow">Срок действия ключа подписи истёк. Включите «Разрешить просроченные ключи» в настройках PGPony, чтобы подписывать им.</string>

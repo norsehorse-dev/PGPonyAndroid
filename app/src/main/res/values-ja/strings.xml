@@ -2447,6 +2447,17 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="err_signer_key_not_certified_by_key">署名者の鍵は、所属先と主張する鍵によって認証されていません</string>
     <string name="err_signer_key_not_keyring">署名者の鍵が鍵束にありません</string>
     <string name="err_signer_key_was_expired_when_signed">署名時に署名者の鍵は期限切れでした</string>
+    <string name="err_signature_has_expired">署名の有効期限が切れています</string>
+    <string name="err_signature_predates_key">署名の日付が、署名した鍵の作成日より前になっています</string>
+    <string name="err_signer_key_not_valid_when_signed">署名時に署名者の鍵は有効ではありませんでした</string>
+    <string name="err_signer_key_too_weak">署名者の鍵は弱すぎて信頼できません（2048 ビット未満の RSA、または DSA）</string>
+    <string name="err_secret_needs_passphrase_contact">%1$s の秘密鍵はパスフレーズで保護されています。既にある連絡先のものであることを確認するには、PGPony でロックを解除する必要があります。既存の連絡先は変更されず、何もインポートされませんでした。</string>
+    <string name="err_secret_wrong_passphrase_contact">パスフレーズで %1$s の秘密鍵のロックを解除できませんでした。既存の連絡先は変更されず、何もインポートされませんでした。</string>
+    <string name="err_secret_not_this_contact">この秘密鍵は、既にある連絡先 %1$s のものではありません。既存の連絡先は変更されず、何もインポートされませんでした。</string>
+    <string name="err_secret_material_mismatch_contact">秘密鍵の鍵素材が、既にある連絡先 %1$s と一致しません。既存の連絡先は変更されず、何もインポートされませんでした。</string>
+    <string name="err_secret_no_material_contact">%1$s の鍵には使用できる秘密鍵素材がありません（オフライン鍵またはハードウェアキーのプレースホルダーのみ）。既存の連絡先は変更されず、何もインポートされませんでした。</string>
+    <string name="err_secret_unproven_contact">この秘密鍵が既にある連絡先 %1$s のものかどうか、PGPony で確認できませんでした。既存の連絡先は変更されず、何もインポートされませんでした。</string>
+    <string name="err_secret_unreadable_contact">%1$s の秘密鍵を読み取れませんでした。既存の連絡先は変更されず、何もインポートされませんでした。</string>
     <string name="err_signing_failed">署名に失敗しました</string>
     <string name="err_signing_failed_2">署名に失敗しました: %1$s</string>
     <string name="err_signing_key_has_expired_enable_allow">署名鍵の有効期限が切れています。この鍵で署名するには、PGPony の設定で「期限切れの鍵を許可」を有効にしてください。</string>

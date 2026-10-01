@@ -2541,6 +2541,17 @@
     <string name="err_signer_key_not_certified_by_key">Signer key is not certified by the key it claims to belong to</string>
     <string name="err_signer_key_not_keyring">Signer key is not in your keyring</string>
     <string name="err_signer_key_was_expired_when_signed">Signer key was expired when it signed</string>
+    <string name="err_signature_has_expired">Signature has expired</string>
+    <string name="err_signature_predates_key">Signature is dated before the key that made it existed</string>
+    <string name="err_signer_key_not_valid_when_signed">Signer key was not valid when it signed</string>
+    <string name="err_signer_key_too_weak">Signer key is too weak to trust (RSA under 2048 bits, or DSA)</string>
+    <string name="err_secret_needs_passphrase_contact">The private key for %1$s is protected by a passphrase, and PGPony has to unlock it to confirm it belongs to the contact you already have. The existing contact was left unchanged and nothing was imported.</string>
+    <string name="err_secret_wrong_passphrase_contact">The passphrase did not unlock the private key for %1$s. The existing contact was left unchanged and nothing was imported.</string>
+    <string name="err_secret_not_this_contact">The private key does not belong to the contact %1$s you already have. The existing contact was left unchanged and nothing was imported.</string>
+    <string name="err_secret_material_mismatch_contact">The private key material does not match the contact %1$s you already have. The existing contact was left unchanged and nothing was imported.</string>
+    <string name="err_secret_no_material_contact">The key for %1$s carries no usable private key material (only placeholders for an offline or hardware key). The existing contact was left unchanged and nothing was imported.</string>
+    <string name="err_secret_unproven_contact">PGPony could not test that the private key belongs to the contact %1$s you already have. The existing contact was left unchanged and nothing was imported.</string>
+    <string name="err_secret_unreadable_contact">The private key for %1$s could not be read. The existing contact was left unchanged and nothing was imported.</string>
     <string name="err_signing_failed">Signing failed</string>
     <string name="err_signing_failed_2">Signing failed: %1$s</string>
     <string name="err_signing_key_has_expired_enable_allow">Signing key has expired. Enable \"Allow expired keys\" in PGPony settings to sign with it.</string>

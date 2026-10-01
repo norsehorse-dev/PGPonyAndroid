@@ -2523,6 +2523,17 @@
     <string name="err_signer_key_not_certified_by_key">签名者密钥未经其声称所属的密钥认证</string>
     <string name="err_signer_key_not_keyring">签名者密钥不在你的密钥环中</string>
     <string name="err_signer_key_was_expired_when_signed">签名时签名者密钥已过期</string>
+    <string name="err_signature_has_expired">签名已过期</string>
+    <string name="err_signature_predates_key">签名日期早于生成它的密钥的创建时间</string>
+    <string name="err_signer_key_not_valid_when_signed">签名时签名者密钥无效</string>
+    <string name="err_signer_key_too_weak">签名者密钥太弱，无法信任（低于 2048 位的 RSA 或 DSA）</string>
+    <string name="err_secret_needs_passphrase_contact">%1$s 的私钥受口令保护，PGPony 需要解锁它，才能确认它属于你已有的联系人。现有联系人未更改，未导入任何内容。</string>
+    <string name="err_secret_wrong_passphrase_contact">该口令未能解锁 %1$s 的私钥。现有联系人未更改，未导入任何内容。</string>
+    <string name="err_secret_not_this_contact">该私钥不属于你已有的联系人 %1$s。现有联系人未更改，未导入任何内容。</string>
+    <string name="err_secret_material_mismatch_contact">私钥材料与你已有的联系人 %1$s 不匹配。现有联系人未更改，未导入任何内容。</string>
+    <string name="err_secret_no_material_contact">%1$s 的密钥不含可用的私钥材料（只有离线密钥或硬件密钥的占位项）。现有联系人未更改，未导入任何内容。</string>
+    <string name="err_secret_unproven_contact">PGPony 无法验证该私钥是否属于你已有的联系人 %1$s。现有联系人未更改，未导入任何内容。</string>
+    <string name="err_secret_unreadable_contact">无法读取 %1$s 的私钥。现有联系人未更改，未导入任何内容。</string>
     <string name="err_signing_failed">签名失败</string>
     <string name="err_signing_failed_2">签名失败：%1$s</string>
     <string name="err_signing_key_has_expired_enable_allow">签名密钥已过期。在 PGPony 设置中启用「允许已过期的密钥」即可用它签名。</string>

@@ -2556,6 +2556,17 @@
     <string name="err_signer_key_not_certified_by_key">Ключ підписувача не сертифіковано ключем, якому він нібито належить</string>
     <string name="err_signer_key_not_keyring">Ключа підписувача немає у вашій зв’язці ключів</string>
     <string name="err_signer_key_was_expired_when_signed">На момент підписання термін дії ключа підписувача вже минув</string>
+    <string name="err_signature_has_expired">Термін дії підпису сплив</string>
+    <string name="err_signature_predates_key">Підпис датовано часом до створення ключа, яким його зроблено</string>
+    <string name="err_signer_key_not_valid_when_signed">На момент підписання ключ підписувача не був дійсним</string>
+    <string name="err_signer_key_too_weak">Ключ підписувача надто слабкий, щоб йому довіряти (RSA менше 2048 біт або DSA)</string>
+    <string name="err_secret_needs_passphrase_contact">Закритий ключ для %1$s захищено парольною фразою, і PGPony має розблокувати його, щоб переконатися, що він належить наявному контакту. Наявний контакт не змінено, нічого не імпортовано.</string>
+    <string name="err_secret_wrong_passphrase_contact">Парольна фраза не розблокувала закритий ключ для %1$s. Наявний контакт не змінено, нічого не імпортовано.</string>
+    <string name="err_secret_not_this_contact">Закритий ключ не належить наявному контакту %1$s. Наявний контакт не змінено, нічого не імпортовано.</string>
+    <string name="err_secret_material_mismatch_contact">Матеріал закритого ключа не збігається з наявним контактом %1$s. Наявний контакт не змінено, нічого не імпортовано.</string>
+    <string name="err_secret_no_material_contact">Ключ для %1$s не містить придатного матеріалу закритого ключа (лише заглушки для офлайн- або апаратного ключа). Наявний контакт не змінено, нічого не імпортовано.</string>
+    <string name="err_secret_unproven_contact">PGPony не вдалося перевірити, що закритий ключ належить наявному контакту %1$s. Наявний контакт не змінено, нічого не імпортовано.</string>
+    <string name="err_secret_unreadable_contact">Не вдалося прочитати закритий ключ для %1$s. Наявний контакт не змінено, нічого не імпортовано.</string>
     <string name="err_signing_failed">Не вдалося підписати</string>
     <string name="err_signing_failed_2">Не вдалося підписати: %1$s</string>
     <string name="err_signing_key_has_expired_enable_allow">Термін дії ключа підпису минув. Щоб підписувати ним, увімкніть «Дозволити прострочені ключі» в налаштуваннях PGPony.</string>

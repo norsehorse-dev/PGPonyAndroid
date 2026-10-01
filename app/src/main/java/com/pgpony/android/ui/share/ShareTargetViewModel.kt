@@ -54,6 +54,9 @@ import com.pgpony.android.PGPonyApp
 import com.pgpony.android.R
 import com.pgpony.android.crypto.PGPCryptoError
 import com.pgpony.android.crypto.PGPCryptoService
+import com.pgpony.android.crypto.SignerStatus
+import com.pgpony.android.crypto.pqc.CompositeSignerGate
+import com.pgpony.android.data.KeyDeduplicationService
 import com.pgpony.android.ui.util.ScratchFiles
 import com.pgpony.android.data.PGPKeyEntity
 import com.pgpony.android.data.repository.KeyRepository
@@ -530,7 +533,8 @@ class ShareTargetViewModel(
                 }
                 val sig = summarizeSignature(
                     result.signatureVerified, result.signerKeyID, result.hasSignature,
-                    result.compositeInline, result.compositeInlineBytes, result.compositeClaimedSignerFp
+                    result.compositeInline, result.compositeInlineBytes, result.compositeClaimedSignerFp,
+                    result.signerPrimaryFingerprint
                 )
                 _state.update {
                     it.copy(
@@ -850,8 +854,15 @@ class ShareTargetViewModel(
     /**
      * 4.6.0 (item 15): the signature state of a Quick Action decrypt. An inline
      * COMPOSITE (ML-DSA + EdDSA) signature is verified against the stored
-     * composite key, as the Decrypt screen does; before, the Quick Action read
-     * only signatureVerified and showed such a message as unverified.
+     * composite certificates, as the Decrypt screen does; before, the Quick
+     * Action read only signatureVerified and showed such a message as
+     * unverified.
+     *
+     * A2 (ENGINE-4): the composite signature is graded by CompositeSignerGate
+     * (policy and signer validity, signer found by the key that verified).
+     * The classical signer is named from the engine's primary fingerprint of
+     * the certificate that validly carries the verifying key, not from the
+     * 64-bit key ID.
      */
     private suspend fun summarizeSignature(
         signatureVerified: Boolean,
@@ -860,30 +871,35 @@ class ShareTargetViewModel(
         compositeInline: Boolean,
         compositeInlineBytes: ByteArray?,
         compositeClaimedSignerFp: String?,
+        signerPrimaryFingerprint: String?,
     ): SignatureSummary {
         if (compositeInline && compositeInlineBytes != null) {
-            val fp = compositeClaimedSignerFp
-            val match = fp?.let { claimed ->
-                withContext(Dispatchers.IO) {
-                    repository.getAllKeys().filter { it.algorithm.isCompositeSign }.firstNotNullOfOrNull { e ->
-                        repository.loadCompositePublicInfo(e.fingerprint)?.compositeSigners
-                            ?.firstOrNull { it.fingerprintHex.equals(claimed, ignoreCase = true) }
-                            ?.let { e to it }
-                    }
-                }
-            } ?: return SignatureSummary(false, null, fp?.take(16), unknownSigner = true)
-            val (entity, component) = match
-            val ok = withContext(Dispatchers.Default) {
+            val certs = withContext(Dispatchers.IO) { repository.loadCompositeSignerCerts() }
+            val graded = withContext(Dispatchers.Default) {
                 runCatching {
-                    com.pgpony.android.crypto.pqc.CompositeDocumentVerifier
-                        .verifyInline(component.publicMaterial, compositeInlineBytes).valid
-                }.getOrDefault(false)
+                    CompositeSignerGate.verifyInline(certs.map { it.second }, compositeInlineBytes)
+                }.getOrNull()
             }
-            return SignatureSummary(ok, entity.userID, fp.take(16), unknownSigner = false)
+            val keyId = graded?.signerKeyID ?: compositeClaimedSignerFp?.take(16)
+            if (graded == null || graded.status == SignerStatus.UNKNOWN_SIGNER) {
+                return SignatureSummary(false, null, keyId, unknownSigner = true)
+            }
+            val entity = certs.getOrNull(graded.certIndex)?.first
+            return SignatureSummary(graded.verified, entity?.userID, keyId, unknownSigner = false)
         }
-        val name = signerKeyID?.let { keyId ->
-            _state.value.availableRecipients.firstOrNull { k -> k.longKeyId.equals(keyId, ignoreCase = true) }?.userID
+        val recipients = _state.value.availableRecipients
+        val byFingerprint = signerPrimaryFingerprint?.let { fp ->
+            val target = KeyDeduplicationService.normalize(fp)
+            recipients.firstOrNull { k -> KeyDeduplicationService.normalize(k.fingerprint) == target }
         }
+        // A verified signer is named only through its fingerprint. A signature
+        // that did not verify keeps the old key ID label, which vouches for
+        // nothing.
+        val name = byFingerprint?.userID ?: if (!signatureVerified) {
+            signerKeyID?.let { keyId ->
+                recipients.firstOrNull { k -> k.longKeyId.equals(keyId, ignoreCase = true) }?.userID
+            }
+        } else null
         return SignatureSummary(
             verified = signatureVerified,
             signerName = name,
@@ -972,7 +988,8 @@ class ShareTargetViewModel(
         }
         val sig = summarizeSignature(
             result.signatureVerified, result.signerKeyID, result.hasSignature,
-            result.compositeInline, result.compositeInlineBytes, result.compositeClaimedSignerFp
+            result.compositeInline, result.compositeInlineBytes, result.compositeClaimedSignerFp,
+            result.signerPrimaryFingerprint
         )
         if (mime != null) {
             _state.update {

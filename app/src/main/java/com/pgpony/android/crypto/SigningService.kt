@@ -38,9 +38,7 @@ import org.bouncycastle.openpgp.PGPSecretKeyRing
 import org.bouncycastle.openpgp.PGPSignature
 import org.bouncycastle.openpgp.PGPSignatureGenerator
 import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator
-import org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyDecryptorBuilder
 import org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder
-import org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 
@@ -259,9 +257,10 @@ class SigningService private constructor() {
         hashAlgorithm: Int,
         signatureType: Int
     ): PGPSignatureGenerator {
+        // An Argon2 S2K outside the policy is refused before any KDF runs.
+        enforceArgon2Policy(signingKey.s2K)
         val privateKey = try {
-            val decryptor = BcPBESecretKeyDecryptorBuilder(BcPGPDigestCalculatorProvider())
-                .build((passphrase ?: "").toCharArray())
+            val decryptor = com.pgpony.android.crypto.SecretKeyUnlock.decryptor(passphrase)
             signingKey.extractPrivateKey(decryptor)
         } catch (e: PGPException) {
             // BC throws a generic PGPException for both "no passphrase

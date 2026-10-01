@@ -2458,6 +2458,17 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="err_signer_key_not_certified_by_key">Schlüssel des Unterzeichners ist nicht von dem Schlüssel zertifiziert, zu dem er angeblich gehört</string>
     <string name="err_signer_key_not_keyring">Schlüssel des Unterzeichners ist nicht in deinem Schlüsselbund</string>
     <string name="err_signer_key_was_expired_when_signed">Schlüssel des Unterzeichners war beim Signieren abgelaufen</string>
+    <string name="err_signature_has_expired">Signatur ist abgelaufen</string>
+    <string name="err_signature_predates_key">Die Signatur ist älter als der Schlüssel, der sie erstellt hat</string>
+    <string name="err_signer_key_not_valid_when_signed">Schlüssel des Unterzeichners war beim Signieren nicht gültig</string>
+    <string name="err_signer_key_too_weak">Schlüssel des Unterzeichners ist zu schwach, um ihm zu vertrauen (RSA unter 2048 Bit oder DSA)</string>
+    <string name="err_secret_needs_passphrase_contact">Der private Schlüssel für %1$s ist durch eine Passphrase geschützt, und PGPony muss ihn entsperren, um zu bestätigen, dass er zu deinem vorhandenen Kontakt gehört. Der vorhandene Kontakt wurde nicht geändert und nichts wurde importiert.</string>
+    <string name="err_secret_wrong_passphrase_contact">Die Passphrase hat den privaten Schlüssel für %1$s nicht entsperrt. Der vorhandene Kontakt wurde nicht geändert und nichts wurde importiert.</string>
+    <string name="err_secret_not_this_contact">Der private Schlüssel gehört nicht zu deinem vorhandenen Kontakt %1$s. Der vorhandene Kontakt wurde nicht geändert und nichts wurde importiert.</string>
+    <string name="err_secret_material_mismatch_contact">Das Material des privaten Schlüssels passt nicht zu deinem vorhandenen Kontakt %1$s. Der vorhandene Kontakt wurde nicht geändert und nichts wurde importiert.</string>
+    <string name="err_secret_no_material_contact">Der Schlüssel für %1$s enthält kein nutzbares privates Schlüsselmaterial (nur Platzhalter für einen Offline- oder Hardwareschlüssel). Der vorhandene Kontakt wurde nicht geändert und nichts wurde importiert.</string>
+    <string name="err_secret_unproven_contact">PGPony konnte nicht prüfen, ob der private Schlüssel zu deinem vorhandenen Kontakt %1$s gehört. Der vorhandene Kontakt wurde nicht geändert und nichts wurde importiert.</string>
+    <string name="err_secret_unreadable_contact">Der private Schlüssel für %1$s konnte nicht gelesen werden. Der vorhandene Kontakt wurde nicht geändert und nichts wurde importiert.</string>
     <string name="err_signing_failed">Signieren fehlgeschlagen</string>
     <string name="err_signing_failed_2">Signieren fehlgeschlagen: %1$s</string>
     <string name="err_signing_key_has_expired_enable_allow">Signaturschlüssel ist abgelaufen. Aktiviere \"Abgelaufene Schlüssel zulassen\" in den PGPony-Einstellungen, um damit zu signieren.</string>

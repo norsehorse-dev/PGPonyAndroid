@@ -122,6 +122,17 @@ class VerifyServiceTest {
         assertEquals(SignedInputType.CLEAR_SIGNED, verifier.detectInputType(signed))
     }
 
+    @Test
+    fun detectInputTypeFollowsTheFirstArmorHeaderNotAQuotedMarker() {
+        // A marker quoted in a Comment header or in later text must not pick the path.
+        val message = "-----BEGIN PGP MESSAGE-----\nComment: -----BEGIN PGP SIGNED MESSAGE-----\n\nhQEMA\n-----END PGP MESSAGE-----"
+        assertEquals(SignedInputType.ENCRYPTED, verifier.detectInputType(message))
+        val detached = "-----BEGIN PGP SIGNATURE-----\nComment: -----BEGIN PGP MESSAGE-----\n\niQEz\n-----END PGP SIGNATURE-----"
+        assertEquals(SignedInputType.DETACHED_SIGNATURE, verifier.detectInputType(detached))
+        val prose = "see below\n-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA256\n\nhi\n-----BEGIN PGP SIGNATURE-----\n"
+        assertEquals(SignedInputType.CLEAR_SIGNED, verifier.detectInputType(prose))
+    }
+
     // ── verifyClearSigned — Verified path ─────────────────────────────
 
     @Test

@@ -36,7 +36,10 @@
 // "cannot tell" outcome is a primary whose own algorithm has no verifier here
 // (an obsolete algorithm such as Elgamal-sign); analyze() then reports
 // supported = false and sanitize() returns the input unchanged, so a key the
-// app cannot evaluate is never damaged in storage.
+// app cannot evaluate is never damaged in storage. Such a report vouches for
+// nothing it could not check: no subkey counts as a signer or an encryption
+// target, no revocation is taken from it, and only the primary itself may be
+// used.
 //
 // 3.0.0 (checkpoint 5d-1, from the OpenPGP interoperability test suite): the
 // report keeps every verified self-signature and revocation with its times, so
@@ -279,7 +282,7 @@ object CertificateBindings {
          *  one, rules the subkey out). Unsupported primaries are left to the
          *  caller. */
         fun isUsableEncryptionKey(fpHex: String, nowMs: Long): Boolean {
-            if (!supported) return true
+            if (!supported) return isPrimary(fpHex)
             if (!isPrimaryUsable(nowMs)) return false
             if (isPrimary(fpHex)) return flagsAllowEncryption(activePrimarySig(nowMs)?.keyFlags)
             val s = subkeyByFingerprint(fpHex) ?: return false
@@ -309,7 +312,7 @@ object CertificateBindings {
         /** A key that may speak for the primary as a signer: the primary, or a
          *  bound, back-signed subkey. */
         fun isValidSignerKey(fpHex: String): Boolean {
-            if (!supported) return true
+            if (!supported) return isPrimary(fpHex)
             if (isPrimary(fpHex)) return true
             val s = subkeyByFingerprint(fpHex) ?: return false
             return s.bound && s.backSigned
@@ -338,9 +341,11 @@ object CertificateBindings {
          * it was made; a self-signature must make the primary (and a subkey)
          * valid at [t], and the key flags and expiry come from that
          * self-signature; a signing subkey needs a back-signature alive at [t].
+         * An unsupported report can vouch for nothing: NOT_VALID for the
+         * primary and UNBOUND for any other key.
          */
         fun signerValidityAt(fpHex: String, t: Long): SignerValidity {
-            if (!supported) return SignerValidity.VALID
+            if (!supported) return if (isPrimary(fpHex)) SignerValidity.NOT_VALID else SignerValidity.UNBOUND
             if (t < primaryCreatedAtMs) return SignerValidity.PREDATES_KEY
             val sub = if (isPrimary(fpHex)) null else (subkeyByFingerprint(fpHex) ?: return SignerValidity.UNBOUND)
             if (sub != null && t < sub.createdAtMs) return SignerValidity.PREDATES_KEY
@@ -1220,4 +1225,23 @@ object CertificateBindings {
 
     /** Convenience for Bouncy Castle rings: the report for [ring]'s encoding. */
     fun analyze(ring: PGPPublicKeyRing): Report? = sanitizeAndAnalyze(ring.encoded).second
+
+    /**
+     * The key revocation (0x20) of the certificate in [raw] that the primary
+     * itself made, that verifies and that is in effect at [nowMs], or null.
+     * Null as well when the certificate cannot be analysed or its primary
+     * algorithm has no verifier here: an unchecked revocation is never
+     * reported. When several qualify, the oldest one is returned. Callers that
+     * mark a stored key revoked from a fetched copy use this, never a raw scan
+     * of the fetched packets.
+     */
+    fun verifiedKeyRevocation(raw: ByteArray, nowMs: Long = System.currentTimeMillis()): Revocation? {
+        val report = runCatching { analyze(raw) }.getOrNull() ?: return null
+        if (!report.supported) return null
+        return report.primaryRevocations.filter { it.inEffectAt(nowMs) }.minByOrNull { it.createdMs }
+    }
+
+    /** [verifiedKeyRevocation] for a Bouncy Castle ring. */
+    fun verifiedKeyRevocation(ring: PGPPublicKeyRing, nowMs: Long = System.currentTimeMillis()): Revocation? =
+        runCatching { verifiedKeyRevocation(ring.encoded, nowMs) }.getOrNull()
 }

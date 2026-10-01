@@ -2458,6 +2458,17 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="err_signer_key_not_certified_by_key">La clé du signataire n\'est pas certifiée par la clé à laquelle elle prétend appartenir</string>
     <string name="err_signer_key_not_keyring">La clé du signataire n\'est pas dans votre trousseau</string>
     <string name="err_signer_key_was_expired_when_signed">La clé du signataire était expirée au moment de la signature</string>
+    <string name="err_signature_has_expired">La signature a expiré</string>
+    <string name="err_signature_predates_key">La signature est datée d\'avant la clé qui l\'a produite</string>
+    <string name="err_signer_key_not_valid_when_signed">La clé du signataire n\'était pas valide au moment de la signature</string>
+    <string name="err_signer_key_too_weak">La clé du signataire est trop faible pour être fiable (RSA de moins de 2048 bits, ou DSA)</string>
+    <string name="err_secret_needs_passphrase_contact">La clé privée de %1$s est protégée par une phrase secrète, et PGPony doit la déverrouiller pour confirmer qu\'elle appartient au contact que vous avez déjà. Le contact existant n\'a pas été modifié et rien n\'a été importé.</string>
+    <string name="err_secret_wrong_passphrase_contact">La phrase secrète n\'a pas déverrouillé la clé privée de %1$s. Le contact existant n\'a pas été modifié et rien n\'a été importé.</string>
+    <string name="err_secret_not_this_contact">La clé privée n\'appartient pas au contact %1$s que vous avez déjà. Le contact existant n\'a pas été modifié et rien n\'a été importé.</string>
+    <string name="err_secret_material_mismatch_contact">Le matériel de la clé privée ne correspond pas au contact %1$s que vous avez déjà. Le contact existant n\'a pas été modifié et rien n\'a été importé.</string>
+    <string name="err_secret_no_material_contact">La clé de %1$s ne contient aucun matériel de clé privée utilisable (seulement des emplacements réservés à une clé hors ligne ou matérielle). Le contact existant n\'a pas été modifié et rien n\'a été importé.</string>
+    <string name="err_secret_unproven_contact">PGPony n\'a pas pu vérifier que la clé privée appartient au contact %1$s que vous avez déjà. Le contact existant n\'a pas été modifié et rien n\'a été importé.</string>
+    <string name="err_secret_unreadable_contact">Impossible de lire la clé privée de %1$s. Le contact existant n\'a pas été modifié et rien n\'a été importé.</string>
     <string name="err_signing_failed">Échec de la signature</string>
     <string name="err_signing_failed_2">Échec de la signature : %1$s</string>
     <string name="err_signing_key_has_expired_enable_allow">La clé de signature a expiré. Activez « Autoriser les clés expirées » dans les réglages de PGPony pour signer avec elle.</string>

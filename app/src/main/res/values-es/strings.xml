@@ -2458,6 +2458,17 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="err_signer_key_not_certified_by_key">La clave del firmante no está certificada por la clave a la que dice pertenecer</string>
     <string name="err_signer_key_not_keyring">La clave del firmante no está en tu llavero</string>
     <string name="err_signer_key_was_expired_when_signed">La clave del firmante estaba caducada cuando firmó</string>
+    <string name="err_signature_has_expired">La firma ha caducado</string>
+    <string name="err_signature_predates_key">La firma tiene una fecha anterior a la clave que la hizo</string>
+    <string name="err_signer_key_not_valid_when_signed">La clave del firmante no era válida cuando firmó</string>
+    <string name="err_signer_key_too_weak">La clave del firmante es demasiado débil para confiar en ella (RSA de menos de 2048 bits, o DSA)</string>
+    <string name="err_secret_needs_passphrase_contact">La clave privada de %1$s está protegida con una frase de contraseña, y PGPony tiene que desbloquearla para confirmar que pertenece al contacto que ya tienes. El contacto existente no se modificó y no se importó nada.</string>
+    <string name="err_secret_wrong_passphrase_contact">La frase de contraseña no desbloqueó la clave privada de %1$s. El contacto existente no se modificó y no se importó nada.</string>
+    <string name="err_secret_not_this_contact">La clave privada no pertenece al contacto %1$s que ya tienes. El contacto existente no se modificó y no se importó nada.</string>
+    <string name="err_secret_material_mismatch_contact">El material de la clave privada no coincide con el contacto %1$s que ya tienes. El contacto existente no se modificó y no se importó nada.</string>
+    <string name="err_secret_no_material_contact">La clave de %1$s no contiene material de clave privada utilizable (solo marcadores de una clave sin conexión o de hardware). El contacto existente no se modificó y no se importó nada.</string>
+    <string name="err_secret_unproven_contact">PGPony no pudo comprobar que la clave privada pertenece al contacto %1$s que ya tienes. El contacto existente no se modificó y no se importó nada.</string>
+    <string name="err_secret_unreadable_contact">No se pudo leer la clave privada de %1$s. El contacto existente no se modificó y no se importó nada.</string>
     <string name="err_signing_failed">Error al firmar</string>
     <string name="err_signing_failed_2">Error al firmar: %1$s</string>
     <string name="err_signing_key_has_expired_enable_allow">La clave de firma ha caducado. Activa \"Permitir claves caducadas\" en los ajustes de PGPony para firmar con ella.</string>
