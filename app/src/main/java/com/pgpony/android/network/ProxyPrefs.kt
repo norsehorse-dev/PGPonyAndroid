@@ -28,7 +28,7 @@ object ProxyPrefs {
     const val KEY_MODE = "proxy_mode"                 // "off" | "orbot" | "custom"
     const val KEY_CUSTOM_HOST = "proxy_custom_host"
     const val KEY_CUSTOM_PORT = "proxy_custom_port"
-    const val KEY_ONION_MIRROR = "proxy_onion_mirror" // default ON under a proxy
+    const val KEY_ONION_MIRROR = "proxy_onion_mirror" // default OFF (3.0.0 / 4.7.0): opt in under a proxy
     // #proxy stream isolation: optional SOCKS5 user/pass. Blank = no auth.
     // Applies to whichever proxy is active (Orbot or Custom). A distinct
     // user/pass pair puts PGPony on its own Tor circuit (IsolateSOCKSAuth).
@@ -87,8 +87,11 @@ object ProxyPrefs {
         }
     }
 
+    /** Off unless the user turned it on. The mirror is plain http inside Tor, so with no Tor
+     *  daemon on the proxy port whatever answers there would serve the lookups; keyserver
+     *  traffic through a proxy goes to the https host by default instead. */
     fun onionMirror(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_ONION_MIRROR, true)
+        prefs(context).getBoolean(KEY_ONION_MIRROR, false)
 
     fun setMode(context: Context, mode: String) =
         prefs(context).edit().putString(KEY_MODE, mode).apply()

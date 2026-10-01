@@ -414,7 +414,7 @@ class BackupService(
                 )
             }
             ProxyPrefs.setMode(ctx, mode)
-            ProxyPrefs.setOnionMirror(ctx, p.optBoolean("onionMirror", true))
+            ProxyPrefs.setOnionMirror(ctx, p.optBoolean("onionMirror", false))
             HttpClientFactory.invalidate()
             applied = true
         }

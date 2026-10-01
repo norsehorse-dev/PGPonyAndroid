@@ -193,7 +193,8 @@ the message and signature checks (one grammar walker for in-memory, streaming an
 by fingerprint; expired signatures graded), messages without integrity protection refused, secret key imports
 over an existing contact proven before the contact becomes a key pair, verified key-server revocations, proxy
 and Tor traffic resolving names through the proxy (a loopback SOCKS bridge), and a pairing protocol revision
-(item 21). Eleven new error strings with ErrorText rules; Korean falls back to English for them, as for every
+(item 21). The keys.pgpony.app onion mirror now defaults to off (an explicit choice is kept), matching desktop
+3.0.0. Eleven new error strings with ErrorText rules; Korean falls back to English for them, as for every
 other error string.
 
 On device before 4.7.0: Tor mode with Orbot (key search, WKD, update check, publish), a custom proxy with and
