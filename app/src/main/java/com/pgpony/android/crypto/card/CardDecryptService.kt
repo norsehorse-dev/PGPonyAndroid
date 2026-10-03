@@ -177,7 +177,20 @@ class CardDecryptService private constructor() {
             // is where the card operation happens for an addressed message.
             val clear = clearStream
                 ?: chosen.getDataStream(CardPublicKeyDataDecryptorFactory(session, chosenKey))
-            val result = readLiteralAndVerify(JcaPGPObjectFactory(clear), verificationKeys)
+            // 4.6.3 (4.7.0 item 12a): the decrypted content is read whole
+            // (bounded, as the literal already was) and checked against the
+            // message grammar before the walk, as on the software path.
+            val clearBytes = readBounded(clear)
+            val checked = try {
+                com.pgpony.android.crypto.MessageGrammar.normalizePlaintext(clearBytes)
+            } catch (e: com.pgpony.android.crypto.MessageGrammar.Truncated) {
+                throw OpenPgpCardException.Malformed("Malformed message: truncated packet")
+            } catch (e: com.pgpony.android.crypto.MessageGrammar.Malformed) {
+                throw OpenPgpCardException.Malformed("Malformed message: ${e.message}")
+            }
+            val result = readLiteralAndVerify(
+                JcaPGPObjectFactory(java.io.ByteArrayInputStream(checked)), verificationKeys
+            )
 
             // INTEGRITY GATE. readLiteralAndVerify has fully read the plaintext,
             // so the SEIPD protection can now be checked: reject a legacy
@@ -255,6 +268,22 @@ class CardDecryptService private constructor() {
         return null
     }
 
+    /** 4.6.3: [input] read whole, within the decrypted-message size cap. */
+    private fun readBounded(input: java.io.InputStream): ByteArray {
+        val out = ByteArrayOutputStream()
+        val buf = ByteArray(1 shl 16)
+        var total = 0L
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            total += n
+            if (total > SecurityLimits.MAX_MESSAGE_PLAINTEXT_BYTES)
+                throw PGPCryptoError.ResourceLimitExceeded("decrypted message exceeds size cap")
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
+    }
+
     /**
      * Walk the decrypted packet stream: recover the literal data and, if an
      * embedded one-pass signature is present and [verificationKeys] is given,
@@ -300,6 +329,13 @@ class CardDecryptService private constructor() {
                     }
                 }
                 is PGPLiteralData -> {
+                    // 4.6.3 (4.7.0 item 12a): one literal per message, as on the
+                    // software paths. A second literal replaced the first after
+                    // its signature verified, so the card path showed other
+                    // content under a verified signer.
+                    if (data != null) {
+                        throw OpenPgpCardException.Malformed("Malformed message: more than one literal data packet")
+                    }
                     filename = com.pgpony.android.crypto.LiteralFilename.sanitize(obj.fileName) // 4.6.0 (item 17.3)
                     val out = ByteArrayOutputStream()
                     val buf = ByteArray(4096)

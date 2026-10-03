@@ -145,10 +145,21 @@ gets.
 
 ## 9. Message grammar walker and card result (4.7.0 item 12a)
 
-Gate first: run ContentWalkerTest's crafted messages against v4.6.2. If none get through, record that here and drop
-the item. If any do, port the walker and the card result change from 770f5be onto `4.6.x` by hand (that commit
-also carries the pairing revision, signer identity and proxy changes; only the walker and the card result come
-across here, plus the pairing package in item 10). Release notes say "message handling hardening" only.
+Gate: failed. Reading v4.6.2's four content walks shows a second literal replacing (in memory, card) or
+following (streaming) the signed one after its signature verified. Main's ContentWalker is entangled with the
+SignerStatus, signer-identity and proxy work in 770f5be, so instead of that port 4.6.3 carries:
+
+- MessageGrammar.kt and MessageGrammarTest.kt from main (adc109c), byte for byte, so cherry-picking to main is a
+  no-op for them.
+- MessageGrammar.normalizePlaintext on the in-memory decrypt (as on main), the signed-only path and the card
+  path (the card's decrypted content is now read whole within the existing size cap, then walked).
+- A one-literal guard in every walk: memory, signed-only, streaming (refused before a byte of the second literal
+  is written) and card.
+- LiteralGuardTest: the forged layouts are refused on the software paths, and an ordinary signed message still
+  verifies on each. The card path needs a card to exercise.
+
+normalizeOuter (ESK filtering before decryption) stays on main only: it changes which ESKs Bouncy Castle sees,
+which is interop work rather than this fix. Release notes say "message handling hardening" only.
 
 
 ## 10. Pair with PGPony Desktop and move keys (4.7.0 item 21)

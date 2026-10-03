@@ -1963,7 +1963,12 @@ class PGPCryptoService private constructor() {
                 }
                 return bufOut.toByteArray()
             }
-            fun parsePlain(plainBytes: ByteArray): DecryptResult {
+            fun parsePlain(decrypted: ByteArray): DecryptResult {
+                // 4.6.3 (4.7.0 item 12a): the decrypted content must be one
+                // well-formed message (MessageGrammar, as on main): no second
+                // literal, no stray packets after it, every one-pass signature
+                // closed by its signature.
+                val plainBytes = plaintextChecked(decrypted)
                 if (com.pgpony.android.crypto.pqc.CompositeDocumentVerifier.isCompositeInline(plainBytes)) {
                     val content = com.pgpony.android.crypto.pqc.CompositeDocumentVerifier.inlineContent(plainBytes)
                         ?: throw PGPCryptoError.DecryptionFailed("No literal data in composite inline message")
@@ -2462,6 +2467,12 @@ class PGPCryptoService private constructor() {
                     }
                 }
                 is PGPLiteralData -> {
+                    // 4.6.3 (4.7.0 item 12a): refuse a second literal before a
+                    // byte of it is written; it used to be appended to the
+                    // output after the first one's signature had verified.
+                    if (wroteLiteral) {
+                        throw PGPCryptoError.DecryptionFailed("Malformed message: more than one literal data packet")
+                    }
                     wroteLiteral = true
                     filename = LiteralFilename.sanitize(obj.fileName) // 4.6.0 (item 17.3)
                     val litStream = obj.inputStream
@@ -2813,6 +2824,12 @@ class PGPCryptoService private constructor() {
                     }
                 }
                 is PGPLiteralData -> {
+                    // 4.6.3 (4.7.0 item 12a): one literal per message. A second
+                    // one replaced the first after its signature had verified,
+                    // so other content was shown under a verified signer.
+                    if (literalData != null) {
+                        throw PGPCryptoError.DecryptionFailed("Malformed message: more than one literal data packet")
+                    }
                     filename = LiteralFilename.sanitize(obj.fileName) // 4.6.0 (item 17.3)
                     val litStream = obj.inputStream
                     val buffer = ByteArrayOutputStream()
@@ -2965,12 +2982,20 @@ class PGPCryptoService private constructor() {
      * never presented as a decrypted result.
      */
     private fun signedOnly(message: ByteArray, verificationKeys: List<PGPPublicKeyRing>?): DecryptResult? {
-        val input = if (isArmored(message)) {
-            ArmoredInputStream(ByteArrayInputStream(message))
+        val binary = if (isArmored(message)) {
+            ArmoredInputStream(ByteArrayInputStream(message)).use { it.readBytes() }
         } else {
-            ByteArrayInputStream(message)
+            message
         }
-        val result = processDecryptedContent(JcaPGPObjectFactory(input), verificationKeys)
+        // 4.6.3 (4.7.0 item 12a): the same grammar check as decrypted content,
+        // for input that starts like a signed or literal message. Anything
+        // else (a key block, junk) stays "not a message", as before.
+        val checked = try {
+            plaintextChecked(binary)
+        } catch (e: PGPCryptoError.DecryptionFailed) {
+            if (MessageGrammar.firstSignificantTag(binary) in setOf(2, 4, 8, 11)) throw e else return null
+        }
+        val result = processDecryptedContent(JcaPGPObjectFactory(ByteArrayInputStream(checked)), verificationKeys)
         return result.takeIf { it.hasSignature }
     }
 
@@ -3438,6 +3463,15 @@ class PGPCryptoService private constructor() {
             if (key != null) return key
         }
         return null
+    }
+
+    /** 4.6.3 (4.7.0 item 12a): decrypted content checked by MessageGrammar.normalizePlaintext. */
+    private fun plaintextChecked(plain: ByteArray): ByteArray = try {
+        MessageGrammar.normalizePlaintext(plain)
+    } catch (e: MessageGrammar.Truncated) {
+        throw PGPCryptoError.DecryptionFailed("Malformed message: truncated packet")
+    } catch (e: MessageGrammar.Malformed) {
+        throw PGPCryptoError.DecryptionFailed("Malformed message: ${e.message}")
     }
 
     /** Find a public key by key ID across multiple key rings. */
