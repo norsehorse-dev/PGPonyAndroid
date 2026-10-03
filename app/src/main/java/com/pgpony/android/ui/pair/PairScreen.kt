@@ -8,6 +8,10 @@
 // backup; the receiver picks what to take and sees each item, as read from its
 // bytes, before anything is written.
 //
+// Each item gets a row with its outcome (added on the other side, skipped,
+// failed), and Done ends the session with a count of what moved and a way to
+// open the keys that arrived.
+//
 // Nothing is remembered: leaving the screen ends the session and wipes its
 // keys, and no socket is touched on the main thread. Offline mode blocks
 // pairing (it opens a socket even though the traffic stays on the local
@@ -19,6 +23,7 @@ package com.pgpony.android.ui.pair
 import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -34,8 +39,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -88,6 +97,8 @@ import com.pgpony.android.ui.keyring.BiometricAvailability
 import com.pgpony.android.ui.keyring.BiometricGate
 import com.pgpony.android.ui.scanner.QRScannerScreen
 import com.pgpony.android.ui.util.ClipboardService
+import com.pgpony.android.ui.util.rememberHaptics
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.isActive
@@ -95,6 +106,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DateFormat
 import java.util.Date
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 private sealed class PairStage {
@@ -105,6 +117,8 @@ private sealed class PairStage {
     class Compare(val attempt: PairAttempt, val peer: String, val waiting: Boolean = false) : PairStage()
     class Paired(val session: PairSession, val peer: String) : PairStage()
     class Failed(val message: String) : PairStage()
+    /** The session ended after something moved: what it moved, and who ended it. */
+    class Finished(val rows: List<PairRow>, val peerName: String?, val byPeer: Boolean) : PairStage()
 }
 
 /** Runs [block] on a daemon thread, so a socket write never runs on the main thread. */
@@ -142,7 +156,12 @@ private fun grouped(fp: String) = fp.uppercase().chunked(4).joinToString(" ")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PairScreen(onBack: () -> Unit, onKeysChanged: () -> Unit) {
+fun PairScreen(
+    onBack: () -> Unit,
+    onKeysChanged: () -> Unit,
+    onOpenKey: (fingerprint: String) -> Unit = {},
+    onOpenKeyring: () -> Unit = {}
+) {
     val scope = rememberCoroutineScope()
     val controller = remember { PairController(PGPonyApp.instance.keyRepository) }
     var stage by remember { mutableStateOf<PairStage>(PairStage.Choose) }
@@ -230,6 +249,20 @@ fun PairScreen(onBack: () -> Unit, onKeysChanged: () -> Unit) {
     fun refuse(compare: PairStage.Compare, message: String) {
         inBackground { compare.attempt.reject() }
         stage = PairStage.Failed(message)
+    }
+
+    // Done, BYE or a lost connection. Done with nothing moved simply closes the screen
+    // (teardown ends the session); otherwise the session ends here and the summary shows.
+    fun finish(paired: PairStage.Paired, rows: List<PairRow>, peerName: String?, byPeer: Boolean) {
+        if (stage !== paired) return
+        val closed = PairLedger.closed(rows)
+        if (closed.isEmpty() && !byPeer) {
+            onBack()
+            return
+        }
+        paired.session.endAsync()
+        stage = if (closed.isEmpty()) PairStage.Failed(str(R.string.pair_ended))
+        else PairStage.Finished(closed, peerName, byPeer)
     }
 
     if (scanning) {
@@ -327,15 +360,16 @@ fun PairScreen(onBack: () -> Unit, onKeysChanged: () -> Unit) {
                         onDiffer = { refuse(s, str(R.string.pair_fail_you_refused)) }
                     )
                 }
-                is PairStage.Paired -> {
-                    SessionPane(controller, s.session, s.peer, onKeysChanged) {
-                        stage = PairStage.Failed(str(R.string.pair_ended))
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.pair_end))
-                    }
+                is PairStage.Paired -> SessionPane(controller, s.session, s.peer, onKeysChanged) { rows, peerName, byPeer ->
+                    finish(s, rows, peerName, byPeer)
                 }
+                is PairStage.Finished -> FinishedPane(
+                    s,
+                    onClose = onBack,
+                    onAgain = { stage = PairStage.Choose },
+                    onOpenKey = onOpenKey,
+                    onOpenKeyring = onOpenKeyring
+                )
                 is PairStage.Failed -> {
                     Text(s.message, style = MaterialTheme.typography.bodyMedium)
                     OutlinedButton(onClick = { stage = PairStage.Choose }) { Text(stringResource(R.string.pair_again)) }
@@ -530,14 +564,18 @@ private fun SessionPane(
     session: PairSession,
     peer: String,
     onKeysChanged: () -> Unit,
-    onEnded: () -> Unit
+    onFinished: (rows: List<PairRow>, peerName: String?, byPeer: Boolean) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val haptics = rememberHaptics()
     var peerName by remember { mutableStateOf<String?>(null) }
     // What the other side can import (its INFO); nothing is offered that it cannot take.
     var peerInfo by remember { mutableStateOf<PairInfo?>(null) }
+    // Messages that belong to no one item: a send or an offer that did not go out.
     val log = remember { mutableStateListOf<String>() }
+    // Every item this session sent or received, in order, with its outcome.
+    var rows by remember { mutableStateOf(listOf<PairRow>()) }
     var incoming by remember { mutableStateOf<Incoming?>(null) }
     var outgoing by remember { mutableStateOf<PairController.Prepared?>(null) }
     var pendingResults by remember { mutableIntStateOf(0) }
@@ -554,19 +592,32 @@ private fun SessionPane(
         scope.launch { runCatching { withContext(Dispatchers.IO) { session.sendResult(result) } } }
     }
 
+    /** A received item's row, named and fingerprinted as read from its bytes when it got that far. */
+    fun receivedRow(item: PairItem, preview: com.pgpony.android.data.repository.ImportPreview?, outcome: PairOutcome, detail: String? = null) =
+        PairRow(
+            id = item.id,
+            direction = PairDirection.RECEIVED,
+            kind = item.kind,
+            name = preview?.userId?.takeIf { it.isNotBlank() } ?: item.name,
+            fingerprint = (preview?.fingerprint ?: item.fingerprint)?.takeIf { item.kind != PairItem.BACKUP },
+            outcome = outcome,
+            detail = detail
+        )
+
     // Nothing is written before the user accepted the preview; the RESULT goes out after.
     fun decide(r: PairController.Received, add: Boolean) {
         if (!received.remove(r)) return // a second tap on the same item
         val item = r.item
         if (!add) {
-            log += str(R.string.pair_skipped, item.name)
+            rows = rows + receivedRow(item, r.preview, PairOutcome.SKIPPED)
             sendResult(PairResult(item.id, false, str(R.string.pair_skipped_reason)))
             return
         }
         scope.launch {
             val result = try {
                 val summary = controller.apply(item, r.bytes, backupCode)
-                log += str(R.string.pair_result_ok, item.name, summary)
+                rows = rows + receivedRow(item, r.preview, PairOutcome.ADDED, summary)
+                haptics.success()
                 PairResult(item.id, true)
             } catch (e: com.pgpony.android.backup.BackupError.WrongCode) {
                 // A mistyped recovery code keeps the backup here for another
@@ -576,7 +627,7 @@ private fun SessionPane(
                 return@launch
             } catch (e: Exception) {
                 val why = com.pgpony.android.i18n.ErrorText.localize(e.message) ?: e.javaClass.simpleName
-                log += str(R.string.pair_result_failed, item.name, why)
+                rows = rows + receivedRow(item, r.preview, PairOutcome.FAILED, why)
                 PairResult(item.id, false, why)
             }
             backupError = null
@@ -595,8 +646,8 @@ private fun SessionPane(
             is PairMessage.Answer -> {
                 val prepared = outgoing ?: return
                 val accepted = prepared.items.filter { it.id in m.answer.accept }
+                rows = PairLedger.offered(rows, prepared.items, m.answer.accept)
                 if (accepted.isEmpty()) {
-                    log += str(R.string.pair_declined)
                     outgoing = null
                     return
                 }
@@ -623,19 +674,19 @@ private fun SessionPane(
                         received += controller.check(item, m.bytes)
                     } catch (e: Exception) {
                         val why = e.message ?: e.javaClass.simpleName
-                        log += str(R.string.pair_result_failed, item.name, why)
+                        rows = rows + receivedRow(item, null, PairOutcome.FAILED, why)
                         sendResult(PairResult(item.id, false, why))
                     }
                 }
             }
             is PairMessage.Result -> {
-                val name = outgoing?.items?.firstOrNull { it.id == m.result.id }?.name ?: "#${m.result.id}"
-                log += if (m.result.ok) str(R.string.pair_sent_ok, name)
-                else str(R.string.pair_result_failed, name, m.result.error ?: "")
+                val (next, settled) = PairLedger.answered(rows, m.result.id, m.result.ok, m.result.error)
+                rows = next
+                if (settled?.outcome == PairOutcome.ADDED) haptics.success()
                 pendingResults -= 1
                 if (pendingResults <= 0) outgoing = null
             }
-            PairMessage.Bye -> onEnded()
+            PairMessage.Bye -> onFinished(rows, peerName, true)
         }
     }
 
@@ -658,8 +709,11 @@ private fun SessionPane(
                 onMessage(m)
                 if (m == PairMessage.Bye) break
             }
+        } catch (e: CancellationException) {
+            // This pane went away (Done, or the screen closed); that path already ended the session.
+            throw e
         } catch (e: Exception) {
-            onEnded()
+            onFinished(rows, peerName, true)
         }
     }
 
@@ -710,7 +764,147 @@ private fun SessionPane(
 
     if (log.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))
-        log.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+        log.forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+    }
+
+    PairRows(rows, peerName)
+
+    Spacer(Modifier.height(8.dp))
+    OutlinedButton(onClick = { onFinished(rows, peerName, false) }, modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.pair_done))
+    }
+}
+
+/** The sent and received rows, each group under its heading. [action] adds a button under a row. */
+@Composable
+private fun PairRows(
+    rows: List<PairRow>,
+    peerName: String?,
+    action: (@Composable (PairRow) -> Unit)? = null
+) {
+    for (direction in PairDirection.entries) {
+        val group = rows.filter { it.direction == direction }
+        if (group.isEmpty()) continue
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(if (direction == PairDirection.SENT) R.string.pair_rows_sent else R.string.pair_rows_received),
+            style = MaterialTheme.typography.titleSmall
+        )
+        group.forEach { row -> PairRowView(row, peerName) { action?.invoke(row) } }
+    }
+}
+
+@Composable
+private fun PairRowView(row: PairRow, peerName: String?, action: @Composable () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+            when (row.outcome) {
+                PairOutcome.WAITING -> CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                PairOutcome.ADDED -> Icon(Icons.Filled.CheckCircle, null, tint = MaterialTheme.colorScheme.primary)
+                PairOutcome.FAILED -> Icon(Icons.Outlined.ErrorOutline, null, tint = MaterialTheme.colorScheme.error)
+                else -> Icon(Icons.Outlined.RemoveCircleOutline, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            Text(
+                when (row.kind) {
+                    PairItem.KEY_PAIR -> stringResource(R.string.pair_kind_keypair, row.name)
+                    PairItem.PUBLIC_KEY -> stringResource(R.string.pair_kind_public, row.name)
+                    else -> stringResource(R.string.pair_item_backup)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                rowStatus(row, peerName),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (row.outcome == PairOutcome.FAILED) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            // The same grouping both apps use on the received preview, so the two screens can be compared.
+            row.fingerprint?.let {
+                Text(
+                    grouped(it),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            action()
+        }
+    }
+}
+
+@Composable
+private fun rowStatus(row: PairRow, peerName: String?): String {
+    val failed = row.detail?.let { stringResource(R.string.pair_row_failed, it) } ?: stringResource(R.string.pair_row_failed_plain)
+    return if (row.direction == PairDirection.SENT) when (row.outcome) {
+        PairOutcome.WAITING -> stringResource(R.string.pair_row_waiting)
+        PairOutcome.ADDED -> peerName?.let { stringResource(R.string.pair_row_added_on, it) }
+            ?: stringResource(R.string.pair_row_added_on_unnamed)
+        PairOutcome.SKIPPED -> peerName?.let { stringResource(R.string.pair_row_skipped_on, it) }
+            ?: stringResource(R.string.pair_row_skipped_on_unnamed)
+        PairOutcome.DECLINED -> stringResource(R.string.pair_row_declined)
+        PairOutcome.FAILED -> failed
+        PairOutcome.NO_ANSWER -> stringResource(R.string.pair_row_no_answer)
+    } else when (row.outcome) {
+        PairOutcome.ADDED -> (row.detail ?: stringResource(R.string.pair_import_added))
+            .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+        PairOutcome.FAILED -> failed
+        else -> stringResource(R.string.pair_row_skipped_here)
+    }
+}
+
+/** After Done or the other side ending: the counts, every row, and a way to open what arrived. */
+@Composable
+private fun FinishedPane(
+    finished: PairStage.Finished,
+    onClose: () -> Unit,
+    onAgain: () -> Unit,
+    onOpenKey: (String) -> Unit,
+    onOpenKeyring: () -> Unit
+) {
+    val tally = remember(finished) { PairLedger.tally(finished.rows) }
+    Text(stringResource(R.string.pair_finished_title), style = MaterialTheme.typography.titleMedium)
+    if (finished.byPeer) {
+        Text(stringResource(R.string.pair_finished_by_peer), style = MaterialTheme.typography.bodyMedium)
+    }
+    Text(
+        stringResource(R.string.pair_ended),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Spacer(Modifier.height(4.dp))
+    TallyLine(stringResource(R.string.pair_tally_sent), tally.sent)
+    TallyLine(stringResource(R.string.pair_tally_received), tally.received)
+    TallyLine(stringResource(R.string.pair_tally_skipped), tally.skipped)
+    if (tally.failed > 0) TallyLine(stringResource(R.string.pair_tally_failed), tally.failed)
+    if (tally.unanswered > 0) TallyLine(stringResource(R.string.pair_tally_unanswered), tally.unanswered)
+
+    PairRows(finished.rows, finished.peerName) { row ->
+        if (row.direction == PairDirection.RECEIVED && row.outcome == PairOutcome.ADDED) {
+            val fp = row.fingerprint
+            if (fp != null) {
+                TextButton(onClick = { onOpenKey(fp) }) { Text(stringResource(R.string.pair_view_key)) }
+            } else if (row.isBackup) {
+                TextButton(onClick = onOpenKeyring) { Text(stringResource(R.string.pair_view_keyring)) }
+            }
+        }
+    }
+
+    Spacer(Modifier.height(8.dp))
+    Button(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.pair_close)) }
+    OutlinedButton(onClick = onAgain, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.pair_again)) }
+}
+
+@Composable
+private fun TallyLine(label: String, count: Int) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Text(count.toString(), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
     }
 }
 

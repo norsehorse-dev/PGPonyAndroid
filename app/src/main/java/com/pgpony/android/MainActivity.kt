@@ -1367,7 +1367,20 @@ fun PGPonyMainScreen(
                 composable("pair") {
                     com.pgpony.android.ui.pair.PairScreen(
                         onBack = { navController.popBackStack() },
-                        onKeysChanged = { keyringVm.loadKeys() }
+                        onKeysChanged = { keyringVm.loadKeys() },
+                        // From the summary, after the session ended: the pairing
+                        // screen leaves the stack, so Back from the key lands on the Keyring.
+                        onOpenKey = { fingerprint ->
+                            navController.navigate("keyring/$fingerprint") {
+                                popUpTo(Screen.Keyring.route) { inclusive = false }
+                            }
+                        },
+                        onOpenKeyring = {
+                            navController.navigate(Screen.Keyring.route) {
+                                popUpTo(Screen.Keyring.route) { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        }
                     )
                 }
                 // §5.6.1 (#36 part 1): key recycle bin. Reuses the shared

@@ -192,6 +192,13 @@ out or comes in with a secret in the clear), a "pair" route reached from Setting
 100 strings in every locale but Korean (falls back to English). Desktop 3.0.x needs no change: it already shows
 the invite QR when hosting and takes a typed address or pasted invite when joining.
 
+Confirmation (added after RC1 testing): a row per item, sent or received, with its outcome (added on the other
+side, skipped, declined, failed with the reason, no answer), the fingerprint grouped as both apps show it, a
+haptic tick on each success, and Done, which ends the session and shows the counts with View key and View
+keyring for what arrived (ui/pair/PairLedger.kt, PairLedgerTest). Protocol v1 has no skip flag, so a skip is
+told from a failure by the reason text either app sends in each language. On main: add an optional
+`"skipped": true` member to RESULT (unknown members are ignored, so v1 peers are unaffected) and match on it.
+
 Test: the pair unit tests and the four vector files on `4.6.x`, plus PairControllerTest. On device against desktop 3.0.0 (macOS and Linux):
 phone joins by scan and by typed address, phone hosts and desktop joins, a wrong typed code, a Different, a
 connection from a non-local address refused, one item of each kind each way, a backup restored with its recovery
