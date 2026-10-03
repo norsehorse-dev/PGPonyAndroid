@@ -1019,6 +1019,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         when (_encryptState.value.mode) {
             EncryptMode.FILE -> encryptFile(pass)
             EncryptMode.TEXT -> encrypt(pass)
+            // 4.6.3 (#72): package mode signs with ML-DSA keys too.
+            EncryptMode.BUNDLE -> encryptBundle(pass)
             else -> pqcV4Decision = null
         }
     }
@@ -1146,7 +1148,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         session: com.pgpony.android.crypto.card.OpenPgpCardSession,
         pin: ByteArray,
         cardSigningPublicKey: org.bouncycastle.openpgp.PGPPublicKey,
-        recipientRings: List<org.bouncycastle.openpgp.PGPPublicKeyRing>
+        recipientRings: List<org.bouncycastle.openpgp.PGPPublicKeyRing>,
+        // 4.6.3 (4.7.0 item 5): v4 algo-35 recipients, on their own channel.
+        v4Recipients: List<com.pgpony.android.crypto.pqc.V4Algo35Recipient> = emptyList()
     ): String {
         val s = _encryptState.value
         val payloadBytes = s.bundleAttachments.sumOf { it.size.coerceAtLeast(0L) }
@@ -1189,7 +1193,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             cardPin = pin,
                             cardSigningPublicKey = cardSigningPublicKey,
                             filename = null,
-                            armor = true
+                            armor = true,
+                            v4Algo35Recipients = v4Recipients
                         )
                     }
                 }
@@ -1465,10 +1470,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // bundle encrypt paths were dispatched; the ordinary
                 // recipient encrypt ran its ring loads AND the encryption
                 // itself on Dispatchers.Main.
-                val recipientRings = withContext(Dispatchers.IO) {
-                    s.selectedRecipients.mapNotNull { repo.loadEncryptionRecipientRing(it.fingerprint) }
-                }
-                val v4Recipients = v4RecipientsFor(s.selectedRecipients)
+                // 4.6.3 (4.7.0 item 5): a selected recipient that gives no key
+                // stops the operation instead of being left out.
+                val (recipientRings, v4Recipients) = loadRecipientsStrict(s.selectedRecipients)
                 val effectiveSigner = if (s.signMessage && s.signingKey != null) {
                     // RC3 §N (#34): PQC/classical-recipient default.
                     withContext(Dispatchers.IO) {
@@ -1722,16 +1726,36 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      * binary .pgp, and armoring a large file would inflate it by a
      * third for no benefit.
      */
-    /** item 14 (#56): the v4 Ed25519 + algo-35 recipients among [recipients].
-     *  Such a key is not a BouncyCastle ring, so loadEncryptionRecipientRing
-     *  drops it; it travels the v4Algo35Recipients channel instead. */
-    private suspend fun v4RecipientsFor(
+    /**
+     * 4.6.3 (4.7.0 item 5): every selected recipient, loaded through the same
+     * loaders as the share Quick Action (ShareRecipients): BouncyCastle rings,
+     * a composite ML-DSA key's ML-KEM subkey, or the v4 algo-35 channel. A
+     * recipient that gives no encryption key throws, so nothing is encrypted
+     * with someone quietly left out (mapNotNull used to drop them).
+     */
+    private suspend fun loadRecipientsStrict(
         recipients: List<PGPKeyEntity>
-    ): List<com.pgpony.android.crypto.pqc.V4Algo35Recipient> = withContext(Dispatchers.IO) {
-        recipients
-            .filter { it.algorithm == com.pgpony.android.crypto.KeyAlgorithm.MLKEM768_X25519_V4 }
-            .mapNotNull { repo.loadV4Algo35Recipient(it.fingerprint) }
-    }
+    ): Pair<List<org.bouncycastle.openpgp.PGPPublicKeyRing>, List<com.pgpony.android.crypto.pqc.V4Algo35Recipient>> =
+        withContext(Dispatchers.IO) {
+            val byFp = recipients.associateBy { it.fingerprint.uppercase() }
+            val loaded = com.pgpony.android.ui.share.ShareRecipients.load(
+                fingerprints = recipients.map { it.fingerprint },
+                isV4Algo35 = { fp ->
+                    byFp[fp.uppercase()]?.algorithm == com.pgpony.android.crypto.KeyAlgorithm.MLKEM768_X25519_V4
+                },
+                ring = { fp -> repo.loadEncryptionRecipientRing(fp) },
+                v4Algo35 = { fp -> repo.loadV4Algo35Recipient(fp) }
+            )
+            if (!loaded.isComplete) {
+                val names = loaded.unusable.joinToString(", ") { fp ->
+                    byFp[fp.uppercase()]?.let { e -> e.userID.ifBlank { e.shortFingerprint } } ?: fp
+                }
+                throw IllegalStateException(
+                    PGPonyApp.instance.getString(R.string.share_target_encrypt_recipient_unusable_format, names)
+                )
+            }
+            loaded.rings to loaded.v4Algo35
+        }
 
     private suspend fun streamEncryptToScratch(
         uri: android.net.Uri,
@@ -1850,10 +1874,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // 4.0.4 — off the main thread; see encryptText above. File
                 // encrypt is the worse of the two, because the payload is
                 // whatever the user picked rather than a text box.
-                val recipientRings = withContext(Dispatchers.IO) {
-                    s.selectedRecipients.mapNotNull { repo.loadEncryptionRecipientRing(it.fingerprint) }
-                }
-                val v4Recipients = v4RecipientsFor(s.selectedRecipients)
+                // 4.6.3 (4.7.0 item 5): a selected recipient that gives no key
+                // stops the operation instead of being left out.
+                val (recipientRings, v4Recipients) = loadRecipientsStrict(s.selectedRecipients)
                 val effectiveSigner = if (s.signMessage && s.signingKey != null) {
                     // RC3 §N (#34): PQC/classical-recipient default.
                     withContext(Dispatchers.IO) {
@@ -2410,23 +2433,57 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             try {
                 // 4.0.4 — the crypto below was already on Dispatchers.Default,
                 // but the ring loads feeding it were not.
-                val recipientRings = withContext(Dispatchers.IO) {
-                    s.selectedRecipients.mapNotNull { repo.loadEncryptionRecipientRing(it.fingerprint) }
-                }
-                val v4Recipients = v4RecipientsFor(s.selectedRecipients)
-                val signingRing = withContext(Dispatchers.IO) {
+                // 4.6.3 (4.7.0 item 5): a selected recipient that gives no key
+                // stops the operation instead of being left out.
+                val (recipientRings, v4Recipients) = loadRecipientsStrict(s.selectedRecipients)
+                val effectiveSigner = withContext(Dispatchers.IO) {
                     if (
                         s.signMessage && s.signingKey != null && s.signingKey.isCardBacked != true
                     ) {
                         // RC3 §N (#34): PQC/classical-recipient default.
-                        val effective = resolveEffectiveSigner(
+                        resolveEffectiveSigner(
                             base = s.signingKey,
                             recipients = s.selectedRecipients,
                             signOnly = false
                         )
-                        repo.loadSecretKeyRing(effective.fingerprint)
                     } else null
                 }
+                val signingRing = withContext(Dispatchers.IO) {
+                    if (effectiveSigner != null && !effectiveSigner.algorithm.isCompositeSign)
+                        repo.loadSecretKeyRing(effectiveSigner.fingerprint)
+                    else null
+                }
+                // 4.6.3 (#72): a composite ML-DSA signer is not a BouncyCastle
+                // ring, so loadSecretKeyRing returned null and package mode
+                // reported that the signing key could not be unlocked. Load the
+                // raw composite material as the single-file path does (#65).
+                val compositeInfo = withContext(Dispatchers.IO) {
+                    if (effectiveSigner != null && effectiveSigner.algorithm.isCompositeSign)
+                        repo.loadCompositeKeyInfo(effectiveSigner.fingerprint, passphrase?.toCharArray())
+                    else null
+                }
+                if (effectiveSigner != null && effectiveSigner.algorithm.isCompositeSign &&
+                    compositeInfo?.compositeSecret == null
+                ) {
+                    throw SigningError.PassphraseRequired()
+                }
+                // 4.6.0 (item 14), as in encryptFile: an ML-DSA signature to a
+                // v4 recipient reads in PGPony but not in GnuPG; ask first.
+                val pqcInV1 = compositeInfo != null &&
+                    crypto.compositeSignatureInSeipdV1(recipientRings, s.recipientSubkeyChoices, v4Recipients)
+                val pqcDecision = pqcV4Decision.also { pqcV4Decision = null }
+                if (pqcInV1 && pqcDecision == null) {
+                    pqcV4PendingPassphrase = passphrase
+                    _encryptState.value = _encryptState.value.copy(
+                        isProcessing = false,
+                        processedBytes = 0L,
+                        totalBytes = 0L,
+                        showSignPassphraseDialog = false,
+                        showPqcV4SignPrompt = true
+                    )
+                    return@launch
+                }
+                val droppedPqcSignature = pqcInV1 && pqcDecision == false
 
                 // 4.1.0 Phase 14c. The ring load above returns null if
                 // loadSecretKeyRing fails for any other reason too. Either
@@ -2437,7 +2494,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // crypto app can hand you, and it is precisely the failure
                 // AraafRoyall's screenshots were suspected of showing.
                 // Refuse loudly instead.
-                if (s.signMessage && s.signingKey != null && signingRing == null) {
+                if (s.signMessage && s.signingKey != null && signingRing == null && compositeInfo == null) {
                     _encryptState.value = _encryptState.value.copy(
                         isProcessing = false,
                         processedBytes = 0L,
@@ -2490,28 +2547,55 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         totalBytes = payloadBytes + mimeFile.length()
                     )
                     val cipherFile = java.io.File(mimeFile.parentFile, "message.asc")
-                    val input = ProgressInputStream(
-                        delegate = mimeFile.inputStream(),
-                        isCancelled = { job?.isActive == false },
-                    ) { read ->
-                        _encryptState.value = _encryptState.value.copy(
-                            processedBytes = payloadBytes + read
+                    if (compositeInfo != null) {
+                        // 4.6.3 (#72): a composite signature covers the whole
+                        // document and cannot stream, so the assembled package
+                        // takes the buffered crypto.encrypt path, as a composite
+                        // signer does for a single file (#65).
+                        val container = mimeFile.readBytes()
+                        val out = crypto.encrypt(
+                            data = container,
+                            recipientPublicKeys = recipientRings,
+                            signingSecretKey = null,
+                            passphrase = passphrase,
+                            filename = null,
+                            armor = true,
+                            signingKeyId = s.selectedSigningKeyId,
+                            recipientSubkeyChoices = s.recipientSubkeyChoices,
+                            v4Algo35Recipients = v4Recipients,
+                            compositeSignSuite = compositeInfo.suite,
+                            compositeSignSecret = compositeInfo.compositeSecret,
+                            compositeSignerFingerprint = compositeInfo.fingerprint,
+                            compositeSignInSeipdV1 = !droppedPqcSignature
                         )
-                    }
-                    input.use { source ->
-                        cipherFile.outputStream().buffered().use { sink ->
-                            crypto.encryptStream(
-                                input = source,
-                                output = sink,
-                                recipientPublicKeys = recipientRings,
-                                signingSecretKey = signingRing,
-                                passphrase = passphrase,
-                                filename = null,
-                                armor = true,
-                                signingKeyId = s.selectedSigningKeyId,
-                                recipientSubkeyChoices = s.recipientSubkeyChoices,
-                                v4Algo35Recipients = v4Recipients
+                        cipherFile.writeBytes(out)
+                        _encryptState.value = _encryptState.value.copy(
+                            processedBytes = payloadBytes + container.size
+                        )
+                    } else {
+                        val input = ProgressInputStream(
+                            delegate = mimeFile.inputStream(),
+                            isCancelled = { job?.isActive == false },
+                        ) { read ->
+                            _encryptState.value = _encryptState.value.copy(
+                                processedBytes = payloadBytes + read
                             )
+                        }
+                        input.use { source ->
+                            cipherFile.outputStream().buffered().use { sink ->
+                                crypto.encryptStream(
+                                    input = source,
+                                    output = sink,
+                                    recipientPublicKeys = recipientRings,
+                                    signingSecretKey = signingRing,
+                                    passphrase = passphrase,
+                                    filename = null,
+                                    armor = true,
+                                    signingKeyId = s.selectedSigningKeyId,
+                                    recipientSubkeyChoices = s.recipientSubkeyChoices,
+                                    v4Algo35Recipients = v4Recipients
+                                )
+                            }
                         }
                     }
                     // The container is plaintext and its job is done.
@@ -2545,6 +2629,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     // signing key, which is why it went unnoticed.
                     showSignPassphraseDialog = false,
                     signPassphrase = "",
+                    // 4.6.3 (#72): the PQC-to-v4 prompt's "send unsigned" answer.
+                    sentUnsignedPqc = droppedPqcSignature,
                     showBundleResultSheet = true
                 )
                 _events.tryEmit(Event.EncryptSuccess)

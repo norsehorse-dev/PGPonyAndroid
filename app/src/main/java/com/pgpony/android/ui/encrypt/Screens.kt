@@ -679,7 +679,7 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
                         val msg = state.inputText
                         viewModel.onCardSignStarted()
                         cardSignWaiting = true
-                        val recipientFps = state.selectedRecipients.map { it.fingerprint }
+                        val recipientEntities = state.selectedRecipients
                         // FILE mode encrypts-and-signs the picked bytes
                         // (binary, armor=false) → file result sheet. SIGN
                         // clear-signs text; TEXT encrypts-and-signs text —
@@ -704,12 +704,11 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
                                 if (fileBytes == null) throw OpenPgpCardException.Malformed(
                                     if (tooLargeForCard) cardTooLargeMsg else cardNoFileMsg
                                 )
-                                val recipientRings = recipientFps.mapNotNull {
-                                    PGPonyApp.instance.keyRepository.loadPublicKeyRing(it)
-                                }
-                                if (recipientRings.isEmpty()) {
-                                    throw OpenPgpCardException.Malformed(cardNoRecipientsMsg)
-                                }
+                                // 4.6.3 (4.7.0 item 5): the Encrypt screen's
+                                // loaders, and no recipient silently left out.
+                                val (recipientRings, v4Recipients) = loadCardRecipients(
+                                    encryptContext, recipientEntities, cardNoRecipientsMsg
+                                )
                                 PGPCryptoService.shared.encrypt(
                                     data = fileBytes,
                                     recipientPublicKeys = recipientRings,
@@ -721,7 +720,8 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
                                     cardSigningPublicKey =
                                         CardSigningService.shared.signingPublicKey(pubRing, fp),
                                     filename = fileName,
-                                    armor = false
+                                    armor = false,
+                                    v4Algo35Recipients = v4Recipients
                                 )
                             }) { result ->
                                 cardSignWaiting = false
@@ -748,12 +748,11 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
                                 val pubRing = PGPonyApp.instance.keyRepository
                                     .loadPublicKeyRingByCardFingerprint(fp)
                                     ?: throw OpenPgpCardException.Malformed(cardPairFirstMsg)
-                                val recipientRings = recipientFps.mapNotNull {
-                                    PGPonyApp.instance.keyRepository.loadPublicKeyRing(it)
-                                }
-                                if (recipientRings.isEmpty()) {
-                                    throw OpenPgpCardException.Malformed(cardNoRecipientsMsg)
-                                }
+                                // 4.6.3 (4.7.0 item 5): the Encrypt screen's
+                                // loaders, and no recipient silently left out.
+                                val (recipientRings, v4Recipients) = loadCardRecipients(
+                                    encryptContext, recipientEntities, cardNoRecipientsMsg
+                                )
                                 viewModel.encryptBundleWithCard(
                                     session = session,
                                     pin = pin.toByteArray(Charsets.UTF_8),
@@ -761,7 +760,8 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
                                     // SUBKEY on offline-primary layouts.
                                     cardSigningPublicKey =
                                         CardSigningService.shared.signingPublicKey(pubRing, fp),
-                                    recipientRings = recipientRings
+                                    recipientRings = recipientRings,
+                                    v4Recipients = v4Recipients
                                 )
                             }) { result ->
                                 cardSignWaiting = false
@@ -784,12 +784,10 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
                                     .loadPublicKeyRingByCardFingerprint(fp)
                                     ?: throw OpenPgpCardException.Malformed(cardPairFirstMsg)
                                 if (encryptAndSign) {
-                                    val recipientRings = recipientFps.mapNotNull {
-                                        PGPonyApp.instance.keyRepository.loadPublicKeyRing(it)
-                                    }
-                                    if (recipientRings.isEmpty()) {
-                                        throw OpenPgpCardException.Malformed(cardNoRecipientsMsg)
-                                    }
+                                    // 4.6.3 (4.7.0 item 5): as above.
+                                    val (recipientRings, v4Recipients) = loadCardRecipients(
+                                        encryptContext, recipientEntities, cardNoRecipientsMsg
+                                    )
                                     val out = PGPCryptoService.shared.encrypt(
                                         data = msg.toByteArray(Charsets.UTF_8),
                                         recipientPublicKeys = recipientRings,
@@ -800,7 +798,8 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
                                     // layouts; the primary claims the wrong issuer.
                                     cardSigningPublicKey =
                                         CardSigningService.shared.signingPublicKey(pubRing, fp),
-                                        armor = true
+                                        armor = true,
+                                        v4Algo35Recipients = v4Recipients
                                     )
                                     String(out, Charsets.UTF_8)
                                 } else if (state.detachedSignature) {
@@ -4383,4 +4382,39 @@ private fun DecryptKeyPickerRow(
             )
         }
     }
+}
+
+/**
+ * 4.6.3 (4.7.0 item 5): the recipients of a card encrypt-and-sign, loaded the
+ * way the Encrypt screen loads them (ShareRecipients): BouncyCastle rings, a
+ * composite ML-DSA key's ML-KEM subkey, or the v4 algo-35 channel. The plain
+ * loader these card paths used dropped a composite or algo-35 recipient
+ * without a word; now any selected recipient that gives no key stops the
+ * operation.
+ */
+private fun loadCardRecipients(
+    context: Context,
+    recipients: List<PGPKeyEntity>,
+    noRecipientsMsg: String
+): Pair<List<org.bouncycastle.openpgp.PGPPublicKeyRing>, List<com.pgpony.android.crypto.pqc.V4Algo35Recipient>> {
+    val repo = PGPonyApp.instance.keyRepository
+    val byFp = recipients.associateBy { it.fingerprint.uppercase() }
+    val loaded = com.pgpony.android.ui.share.ShareRecipients.load(
+        fingerprints = recipients.map { it.fingerprint },
+        isV4Algo35 = { fp ->
+            byFp[fp.uppercase()]?.algorithm == com.pgpony.android.crypto.KeyAlgorithm.MLKEM768_X25519_V4
+        },
+        ring = { fp -> repo.loadEncryptionRecipientRing(fp) },
+        v4Algo35 = { fp -> repo.loadV4Algo35Recipient(fp) }
+    )
+    if (!loaded.isComplete) {
+        val names = loaded.unusable.joinToString(", ") { fp ->
+            byFp[fp.uppercase()]?.let { e -> e.userID.ifBlank { e.shortFingerprint } } ?: fp
+        }
+        throw OpenPgpCardException.Malformed(
+            context.getString(R.string.share_target_encrypt_recipient_unusable_format, names)
+        )
+    }
+    if (loaded.isEmpty) throw OpenPgpCardException.Malformed(noRecipientsMsg)
+    return loaded.rings to loaded.v4Algo35
 }
