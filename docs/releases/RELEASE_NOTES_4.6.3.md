@@ -15,6 +15,10 @@ always travels under a passphrase: one that has none is protected with a transfe
 trip. A backup restores with the recovery code the sending screen shows, and takes no trust levels or settings
 from the other device.
 
+Every item gets its own line with how it went: added on the other device, skipped there, or not imported
+and why, with the key's fingerprint so you can compare it with the other screen. Done ends the session and
+shows what was sent, received and skipped, with a button to open each key that arrived.
+
 The phone only pairs over Wi-Fi, Ethernet, tethering or USB, never over mobile data, and only with a device on
 the local network. Offline mode blocks pairing. Sending a key pair or a backup asks for your fingerprint or
 screen lock first, as exporting a private key does. Nothing is kept: leaving the screen ends the session and
