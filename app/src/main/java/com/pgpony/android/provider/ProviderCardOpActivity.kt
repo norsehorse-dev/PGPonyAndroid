@@ -315,7 +315,17 @@ class ProviderCardOpActivity : ComponentActivity() {
         return when (op.action) {
             OpenPgpApi.ACTION_SIGN_AND_ENCRYPT -> {
                 val pubRing = ringForSlot(ard.sigFingerprint)
-                val recipients = op.recipientFingerprints.mapNotNull { repo.loadPublicKeyRing(it) }
+                // 4.6.3 (4.7.0 item 5): the provider's own recipient loader, so a
+                // composite ML-DSA recipient is reached through its ML-KEM
+                // subkey, and a recipient that gives no key stops the send
+                // instead of being left out (the service already resolved
+                // every fingerprint here with the same loader).
+                val recipients = op.recipientFingerprints.map { fp ->
+                    repo.loadEncryptionRecipientRing(fp)
+                        ?: throw OpenPgpCardException.Malformed(
+                            getString(R.string.share_target_encrypt_recipient_unusable_format, fp)
+                        )
+                }
                 // P2c Fix3: stream through a temp file with compression
                 // OFF. Streaming avoids buffering a 45 MB attachment's
                 // ciphertext in memory; skipping ZLIB keeps the card
