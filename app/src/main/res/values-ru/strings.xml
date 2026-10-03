@@ -305,6 +305,7 @@
     <!-- RC3 §J (#16): Sign File / Verify stream the picked file from disk; these cover the two remaining failure shapes. -->
     <string name="sign_verify_error_file_unreadable">Не удалось прочитать выбранный файл. Выберите его снова.</string>
     <string name="verify_file_error_sig_not_signature">Этот файл слишком велик для отсоединённой подписи. Выберите файл .asc или .sig, а не подписанное содержимое.</string>
+    <string name="verify_error_signature_damaged">Блок подписи повреждён, поэтому его нельзя проверить. Получите новую копию файла подписи.</string>
     <string name="sign_file_save_button">Сохранить в «Файлы»</string>
     <string name="encrypt_mode_password">Пароль</string>
 
@@ -1781,6 +1782,7 @@
     <string name="settings_share_format_subtitle">Как кнопка \"Поделиться\" упаковывает зашифрованный или подписанный результат.</string>
     <!-- 3.1.0 Phase 8 Fix1 — file import read error -->
     <string name="keyring_error_file_read">Не удалось прочитать этот файл. Попробуйте сохранить его в локальное хранилище (приложение \"Файлы\") и импортировать снова.</string>
+    <string name="keyring_error_file_too_large">Этот файл слишком велик для ключа. Выберите файл ключа .asc, .gpg или .pgp.</string>
     <!-- 3.1.0 Phase 8 Fix2 — file import diagnostic -->
     <string name="keyring_error_parse_diag">Не удалось прочитать ключ из файла — получено %1$d байт, начинающихся с \"%2$s\"</string>
     <!-- 3.1.0 Phase 8 Fix3 — richer file import diagnostic -->

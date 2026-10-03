@@ -287,11 +287,16 @@ enum class ExpirationOption(val displayName: String, val seconds: Long?) {
 
 class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
 
-    private companion object {
+    companion object {
         /** RC5 P3 (#23): minimum visible duration for the pull-to-refresh
          *  indicator. Long enough to read as "the app responded", short
          *  enough not to feel like fake work. */
-        const val MIN_REFRESH_SPIN_MS = 650L
+        private const val MIN_REFRESH_SPIN_MS = 650L
+
+        /** 4.6.3 (4.7.0 item 19 F): the largest file read as a key to import.
+         *  Far above any real keyring export, small enough that the preview's
+         *  String and armored copies of it fit in memory. */
+        const val KEY_FILE_MAX_BYTES: Long = 32L * 1024 * 1024
     }
 
     private val _state = MutableStateFlow(KeyringUiState())
@@ -853,6 +858,13 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
      *     armored preview, so .gpg/.pgp key files import like .asc.
      *   • armored text → straight to previewArmoredKey, as before.
      */
+    /** 4.6.3 (4.7.0 item 19 F): a picked key file over [KEY_FILE_MAX_BYTES]. */
+    fun reportKeyFileTooLarge() {
+        _state.value = _state.value.copy(
+            errorMessage = PGPonyApp.instance.getString(R.string.keyring_error_file_too_large)
+        )
+    }
+
     fun previewKeyBytes(
         bytes: ByteArray?,
         sourceFilename: String? = null,

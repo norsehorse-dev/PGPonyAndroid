@@ -325,6 +325,7 @@
     <!-- RC3 §J (#16): Sign File / Verify stream the picked file from disk; these cover the two remaining failure shapes. -->
     <string name="sign_verify_error_file_unreadable">Couldn\'t read the picked file. Pick it again.</string>
     <string name="verify_file_error_sig_not_signature">That file is too large to be a detached signature. Pick the .asc or .sig file, not the signed content.</string>
+    <string name="verify_error_signature_damaged">The signature block is damaged, so it cannot be checked. Get a fresh copy of the signature file.</string>
     <string name="sign_file_save_button">Save to Files</string>
     <string name="encrypt_mode_password">Password</string>
 
@@ -1879,6 +1880,7 @@
     <string name="settings_share_format_subtitle">How the Share button packages an encrypted or signed result.</string>
     <!-- 3.1.0 Phase 8 Fix1 — file import read error -->
     <string name="keyring_error_file_read">Couldn\'t read that file. Try saving it to local storage (Files app) and importing again.</string>
+    <string name="keyring_error_file_too_large">That file is too large to be a key. Pick the .asc, .gpg or .pgp key file.</string>
     <!-- 3.1.0 Phase 8 Fix2 — file import diagnostic -->
     <string name="keyring_error_parse_diag">Couldn\'t read a key from the file. Got %1$d bytes starting with \"%2$s\"</string>
     <!-- 3.1.0 Phase 8 Fix3 — richer file import diagnostic -->

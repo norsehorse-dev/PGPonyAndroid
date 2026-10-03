@@ -3326,6 +3326,8 @@ private fun shareSignatureFile(context: Context, bytes: ByteArray, filename: Str
 private fun DecryptVerifyBody(state: DecryptUiState, viewModel: EncryptDecryptViewModel) {
     val context = LocalContext.current
     val activity = context.findEncryptMainActivity()
+    // 4.6.3 (4.7.0 item 19 B): the signature read leaves the main thread.
+    val pickScope = rememberCoroutineScope()
 
     val pickInto: (isSignature: Boolean) -> Unit = { isSignature ->
         activity?.startDocumentPicker(arrayOf("*/*")) { uri ->
@@ -3338,11 +3340,18 @@ private fun DecryptVerifyBody(state: DecryptUiState, viewModel: EncryptDecryptVi
                     // whole packet, and a real one is a few hundred
                     // bytes). The 1 MiB cap exists so picking the wrong
                     // file here fails fast instead of buffering a movie.
-                    val bytes = viewModel.readAtMost(uri, SIGNATURE_FILE_BUFFER_LIMIT)
-                    if (bytes == null) {
-                        viewModel.reportVerifyFileTooLarge()
-                    } else {
-                        viewModel.setVerifyFileSignature(name ?: fallback ?: "signature", bytes)
+                    // 4.6.3 (4.7.0 item 19 B, Play ANR): read on IO. A
+                    // cloud-backed provider can block on this read, and the
+                    // picker callback runs on the main thread.
+                    pickScope.launch {
+                        val bytes = withContext(Dispatchers.IO) {
+                            viewModel.readAtMost(uri, SIGNATURE_FILE_BUFFER_LIMIT)
+                        }
+                        if (bytes == null) {
+                            viewModel.reportVerifyFileTooLarge()
+                        } else {
+                            viewModel.setVerifyFileSignature(name ?: fallback ?: "signature", bytes)
+                        }
                     }
                 } else {
                     // RC3 §J (#16), iOS 8.1.0 §3a parity: the signed

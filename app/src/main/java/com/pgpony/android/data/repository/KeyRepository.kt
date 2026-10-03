@@ -1768,8 +1768,15 @@ class KeyRepository(
      * (passphrase wrong, key not a key pair, etc.).
      */
     /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    // 4.6.3 (4.7.0 item 19 A, Play ANR): every public Key Detail edit below
+    // runs on Dispatchers.Default. Each unlocks the secret key (S2K, Argon2 on
+    // v6 keys) and signs, and Key Detail called them from viewModelScope on the
+    // main thread; Add subkey with RSA generation was the reported ANR. Doing
+    // it here means no caller can run them on Main.
     suspend fun applyRevocation(fingerprint: String, reason: RevocationReason, comment: String?, passphrase: String?): String =
-        applyRevocationEdit(fingerprint, reason, comment, passphrase).also { stampLocalEdit(fingerprint) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            applyRevocationEdit(fingerprint, reason, comment, passphrase).also { stampLocalEdit(fingerprint) }
+        }
 
     private suspend fun applyRevocationEdit(
         fingerprint: String,
@@ -1847,7 +1854,9 @@ class KeyRepository(
      */
     /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
     suspend fun revokeSubkey(fingerprint: String, subkeyFingerprint: String, reason: RevocationReason, comment: String?, passphrase: String?, allowLastEncryptionSubkey: Boolean = false) =
-        revokeSubkeyEdit(fingerprint, subkeyFingerprint, reason, comment, passphrase, allowLastEncryptionSubkey).also { stampLocalEdit(fingerprint) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            revokeSubkeyEdit(fingerprint, subkeyFingerprint, reason, comment, passphrase, allowLastEncryptionSubkey).also { stampLocalEdit(fingerprint) }
+        }
 
     private suspend fun revokeSubkeyEdit(
         fingerprint: String,
@@ -1945,7 +1954,9 @@ class KeyRepository(
      */
     /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
     suspend fun removeSubkey(fingerprint: String, subkeyFingerprint: String, allowLastEncryptionSubkey: Boolean = false) =
-        removeSubkeyEdit(fingerprint, subkeyFingerprint, allowLastEncryptionSubkey).also { stampLocalEdit(fingerprint) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            removeSubkeyEdit(fingerprint, subkeyFingerprint, allowLastEncryptionSubkey).also { stampLocalEdit(fingerprint) }
+        }
 
     private suspend fun removeSubkeyEdit(
         fingerprint: String,
@@ -2053,7 +2064,9 @@ class KeyRepository(
      */
     /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
     suspend fun setKeyExpirationSoftware(fingerprint: String, expiresAtEpochSeconds: Long?, passphrase: String?) =
-        setKeyExpirationSoftwareEdit(fingerprint, expiresAtEpochSeconds, passphrase).also { stampLocalEdit(fingerprint) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            setKeyExpirationSoftwareEdit(fingerprint, expiresAtEpochSeconds, passphrase).also { stampLocalEdit(fingerprint) }
+        }
 
     private suspend fun setKeyExpirationSoftwareEdit(
         fingerprint: String,
@@ -2177,7 +2190,9 @@ class KeyRepository(
      */
     /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
     suspend fun persistCardExpiration(fingerprint: String, updatedPublicRing: org.bouncycastle.openpgp.PGPPublicKeyRing, expiresAtEpochSeconds: Long?) =
-        persistCardExpirationEdit(fingerprint, updatedPublicRing, expiresAtEpochSeconds).also { stampLocalEdit(fingerprint) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            persistCardExpirationEdit(fingerprint, updatedPublicRing, expiresAtEpochSeconds).also { stampLocalEdit(fingerprint) }
+        }
 
     private suspend fun persistCardExpirationEdit(
         fingerprint: String,
@@ -2250,7 +2265,9 @@ class KeyRepository(
      */
     /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
     suspend fun addSubkey(fingerprint: String, type: ClassicalSubkeyGen.ClassicalSubkeyType, expirationSeconds: Long?, passphrase: String?) =
-        addSubkeyEdit(fingerprint, type, expirationSeconds, passphrase).also { stampLocalEdit(fingerprint) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            addSubkeyEdit(fingerprint, type, expirationSeconds, passphrase).also { stampLocalEdit(fingerprint) }
+        }
 
     private suspend fun addSubkeyEdit(
         fingerprint: String,
@@ -2346,7 +2363,9 @@ class KeyRepository(
      */
     /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
     suspend fun addCompositeEncryptionSubkey(fingerprint: String, suite: com.pgpony.android.crypto.pqc.CompositeSuite, expirationSeconds: Long?, passphrase: String?) =
-        addCompositeEncryptionSubkeyEdit(fingerprint, suite, expirationSeconds, passphrase).also { stampLocalEdit(fingerprint) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            addCompositeEncryptionSubkeyEdit(fingerprint, suite, expirationSeconds, passphrase).also { stampLocalEdit(fingerprint) }
+        }
 
     private suspend fun addCompositeEncryptionSubkeyEdit(
         fingerprint: String,
@@ -2454,7 +2473,9 @@ class KeyRepository(
      */
     /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
     suspend fun addCompositeSigningSubkey(fingerprint: String, suite: com.pgpony.android.crypto.pqc.CompositeSignSuite, expirationSeconds: Long?, passphrase: String?) =
-        addCompositeSigningSubkeyEdit(fingerprint, suite, expirationSeconds, passphrase).also { stampLocalEdit(fingerprint) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            addCompositeSigningSubkeyEdit(fingerprint, suite, expirationSeconds, passphrase).also { stampLocalEdit(fingerprint) }
+        }
 
     private suspend fun addCompositeSigningSubkeyEdit(
         fingerprint: String,
@@ -2532,7 +2553,9 @@ class KeyRepository(
      */
     /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
     suspend fun addUserId(fingerprint: String, userId: String, makePrimary: Boolean, passphrase: String?) =
-        addUserIdEdit(fingerprint, userId, makePrimary, passphrase).also { stampLocalEdit(fingerprint) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            addUserIdEdit(fingerprint, userId, makePrimary, passphrase).also { stampLocalEdit(fingerprint) }
+        }
 
     private suspend fun addUserIdEdit(
         fingerprint: String,
@@ -2601,7 +2624,9 @@ class KeyRepository(
      */
     /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
     suspend fun setNotations(fingerprint: String, notations: List<UserIdService.Notation>, passphrase: String?) =
-        setNotationsEdit(fingerprint, notations, passphrase).also { stampLocalEdit(fingerprint) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            setNotationsEdit(fingerprint, notations, passphrase).also { stampLocalEdit(fingerprint) }
+        }
 
     private suspend fun setNotationsEdit(
         fingerprint: String,
@@ -2632,7 +2657,9 @@ class KeyRepository(
      *  for the "can't revoke the last UID" guard. */
     /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
     suspend fun revokeUserId(fingerprint: String, userId: String, reason: RevocationReason, comment: String?, passphrase: String?) =
-        revokeUserIdEdit(fingerprint, userId, reason, comment, passphrase).also { stampLocalEdit(fingerprint) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            revokeUserIdEdit(fingerprint, userId, reason, comment, passphrase).also { stampLocalEdit(fingerprint) }
+        }
 
     private suspend fun revokeUserIdEdit(
         fingerprint: String,
@@ -2669,7 +2696,9 @@ class KeyRepository(
      *  CompositePrimaryKeyGen.removeUserId for the last-UID guard. */
     /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
     suspend fun removeUserId(fingerprint: String, userId: String) =
-        removeUserIdEdit(fingerprint, userId).also { stampLocalEdit(fingerprint) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            removeUserIdEdit(fingerprint, userId).also { stampLocalEdit(fingerprint) }
+        }
 
     private suspend fun removeUserIdEdit(fingerprint: String, userId: String) {
         val entity = dao.getByFingerprint(fingerprint)
@@ -2727,7 +2756,9 @@ class KeyRepository(
     /** Make [userId] the primary identity on a software key pair. */
     /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
     suspend fun setPrimaryUserId(fingerprint: String, userId: String, passphrase: String?) =
-        setPrimaryUserIdEdit(fingerprint, userId, passphrase).also { stampLocalEdit(fingerprint) }
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            setPrimaryUserIdEdit(fingerprint, userId, passphrase).also { stampLocalEdit(fingerprint) }
+        }
 
     private suspend fun setPrimaryUserIdEdit(
         fingerprint: String,
@@ -2925,7 +2956,17 @@ class KeyRepository(
      * PIN instead), and the sheet says existing backups keep the old
      * passphrase until re-exported.
      */
+    // 4.6.3 (4.7.0 item 19 A): the S2K work (Argon2 on v6 keys) runs off the
+    // main thread whoever calls, like the Key Detail edits above.
     suspend fun changePassphrase(
+        fingerprint: String,
+        oldPassphrase: String,
+        newPassphrase: String
+    ): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        changePassphraseOnCaller(fingerprint, oldPassphrase, newPassphrase)
+    }
+
+    private suspend fun changePassphraseOnCaller(
         fingerprint: String,
         oldPassphrase: String,
         newPassphrase: String

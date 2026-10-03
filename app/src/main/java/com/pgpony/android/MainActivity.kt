@@ -67,6 +67,7 @@
 
 package com.pgpony.android
 
+import kotlinx.coroutines.flow.first
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -933,8 +934,15 @@ fun PGPonyMainScreen(
     // Consume the onboarding "restore backup" request once the NavHost is
     // up (the LaunchedEffect body runs after this composition, so the nav
     // graph is set by then).
+    // 4.6.3 (4.7.0 item 19 E, Play crash): the NavHost sits inside the
+    // Scaffold's content, which is composed during layout, so an effect here
+    // can run before the graph is set, and navController.graph then throws
+    // IllegalStateException (a cold start from a share or open-with intent).
+    // Each navigating effect waits for the first back-stack entry, which
+    // exists only once the graph does.
     LaunchedEffect(pendingOpenBackup) {
         if (pendingOpenBackup) {
+            navController.currentBackStackEntryFlow.first()
             pendingOpenBackup = false
             navController.navigate("backup")
         }
@@ -947,6 +955,7 @@ fun PGPonyMainScreen(
     LaunchedEffect(keyringStateForEncryptJump.pendingEncryptToFingerprint) {
         val encryptToFp = keyringStateForEncryptJump.pendingEncryptToFingerprint
         if (encryptToFp != null) {
+            navController.currentBackStackEntryFlow.first() // 4.6.3: see above
             keyringVm.consumeEncryptToFingerprint()
             encDecVm.preselectRecipient(encryptToFp)
             navController.navigate(Screen.Encrypt.route) {
@@ -959,6 +968,8 @@ fun PGPonyMainScreen(
     // Handle pending intent actions
     val action = pendingAction.value
     LaunchedEffect(action) {
+        // 4.6.3: see the note above LaunchedEffect(pendingOpenBackup).
+        if (action !is IntentAction.None) navController.currentBackStackEntryFlow.first()
         when (action) {
             is IntentAction.EncryptText -> {
                 encDecVm.updateEncryptInput(action.text)

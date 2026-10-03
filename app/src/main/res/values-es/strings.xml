@@ -1295,6 +1295,7 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="settings_share_format_subtitle">Cómo empaqueta el botón Compartir un resultado cifrado o firmado.</string>
     <!-- 3.1.0 Phase 8 Fix1 — file import read error -->
     <string name="keyring_error_file_read">No se pudo leer el archivo. Guárdalo en el almacenamiento local (app Archivos) e intenta importarlo de nuevo.</string>
+    <string name="keyring_error_file_too_large">Ese archivo es demasiado grande para ser una clave. Elige el archivo de clave .asc, .gpg o .pgp.</string>
     <!-- 3.1.0 Phase 8 Fix2 — file import diagnostic -->
     <string name="keyring_error_parse_diag">Couldn\'t read a key from the file — got %1$d bytes starting with \"%2$s\"</string>
     <!-- 3.1.0 Phase 8 Fix3 — richer file import diagnostic -->
@@ -1853,6 +1854,7 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="sign_file_save_button">Guardar en Archivos</string>
     <string name="sign_verify_error_file_unreadable">No se pudo leer el archivo seleccionado. Selecciónalo de nuevo.</string>
     <string name="verify_file_error_sig_not_signature">Ese archivo es demasiado grande para ser una firma separada. Elige el archivo .asc o .sig, no el contenido firmado.</string>
+    <string name="verify_error_signature_damaged">El bloque de firma está dañado, así que no se puede comprobar. Consigue una copia nueva del archivo de firma.</string>
 
     <!-- 4.2.0 RC4 workstream O8: strings added by O3/O5. -->
     <string name="key_detail_fallbacks_strict_title">Usar solo las claves de reserva activadas</string>

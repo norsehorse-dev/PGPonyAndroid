@@ -1295,6 +1295,7 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="settings_share_format_subtitle">Wie die Teilen-Schaltfläche ein verschlüsseltes oder signiertes Ergebnis verpackt.</string>
     <!-- 3.1.0 Phase 8 Fix1 — file import read error -->
     <string name="keyring_error_file_read">Datei konnte nicht gelesen werden. Speichern Sie sie lokal (Dateien-App) und importieren Sie erneut.</string>
+    <string name="keyring_error_file_too_large">Diese Datei ist zu groß für einen Schlüssel. Wähle die .asc-, .gpg- oder .pgp-Schlüsseldatei.</string>
     <!-- 3.1.0 Phase 8 Fix2 — file import diagnostic -->
     <string name="keyring_error_parse_diag">Couldn\'t read a key from the file — got %1$d bytes starting with \"%2$s\"</string>
     <!-- 3.1.0 Phase 8 Fix3 — richer file import diagnostic -->
@@ -1853,6 +1854,7 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="sign_file_save_button">In Dateien speichern</string>
     <string name="sign_verify_error_file_unreadable">Die ausgewählte Datei konnte nicht gelesen werden. Wähle sie erneut aus.</string>
     <string name="verify_file_error_sig_not_signature">Diese Datei ist zu groß für eine abgetrennte Signatur. Wähle die .asc- oder .sig-Datei, nicht den signierten Inhalt.</string>
+    <string name="verify_error_signature_damaged">Der Signaturblock ist beschädigt und kann nicht geprüft werden. Besorge eine frische Kopie der Signaturdatei.</string>
 
     <!-- 4.2.0 RC4 workstream O8: strings added by O3/O5. -->
     <string name="key_detail_fallbacks_strict_title">Nur aktivierte Fallbacks verwenden</string>

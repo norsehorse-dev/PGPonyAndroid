@@ -1295,6 +1295,7 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="settings_share_format_subtitle">共有ボタンが暗号化または署名された結果をどのように扱うか。</string>
     <!-- 3.1.0 Phase 8 Fix1 — file import read error -->
     <string name="keyring_error_file_read">ファイルを読み取れませんでした。ローカルストレージ（ファイルアプリ）に保存してから、もう一度インポートしてください。</string>
+    <string name="keyring_error_file_too_large">このファイルは鍵としては大きすぎます。.asc、.gpg、.pgp の鍵ファイルを選んでください。</string>
     <!-- 3.1.0 Phase 8 Fix2 — file import diagnostic -->
     <string name="keyring_error_parse_diag">Couldn\'t read a key from the file — got %1$d bytes starting with \"%2$s\"</string>
     <!-- 3.1.0 Phase 8 Fix3 — richer file import diagnostic -->
@@ -1850,6 +1851,7 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="sign_file_save_button">ファイルに保存</string>
     <string name="sign_verify_error_file_unreadable">選択したファイルを読み取れませんでした。もう一度選択してください。</string>
     <string name="verify_file_error_sig_not_signature">このファイルは分離署名にしては大きすぎます。署名対象ではなく .asc または .sig ファイルを選択してください。</string>
+    <string name="verify_error_signature_damaged">署名ブロックが壊れているため検証できません。署名ファイルを新しく入手し直してください。</string>
 
     <!-- 4.2.0 RC4 workstream O8: strings added by O3/O5. -->
     <string name="key_detail_fallbacks_strict_title">有効なフォールバックのみ使用</string>

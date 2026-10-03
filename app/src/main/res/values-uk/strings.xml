@@ -318,6 +318,7 @@
     <!-- RC3 §J (#16): Sign File / Verify stream the picked file from disk; these cover the two remaining failure shapes. -->
     <string name="sign_verify_error_file_unreadable">Не вдалося прочитати вибраний файл. Виберіть його ще раз.</string>
     <string name="verify_file_error_sig_not_signature">Цей файл завеликий для окремого підпису. Виберіть файл .asc або .sig, а не підписаний вміст.</string>
+    <string name="verify_error_signature_damaged">Блок підпису пошкоджено, тому його не можна перевірити. Отримайте нову копію файлу підпису.</string>
     <string name="sign_file_save_button">Зберегти у «Файли»</string>
     <string name="encrypt_mode_password">Пароль</string>
 
@@ -1878,6 +1879,7 @@
     <string name="settings_share_format_subtitle">Як кнопка «Поділитися» пакує зашифрований або підписаний результат.</string>
     <!-- 3.1.0 Phase 8 Fix1: file import read error -->
     <string name="keyring_error_file_read">Не вдалося прочитати цей файл. Спробуйте зберегти його в локальне сховище (застосунок «Файли») та імпортувати знову.</string>
+    <string name="keyring_error_file_too_large">Цей файл завеликий для ключа. Виберіть файл ключа .asc, .gpg або .pgp.</string>
     <!-- 3.1.0 Phase 8 Fix2: file import diagnostic -->
     <string name="keyring_error_parse_diag">Не вдалося прочитати ключ із файлу. Отримано байтів: %1$d, початок: «%2$s»</string>
     <!-- 3.1.0 Phase 8 Fix3: richer file import diagnostic -->

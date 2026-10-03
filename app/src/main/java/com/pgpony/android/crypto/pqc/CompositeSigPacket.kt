@@ -255,6 +255,15 @@ object CompositeSigPacket {
         }
     }
 
+    /**
+     * 4.6.3 (4.7.0 item 19 G, Play crash): an armored block whose Base64 does
+     * not decode (damaged or hand-edited). Still an IllegalArgumentException,
+     * so every existing catch keeps working; callers that verify catch it to
+     * show "the signature block is damaged" instead of crashing.
+     */
+    class DamagedArmorException(cause: Throwable) :
+        IllegalArgumentException("The armored block is damaged: its Base64 does not decode", cause)
+
     /** Decode the payload of a single ASCII-armored block (ignores the CRC). */
     fun dearmor(armored: String): ByteArray {
         val lines = armored.replace("\r\n", "\n").split("\n")
@@ -272,7 +281,11 @@ object CompositeSigPacket {
             if (line.contains(":")) continue // armor header (e.g. Hash:)
             out.append(line)
         }
-        return java.util.Base64.getDecoder().decode(out.toString())
+        return try {
+            java.util.Base64.getDecoder().decode(out.toString())
+        } catch (e: IllegalArgumentException) {
+            throw DamagedArmorException(e)
+        }
     }
 
     private fun crc24(data: ByteArray): Int {

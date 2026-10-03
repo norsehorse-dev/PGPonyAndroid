@@ -1663,20 +1663,28 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      * ones stay on disk until encryptFile() streams them.
      */
     fun setFileToEncrypt(name: String, size: Long, uri: android.net.Uri) {
-        val inline: ByteArray? = if (size <= INLINE_FILE_LIMIT) {
-            readAtMost(uri, INLINE_FILE_LIMIT)
-        } else {
-            null
-        }
+        // 4.6.3 (4.7.0 item 19 B, Play ANR): the file is selected at once as a
+        // URI (the streaming path, valid for any size) and a small one is
+        // read on Dispatchers.IO, then swapped in as bytes. The read used to
+        // run here, on the main thread, and a cloud-backed provider could
+        // block it long enough for an ANR.
         _encryptState.value = _encryptState.value.copy(
             selectedFileName = name,
             selectedFileSize = size,
-            selectedFileBytes = inline,
-            selectedFileUri = if (inline == null) uri else null,
+            selectedFileBytes = null,
+            selectedFileUri = uri,
             encryptedFileBytes = null,
             encryptedFile = null,
             errorMessage = null
         )
+        if (size > INLINE_FILE_LIMIT) return
+        viewModelScope.launch {
+            val inline = withContext(Dispatchers.IO) { readAtMost(uri, INLINE_FILE_LIMIT) } ?: return@launch
+            val now = _encryptState.value
+            if (now.selectedFileUri == uri && !now.isProcessing) {
+                _encryptState.value = now.copy(selectedFileBytes = inline, selectedFileUri = null)
+            }
+        }
     }
 
     /**
@@ -3196,7 +3204,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         if (matched != null) {
             val (entity, component) = matched
             val ok = withContext(Dispatchers.Default) {
-                CompositeDocumentVerifier.verifyCleartext(component.publicMaterial, armored).valid
+                runCatching { CompositeDocumentVerifier.verifyCleartext(component.publicMaterial, armored).valid }
+                    .getOrDefault(false) // 4.6.3 (item 19 G): unparsable is not valid
             }
             return if (ok) {
                 VerificationResult.Verified(
@@ -3250,8 +3259,18 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         sig: ByteArray,
         signedUri: android.net.Uri
     ): VerificationResult? {
-        val sigPacket = CompositeDocumentVerifier.rawSignaturePacket(sig)
-        if (!CompositeDocumentVerifier.isCompositeSignature(sigPacket)) return null
+        // 4.6.3 (4.7.0 item 19 G, Play crash): a damaged armored signature
+        // threw out of here, uncaught in runVerifyFile's coroutine.
+        val sigPacket = try {
+            CompositeDocumentVerifier.rawSignaturePacket(sig)
+        } catch (e: com.pgpony.android.crypto.pqc.CompositeSigPacket.DamagedArmorException) {
+            return VerificationResult.Invalid(
+                reason = PGPonyApp.instance.getString(R.string.verify_error_signature_damaged),
+                signerKeyID = null,
+                signedContent = null
+            )
+        }
+        if (!runCatching { CompositeDocumentVerifier.isCompositeSignature(sigPacket) }.getOrDefault(false)) return null
         val data = withContext(Dispatchers.IO) {
             PGPonyApp.instance.contentResolver.openInputStream(signedUri)?.use { it.readBytes() }
         } ?: return VerificationResult.Invalid(
@@ -3264,7 +3283,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         if (matched != null) {
             val (entity, component) = matched
             val ok = withContext(Dispatchers.Default) {
-                CompositeDocumentVerifier.verifyDetached(component.publicMaterial, sigPacket, data).valid
+                runCatching { CompositeDocumentVerifier.verifyDetached(component.publicMaterial, sigPacket, data).valid }
+                    .getOrDefault(false) // 4.6.3 (item 19 G): unparsable is not valid
             }
             return if (ok) {
                 VerificationResult.Verified(
@@ -3305,7 +3325,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             val result: VerificationResult = if (matched != null) {
                 val (entity, component) = matched
                 val ok = withContext(Dispatchers.Default) {
-                    CompositeDocumentVerifier.verifyInline(component.publicMaterial, message).valid
+                    runCatching { CompositeDocumentVerifier.verifyInline(component.publicMaterial, message).valid }
+                        .getOrDefault(false) // 4.6.3 (item 19 G): unparsable is not valid
                 }
                 if (ok) {
                     VerificationResult.Verified(
@@ -3731,9 +3752,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             if (matched != null) {
                 val (entity, component) = matched
                 val ok = withContext(Dispatchers.Default) {
-                    CompositeDocumentVerifier.verifyInline(
-                        component.publicMaterial, result.compositeInlineBytes
-                    ).valid
+                    runCatching {
+                        CompositeDocumentVerifier.verifyInline(
+                            component.publicMaterial, result.compositeInlineBytes
+                        ).valid
+                    }.getOrDefault(false) // 4.6.3 (item 19 G): unparsable is not valid
                 }
                 return if (ok) {
                     VerificationResult.Verified(
@@ -3831,9 +3854,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             if (matched != null) {
                 val (entity, component) = matched
                 val ok = withContext(Dispatchers.Default) {
-                    CompositeDocumentVerifier.verifyInline(
-                        component.publicMaterial, result.compositeInlineBytes
-                    ).valid
+                    runCatching {
+                        CompositeDocumentVerifier.verifyInline(
+                            component.publicMaterial, result.compositeInlineBytes
+                        ).valid
+                    }.getOrDefault(false) // 4.6.3 (item 19 G): unparsable is not valid
                 }
                 return if (ok) {
                     VerificationResult.Verified(
@@ -3988,26 +4013,34 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      * bigger than advertised.
      */
     fun setFileToDecrypt(name: String, size: Long, uri: android.net.Uri) {
-        val inline: ByteArray? = if (size <= INLINE_FILE_LIMIT) {
-            // Covers a negative/absent size too: some DocumentsProviders
-            // don't report one, and readAtMost is bounded anyway.
-            readAtMost(uri, INLINE_FILE_LIMIT)
-        } else {
-            null
-        }
+        // 4.6.3 (4.7.0 item 19 B, Play ANR): as setFileToEncrypt. Selected
+        // at once as a URI, a small file read on Dispatchers.IO and swapped
+        // in as bytes; the read no longer runs on the main thread.
         _decryptState.value = _decryptState.value.copy(
             selectedFileName = name,
             selectedFileSize = size,
-            selectedFileBytes = inline,
-            selectedFileUri = if (inline == null) uri else null,
+            selectedFileBytes = null,
+            selectedFileUri = uri,
             decryptedFileBytes = null,
             decryptedFile = null,
             errorMessage = null
         )
-        if (inline != null) {
-            detectCardRecipientFile(inline)
-        } else {
+        if (size > INLINE_FILE_LIMIT) {
             detectCardRecipientFileStreaming(uri)
+            return
+        }
+        viewModelScope.launch {
+            // Covers a negative/absent size too: some DocumentsProviders
+            // don't report one, and readAtMost is bounded anyway.
+            val inline = withContext(Dispatchers.IO) { readAtMost(uri, INLINE_FILE_LIMIT) }
+            val now = _decryptState.value
+            if (now.selectedFileUri != uri || now.isProcessing) return@launch
+            if (inline != null) {
+                _decryptState.value = now.copy(selectedFileBytes = inline, selectedFileUri = null)
+                detectCardRecipientFile(inline)
+            } else {
+                detectCardRecipientFileStreaming(uri)
+            }
         }
     }
 

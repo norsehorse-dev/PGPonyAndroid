@@ -53,6 +53,21 @@ class PGPonyApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // 4.6.3 (4.7.0 item 19, guard rail): debug builds log main-thread disk
+        // and network access in both processes (this runs for :remote_api
+        // too), so the I/O behind the Play ANR clusters shows up during RC
+        // testing. Log only; release builds are untouched.
+        if (BuildConfig.DEBUG) {
+            android.os.StrictMode.setThreadPolicy(
+                android.os.StrictMode.ThreadPolicy.Builder()
+                    .detectDiskReads()
+                    .detectDiskWrites()
+                    .detectNetwork()
+                    .penaltyLog()
+                    .build()
+            )
+        }
+
         // Register Bouncy Castle as the #1 security provider
         Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME)
         Security.insertProviderAt(BouncyCastleProvider(), 1)
