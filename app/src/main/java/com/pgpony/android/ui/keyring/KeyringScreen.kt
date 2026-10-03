@@ -67,7 +67,9 @@ fun KeyringScreen(
     // key NFC scan screen. Defaulted so existing call sites / previews
     // that don't pass it still compile.
     onScanCard: () -> Unit = {},
-    onOpenRecycleBin: () -> Unit = {}
+    onOpenRecycleBin: () -> Unit = {},
+    // 4.6.3 (4.7.0 item 21): pair with PGPony Desktop or another phone.
+    onOpenPair: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     // 4.6.0 (item 20): the key whose shared identity is being listed.
@@ -158,6 +160,11 @@ fun KeyringScreen(
                             text = { Text(stringResource(R.string.settings_recycle_bin_title)) },
                             leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
                             onClick = { moreMenuOpen = false; onOpenRecycleBin() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.pair_menu)) },
+                            leadingIcon = { Icon(Icons.Filled.Devices, contentDescription = null) },
+                            onClick = { moreMenuOpen = false; onOpenPair() }
                         )
                     }
                 }

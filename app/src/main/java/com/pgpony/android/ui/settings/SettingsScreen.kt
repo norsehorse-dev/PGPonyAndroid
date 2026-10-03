@@ -79,7 +79,8 @@ fun SettingsScreen(
     onReplayOnboarding: () -> Unit = {},
     onOpenPassStore: () -> Unit = {},
     onKeysChanged: () -> Unit = {},
-    onOpenRecycleBin: () -> Unit = {}
+    onOpenRecycleBin: () -> Unit = {},
+    onOpenPair: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     // RC3 §J (#20): which category sub-page is open; null = the top-level
@@ -828,6 +829,15 @@ fun SettingsScreen(
                 icon = Icons.Filled.Delete,
                 iconTint = Color(0xFF8B5CF6),
                 onClick = onOpenRecycleBin
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            // ── 4.6.3 (4.7.0 item 21): pair with another device ─────────
+            SettingsAction(
+                title = stringResource(R.string.pair_menu),
+                subtitle = stringResource(R.string.pair_settings_subtitle),
+                icon = Icons.Filled.Devices,
+                iconTint = Color(0xFF8B5CF6),
+                onClick = onOpenPair
             )
             Spacer(modifier = Modifier.height(16.dp))
 

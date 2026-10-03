@@ -184,7 +184,15 @@ Work:
 - targetSdk stays 36, so no ACCESS_LOCAL_NETWORK runtime permission yet. Note it for the SDK 37 bump.
 - Strings in every locale; Korean falls back to English where untranslated.
 
-Test: the pair unit tests and the three vector files on `4.6.x`. On device against desktop 3.0.0 (macOS and Linux):
+Built (RC2): ui/pair/PairController.kt (desktop's controller, phone-adjusted: the host lists and accepts only
+Wi-Fi, Ethernet, tethering and USB interfaces, and a peer must reach it on a listed address), PairScreen.kt
+(desktop's dialog as a screen: Choose, Hosting with the invite QR, Joining by scan or typed address, the two
+compare panes, the session), PairKeyProtection.kt (main's SecretKeyCheck.protectionOf rule, so no key pair goes
+out or comes in with a secret in the clear), a "pair" route reached from Settings and the Keyring overflow, and
+100 strings in every locale but Korean (falls back to English). Desktop 3.0.x needs no change: it already shows
+the invite QR when hosting and takes a typed address or pasted invite when joining.
+
+Test: the pair unit tests and the four vector files on `4.6.x`, plus PairControllerTest. On device against desktop 3.0.0 (macOS and Linux):
 phone joins by scan and by typed address, phone hosts and desktop joins, a wrong typed code, a Different, a
 connection from a non-local address refused, one item of each kind each way, a backup restored with its recovery
 code, and a key pair moved and then used to decrypt on the receiving side.
