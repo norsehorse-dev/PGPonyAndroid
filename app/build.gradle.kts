@@ -257,8 +257,11 @@ android {
         // 4.6.2: Simplified Chinese, Ukrainian and Turkish join the picker; Korean
         // gains the strings its translator has finished so far; text and error
         // messages that were hardcoded in English become translatable.
-        versionCode = 462
-        versionName = "4.6.2"
+        // 4.6.3: the 4.7.0 bug fixes pulled forward (#15, #67, #68, #72, #73,
+        // #74, Play vitals, message handling hardening) and pairing with
+        // PGPony Desktop.
+        versionCode = 463
+        versionName = "4.6.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
