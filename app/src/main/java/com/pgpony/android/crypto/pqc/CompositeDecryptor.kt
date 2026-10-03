@@ -258,7 +258,7 @@ object CompositeDecryptor {
             when {
                 parsed.recipientFingerprint.isNotEmpty() -> fp.contentEquals(parsed.recipientFingerprint)
                 parsed.recipientKeyId.size == 8 ->
-                    fp.copyOfRange(fp.size - 8, fp.size).contentEquals(parsed.recipientKeyId)
+                    keyIdOfFingerprint(fp).contentEquals(parsed.recipientKeyId)
                 else -> true
             }
         }
@@ -511,9 +511,12 @@ object CompositeDecryptor {
             }
     }
 
-    /** item 14 (#56): the raw ring whose ML-KEM subkey key ID (low 8 octets of
-     *  the subkey fingerprint) is [keyId] — a v4 interop ring's v4 algo-35
-     *  subkey, or a composite-PRIMARY ring's v6 subkey. */
+    /** item 14 (#56): the raw ring whose ML-KEM subkey key ID is [keyId], a
+     *  v4 interop ring's v4 algo-35 subkey, or a composite-PRIMARY ring's v6
+     *  subkey. 4.6.3 (#73): the key ID comes from [keyIdOfFingerprint], which
+     *  takes the first 8 octets of a v6 fingerprint; this compared the last 8
+     *  for every key, so a v3 PKESK naming a v6 ML-KEM subkey (GpgFrontend's
+     *  rPGP engine writes one) never matched. */
     private fun findRawCompositeByKeyId(keyId: ByteArray, rawRings: List<ByteArray>): ByteArray? =
         rawRings.firstOrNull { ring ->
             runCatching {
@@ -525,10 +528,19 @@ object CompositeDecryptor {
                     listOfNotNull(CompositeKeyFacade.parse(ring).encryptionSubkey?.fingerprint)
                 }
                 fps.any { fp ->
-                    fp.size >= 8 && fp.copyOfRange(fp.size - 8, fp.size).contentEquals(keyId)
+                    fp.size >= 8 && keyIdOfFingerprint(fp).contentEquals(keyId)
                 }
             }.getOrDefault(false)
         }
+
+    /**
+     * 4.6.3 (#73): the 8-octet key ID of a key with fingerprint [fp]. A v4 key
+     * ID is the last 8 octets of its 20-octet fingerprint; a v6 key ID (RFC
+     * 9580 5.5.4.3) and a v5 one are the first 8 octets of the 32-octet
+     * fingerprint.
+     */
+    internal fun keyIdOfFingerprint(fp: ByteArray): ByteArray =
+        if (fp.size == 20) fp.copyOfRange(fp.size - 8, fp.size) else fp.copyOfRange(0, 8)
 
     /** Big-endian 8-octet key ID to the Long BC exposes as PGPSecretKey.keyID. */
     private fun keyIdToLong(keyId: ByteArray): Long {
