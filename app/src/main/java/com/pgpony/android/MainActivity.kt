@@ -1202,7 +1202,8 @@ fun PGPonyMainScreen(
                             navController.navigate("keyring/$fingerprint")
                         },
                         onScanCard = { navController.navigate("card_scan") },
-                        onOpenRecycleBin = { navController.navigate("recently_deleted") }
+                        onOpenRecycleBin = { navController.navigate("recently_deleted") },
+                        onOpenPair = { navController.navigate("pair") }
                     )
                 }
                 // Phase A4a: KeyDetailScreen route.
@@ -1358,7 +1359,15 @@ fun PGPonyMainScreen(
                         onReplayOnboarding = { onboardingDone = false },
                         onOpenPassStore = { navController.navigate("pass_store") },
                         onKeysChanged = { keyringVm.loadKeys() },
-                        onOpenRecycleBin = { navController.navigate("recently_deleted") }
+                        onOpenRecycleBin = { navController.navigate("recently_deleted") },
+                        onOpenPair = { navController.navigate("pair") }
+                    )
+                }
+                // 4.6.3 (4.7.0 item 21): pair with PGPony Desktop or another phone.
+                composable("pair") {
+                    com.pgpony.android.ui.pair.PairScreen(
+                        onBack = { navController.popBackStack() },
+                        onKeysChanged = { keyringVm.loadKeys() }
                     )
                 }
                 // §5.6.1 (#36 part 1): key recycle bin. Reuses the shared
