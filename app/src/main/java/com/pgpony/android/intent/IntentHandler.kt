@@ -262,12 +262,25 @@ object IntentHandler {
      *   • new format: bit7=1, bit6=1, tag in bits 5..0
      * The Verify-a-file sheet does the real parse; this only routes.
      */
-    private fun isBinaryDetachedSignature(bytes: ByteArray): Boolean {
-        if (bytes.isEmpty()) return false
-        val b = bytes[0].toInt() and 0xFF
-        if (b and 0x80 == 0) return false
-        val tag = if (b and 0x40 == 0) (b shr 2) and 0x0F else b and 0x3F
-        return tag == 2
+    private fun isBinaryDetachedSignature(bytes: ByteArray): Boolean =
+        // 4.6.3 (#67): a real packet walk. The first-byte check took every PNG
+        // (0x89 reads as an old-format tag-2 header) for a signature.
+        PacketSniff.isDetachedSignature(bytes)
+
+    /**
+     * 4.6.3 (#67): an encrypted message by its packets as well as by
+     * BouncyCastle's recipient listing, so a message whose recipients
+     * BouncyCastle cannot list still opens to Decrypt instead of Encrypt.
+     */
+    private fun looksEncryptedBinary(bytes: ByteArray): Boolean {
+        val listed = try {
+            val info = com.pgpony.android.crypto.PGPCryptoService.shared
+                .inspectEncryptedMessage(bytes)
+            info.publicKeyIDs.isNotEmpty() || info.isPasswordEncrypted
+        } catch (_: Exception) {
+            false
+        }
+        return listed || PacketSniff.looksLikeEncryptedMessage(bytes)
     }
 
     /**
@@ -552,13 +565,7 @@ object IntentHandler {
 
         // Binary: the session-key packets are at the front, so the same
         // parse-don't-sniff test the buffered path uses works on the head.
-        val looksEncrypted = try {
-            val info = com.pgpony.android.crypto.PGPCryptoService.shared
-                .inspectEncryptedMessage(head)
-            info.publicKeyIDs.isNotEmpty() || info.isPasswordEncrypted
-        } catch (_: Exception) {
-            false
-        }
+        val looksEncrypted = looksEncryptedBinary(head)
         return if (looksEncrypted) {
             IntentAction.DecryptFile(null, uri, filename)
         } else {
@@ -656,13 +663,7 @@ object IntentHandler {
             // same rationale as classifyFileForShare (A15). If BouncyCastle
             // finds recipients or a password packet it's encrypted →
             // Decrypt; otherwise it's a generic file → Encrypt (C1).
-            val looksEncrypted = try {
-                val info = com.pgpony.android.crypto.PGPCryptoService.shared
-                    .inspectEncryptedMessage(bytes)
-                info.publicKeyIDs.isNotEmpty() || info.isPasswordEncrypted
-            } catch (_: Exception) {
-                false
-            }
+            val looksEncrypted = looksEncryptedBinary(bytes)
             return if (looksEncrypted) {
                 IntentAction.DecryptFile(bytes, null, filename)
             } else {
@@ -705,13 +706,7 @@ object IntentHandler {
             headStr.contains("-----BEGIN PGP SIGNED MESSAGE-----")
         val looksEncrypted = armoredMessage ||
             headStr.contains("multipart/encrypted", ignoreCase = true) ||
-            try {
-                val info = com.pgpony.android.crypto.PGPCryptoService.shared
-                    .inspectEncryptedMessage(head)
-                info.publicKeyIDs.isNotEmpty() || info.isPasswordEncrypted
-            } catch (_: Exception) {
-                false
-            }
+            looksEncryptedBinary(head)
 
         return ShareIntentContent.PgpFile(
             data = null,
@@ -783,13 +778,7 @@ object IntentHandler {
                 // BouncyCastle finds public-key recipients or a password packet,
                 // it's an encrypted message → offer Decrypt; otherwise it's a
                 // generic file the user wants to Encrypt.
-                val looksEncrypted = try {
-                    val info = com.pgpony.android.crypto.PGPCryptoService.shared
-                        .inspectEncryptedMessage(bytes)
-                    info.publicKeyIDs.isNotEmpty() || info.isPasswordEncrypted
-                } catch (_: Exception) {
-                    false
-                }
+                val looksEncrypted = looksEncryptedBinary(bytes)
                 ShareIntentContent.PgpFile(
                     data = bytes,
                     uri = uri,
