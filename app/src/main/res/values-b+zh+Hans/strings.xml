@@ -1839,7 +1839,7 @@
     <string name="settings_passphrase_cache_title">记住密钥口令</string>
     <string name="settings_passphrase_cache_subtitle">在所选时长内将为已连接应用输入的口令保留在内存中。绝不写入磁盘；输错口令或关闭应用时会被清除。</string>
     <string name="settings_passphrase_cache_countdown_format">口令已记住。将在 %1$s 后清除</string>
-    <string name="settings_passphrase_cache_none_held">当前没有记住的口令。</string>
+    <string name="settings_passphrase_cache_none_held">PGPony 本身没有记住任何口令。为邮件及其他已连接应用输入的口令单独保存，“立即清除”也会清除它们。</string>
     <string name="settings_passphrase_cache_held_until_cleared">口令已记住，直到你手动清除。</string>
     <!-- 4.0.0 Phase 9b: settings parity (clear inputs, pubkey comment, licenses) -->
     <string name="settings_clear_inputs_title">加密后清除输入</string>
@@ -1899,7 +1899,19 @@
     <string name="provider_keypicker_empty">你的密钥环中还没有可用的密钥。请先在 PGPony 中创建或导入一个密钥对。</string>
     <!-- 4.0.0 Succession Phase P2a-2: provider passphrase prompt -->
     <string name="provider_passphrase_title">解锁签名密钥</string>
-    <string name="provider_passphrase_body_format">输入 %1$s 的口令以签名此消息。PGPony 会记住它 5 分钟，且仅限此设备。</string>
+    <string name="provider_passphrase_title_decrypt">解锁解密密钥</string>
+    <string name="provider_passphrase_title_ssh">解锁 SSH 密钥</string>
+    <string name="provider_passphrase_action_sign">输入 %1$s 的口令以签名此消息。</string>
+    <string name="provider_passphrase_action_decrypt">输入 %1$s 的口令以解密此消息。</string>
+    <string name="provider_passphrase_action_ssh">输入 %1$s 的口令以通过 SSH 登录。</string>
+    <plurals name="provider_passphrase_keep_minutes">
+        <item quantity="other">PGPony 会记住它 %1$d 分钟，且仅限此设备。</item>
+    </plurals>
+    <plurals name="provider_passphrase_keep_hours">
+        <item quantity="other">PGPony 会记住它 %1$d 小时，且仅限此设备。</item>
+    </plurals>
+    <string name="provider_passphrase_keep_until_cleared">PGPony 会记住它，直到你在设置中清除，且仅限此设备。</string>
+    <string name="provider_passphrase_keep_until_locked">PGPony 会记住它，直到手机锁定，且仅限此设备。</string>
     <string name="provider_passphrase_wrong">口令错误。请重试。</string>
     <string name="provider_passphrase_hint">口令</string>
     <string name="provider_passphrase_change_key">使用其他密钥签名</string>

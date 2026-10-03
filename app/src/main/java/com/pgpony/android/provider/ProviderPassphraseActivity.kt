@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.pgpony.android.PGPonyTheme
 import com.pgpony.android.R
 import com.pgpony.android.ui.util.autofillPassword
+import org.openintents.openpgp.util.OpenPgpApi
 
 class ProviderPassphraseActivity : ComponentActivity() {
 
@@ -71,7 +72,13 @@ class ProviderPassphraseActivity : ComponentActivity() {
         val keyId = intent.getLongExtra(EXTRA_KEY_ID, 0L)
         val keyLabel = intent.getStringExtra(EXTRA_KEY_LABEL) ?: ""
         val wasWrong = intent.getBooleanExtra(EXTRA_WRONG, false)
-        val allowKeyChange = !intent.getBooleanExtra(EXTRA_NO_KEY_CHANGE, false)
+        // 4.6.3 (#15): say what the passphrase is for, from the request the
+        // client sent, and how long PGPony keeps it, from the setting as THIS
+        // process reads it. Until 4.6.2 the text always said "to sign this
+        // message" and "5 minutes", whatever the operation and the setting.
+        val purpose = PassphrasePurpose.of(apiData?.action)
+        val allowKeyChange = !intent.getBooleanExtra(EXTRA_NO_KEY_CHANGE, false) &&
+            purpose == PassphrasePurpose.SIGN
 
         if (keyId == 0L) {
             setResult(Activity.RESULT_CANCELED)
@@ -96,13 +103,12 @@ class ProviderPassphraseActivity : ComponentActivity() {
                 var passphrase by remember { mutableStateOf("") }
                 AlertDialog(
                     onDismissRequest = { cancel() },
-                    title = { Text(stringResource(R.string.provider_passphrase_title)) },
+                    title = { Text(stringResource(purpose.titleRes)) },
                     text = {
                         Column {
                             Text(
-                                stringResource(
-                                    R.string.provider_passphrase_body_format, keyLabel
-                                ),
+                                stringResource(purpose.actionRes, keyLabel) + " " +
+                                    keepSentence(com.pgpony.android.session.SessionPolicy.durationSec()),
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(bottom = 12.dp)
                             )
@@ -189,5 +195,38 @@ class ProviderPassphraseActivity : ComponentActivity() {
     override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
         if (ProviderWindowGuard.isObscured(ev)) return false
         return super.dispatchTouchEvent(ev)
+    }
+}
+
+/** 4.6.3 (#15): what a provider passphrase prompt unlocks the key for. */
+internal enum class PassphrasePurpose(val titleRes: Int, val actionRes: Int) {
+    SIGN(R.string.provider_passphrase_title, R.string.provider_passphrase_action_sign),
+    DECRYPT(R.string.provider_passphrase_title_decrypt, R.string.provider_passphrase_action_decrypt),
+    SSH(R.string.provider_passphrase_title_ssh, R.string.provider_passphrase_action_ssh);
+
+    companion object {
+        fun of(action: String?): PassphrasePurpose = when (action) {
+            OpenPgpApi.ACTION_DECRYPT_VERIFY,
+            OpenPgpApi.ACTION_DECRYPT_METADATA -> DECRYPT
+            SshAuthenticationService.ACTION_SIGN -> SSH
+            else -> SIGN
+        }
+    }
+}
+
+/** 4.6.3 (#15): how long the passphrase is kept, in the words of the setting. */
+@androidx.compose.runtime.Composable
+internal fun keepSentence(durationSec: Int): String = when {
+    durationSec == com.pgpony.android.session.SessionPolicy.DURATION_UNTIL_CLEARED ->
+        stringResource(R.string.provider_passphrase_keep_until_cleared)
+    durationSec == com.pgpony.android.session.SessionPolicy.DURATION_UNTIL_LOCKED ->
+        stringResource(R.string.provider_passphrase_keep_until_locked)
+    durationSec >= 3600 && durationSec % 3600 == 0 -> {
+        val h = durationSec / 3600
+        androidx.compose.ui.res.pluralStringResource(R.plurals.provider_passphrase_keep_hours, h, h)
+    }
+    else -> {
+        val m = ((durationSec + 59) / 60).coerceAtLeast(1)
+        androidx.compose.ui.res.pluralStringResource(R.plurals.provider_passphrase_keep_minutes, m, m)
     }
 }

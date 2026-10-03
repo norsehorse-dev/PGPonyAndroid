@@ -1842,7 +1842,7 @@
     <string name="settings_passphrase_cache_title">Anahtar parola ifadelerini hatırla</string>
     <string name="settings_passphrase_cache_subtitle">Bağlı uygulamalar için yazılan parola ifadelerini seçilen süre boyunca bellekte tutar. Asla diske kaydedilmez; yanlış bir parola ifadesi girildiğinde veya uygulama kapatıldığında temizlenir.</string>
     <string name="settings_passphrase_cache_countdown_format">Parola ifadesi hatırlanıyor. Temizlenmesine kalan süre: %1$s</string>
-    <string name="settings_passphrase_cache_none_held">Şu anda hatırlanan bir parola ifadesi yok.</string>
+    <string name="settings_passphrase_cache_none_held">PGPony kendisi hiçbirini hatırlamıyor. E-posta ve diğer bağlı uygulamalar için girilen parola ifadeleri ayrı tutulur ve Şimdi temizle bunları da unutur.</string>
     <string name="settings_passphrase_cache_held_until_cleared">Parola ifadesi, siz temizleyene kadar hatırlanıyor.</string>
     <!-- 4.0.0 Phase 9b: settings parity (clear inputs, pubkey comment, licenses) -->
     <string name="settings_clear_inputs_title">Şifrelemeden sonra girdileri temizle</string>
@@ -1902,7 +1902,21 @@
     <string name="provider_keypicker_empty">Anahtarlığınızda henüz kullanılabilir anahtar yok. Önce PGPony\'de bir anahtar çifti oluşturun veya içe aktarın.</string>
     <!-- 4.0.0 Succession Phase P2a-2: provider passphrase prompt -->
     <string name="provider_passphrase_title">İmzalama anahtarının kilidini aç</string>
-    <string name="provider_passphrase_body_format">Bu mesajı imzalamak için %1$s anahtarının parola ifadesini girin. PGPony bunu yalnızca bu cihazda 5 dakika boyunca hatırlar.</string>
+    <string name="provider_passphrase_title_decrypt">Şifre çözme anahtarının kilidini aç</string>
+    <string name="provider_passphrase_title_ssh">SSH anahtarının kilidini aç</string>
+    <string name="provider_passphrase_action_sign">Bu mesajı imzalamak için %1$s anahtarının parola ifadesini girin.</string>
+    <string name="provider_passphrase_action_decrypt">Bu mesajın şifresini çözmek için %1$s anahtarının parola ifadesini girin.</string>
+    <string name="provider_passphrase_action_ssh">SSH ile oturum açmak için %1$s anahtarının parola ifadesini girin.</string>
+    <plurals name="provider_passphrase_keep_minutes">
+        <item quantity="one">PGPony bunu yalnızca bu cihazda %1$d dakika boyunca hatırlar.</item>
+        <item quantity="other">PGPony bunu yalnızca bu cihazda %1$d dakika boyunca hatırlar.</item>
+    </plurals>
+    <plurals name="provider_passphrase_keep_hours">
+        <item quantity="one">PGPony bunu yalnızca bu cihazda %1$d saat boyunca hatırlar.</item>
+        <item quantity="other">PGPony bunu yalnızca bu cihazda %1$d saat boyunca hatırlar.</item>
+    </plurals>
+    <string name="provider_passphrase_keep_until_cleared">PGPony bunu yalnızca bu cihazda, Ayarlar\'dan temizleyene kadar hatırlar.</string>
+    <string name="provider_passphrase_keep_until_locked">PGPony bunu yalnızca bu cihazda, telefon kilitlenene kadar hatırlar.</string>
     <string name="provider_passphrase_wrong">Yanlış parola ifadesi. Yeniden deneyin.</string>
     <string name="provider_passphrase_hint">Parola ifadesi</string>
     <string name="provider_passphrase_change_key">Farklı bir anahtarla imzala</string>

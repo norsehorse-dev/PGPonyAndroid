@@ -1753,7 +1753,7 @@
     <string name="settings_passphrase_cache_title">Запоминать парольные фразы ключей</string>
     <string name="settings_passphrase_cache_subtitle">Хранить введённые для подключённых приложений парольные фразы в памяти в течение выбранного времени. Никогда не сохраняются на диск; очищаются при неверной парольной фразе или закрытии приложения.</string>
     <string name="settings_passphrase_cache_countdown_format">Парольная фраза запомнена — очистится через %1$s</string>
-    <string name="settings_passphrase_cache_none_held">Сейчас парольная фраза не запомнена.</string>
+    <string name="settings_passphrase_cache_none_held">Сам PGPony ничего не запомнил. Парольные фразы, введённые для почтовых и других подключённых приложений, хранятся отдельно, и «Очистить сейчас» стирает и их.</string>
     <string name="settings_passphrase_cache_held_until_cleared">Парольная фраза запомнена до тех пор, пока вы её не очистите.</string>
     <!-- 4.0.0 Phase 9b: settings parity (clear inputs, pubkey comment, licenses) -->
     <string name="settings_clear_inputs_title">Очищать ввод после шифрования</string>
@@ -1806,7 +1806,25 @@
     <string name="provider_keypicker_empty">В вашей связке ключей пока нет пригодных ключей. Сначала создайте или импортируйте пару ключей в PGPony.</string>
     <!-- 4.0.0 Succession Phase P2a-2 — provider passphrase prompt -->
     <string name="provider_passphrase_title">Разблокировать ключ подписи</string>
-    <string name="provider_passphrase_body_format">Введите парольную фразу для %1$s, чтобы подписать это сообщение. PGPony запомнит её на 5 минут только на этом устройстве.</string>
+    <string name="provider_passphrase_title_decrypt">Разблокировать ключ расшифровки</string>
+    <string name="provider_passphrase_title_ssh">Разблокировать ключ SSH</string>
+    <string name="provider_passphrase_action_sign">Введите парольную фразу для %1$s, чтобы подписать это сообщение.</string>
+    <string name="provider_passphrase_action_decrypt">Введите парольную фразу для %1$s, чтобы расшифровать это сообщение.</string>
+    <string name="provider_passphrase_action_ssh">Введите парольную фразу для %1$s, чтобы войти по SSH.</string>
+    <plurals name="provider_passphrase_keep_minutes">
+        <item quantity="one">PGPony запомнит её на %1$d минуту только на этом устройстве.</item>
+        <item quantity="few">PGPony запомнит её на %1$d минуты только на этом устройстве.</item>
+        <item quantity="many">PGPony запомнит её на %1$d минут только на этом устройстве.</item>
+        <item quantity="other">PGPony запомнит её на %1$d минуты только на этом устройстве.</item>
+    </plurals>
+    <plurals name="provider_passphrase_keep_hours">
+        <item quantity="one">PGPony запомнит её на %1$d час только на этом устройстве.</item>
+        <item quantity="few">PGPony запомнит её на %1$d часа только на этом устройстве.</item>
+        <item quantity="many">PGPony запомнит её на %1$d часов только на этом устройстве.</item>
+        <item quantity="other">PGPony запомнит её на %1$d часа только на этом устройстве.</item>
+    </plurals>
+    <string name="provider_passphrase_keep_until_cleared">PGPony запомнит её только на этом устройстве, пока вы не очистите её в настройках.</string>
+    <string name="provider_passphrase_keep_until_locked">PGPony запомнит её только на этом устройстве, до блокировки телефона.</string>
     <string name="provider_passphrase_wrong">Неверная парольная фраза — попробуйте снова.</string>
     <string name="provider_passphrase_hint">Парольная фраза</string>
     <string name="provider_passphrase_unlock">Разблокировать</string>

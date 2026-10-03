@@ -1575,9 +1575,21 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="provider_keypicker_for_format">%1$s 用</string>
     <string name="provider_keypicker_none">鍵なし — 署名しない</string>
     <string name="provider_keypicker_title">署名鍵を選択</string>
-    <string name="provider_passphrase_body_format">このメッセージに署名するには %1$s のパスフレーズを入力してください。PGPony はこの端末上でのみ 5 分間記憶します。</string>
     <string name="provider_passphrase_hint">パスフレーズ</string>
     <string name="provider_passphrase_title">署名鍵のロックを解除</string>
+    <string name="provider_passphrase_title_decrypt">復号鍵のロックを解除</string>
+    <string name="provider_passphrase_title_ssh">SSH 鍵のロックを解除</string>
+    <string name="provider_passphrase_action_sign">このメッセージに署名するには %1$s のパスフレーズを入力してください。</string>
+    <string name="provider_passphrase_action_decrypt">このメッセージを復号するには %1$s のパスフレーズを入力してください。</string>
+    <string name="provider_passphrase_action_ssh">SSH でログインするには %1$s のパスフレーズを入力してください。</string>
+    <plurals name="provider_passphrase_keep_minutes">
+        <item quantity="other">PGPony はこの端末上でのみ %1$d 分間記憶します。</item>
+    </plurals>
+    <plurals name="provider_passphrase_keep_hours">
+        <item quantity="other">PGPony はこの端末上でのみ %1$d 時間記憶します。</item>
+    </plurals>
+    <string name="provider_passphrase_keep_until_cleared">PGPony はこの端末上でのみ、設定で消去するまで記憶します。</string>
+    <string name="provider_passphrase_keep_until_locked">PGPony はこの端末上でのみ、端末がロックされるまで記憶します。</string>
     <string name="provider_passphrase_unlock">ロック解除</string>
     <string name="provider_passphrase_wrong">パスフレーズが違います。もう一度お試しください。</string>
     <string name="publish_action">公開</string>
@@ -1832,7 +1844,7 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="settings_more_vaultpony_subtitle">VeraCrypt互換の暗号化ボールトを、すべて端末内で</string>
     <string name="settings_passphrase_cache_countdown_format">パスフレーズを記憶中 – %1$s 後に消去</string>
     <string name="settings_passphrase_cache_held_until_cleared">消去するまでパスフレーズを記憶します。</string>
-    <string name="settings_passphrase_cache_none_held">現在記憶されているパスフレーズはありません。</string>
+    <string name="settings_passphrase_cache_none_held">PGPony 本体が記憶しているパスフレーズはありません。メールアプリなど連携アプリ用に入力したパスフレーズは別に保持されており、「今すぐ消去」でそれらも消去されます。</string>
     <string name="settings_passphrase_cache_subtitle">連携アプリ向けに入力したパスフレーズを、選んだ時間だけメモリに保持します。ディスクには保存されず、誤ったパスフレーズやアプリ終了で消去されます。</string>
     <string name="settings_passphrase_cache_title">鍵のパスフレーズを記憶</string>
     <string name="sign_file_save_button">ファイルに保存</string>

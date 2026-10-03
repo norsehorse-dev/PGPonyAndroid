@@ -1575,9 +1575,23 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="provider_keypicker_for_format">Para %1$s</string>
     <string name="provider_keypicker_none">Sin clave: no firmar</string>
     <string name="provider_keypicker_title">Elegir clave de firma</string>
-    <string name="provider_passphrase_body_format">Introduce la frase de contraseña de %1$s para firmar este mensaje. PGPony la recuerda durante 5 minutos, solo en este dispositivo.</string>
     <string name="provider_passphrase_hint">Frase de contraseña</string>
     <string name="provider_passphrase_title">Desbloquear clave de firma</string>
+    <string name="provider_passphrase_title_decrypt">Desbloquear clave de descifrado</string>
+    <string name="provider_passphrase_title_ssh">Desbloquear clave SSH</string>
+    <string name="provider_passphrase_action_sign">Introduce la frase de contraseña de %1$s para firmar este mensaje.</string>
+    <string name="provider_passphrase_action_decrypt">Introduce la frase de contraseña de %1$s para descifrar este mensaje.</string>
+    <string name="provider_passphrase_action_ssh">Introduce la frase de contraseña de %1$s para iniciar sesión por SSH.</string>
+    <plurals name="provider_passphrase_keep_minutes">
+        <item quantity="one">PGPony la recuerda durante %1$d minuto, solo en este dispositivo.</item>
+        <item quantity="other">PGPony la recuerda durante %1$d minutos, solo en este dispositivo.</item>
+    </plurals>
+    <plurals name="provider_passphrase_keep_hours">
+        <item quantity="one">PGPony la recuerda durante %1$d hora, solo en este dispositivo.</item>
+        <item quantity="other">PGPony la recuerda durante %1$d horas, solo en este dispositivo.</item>
+    </plurals>
+    <string name="provider_passphrase_keep_until_cleared">PGPony la recuerda solo en este dispositivo, hasta que la borres en Ajustes.</string>
+    <string name="provider_passphrase_keep_until_locked">PGPony la recuerda solo en este dispositivo, hasta que se bloquee el teléfono.</string>
     <string name="provider_passphrase_unlock">Desbloquear</string>
     <string name="provider_passphrase_wrong">Frase de contraseña incorrecta: inténtalo de nuevo.</string>
     <string name="publish_action">Publicar</string>
@@ -1833,7 +1847,7 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="settings_more_vaultpony_subtitle">Cajas fuertes cifradas compatibles con VeraCrypt, todo en tu dispositivo</string>
     <string name="settings_passphrase_cache_countdown_format">Frase de contraseña recordada: se borra en %1$s</string>
     <string name="settings_passphrase_cache_held_until_cleared">Frase de contraseña recordada hasta que la borres.</string>
-    <string name="settings_passphrase_cache_none_held">No hay ninguna frase de contraseña recordada actualmente.</string>
+    <string name="settings_passphrase_cache_none_held">PGPony no recuerda ninguna por sí misma. Las frases de contraseña escritas para apps de correo y otras apps conectadas se guardan aparte, y Borrar ahora también las olvida.</string>
     <string name="settings_passphrase_cache_subtitle">Mantén en memoria, durante el tiempo elegido, las frases de contraseña escritas para apps conectadas. Nunca se guardan en disco; se borran con una frase incorrecta o al cerrar la app.</string>
     <string name="settings_passphrase_cache_title">Recordar frases de contraseña</string>
     <string name="sign_file_save_button">Guardar en Archivos</string>

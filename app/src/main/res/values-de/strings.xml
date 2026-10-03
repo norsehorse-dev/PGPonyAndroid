@@ -1575,9 +1575,23 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="provider_keypicker_for_format">Für %1$s</string>
     <string name="provider_keypicker_none">Kein Schlüssel — nicht signieren</string>
     <string name="provider_keypicker_title">Signaturschlüssel wählen</string>
-    <string name="provider_passphrase_body_format">Gib die Passphrase für %1$s ein, um diese Nachricht zu signieren. PGPony merkt sie sich 5 Minuten lang, nur auf diesem Gerät.</string>
     <string name="provider_passphrase_hint">Passphrase</string>
     <string name="provider_passphrase_title">Signaturschlüssel entsperren</string>
+    <string name="provider_passphrase_title_decrypt">Entschlüsselungsschlüssel entsperren</string>
+    <string name="provider_passphrase_title_ssh">SSH-Schlüssel entsperren</string>
+    <string name="provider_passphrase_action_sign">Gib die Passphrase für %1$s ein, um diese Nachricht zu signieren.</string>
+    <string name="provider_passphrase_action_decrypt">Gib die Passphrase für %1$s ein, um diese Nachricht zu entschlüsseln.</string>
+    <string name="provider_passphrase_action_ssh">Gib die Passphrase für %1$s ein, um dich per SSH anzumelden.</string>
+    <plurals name="provider_passphrase_keep_minutes">
+        <item quantity="one">PGPony merkt sie sich %1$d Minute lang, nur auf diesem Gerät.</item>
+        <item quantity="other">PGPony merkt sie sich %1$d Minuten lang, nur auf diesem Gerät.</item>
+    </plurals>
+    <plurals name="provider_passphrase_keep_hours">
+        <item quantity="one">PGPony merkt sie sich %1$d Stunde lang, nur auf diesem Gerät.</item>
+        <item quantity="other">PGPony merkt sie sich %1$d Stunden lang, nur auf diesem Gerät.</item>
+    </plurals>
+    <string name="provider_passphrase_keep_until_cleared">PGPony merkt sie sich nur auf diesem Gerät, bis du sie in den Einstellungen löschst.</string>
+    <string name="provider_passphrase_keep_until_locked">PGPony merkt sie sich nur auf diesem Gerät, bis das Telefon gesperrt wird.</string>
     <string name="provider_passphrase_unlock">Entsperren</string>
     <string name="provider_passphrase_wrong">Falsche Passphrase — versuche es erneut.</string>
     <string name="publish_action">Veröffentlichen</string>
@@ -1833,7 +1847,7 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="settings_more_vaultpony_subtitle">VeraCrypt-kompatible verschlüsselte Tresore, vollständig auf deinem Gerät</string>
     <string name="settings_passphrase_cache_countdown_format">Passphrase gemerkt – wird gelöscht in %1$s</string>
     <string name="settings_passphrase_cache_held_until_cleared">Passphrase gemerkt, bis du sie löschst.</string>
-    <string name="settings_passphrase_cache_none_held">Derzeit ist keine Passphrase gemerkt.</string>
+    <string name="settings_passphrase_cache_none_held">PGPony selbst hat keine gemerkt. Passphrasen, die für Mail-Apps und andere verbundene Apps eingegeben wurden, werden getrennt gehalten, und „Jetzt löschen“ entfernt auch diese.</string>
     <string name="settings_passphrase_cache_subtitle">Halte für verbundene Apps eingegebene Passphrasen für eine gewählte Dauer im Speicher. Nie auf der Festplatte gespeichert; gelöscht bei falscher Passphrase oder beim Schließen der App.</string>
     <string name="settings_passphrase_cache_title">Schlüssel-Passphrasen merken</string>
     <string name="sign_file_save_button">In Dateien speichern</string>

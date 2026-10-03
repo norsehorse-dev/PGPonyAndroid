@@ -1575,9 +1575,23 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="provider_keypicker_for_format">Pour %1$s</string>
     <string name="provider_keypicker_none">Aucune clé — ne pas signer</string>
     <string name="provider_keypicker_title">Choisir la clé de signature</string>
-    <string name="provider_passphrase_body_format">Saisissez la phrase secrète de %1$s pour signer ce message. PGPony la mémorise 5 minutes, uniquement sur cet appareil.</string>
     <string name="provider_passphrase_hint">Phrase secrète</string>
     <string name="provider_passphrase_title">Déverrouiller la clé de signature</string>
+    <string name="provider_passphrase_title_decrypt">Déverrouiller la clé de déchiffrement</string>
+    <string name="provider_passphrase_title_ssh">Déverrouiller la clé SSH</string>
+    <string name="provider_passphrase_action_sign">Saisissez la phrase secrète de %1$s pour signer ce message.</string>
+    <string name="provider_passphrase_action_decrypt">Saisissez la phrase secrète de %1$s pour déchiffrer ce message.</string>
+    <string name="provider_passphrase_action_ssh">Saisissez la phrase secrète de %1$s pour vous connecter en SSH.</string>
+    <plurals name="provider_passphrase_keep_minutes">
+        <item quantity="one">PGPony la mémorise %1$d minute, uniquement sur cet appareil.</item>
+        <item quantity="other">PGPony la mémorise %1$d minutes, uniquement sur cet appareil.</item>
+    </plurals>
+    <plurals name="provider_passphrase_keep_hours">
+        <item quantity="one">PGPony la mémorise %1$d heure, uniquement sur cet appareil.</item>
+        <item quantity="other">PGPony la mémorise %1$d heures, uniquement sur cet appareil.</item>
+    </plurals>
+    <string name="provider_passphrase_keep_until_cleared">PGPony la mémorise uniquement sur cet appareil, jusqu’à ce que vous l’effaciez dans les Réglages.</string>
+    <string name="provider_passphrase_keep_until_locked">PGPony la mémorise uniquement sur cet appareil, jusqu’au verrouillage du téléphone.</string>
     <string name="provider_passphrase_unlock">Déverrouiller</string>
     <string name="provider_passphrase_wrong">Phrase secrète incorrecte — réessayez.</string>
     <string name="publish_action">Publier</string>
@@ -1833,7 +1847,7 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="settings_more_vaultpony_subtitle">Coffres chiffrés compatibles VeraCrypt, entièrement sur votre appareil</string>
     <string name="settings_passphrase_cache_countdown_format">Phrase secrète mémorisée – effacement dans %1$s</string>
     <string name="settings_passphrase_cache_held_until_cleared">Phrase secrète mémorisée jusqu\'à ce que vous l\'effaciez.</string>
-    <string name="settings_passphrase_cache_none_held">Aucune phrase secrète n\'est mémorisée actuellement.</string>
+    <string name="settings_passphrase_cache_none_held">PGPony n’en mémorise aucune lui-même. Les phrases secrètes saisies pour les apps de messagerie et les autres apps connectées sont gardées à part, et Effacer maintenant les oublie aussi.</string>
     <string name="settings_passphrase_cache_subtitle">Conserve en mémoire, pendant la durée choisie, les phrases secrètes saisies pour les applis connectées. Jamais écrites sur le disque ; effacées en cas de phrase incorrecte ou à la fermeture de l\'appli.</string>
     <string name="settings_passphrase_cache_title">Mémoriser les phrases secrètes</string>
     <string name="sign_file_save_button">Enregistrer dans les fichiers</string>

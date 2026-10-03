@@ -1936,11 +1936,28 @@ private fun PassphraseCacheSection() {
                 }
             }
         } else {
-            Text(
-                stringResource(R.string.settings_passphrase_cache_none_held),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // 4.6.3 (#15): this process only sees passphrases typed inside
+            // PGPony. One typed for a mail app is held by the :remote_api
+            // process, so say so and keep Clear reachable for it.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    stringResource(R.string.settings_passphrase_cache_none_held),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = {
+                    com.pgpony.android.provider.ProviderPassphraseCache.clearAll()
+                    com.pgpony.android.session.InAppPassphraseCache.clearAll()
+                    com.pgpony.android.provider.ProviderCacheClearReceiver.requestClearAll()
+                    remainingMs = 0
+                }) {
+                    Text(stringResource(R.string.settings_card_pin_cache_clear))
+                }
+            }
         }
         Spacer(modifier = Modifier.height(4.dp))
     }
