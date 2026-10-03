@@ -79,6 +79,11 @@ data class KeyringUiState(
     // rendered KeyCard.
     val subkeysByPrimaryId: Map<String, List<PgpSubkeyEntity>> = emptyMap(),
     val isLoading: Boolean = false,
+    // 4.6.3 (#74): true once the keyring has been read at least once. Before
+    // that, allKeys is empty because nothing has loaded yet, not because the
+    // keyring is empty, and isLoading starts false, so the first frame looked
+    // like an empty keyring and flashed the "tap the +" tip on every launch.
+    val hasLoaded: Boolean = false,
     // Phase A8.5: separate from isLoading. isLoading drives the
     // initial-load full-screen spinner; isRefreshing drives only the
     // PullToRefreshBox indicator on user pull-down. Distinguishing
@@ -438,11 +443,13 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                     allKeys = keys,
                     subkeysByPrimaryId = subkeyMap,
                     legacyCompositeFingerprints = computeLegacyCompositeFingerprints(keys),
-                    isLoading = false
+                    isLoading = false,
+                    hasLoaded = true
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     isLoading = false,
+                    hasLoaded = true,
                     errorMessage = ErrorText.localize(e.message)
                 )
             }
@@ -464,7 +471,8 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                 val keys = repo.getAllKeys()
                 _state.value = _state.value.copy(
                     allKeys = keys,
-                    legacyCompositeFingerprints = computeLegacyCompositeFingerprints(keys)
+                    legacyCompositeFingerprints = computeLegacyCompositeFingerprints(keys),
+                    hasLoaded = true
                 )
             } catch (_: Exception) {
             }
@@ -513,6 +521,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                     allKeys = keys,
                     subkeysByPrimaryId = subkeyMap,
                     legacyCompositeFingerprints = computeLegacyCompositeFingerprints(keys),
+                    hasLoaded = true,
                 )
                 holdRefreshIndicator(startedAt)
             } catch (e: Exception) {

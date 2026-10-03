@@ -230,7 +230,8 @@ fun KeyringScreen(
                     }
                 }
         ) {
-        if (state.allKeys.isEmpty() && !state.isLoading) {
+        // 4.6.3 (#74): only once the keyring has been read; see hasLoaded.
+        if (state.hasLoaded && state.allKeys.isEmpty() && !state.isLoading) {
             // Empty state
             Box(
                 modifier = Modifier.fillMaxSize().padding(padding),
@@ -575,7 +576,7 @@ fun KeyringScreen(
     ScreenTooltip(
         tooltipKey = "keyring_fab",
         message = stringResource(R.string.keyring_tooltip_fab),
-        enabled = state.allKeys.isEmpty()
+        enabled = state.hasLoaded && state.allKeys.isEmpty()
     )
 }
 
