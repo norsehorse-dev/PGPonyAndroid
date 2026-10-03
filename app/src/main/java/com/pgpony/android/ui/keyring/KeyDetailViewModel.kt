@@ -1553,6 +1553,12 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                         PendingSubkeyOp.Kind.REVOKE, subkeyFp, reason, comment, passphrase
                     )
                 )
+            } catch (e: com.pgpony.android.crypto.pqc.CompositeSecretProtection.ProtectedKeyException) {
+                // 4.6.3 (item 20): as for Add User ID.
+                _state.value = _state.value.copy(
+                    subkeyRevokeInFlight = false,
+                    subkeyRevokeError = PGPonyApp.instance.getString(R.string.kd_vm_error_revoke_passphrase_required)
+                )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     subkeyRevokeInFlight = false,
@@ -1769,6 +1775,13 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                 _state.value = _state.value.copy(
                     addUserIdInFlight = false,
                     addUserIdError = ErrorText.localize(e.message) ?: PGPonyApp.instance.getString(R.string.key_detail_add_userid_failed)
+                )
+            } catch (e: com.pgpony.android.crypto.pqc.CompositeSecretProtection.ProtectedKeyException) {
+                // 4.6.3 (item 20): a protected ML-DSA key reached without its
+                // passphrase gets the normal prompt text, not the raw message.
+                _state.value = _state.value.copy(
+                    addUserIdInFlight = false,
+                    addUserIdError = PGPonyApp.instance.getString(R.string.kd_vm_error_revoke_passphrase_required)
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
