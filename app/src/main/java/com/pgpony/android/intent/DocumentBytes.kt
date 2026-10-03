@@ -39,10 +39,38 @@ object DocumentBytes {
     data class Detailed(
         val bytes: ByteArray?,
         val declaredSize: Long?,
-        val displayName: String?
+        val displayName: String?,
+        /** 4.6.3: the file is over the caller's maxBytes, so nothing was kept. */
+        val tooLarge: Boolean = false
     )
 
-    fun readDetailed(resolver: ContentResolver, uri: Uri): Detailed {
+    /** 4.6.3: thrown inside the ladder when a route goes past maxBytes. */
+    private class OverLimit : Exception()
+
+    /** Read [input] fully, or throw [OverLimit] once it passes [max]. */
+    private fun readBounded(input: java.io.InputStream, max: Long): ByteArray {
+        if (max == Long.MAX_VALUE) return input.readBytes()
+        val out = java.io.ByteArrayOutputStream()
+        val chunk = ByteArray(64 * 1024)
+        var total = 0L
+        while (true) {
+            val n = input.read(chunk)
+            if (n < 0) break
+            total += n
+            if (total > max) throw OverLimit()
+            out.write(chunk, 0, n)
+        }
+        return out.toByteArray()
+    }
+
+    /**
+     * 4.6.3 (4.7.0 item 19 F, Play crash): [maxBytes] bounds every route.
+     * Picking a large non-key file to import as a key read it whole, and the
+     * key preview then copied it into a String and an armored copy, which ran
+     * out of memory. Past [maxBytes] this returns [Detailed.tooLarge] with no
+     * bytes; a declared size past it is refused before anything is read.
+     */
+    fun readDetailed(resolver: ContentResolver, uri: Uri, maxBytes: Long = Long.MAX_VALUE): Detailed {
         var declaredSize: Long? = null
         var displayName: String? = null
         try {
@@ -63,6 +91,11 @@ object DocumentBytes {
             // metadata is best-effort
         }
 
+        if (declaredSize?.let { it > maxBytes } == true) {
+            return Detailed(null, declaredSize, displayName, tooLarge = true)
+        }
+        var overLimit = false
+
         var best: ByteArray? = null
         fun consider(b: ByteArray?): Boolean {
             if (b == null) return false
@@ -71,28 +104,29 @@ object DocumentBytes {
         }
 
         try {
-            if (consider(resolver.openInputStream(uri)?.use { it.readBytes() })) {
+            if (consider(resolver.openInputStream(uri)?.use { readBounded(it, maxBytes) })) {
                 return Detailed(best, declaredSize, displayName)
             }
-        } catch (_: Throwable) {}
+        } catch (_: OverLimit) { overLimit = true } catch (_: Throwable) {}
         try {
             if (consider(resolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                    java.io.FileInputStream(pfd.fileDescriptor).readBytes()
+                    readBounded(java.io.FileInputStream(pfd.fileDescriptor), maxBytes)
                 })) return Detailed(best, declaredSize, displayName)
-        } catch (_: Throwable) {}
+        } catch (_: OverLimit) { overLimit = true } catch (_: Throwable) {}
         try {
             if (consider(resolver.openAssetFileDescriptor(uri, "r")?.use { afd ->
-                    afd.createInputStream().use { it.readBytes() }
+                    afd.createInputStream().use { readBounded(it, maxBytes) }
                 })) return Detailed(best, declaredSize, displayName)
-        } catch (_: Throwable) {}
+        } catch (_: OverLimit) { overLimit = true } catch (_: Throwable) {}
         for (mime in arrayOf("application/octet-stream", "*/*")) {
             try {
                 if (consider(
                         resolver.openTypedAssetFileDescriptor(uri, mime, null)
-                            ?.createInputStream()?.use { it.readBytes() }
+                            ?.createInputStream()?.use { readBounded(it, maxBytes) }
                     )) return Detailed(best, declaredSize, displayName)
-            } catch (_: Throwable) {}
+            } catch (_: OverLimit) { overLimit = true } catch (_: Throwable) {}
         }
+        if (overLimit && best == null) return Detailed(null, declaredSize, displayName, tooLarge = true)
         return Detailed(best, declaredSize, displayName)
     }
 

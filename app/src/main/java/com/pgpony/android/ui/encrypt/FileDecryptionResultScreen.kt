@@ -60,6 +60,7 @@ import com.pgpony.android.ui.decrypt.VerificationBanner
 import com.pgpony.android.ui.util.ClipboardService
 import com.pgpony.android.ui.util.ScratchFiles
 import java.io.File
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -109,6 +110,10 @@ fun FileDecryptionResultScreen(state: DecryptUiState, onDismiss: () -> Unit) {
     }
 
     var saveStatus by remember { mutableStateOf<DecryptSaveStatus>(DecryptSaveStatus.Idle) }
+    // 4.6.3 (4.7.0 item 19 C, Play ANR): Save and Share copy on
+    // Dispatchers.IO, not in the click handler on the main thread.
+    val ioScope = rememberCoroutineScope()
+    var copying by remember { mutableStateOf(false) }
     var copied by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
@@ -234,26 +239,33 @@ fun FileDecryptionResultScreen(state: DecryptUiState, onDismiss: () -> Unit) {
                         suggestedName = outName
                     ) { uri ->
                         if (uri == null) return@startDocumentCreator
-                        try {
-                            context.contentResolver.openOutputStream(uri)?.use { sink ->
-                                // 4.0.4 — the streamed branch copies in
-                                // chunks; writing a whole 13 MB array here
-                                // would undo the point of streaming it.
-                                if (bytes != null) {
-                                    sink.write(bytes)
-                                } else if (streamed != null) {
-                                    streamed.inputStream().buffered().use { it.copyTo(sink) }
+                        copying = true
+                        ioScope.launch {
+                            saveStatus = try {
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    context.contentResolver.openOutputStream(uri)?.use { sink ->
+                                        // 4.0.4: the streamed branch copies in
+                                        // chunks; writing a whole 13 MB array here
+                                        // would undo the point of streaming it.
+                                        if (bytes != null) {
+                                            sink.write(bytes)
+                                        } else if (streamed != null) {
+                                            streamed.inputStream().buffered().use { it.copyTo(sink) }
+                                        }
+                                        sink.flush()
+                                    }
                                 }
-                                sink.flush()
+                                DecryptSaveStatus.Saved
+                            } catch (e: Exception) {
+                                DecryptSaveStatus.Error(ErrorText.localize(context, e.message) ?: context.getString(R.string.result_file_decrypt_save_failed_fallback))
+                            } finally {
+                                copying = false
                             }
-                            saveStatus = DecryptSaveStatus.Saved
-                        } catch (e: Exception) {
-                            saveStatus = DecryptSaveStatus.Error(ErrorText.localize(context, e.message) ?: context.getString(R.string.result_file_decrypt_save_failed_fallback))
                         }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = activity != null
+                enabled = activity != null && !copying
             ) {
                 Icon(Icons.Filled.SaveAlt, null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
@@ -262,34 +274,42 @@ fun FileDecryptionResultScreen(state: DecryptUiState, onDismiss: () -> Unit) {
 
             // ── 5. Share Decrypted File ──────────────────────────────
             OutlinedButton(
+                enabled = !copying,
                 onClick = {
-                    try {
-                        // 4.0.4 — the streamed output already sits in
-                        // cacheDir/scratch, which file_paths.xml exposes,
-                        // so it can be shared in place. Only the buffered
-                        // branch still needs a file written for it.
-                        val shareUri = if (streamed != null) {
-                            ScratchFiles.uriFor(context, streamed)
-                        } else {
-                            val exportsDir = File(context.cacheDir, "exports").apply { mkdirs() }
-                            val outFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, outName, "decrypted_output")
-                            outFile.writeBytes(bytes ?: ByteArray(0))
-                            FileProvider.getUriForFile(
-                                context,
-                                "${context.packageName}.fileprovider",
-                                outFile
+                    copying = true
+                    ioScope.launch {
+                        try {
+                            // 4.0.4: the streamed output already sits in
+                            // cacheDir/scratch, which file_paths.xml exposes,
+                            // so it can be shared in place. Only the buffered
+                            // branch still needs a file written for it.
+                            val shareUri = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                if (streamed != null) {
+                                    ScratchFiles.uriFor(context, streamed)
+                                } else {
+                                    val exportsDir = File(context.cacheDir, "exports").apply { mkdirs() }
+                                    val outFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, outName, "decrypted_output")
+                                    outFile.writeBytes(bytes ?: ByteArray(0))
+                                    FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.fileprovider",
+                                        outFile
+                                    )
+                                }
+                            }
+                            val send = Intent(Intent.ACTION_SEND).apply {
+                                type = "application/octet-stream"
+                                putExtra(Intent.EXTRA_STREAM, shareUri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(
+                                Intent.createChooser(send, context.getString(R.string.result_file_decrypt_share_chooser))
                             )
+                        } catch (e: Exception) {
+                            saveStatus = DecryptSaveStatus.Error(ErrorText.localize(context, e.message) ?: context.getString(R.string.result_file_decrypt_share_failed_fallback))
+                        } finally {
+                            copying = false
                         }
-                        val send = Intent(Intent.ACTION_SEND).apply {
-                            type = "application/octet-stream"
-                            putExtra(Intent.EXTRA_STREAM, shareUri)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        context.startActivity(
-                            Intent.createChooser(send, context.getString(R.string.result_file_decrypt_share_chooser))
-                        )
-                    } catch (e: Exception) {
-                        saveStatus = DecryptSaveStatus.Error(ErrorText.localize(context, e.message) ?: context.getString(R.string.result_file_decrypt_share_failed_fallback))
                     }
                 },
                 modifier = Modifier.fillMaxWidth()

@@ -1295,6 +1295,7 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="settings_share_format_subtitle">Como o botão Compartilhar empacota um resultado criptografado ou assinado.</string>
     <!-- 3.1.0 Phase 8 Fix1 — file import read error -->
     <string name="keyring_error_file_read">Não foi possível ler o arquivo. Salve-o no armazenamento local (app Arquivos) e importe novamente.</string>
+    <string name="keyring_error_file_too_large">Esse arquivo é grande demais para ser uma chave. Escolha o arquivo de chave .asc, .gpg ou .pgp.</string>
     <!-- 3.1.0 Phase 8 Fix2 — file import diagnostic -->
     <string name="keyring_error_parse_diag">Couldn\'t read a key from the file — got %1$d bytes starting with \"%2$s\"</string>
     <!-- 3.1.0 Phase 8 Fix3 — richer file import diagnostic -->
@@ -1853,6 +1854,7 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="sign_file_save_button">Salvar em Arquivos</string>
     <string name="sign_verify_error_file_unreadable">Não foi possível ler o arquivo selecionado. Selecione-o novamente.</string>
     <string name="verify_file_error_sig_not_signature">Esse arquivo é grande demais para ser uma assinatura separada. Escolha o arquivo .asc ou .sig, não o conteúdo assinado.</string>
+    <string name="verify_error_signature_damaged">O bloco de assinatura está danificado e não pode ser verificado. Obtenha uma cópia nova do arquivo de assinatura.</string>
 
     <!-- 4.2.0 RC4 workstream O8: strings added by O3/O5. -->
     <string name="key_detail_fallbacks_strict_title">Usar apenas as alternativas ativadas</string>

@@ -69,6 +69,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
+import kotlinx.coroutines.launch
 import com.pgpony.android.MainActivity
 import com.pgpony.android.network.KeyLookupSource
 import com.pgpony.android.ui.scanner.QRScannerScreen
@@ -353,6 +354,8 @@ private fun FileSection(state: KeyringUiState, viewModel: KeyringViewModel) {
     // findMainActivity() walks up baseContext until it finds the
     // real activity, matching the standard Compose idiom.
     val activity = context.findMainActivity()
+    // 4.6.3 (4.7.0 item 19 F): the file read leaves the main thread.
+    val readScope = rememberCoroutineScope()
 
     val onPickFile: () -> Unit = {
         // 4.0.4 fix (origin: Meino, key file on a USB stick invisible in
@@ -386,13 +389,25 @@ private fun FileSection(state: KeyringUiState, viewModel: KeyringViewModel) {
                 // keyrings (gpg --export without --armor).
                 // 3.1.0 Phase 8 Fix3: detailed read — declared size and
                 // provider display name ride along for validation + diag.
-                val detailed = com.pgpony.android.intent.DocumentBytes
-                    .readDetailed(context.contentResolver, uri)
-                viewModel.previewKeyBytes(
-                    detailed.bytes,
-                    sourceFilename = detailed.displayName ?: filename,
-                    declaredSize = detailed.declaredSize
-                )
+                // 4.6.3 (4.7.0 item 19 F, Play crash): read on IO and capped,
+                // so picking a large non-key file fails with "too large to be
+                // a key" instead of running out of memory in the preview.
+                readScope.launch {
+                    val detailed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        com.pgpony.android.intent.DocumentBytes.readDetailed(
+                            context.contentResolver, uri, maxBytes = KeyringViewModel.KEY_FILE_MAX_BYTES
+                        )
+                    }
+                    if (detailed.tooLarge) {
+                        viewModel.reportKeyFileTooLarge()
+                    } else {
+                        viewModel.previewKeyBytes(
+                            detailed.bytes,
+                            sourceFilename = detailed.displayName ?: filename,
+                            declaredSize = detailed.declaredSize
+                        )
+                    }
+                }
             }
             // uri == null means the user cancelled or there was no
             // DocumentsUI activity. Cancel is silent (matches iOS);

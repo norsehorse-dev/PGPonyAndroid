@@ -49,7 +49,11 @@ import com.pgpony.android.crypto.card.OpenPgpCardException
 import com.pgpony.android.crypto.card.OpenPgpCardSession
 import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.nfc.OpenPgpCardReader
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.openintents.openpgp.util.OpenPgpApi
 
 class ProviderCardOpActivity : ComponentActivity() {
@@ -123,20 +127,32 @@ class ProviderCardOpActivity : ComponentActivity() {
             return
         }
 
-        val entity = runBlocking {
-            (application as PGPonyApp).keyRepository.getByFingerprint(op.cardEntityFingerprint)
+        // Set before onStart starts the reader, so a card already on the phone
+        // finds the cached PIN.
+        currentPin = CardPinCache.retrieve() ?: ""
+
+        // 4.6.3 (4.7.0 item 19, Play ANR candidate): the Room read runs on
+        // Dispatchers.IO; it was a runBlocking on the main thread in the
+        // :remote_api process.
+        lifecycleScope.launch {
+            val entity = withContext(Dispatchers.IO) {
+                (application as PGPonyApp).keyRepository.getByFingerprint(op.cardEntityFingerprint)
+            }
+            if (entity == null) {
+                ProviderCardOpStore.abandon(opKey)
+                setResult(Activity.RESULT_CANCELED)
+                finish()
+                return@launch
+            }
+            showCardDialog(op, entity)
         }
-        if (entity == null) {
-            ProviderCardOpStore.abandon(opKey)
-            setResult(Activity.RESULT_CANCELED)
-            finish()
-            return
-        }
+    }
+
+    private fun showCardDialog(op: ProviderCardOpStore.PendingOp, entity: com.pgpony.android.data.PGPKeyEntity) {
         val cardLabel = entity.cardManufacturer
             ?: getString(R.string.provider_cardop_generic_card)
 
-        val cachedPin = CardPinCache.retrieve() ?: ""
-        currentPin = cachedPin
+        val cachedPin = currentPin
 
         setContent {
             PGPonyTheme {

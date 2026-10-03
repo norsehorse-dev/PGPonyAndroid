@@ -56,6 +56,7 @@ import com.pgpony.android.R
 import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.MainActivity
 import java.io.File
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,6 +81,12 @@ fun FileEncryptionResultScreen(state: EncryptUiState, onDismiss: () -> Unit) {
     // Save-status banner state. Same one-shot UI flair pattern as the
     // text-mode sheet — kept local since it has no business value.
     var saveStatus by remember { mutableStateOf<SaveStatus>(SaveStatus.Idle) }
+    // 4.6.3 (4.7.0 item 19 C, Play ANR): Save and Share copy the ciphertext,
+    // which can be a very large streamed file, zipped too when wrapZip is on.
+    // That copy ran on the main thread in the click handler; it now runs on
+    // Dispatchers.IO, with both buttons disabled while it does.
+    val ioScope = rememberCoroutineScope()
+    var copying by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -288,34 +295,41 @@ stringResource(R.string.file_enc_result_badge_can_decrypt),
                         suggestedName = if (wrapZip) "$encryptedName.zip" else encryptedName
                     ) { uri ->
                         if (uri == null) {
-                            // user cancelled — silent
+                            // user cancelled, silent
                             return@startDocumentCreator
                         }
-                        try {
-                            val out = context.contentResolver.openOutputStream(uri)
-                            if (out != null) {
-                                if (wrapZip) {
-                                    // ZipPackaging owns and closes `out`.
-                                    com.pgpony.android.ui.util.ZipPackaging.writeSingleEntry(out, encryptedName) { dst ->
-                                        if (encryptedBytes != null) dst.write(encryptedBytes)
-                                        else streamed?.inputStream()?.buffered()?.use { it.copyTo(dst) }
-                                    }
-                                } else {
-                                    out.use { sink ->
-                                        if (encryptedBytes != null) sink.write(encryptedBytes)
-                                        else streamed?.inputStream()?.buffered()?.use { it.copyTo(sink) }
-                                        sink.flush()
+                        copying = true
+                        ioScope.launch {
+                            saveStatus = try {
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    val out = context.contentResolver.openOutputStream(uri)
+                                    if (out != null) {
+                                        if (wrapZip) {
+                                            // ZipPackaging owns and closes `out`.
+                                            com.pgpony.android.ui.util.ZipPackaging.writeSingleEntry(out, encryptedName) { dst ->
+                                                if (encryptedBytes != null) dst.write(encryptedBytes)
+                                                else streamed?.inputStream()?.buffered()?.use { it.copyTo(dst) }
+                                            }
+                                        } else {
+                                            out.use { sink ->
+                                                if (encryptedBytes != null) sink.write(encryptedBytes)
+                                                else streamed?.inputStream()?.buffered()?.use { it.copyTo(sink) }
+                                                sink.flush()
+                                            }
+                                        }
                                     }
                                 }
+                                SaveStatus.Saved
+                            } catch (e: Exception) {
+                                SaveStatus.Error(ErrorText.localize(context, e.message) ?: context.getString(R.string.file_enc_result_save_failed_default))
+                            } finally {
+                                copying = false
                             }
-                            saveStatus = SaveStatus.Saved
-                        } catch (e: Exception) {
-                            saveStatus = SaveStatus.Error(ErrorText.localize(context, e.message) ?: context.getString(R.string.file_enc_result_save_failed_default))
                         }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = activity != null
+                enabled = activity != null && !copying
             ) {
                 Icon(Icons.Filled.SaveAlt, null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
@@ -323,53 +337,61 @@ stringResource(R.string.file_enc_result_badge_can_decrypt),
             }
 
             OutlinedButton(
+                enabled = !copying,
                 onClick = {
-                    try {
-                        // Write to app cache + share via FileProvider so
-                        // other apps can read the file. Cache dir is
-                        // OS-cleaned automatically; FileProvider grants
-                        // one-shot read URIs via FLAG_GRANT_READ_URI_PERMISSION.
-                        //
-                        // 4.0.4 — the streamed ciphertext already lives in
-                        // cacheDir/scratch, which file_paths.xml exposes, so
-                        // it is shared in place rather than copied again.
-                        val exportsDir = File(context.cacheDir, "exports").apply { mkdirs() }
-                        val shareUri = if (wrapZip) {
-                            // 4.6.0: the name comes from the picked file's
-                            // display name, so it goes through safeChild like
-                            // every other exports/ write; ZipPackaging reduces
-                            // the entry name to a base name as well.
-                            val zipFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(
-                                exportsDir, "$encryptedName.zip", "encrypted.gpg.zip"
-                            )
-                            com.pgpony.android.ui.util.ZipPackaging.writeSingleEntry(
-                                java.io.FileOutputStream(zipFile), encryptedName
-                            ) { dst ->
-                                if (encryptedBytes != null) dst.write(encryptedBytes)
-                                else streamed?.inputStream()?.buffered()?.use { it.copyTo(dst) }
+                    copying = true
+                    ioScope.launch {
+                        try {
+                            // Write to app cache + share via FileProvider so
+                            // other apps can read the file. Cache dir is
+                            // OS-cleaned automatically; FileProvider grants
+                            // one-shot read URIs via FLAG_GRANT_READ_URI_PERMISSION.
+                            //
+                            // 4.0.4 — the streamed ciphertext already lives in
+                            // cacheDir/scratch, which file_paths.xml exposes, so
+                            // it is shared in place rather than copied again.
+                            val shareUri = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                val exportsDir = File(context.cacheDir, "exports").apply { mkdirs() }
+                                if (wrapZip) {
+                                    // 4.6.0: the name comes from the picked file's
+                                    // display name, so it goes through safeChild like
+                                    // every other exports/ write; ZipPackaging reduces
+                                    // the entry name to a base name as well.
+                                    val zipFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(
+                                        exportsDir, "$encryptedName.zip", "encrypted.gpg.zip"
+                                    )
+                                    com.pgpony.android.ui.util.ZipPackaging.writeSingleEntry(
+                                        java.io.FileOutputStream(zipFile), encryptedName
+                                    ) { dst ->
+                                        if (encryptedBytes != null) dst.write(encryptedBytes)
+                                        else streamed?.inputStream()?.buffered()?.use { it.copyTo(dst) }
+                                    }
+                                    FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", zipFile)
+                                } else if (streamed != null) {
+                                    ScratchFiles.uriFor(context, streamed)
+                                } else {
+                                    val outFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, encryptedName, "encrypted.pgp")
+                                    outFile.writeBytes(encryptedBytes ?: ByteArray(0))
+                                    FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.fileprovider",
+                                        outFile
+                                    )
+                                }
                             }
-                            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", zipFile)
-                        } else if (streamed != null) {
-                            ScratchFiles.uriFor(context, streamed)
-                        } else {
-                            val outFile = com.pgpony.android.ui.util.ScratchFiles.safeChild(exportsDir, encryptedName, "encrypted.pgp")
-                            outFile.writeBytes(encryptedBytes ?: ByteArray(0))
-                            FileProvider.getUriForFile(
-                                context,
-                                "${context.packageName}.fileprovider",
-                                outFile
+                            val send = Intent(Intent.ACTION_SEND).apply {
+                                type = if (wrapZip) "application/zip" else "application/pgp-encrypted"
+                                putExtra(Intent.EXTRA_STREAM, shareUri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(
+                                Intent.createChooser(send, context.getString(R.string.file_enc_result_share_chooser_title))
                             )
+                        } catch (e: Exception) {
+                            saveStatus = SaveStatus.Error(ErrorText.localize(context, e.message) ?: context.getString(R.string.file_enc_result_share_failed_default))
+                        } finally {
+                            copying = false
                         }
-                        val send = Intent(Intent.ACTION_SEND).apply {
-                            type = if (wrapZip) "application/zip" else "application/pgp-encrypted"
-                            putExtra(Intent.EXTRA_STREAM, shareUri)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        context.startActivity(
-                            Intent.createChooser(send, context.getString(R.string.file_enc_result_share_chooser_title))
-                        )
-                    } catch (e: Exception) {
-                        saveStatus = SaveStatus.Error(ErrorText.localize(context, e.message) ?: context.getString(R.string.file_enc_result_share_failed_default))
                     }
                 },
                 modifier = Modifier.fillMaxWidth()

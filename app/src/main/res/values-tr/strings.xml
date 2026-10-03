@@ -318,6 +318,7 @@
     <!-- RC3 §J (#16): Sign File / Verify stream the picked file from disk; these cover the two remaining failure shapes. -->
     <string name="sign_verify_error_file_unreadable">Seçilen dosya okunamadı. Dosyayı yeniden seçin.</string>
     <string name="verify_file_error_sig_not_signature">Bu dosya ayrık imza olamayacak kadar büyük. İmzalanan içeriği değil, .asc veya .sig dosyasını seçin.</string>
+    <string name="verify_error_signature_damaged">İmza bloğu bozuk olduğu için doğrulanamıyor. İmza dosyasının yeni bir kopyasını alın.</string>
     <string name="sign_file_save_button">Dosyalar\'a Kaydet</string>
     <string name="encrypt_mode_password">Parola</string>
 
@@ -1872,6 +1873,7 @@
     <string name="settings_share_format_subtitle">Paylaş düğmesinin şifreli veya imzalı bir sonucu nasıl paketleyeceği.</string>
     <!-- 3.1.0 Phase 8 Fix1: file import read error -->
     <string name="keyring_error_file_read">Dosya okunamadı. Dosyayı yerel depolamaya (Dosyalar uygulaması) kaydedip yeniden içe aktarmayı deneyin.</string>
+    <string name="keyring_error_file_too_large">Bu dosya bir anahtar olamayacak kadar büyük. .asc, .gpg veya .pgp anahtar dosyasını seçin.</string>
     <!-- 3.1.0 Phase 8 Fix2: file import diagnostic -->
     <string name="keyring_error_parse_diag">Dosyadan anahtar okunamadı. \"%2$s\" ile başlayan %1$d bayt alındı</string>
     <!-- 3.1.0 Phase 8 Fix3: richer file import diagnostic -->

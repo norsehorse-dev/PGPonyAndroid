@@ -318,6 +318,7 @@
     <!-- RC3 §J (#16): Sign File / Verify stream the picked file from disk; these cover the two remaining failure shapes. -->
     <string name="sign_verify_error_file_unreadable">无法读取所选文件。请重新选择。</string>
     <string name="verify_file_error_sig_not_signature">该文件太大，不可能是分离签名。请选择 .asc 或 .sig 文件，而不是已签名的内容。</string>
+    <string name="verify_error_signature_damaged">签名块已损坏，无法校验。请重新获取一份签名文件。</string>
     <string name="sign_file_save_button">存储到「文件」</string>
     <string name="encrypt_mode_password">密码</string>
 
@@ -1869,6 +1870,7 @@
     <string name="settings_share_format_subtitle">「共享」按钮打包加密或签名结果的方式。</string>
     <!-- 3.1.0 Phase 8 Fix1: file import read error -->
     <string name="keyring_error_file_read">无法读取该文件。请尝试将其存储到本地存储（「文件」应用）后重新导入。</string>
+    <string name="keyring_error_file_too_large">该文件太大，不可能是密钥。请选择 .asc、.gpg 或 .pgp 密钥文件。</string>
     <!-- 3.1.0 Phase 8 Fix2: file import diagnostic -->
     <string name="keyring_error_parse_diag">无法从文件中读取密钥。读取到 %1$d 字节，开头为「%2$s」</string>
     <!-- 3.1.0 Phase 8 Fix3: richer file import diagnostic -->

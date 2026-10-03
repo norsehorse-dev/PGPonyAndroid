@@ -1295,6 +1295,7 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="settings_share_format_subtitle">Comment le bouton Partager empaquette un résultat chiffré ou signé.</string>
     <!-- 3.1.0 Phase 8 Fix1 — file import read error -->
     <string name="keyring_error_file_read">Impossible de lire ce fichier. Enregistrez-le en local (app Fichiers) puis réessayez l\'import.</string>
+    <string name="keyring_error_file_too_large">Ce fichier est trop volumineux pour être une clé. Choisissez le fichier de clé .asc, .gpg ou .pgp.</string>
     <!-- 3.1.0 Phase 8 Fix2 — file import diagnostic -->
     <string name="keyring_error_parse_diag">Couldn\'t read a key from the file — got %1$d bytes starting with \"%2$s\"</string>
     <!-- 3.1.0 Phase 8 Fix3 — richer file import diagnostic -->
@@ -1853,6 +1854,7 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="sign_file_save_button">Enregistrer dans les fichiers</string>
     <string name="sign_verify_error_file_unreadable">Impossible de lire le fichier sélectionné. Sélectionnez-le à nouveau.</string>
     <string name="verify_file_error_sig_not_signature">Ce fichier est trop volumineux pour être une signature détachée. Choisissez le fichier .asc ou .sig, pas le contenu signé.</string>
+    <string name="verify_error_signature_damaged">Le bloc de signature est endommagé et ne peut pas être vérifié. Procurez-vous une nouvelle copie du fichier de signature.</string>
 
     <!-- 4.2.0 RC4 workstream O8: strings added by O3/O5. -->
     <string name="key_detail_fallbacks_strict_title">N\'utiliser que les clés de repli activées</string>
