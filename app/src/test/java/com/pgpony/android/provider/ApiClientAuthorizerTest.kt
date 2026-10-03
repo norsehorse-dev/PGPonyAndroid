@@ -251,4 +251,79 @@ class ApiClientAuthorizerTest {
         assertFalse(authorizer.bindSshKey(tbird, fpA))
         assertFalse(authorizer.sshKeyAllowed(tbird, fpA))
     }
+
+    // ── 4.6.3 (#68): several SSH keys per app ─────────────────────────
+
+    private val fpC = "EF".repeat(20)
+
+    @Test
+    fun sshKeys_accumulate_andEachStaysAllowed() = runTest {
+        signatures[agent] = sigA
+        authorizer.grant(agent, SSH)
+        assertTrue(authorizer.bindSshKey(agent, fpA))
+        assertTrue(authorizer.bindSshKey(agent, fpB.lowercase()))
+        assertTrue(authorizer.bindSshKey(agent, fpC))
+        // Approving B and C did not undo A: the 4.6.0 to 4.6.2 ping-pong.
+        assertTrue(authorizer.sshKeyAllowed(agent, fpA))
+        assertTrue(authorizer.sshKeyAllowed(agent, fpB))
+        assertTrue(authorizer.sshKeyAllowed(agent, fpC))
+        assertEquals(listOf(fpA, fpB, fpC), authorizer.sshKeys(agent))
+        assertEquals(fpA, authorizer.sshKey(agent))
+    }
+
+    @Test
+    fun sshKeys_bindingTheSameKeyTwice_storesItOnce() = runTest {
+        signatures[agent] = sigA
+        authorizer.grant(agent, SSH)
+        authorizer.bindSshKey(agent, fpA)
+        authorizer.bindSshKey(agent, fpA.lowercase())
+        assertEquals(listOf(fpA), authorizer.sshKeys(agent))
+        assertEquals(fpA, dao.getByPackage(agent)?.sshKeyFingerprint)
+    }
+
+    @Test
+    fun unbindSshKey_withdrawsOnlyThatKey_andKeepsTheScope() = runTest {
+        signatures[agent] = sigA
+        authorizer.grant(agent, SSH)
+        authorizer.bindSshKey(agent, fpA)
+        authorizer.bindSshKey(agent, fpB)
+        authorizer.unbindSshKey(agent, fpA.lowercase())
+        assertFalse(authorizer.sshKeyAllowed(agent, fpA))
+        assertTrue(authorizer.sshKeyAllowed(agent, fpB))
+        authorizer.unbindSshKey(agent, fpB)
+        assertTrue(authorizer.sshKeys(agent).isEmpty())
+        assertNull(dao.getByPackage(agent)?.sshKeyFingerprint)
+        assertEquals(ApiClientAuthorizer.Decision.AUTHORIZED, authorizer.authorize(agent, SSH))
+    }
+
+    @Test
+    fun revokingSsh_dropsEveryKey() = runTest {
+        signatures[agent] = sigA
+        authorizer.grant(agent, PGP)
+        authorizer.grant(agent, SSH)
+        authorizer.bindSshKey(agent, fpA)
+        authorizer.bindSshKey(agent, fpB)
+        authorizer.revokeScope(agent, SSH)
+        authorizer.grant(agent, SSH)
+        assertTrue(authorizer.sshKeys(agent).isEmpty())
+    }
+
+    @Test
+    fun aSingleKeyStoredBy460_readsAsASetOfOne() = runTest {
+        // What 4.6.0 to 4.6.2 wrote: one uppercase fingerprint, no separator.
+        signatures[agent] = sigA
+        dao.insert(ApiClientEntity(agent, sigA, 1_000L, scopes = SSH, sshKeyFingerprint = fpA))
+        assertEquals(listOf(fpA), authorizer.sshKeys(agent))
+        assertTrue(authorizer.sshKeyAllowed(agent, fpA))
+        authorizer.bindSshKey(agent, fpB)
+        assertEquals("$fpA,$fpB", dao.getByPackage(agent)?.sshKeyFingerprint)
+    }
+
+    @Test
+    fun parseSshKeys_ignoresBlanksAndCase() {
+        assertEquals(emptyList<String>(), ApiClientEntity.parseSshKeys(null))
+        assertEquals(emptyList<String>(), ApiClientEntity.parseSshKeys(""))
+        assertEquals(listOf(fpA, fpB), ApiClientEntity.parseSshKeys(" ${fpA.lowercase()} ,,$fpB,$fpA"))
+        assertNull(ApiClientEntity.joinSshKeys(emptyList()))
+    }
 }

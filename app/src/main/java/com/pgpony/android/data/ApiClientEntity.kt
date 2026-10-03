@@ -58,14 +58,39 @@ data class ApiClientEntity(
      * 4.6.0: the primary fingerprint (hex) of the key the user picked for this
      * app's SSH logins. SSH requests for any other key are refused. Cleared
      * with the SSH scope.
+     *
+     * 4.6.3 (#68): every key the user has approved for this app's SSH logins,
+     * as uppercase hex fingerprints joined by [SSH_KEY_SEPARATOR]. A 4.6.0 to
+     * 4.6.2 row holds one fingerprint, which reads as a set of one, so no
+     * migration is needed. Read it through [sshKeyFingerprints].
      */
     val sshKeyFingerprint: String? = null
 ) {
     fun has(scope: Int): Boolean = scopes and scope == scope
 
+    /** 4.6.3 (#68): the approved SSH keys, uppercase, in the order approved. */
+    fun sshKeyFingerprints(): List<String> = parseSshKeys(sshKeyFingerprint)
+
     companion object {
         const val SCOPE_OPENPGP = 1
         const val SCOPE_SSH = 2
+
+        /** Fingerprints are hex, so a comma never occurs inside one. */
+        const val SSH_KEY_SEPARATOR = ","
+
+        fun parseSshKeys(stored: String?): List<String> =
+            stored.orEmpty().split(SSH_KEY_SEPARATOR)
+                .map { it.trim().uppercase() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+
+        /** The column value for [keys], or null when there are none. */
+        fun joinSshKeys(keys: List<String>): String? =
+            keys.map { it.trim().uppercase() }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .takeIf { it.isNotEmpty() }
+                ?.joinToString(SSH_KEY_SEPARATOR)
     }
 }
 

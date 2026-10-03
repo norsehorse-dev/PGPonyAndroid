@@ -39,6 +39,12 @@
 // request naming any other key gets the picker again, showing only that key,
 // so the user approves it explicitly; nothing is signed with a key the user
 // did not choose for that app.
+//
+// 4.6.3 (#68): an app keeps every key the user approved for it, not only the
+// last one. An agent with several keys asks for all their public keys on each
+// connection, and with a single binding every approval undid the previous
+// one, so the picker came back on every connection. Each key is now approved
+// once.
 
 package com.pgpony.android.provider
 

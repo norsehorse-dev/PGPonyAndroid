@@ -17,6 +17,10 @@
 // SSH, the key its logins are bound to), and each can be removed on its own.
 // Removing SSH also clears the key binding. The delete icon still removes the
 // app entirely.
+//
+// 4.6.3 (#68): an app can hold several SSH keys. Each is listed on its own row
+// with its own Remove, which withdraws that key only; with no key left, the
+// "no key chosen yet" row removes the SSH access itself.
 
 package com.pgpony.android.ui.settings
 
@@ -194,7 +198,7 @@ fun ApiClientsScreen(onDismiss: () -> Unit) {
                 ApiClientRow(
                     client = client,
                     label = rememberAppLabel(client.packageName),
-                    sshKeyLabel = client.sshKeyFingerprint?.let { keyLabels[it.uppercase()] ?: it },
+                    sshKeys = client.sshKeyFingerprints().map { it to (keyLabels[it] ?: it) },
                     onRevoke = {
                         scope.launch {
                             authorizer.revoke(client.packageName)
@@ -204,6 +208,12 @@ fun ApiClientsScreen(onDismiss: () -> Unit) {
                     onRevokeScope = { s ->
                         scope.launch {
                             authorizer.revokeScope(client.packageName, s)
+                            refresh++
+                        }
+                    },
+                    onRemoveSshKey = { fp ->
+                        scope.launch {
+                            authorizer.unbindSshKey(client.packageName, fp)
                             refresh++
                         }
                     }
@@ -235,9 +245,10 @@ private fun rememberAppLabel(packageName: String): String {
 private fun ApiClientRow(
     client: ApiClientEntity,
     label: String,
-    sshKeyLabel: String?,
+    sshKeys: List<Pair<String, String>>,
     onRevoke: () -> Unit,
-    onRevokeScope: (Int) -> Unit
+    onRevokeScope: (Int) -> Unit,
+    onRemoveSshKey: (String) -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -273,14 +284,19 @@ private fun ApiClientRow(
                 )
             }
             if (client.has(ApiClientEntity.SCOPE_SSH)) {
-                ScopeRow(
-                    text = if (sshKeyLabel != null) {
-                        stringResource(R.string.provider_clients_scope_ssh, sshKeyLabel)
-                    } else {
-                        stringResource(R.string.provider_clients_scope_ssh_nokey)
-                    },
-                    onRemove = { onRevokeScope(ApiClientEntity.SCOPE_SSH) }
-                )
+                if (sshKeys.isEmpty()) {
+                    ScopeRow(
+                        text = stringResource(R.string.provider_clients_scope_ssh_nokey),
+                        onRemove = { onRevokeScope(ApiClientEntity.SCOPE_SSH) }
+                    )
+                } else {
+                    sshKeys.forEach { (fingerprint, keyLabel) ->
+                        ScopeRow(
+                            text = stringResource(R.string.provider_clients_scope_ssh, keyLabel),
+                            onRemove = { onRemoveSshKey(fingerprint) }
+                        )
+                    }
+                }
             }
         }
         IconButton(onClick = onRevoke) {
