@@ -53,8 +53,12 @@ object CardPinCache {
     // production the singleton is always initialized, so behavior is
     // unchanged; when it's absent the cache simply reports disabled — the
     // safe default — instead of throwing.
+    // 4.6.3 (#15): MODE_MULTI_PROCESS, so the provider process (:remote_api),
+    // which holds the PIN for mail apps, sees the switch as Settings left it
+    // rather than the copy it loaded when it started.
+    @Suppress("DEPRECATION")
     private fun prefsOrNull() = runCatching {
-        PGPonyApp.instance.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        PGPonyApp.instance.getSharedPreferences(PREFS, Context.MODE_MULTI_PROCESS)
     }.getOrNull()
 
     fun isEnabled(): Boolean = prefsOrNull()?.getBoolean(KEY_ENABLED, false) ?: false

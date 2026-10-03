@@ -1849,7 +1849,7 @@
     <string name="settings_passphrase_cache_title">Remember key passphrases</string>
     <string name="settings_passphrase_cache_subtitle">Keep passphrases typed for connected apps in memory for a chosen duration. Never stored on disk; cleared by a wrong passphrase or closing the app.</string>
     <string name="settings_passphrase_cache_countdown_format">Passphrase remembered. Clears in %1$s</string>
-    <string name="settings_passphrase_cache_none_held">No passphrase is currently remembered.</string>
+    <string name="settings_passphrase_cache_none_held">None remembered by PGPony itself. Passphrases typed for mail and other connected apps are kept apart, and Clear now forgets those too.</string>
     <string name="settings_passphrase_cache_held_until_cleared">Passphrase remembered until you clear it.</string>
     <!-- 4.0.0 Phase 9b: settings parity (clear inputs, pubkey comment, licenses) -->
     <string name="settings_clear_inputs_title">Clear inputs after encrypting</string>
@@ -1909,7 +1909,21 @@
     <string name="provider_keypicker_empty">No usable keys in your keyring yet. Create or import a key pair in PGPony first.</string>
     <!-- 4.0.0 Succession Phase P2a-2 — provider passphrase prompt -->
     <string name="provider_passphrase_title">Unlock signing key</string>
-    <string name="provider_passphrase_body_format">Enter the passphrase for %1$s to sign this message. PGPony remembers it for 5 minutes on this device only.</string>
+    <string name="provider_passphrase_title_decrypt">Unlock decryption key</string>
+    <string name="provider_passphrase_title_ssh">Unlock SSH key</string>
+    <string name="provider_passphrase_action_sign">Enter the passphrase for %1$s to sign this message.</string>
+    <string name="provider_passphrase_action_decrypt">Enter the passphrase for %1$s to decrypt this message.</string>
+    <string name="provider_passphrase_action_ssh">Enter the passphrase for %1$s to sign in with SSH.</string>
+    <plurals name="provider_passphrase_keep_minutes">
+        <item quantity="one">PGPony remembers it for %1$d minute, on this device only.</item>
+        <item quantity="other">PGPony remembers it for %1$d minutes, on this device only.</item>
+    </plurals>
+    <plurals name="provider_passphrase_keep_hours">
+        <item quantity="one">PGPony remembers it for %1$d hour, on this device only.</item>
+        <item quantity="other">PGPony remembers it for %1$d hours, on this device only.</item>
+    </plurals>
+    <string name="provider_passphrase_keep_until_cleared">PGPony remembers it on this device only, until you clear it in Settings.</string>
+    <string name="provider_passphrase_keep_until_locked">PGPony remembers it on this device only, until the phone locks.</string>
     <string name="provider_passphrase_wrong">Wrong passphrase. Try again.</string>
     <string name="provider_passphrase_hint">Passphrase</string>
     <string name="provider_passphrase_change_key">Sign with a different key</string>

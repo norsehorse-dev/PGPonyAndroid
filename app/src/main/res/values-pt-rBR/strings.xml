@@ -1575,9 +1575,23 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="provider_keypicker_for_format">Para %1$s</string>
     <string name="provider_keypicker_none">Sem chave — não assinar</string>
     <string name="provider_keypicker_title">Escolher chave de assinatura</string>
-    <string name="provider_passphrase_body_format">Digite a frase-senha de %1$s para assinar esta mensagem. O PGPony a lembra por 5 minutos, apenas neste aparelho.</string>
     <string name="provider_passphrase_hint">Frase-senha</string>
     <string name="provider_passphrase_title">Desbloquear chave de assinatura</string>
+    <string name="provider_passphrase_title_decrypt">Desbloquear chave de descriptografia</string>
+    <string name="provider_passphrase_title_ssh">Desbloquear chave SSH</string>
+    <string name="provider_passphrase_action_sign">Digite a frase-senha de %1$s para assinar esta mensagem.</string>
+    <string name="provider_passphrase_action_decrypt">Digite a frase-senha de %1$s para descriptografar esta mensagem.</string>
+    <string name="provider_passphrase_action_ssh">Digite a frase-senha de %1$s para entrar via SSH.</string>
+    <plurals name="provider_passphrase_keep_minutes">
+        <item quantity="one">O PGPony a lembra por %1$d minuto, apenas neste aparelho.</item>
+        <item quantity="other">O PGPony a lembra por %1$d minutos, apenas neste aparelho.</item>
+    </plurals>
+    <plurals name="provider_passphrase_keep_hours">
+        <item quantity="one">O PGPony a lembra por %1$d hora, apenas neste aparelho.</item>
+        <item quantity="other">O PGPony a lembra por %1$d horas, apenas neste aparelho.</item>
+    </plurals>
+    <string name="provider_passphrase_keep_until_cleared">O PGPony a lembra apenas neste aparelho, até você apagá-la nos Ajustes.</string>
+    <string name="provider_passphrase_keep_until_locked">O PGPony a lembra apenas neste aparelho, até o telefone ser bloqueado.</string>
     <string name="provider_passphrase_unlock">Desbloquear</string>
     <string name="provider_passphrase_wrong">Frase-senha incorreta — tente novamente.</string>
     <string name="publish_action">Publicar</string>
@@ -1833,7 +1847,7 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="settings_more_vaultpony_subtitle">Cofres criptografados compatíveis com VeraCrypt, inteiramente no seu dispositivo</string>
     <string name="settings_passphrase_cache_countdown_format">Frase-senha lembrada, apaga em %1$s</string>
     <string name="settings_passphrase_cache_held_until_cleared">Frase-senha lembrada até você apagá-la.</string>
-    <string name="settings_passphrase_cache_none_held">Nenhuma frase-senha está lembrada no momento.</string>
+    <string name="settings_passphrase_cache_none_held">O PGPony em si não lembra nenhuma. Frases-senha digitadas para apps de e-mail e outros apps conectados ficam separadas, e Apagar agora também as esquece.</string>
     <string name="settings_passphrase_cache_subtitle">Mantenha na memória, pelo tempo escolhido, as frases-senha digitadas para apps conectados. Nunca gravadas em disco; apagadas com uma frase errada ou ao fechar o app.</string>
     <string name="settings_passphrase_cache_title">Lembrar frases-senha das chaves</string>
     <string name="sign_file_save_button">Salvar em Arquivos</string>

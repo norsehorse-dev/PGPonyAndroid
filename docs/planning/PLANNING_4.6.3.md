@@ -67,20 +67,25 @@ Find the cause before changing anything:
   MODE_MULTI_PROCESS's reload being async and the read racing it; (c) the prompt Thunderbird reaches not being
   ProviderPassphraseActivity, so the passphrase lands in a different cache.
 
-Fix direction, whatever the cause: stop sharing this value through SharedPreferences across processes. Keep the
-session duration in a store both processes read safely (the Room database, which :remote_api already opens, or
-KeyValueSettings backed by a small file read on every call), and have :remote_api never write pgpony_prefs. Move
-the per-address sign-key choice the same way. This also settles 4.7.0 item 19's note about caching SessionPolicy
-with a change listener: listeners do not fire across processes, so that idea is dropped.
+Fix (built): the duration now lives in its own file (files/session_policy), written atomically by
+SessionPolicy.setDurationSec and read straight from disk on every SessionPolicy.durationSec() call in either
+process, so there is no per-process copy to go stale. The pgpony_prefs value is still written (for a downgrade)
+and read only when the file does not exist yet (a duration chosen before 4.6.3). CardPinCache's enable switch
+moves to a MODE_MULTI_PROCESS read for the same reason. This settles 4.7.0 item 19's note about caching
+SessionPolicy with a change listener: listeners do not fire across processes, so that idea is dropped.
 
-Also from 4.7.0 item 1:
+The device check below still decides whether this closes #15. The prompt now states the duration as the
+:remote_api process reads it, so the dialog itself shows whether that process sees the setting.
 
-- The provider passphrase prompt (provider_passphrase_body_format) hardcodes "remembers it for 5 minutes" and says
-  "to sign this message" for decrypts. Build it from the current policy (timed, until cleared, until the phone
-  locks) with sign and decrypt variants, in every locale.
-- Settings shows "none held" for a passphrase held in :remote_api. Ask the provider process for its held state, or
-  change the copy so it does not claim nothing is held. Confirm Clear reaches :remote_api.
-- Check the card PIN cache and InAppPassphraseCache for the same read.
+Also from 4.7.0 item 1 (built):
+
+- The provider passphrase prompt is built from the request and the policy: title and first sentence for sign,
+  decrypt (ACTION_DECRYPT_VERIFY / ACTION_DECRYPT_METADATA) or SSH login, then how long it is kept (minutes,
+  hours, until cleared, until the phone locks), in every locale but Korean (falls back to English). "Sign with a
+  different key" shows only when signing. provider_passphrase_body_format is gone from every locale.
+- Settings: when the main process holds nothing, the text no longer claims nothing is held anywhere (a mail app's
+  passphrase lives in :remote_api), and Clear now stays available so it can reach that process.
+- InAppPassphraseCache reads SessionPolicy, so it follows the file too.
 
 Test: on device with Thunderbird, every option: 1 minute (asks after a minute), 1 hour (does not ask at 6
 minutes), until cleared (does not ask until Clear), until the phone locks (asks after lock and unlock). Change the
