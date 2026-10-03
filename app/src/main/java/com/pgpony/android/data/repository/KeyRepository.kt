@@ -1881,7 +1881,11 @@ class KeyRepository(
                 raw, hexToBytes(targetHex),
                 reasonCode = reason.rfcCode, reasonText = comment.orEmpty(), passphrase = pass
             )
-            val restored = if (pass != null) CompositeKeyFacade.reprotect(updated, null, pass) else updated
+            // 4.6.3 (item 20): the ring comes back still protected, so the old
+            // passphrase is [pass], as in the add-subkey paths. A null old
+            // passphrase made reprotect throw ProtectedKeyException, so revoking
+            // a subkey on a protected ML-DSA key always failed.
+            val restored = if (pass != null) CompositeKeyFacade.reprotect(updated, pass, pass) else updated
             val publicRing = CompositeKeyFacade.publicRingOf(restored)
             val armoredPublic = CompositeSigPacket.armor(
                 "-----BEGIN PGP PUBLIC KEY BLOCK-----",
@@ -2560,8 +2564,12 @@ class KeyRepository(
                 )
             val pass = passphrase?.takeIf { it.isNotEmpty() }?.toCharArray()
             val updated = com.pgpony.android.crypto.pqc.CompositePrimaryKeyGen.addUserId(raw, userId, pass)
+            // 4.6.3 (item 20): the ring comes back still protected, so the old
+            // passphrase is [pass]. With null, reprotect threw
+            // ProtectedKeyException and adding a User ID to a protected ML-DSA
+            // key always failed, even with the right passphrase.
             val restored = if (pass != null)
-                CompositeKeyFacade.reprotect(updated, null, pass) else updated
+                CompositeKeyFacade.reprotect(updated, pass, pass) else updated
             val publicRing = CompositeKeyFacade.publicRingOf(restored)
             val armoredPublic = com.pgpony.android.crypto.pqc.CompositeSigPacket.armor(
                 "-----BEGIN PGP PUBLIC KEY BLOCK-----",
