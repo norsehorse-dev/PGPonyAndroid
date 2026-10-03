@@ -105,7 +105,8 @@ class ProviderKeyPickerActivity : ComponentActivity() {
         const val EXTRA_SSH_CLIENT_PACKAGE = "com.pgpony.android.provider.SSH_CLIENT_PACKAGE"
 
         /** 4.6.0: the client asked for this key (primary fingerprint) but it is
-         *  not the one bound to the app, so only it is offered, for approval. */
+         *  not one the app is bound to, so only it is offered, for approval.
+         *  4.6.3 (#68): approving it adds it to the app's keys. */
         const val EXTRA_SSH_ONLY_FINGERPRINT = "com.pgpony.android.provider.SSH_ONLY_FINGERPRINT"
     }
 

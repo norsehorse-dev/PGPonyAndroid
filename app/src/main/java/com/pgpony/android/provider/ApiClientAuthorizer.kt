@@ -92,27 +92,49 @@ class ApiClientAuthorizer(
         }
     }
 
-    /** The primary fingerprint the user picked for this app's SSH logins. */
-    suspend fun sshKey(packageName: String): String? =
-        dao.getByPackage(packageName)?.takeIf { it.has(ApiClientEntity.SCOPE_SSH) }?.sshKeyFingerprint
+    /**
+     * 4.6.3 (#68): every key the user approved for this app's SSH logins,
+     * uppercase hex primary fingerprints, in the order approved. Empty when
+     * the app has no SSH scope or no key approved yet.
+     */
+    suspend fun sshKeys(packageName: String): List<String> =
+        dao.getByPackage(packageName)?.takeIf { it.has(ApiClientEntity.SCOPE_SSH) }
+            ?.sshKeyFingerprints().orEmpty()
+
+    /** The first key approved for this app's SSH logins, or null. */
+    suspend fun sshKey(packageName: String): String? = sshKeys(packageName).firstOrNull()
 
     /**
-     * True only when [fingerprint] is the key bound to [packageName] for SSH.
-     * An app with no binding yet, or asking for a different key, gets false,
-     * and the SSH service shows the picker for the user to approve that key.
+     * True only when [fingerprint] is one of the keys the user approved for
+     * [packageName]. Any other key gets false, and the SSH service shows the
+     * picker for the user to approve that key once.
      */
     suspend fun sshKeyAllowed(packageName: String, fingerprint: String): Boolean =
-        sshKey(packageName)?.equals(fingerprint, ignoreCase = true) == true
+        sshKeys(packageName).any { it.equals(fingerprint.trim(), ignoreCase = true) }
 
     /**
-     * Bind this app's SSH logins to [fingerprint] (the key the user picked).
-     * Only an app holding the SSH scope can be bound. Returns false otherwise.
+     * Approve [fingerprint] (the key the user picked) for this app's SSH
+     * logins. 4.6.3 (#68): adds to the keys already approved instead of
+     * replacing them, so an agent holding several keys does not flip the
+     * approval back and forth on every connection. Only an app holding the
+     * SSH scope can be bound. Returns false otherwise.
      */
     suspend fun bindSshKey(packageName: String, fingerprint: String): Boolean {
         val row = dao.getByPackage(packageName) ?: return false
         if (!row.has(ApiClientEntity.SCOPE_SSH)) return false
-        dao.updateAccess(packageName, row.scopes, fingerprint.uppercase())
+        val keys = row.sshKeyFingerprints() + fingerprint.trim().uppercase()
+        dao.updateAccess(packageName, row.scopes, ApiClientEntity.joinSshKeys(keys))
         return true
+    }
+
+    /**
+     * 4.6.3 (#68): withdraw one approved SSH key (Settings > Connected apps).
+     * The SSH scope stays; the next request for that key shows the picker.
+     */
+    suspend fun unbindSshKey(packageName: String, fingerprint: String) {
+        val row = dao.getByPackage(packageName) ?: return
+        val keys = row.sshKeyFingerprints().filterNot { it.equals(fingerprint.trim(), ignoreCase = true) }
+        dao.updateAccess(packageName, row.scopes, ApiClientEntity.joinSshKeys(keys))
     }
 
     companion object {
