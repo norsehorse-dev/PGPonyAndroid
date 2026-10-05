@@ -288,17 +288,40 @@ Step 5, confirm the CI legs passed (Actions tab, both JDKs green on the
 determinism step; the release-asset comparison is skipped until the asset
 exists).
 
-Step 6, sign and publish:
+Step 6, sign, then publish as an immutable release.
+
+Immutable releases are on for the repository (since 4.6.3). A published
+release can no longer have assets added, replaced or removed, and its tag
+can't move, so everything is attached to a draft first and only then
+published. Anything wrong after publishing means a new patch version (see
+section 11). Before publishing, the simulation in 10.3 must pass on the
+exact signed file, since that is the last point a fix is still cheap.
+
+Every release carries four assets: the APK, its detached signature, the
+armored OpenPGP release key, and a text file with the OpenPGP fingerprint
+and the APK signing certificate's SHA-256. The certificate value must equal
+the one in the README's "Verify a release"; if it doesn't, stop.
 
 ```
 gpg --detach-sign --armor --local-user 0x53F9798E4919DE62 --output /tmp/<App>-X.Y.Z-foss.apk.asc /tmp/<App>-X.Y.Z-foss.apk
+gpg --armor --export 0x53F9798E4919DE62 > /tmp/NorseHorse-release-key.asc
+gpg --with-colons --fingerprint 0x53F9798E4919DE62 | awk -F: '/^fpr/{print "OpenPGP release key fingerprint: " $10; exit}' > /tmp/<App>-X.Y.Z-signing-keys.txt
+keytool -printcert -jarfile /tmp/<App>-X.Y.Z-foss.apk | awk '/SHA256:/{gsub(":","",$2); print "APK signing certificate SHA-256: " tolower($2)}' >> /tmp/<App>-X.Y.Z-signing-keys.txt
+cat /tmp/<App>-X.Y.Z-signing-keys.txt
 shasum -a 256 /tmp/<App>-X.Y.Z-foss.apk
-gh release create <tag> /tmp/<App>-X.Y.Z-foss.apk /tmp/<App>-X.Y.Z-foss.apk.asc --title "<App> X.Y.Z" --notes-file docs/releases/RELEASE_NOTES_X.Y.Z.md
+gh release create <tag> --draft --verify-tag --title "<App> X.Y.Z" --notes-file docs/releases/RELEASE_NOTES_X.Y.Z.md /tmp/<App>-X.Y.Z-foss.apk /tmp/<App>-X.Y.Z-foss.apk.asc /tmp/NorseHorse-release-key.asc /tmp/<App>-X.Y.Z-signing-keys.txt
+gh release view <tag>
+gh release edit <tag> --draft=false
 ```
+
+Check `gh release view` lists all four assets and the notes carry the
+hashes before the last command; publishing is the point of no return.
 
 Release notes carry BOTH hashes with their meanings: the whole-file
 SHA-256 for downloaders, the content hash for rebuilders (see the 4.1.1
-release body for the canonical wording).
+release body for the canonical wording). Since the notes are part of the
+immutable release, the hashes go into the notes file before step 6, not
+in a follow-up edit.
 
 Step 7, re-run the workflow on the tag (Actions, reproducible-check, Run
 workflow) so the release-asset comparison runs end to end against the
@@ -459,18 +482,24 @@ before concluding a dex "really" differs.
 
 ## 11. Fixing an already-published bad release
 
-If F-Droid has NOT yet published the version (the recipe MR is open or
-failing), replacing the GitHub release asset in place is legitimate and
-faster than a new version: their retry re-downloads the `binary:` URL.
-Requirements: same versionCode, built from the SAME tagged commit, signed
-with the same key, and the release body updated with the new hashes plus a
-dated note explaining the replacement (users who downloaded the old file
-need to understand why hashes changed; state the old whole-file hash and
-the scope of the binary difference). The 4.1.1 release body is the
-template.
+Releases from 4.6.3 on are immutable once published: no asset can be
+replaced, added or removed, and the tag can't move. A bad published
+release is fixed only by cutting a new patch version through the full
+procedure. Leave the bad release in place and say in the new release's
+notes what was wrong with it and which hashes it carried; don't delete it,
+since its assets are the record of what was shipped.
 
-If F-Droid HAS published the version, never replace anything; cut a new
-patch version through the full procedure.
+While a release is still a draft, assets can be replaced freely. That is
+the place to fix a wrong upload: same versionCode, built from the SAME
+tagged commit, signed with the same key, and the step 4 gate run again on
+the new file.
+
+Releases from before 4.6.3 are not immutable. The old rule still applies
+to them: if F-Droid has NOT yet published the version, replacing the asset
+in place is legitimate (their retry re-downloads the `binary:` URL), with
+the release body updated with the new hashes and a dated note (the 4.1.1
+release body is the template). If F-Droid HAS published it, never replace
+anything; cut a new patch version.
 
 Regenerate the `.asc` whenever the APK bytes change; a stale detached
 signature that no longer matches is worse than none.
