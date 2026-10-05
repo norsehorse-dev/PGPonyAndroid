@@ -69,15 +69,20 @@ approved. Settings > Connected apps lists every approved key with its own Remove
 Whole-file SHA-256 (is this download the published file):
 
 ```
-(added at release)
+3af5ca347c5e53331ab84793bba98140673f00a7f1f772cb365c8001fbeaf208
 ```
 
 Content hash (for rebuilders; excludes signature, see docs/REPRODUCIBLE_BUILDS_PLAYBOOK.md):
 
 ```
-(added at release)
+1f81b818e9d84834a49bb57a0d8a470e7d842dcaa740814cd7ddbf89aec1cb74
 ```
 
 The APK is signed with the NorseHorse release key
 (A0CBC8F65AACE56F1C5B767753F9798E4919DE62); the detached signature is attached to
 this release.
+
+From this release on, every release also carries the armored release key (NorseHorse-release-key.asc) and
+PGPony-4.6.3-signing-keys.txt with the OpenPGP fingerprint and the APK signing certificate's SHA-256, and is
+published as an immutable release, so its assets can't be changed afterwards. Check the fingerprint against
+pgpony.app, keys.openpgp.org or keys.pgpony.app rather than trusting the copy in the release alone. (#77)

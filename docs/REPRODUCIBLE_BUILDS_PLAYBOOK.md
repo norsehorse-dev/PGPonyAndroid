@@ -266,12 +266,20 @@ tools/verify_repro.sh rebuild <tag>
 
 Note the printed work directory (call it `<work>`) and the content hash.
 
+The gate finds the SDK on its own, but the clone has no local.properties, so
+step 3 has to pass ANDROID_HOME. Without it the build fails and the `cp`
+after it copies the gate's debug-signed APK instead; step 4 still says
+IDENTICAL because it ignores signatures, so only the certificate check in
+step 6 would catch it (4.6.3, Oct 2026). The certificate is read with
+apksigner `verify`: keytool can't read an APK without a v1 signature.
+Reading with apksigner is fine; R3 is only about signing with it.
+
 Step 3, produce the signed release APK inside the verified clone:
 
 ```
 cp keystore.properties <work>/srcA/
 cd <work>/srcA
-env GRADLE_USER_HOME=<work>/gradleA ./gradlew --no-daemon :app:assembleFossRelease
+env ANDROID_HOME="$HOME/Library/Android/sdk" GRADLE_USER_HOME=<work>/gradleA ./gradlew --no-daemon :app:assembleFossRelease
 cp app/build/outputs/apk/foss/release/app-foss-release.apk /tmp/<App>-X.Y.Z-foss.apk
 ```
 
@@ -306,7 +314,7 @@ the one in the README's "Verify a release"; if it doesn't, stop.
 gpg --detach-sign --armor --local-user 0x53F9798E4919DE62 --output /tmp/<App>-X.Y.Z-foss.apk.asc /tmp/<App>-X.Y.Z-foss.apk
 gpg --armor --export 0x53F9798E4919DE62 > /tmp/NorseHorse-release-key.asc
 gpg --with-colons --fingerprint 0x53F9798E4919DE62 | awk -F: '/^fpr/{print "OpenPGP release key fingerprint: " $10; exit}' > /tmp/<App>-X.Y.Z-signing-keys.txt
-keytool -printcert -jarfile /tmp/<App>-X.Y.Z-foss.apk | awk '/SHA256:/{gsub(":","",$2); print "APK signing certificate SHA-256: " tolower($2)}' >> /tmp/<App>-X.Y.Z-signing-keys.txt
+"$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify --print-certs /tmp/<App>-X.Y.Z-foss.apk | awk '/certificate SHA-256 digest/{print "APK signing certificate SHA-256: " $NF; exit}' >> /tmp/<App>-X.Y.Z-signing-keys.txt
 cat /tmp/<App>-X.Y.Z-signing-keys.txt
 shasum -a 256 /tmp/<App>-X.Y.Z-foss.apk
 gh release create <tag> --draft --verify-tag --title "<App> X.Y.Z" --notes-file docs/releases/RELEASE_NOTES_X.Y.Z.md /tmp/<App>-X.Y.Z-foss.apk /tmp/<App>-X.Y.Z-foss.apk.asc /tmp/NorseHorse-release-key.asc /tmp/<App>-X.Y.Z-signing-keys.txt
