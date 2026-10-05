@@ -166,7 +166,10 @@ object CompositeDocumentVerifier {
         val recovered = textLines.joinToString("\n") { line ->
             if (line.startsWith("- ")) line.substring(2) else line
         }
-        val documentData = CompositeSigPacket.canonicalizeCleartext(recovered)
+        // 4.7.0 (desktop #9): the framing line ending is already gone from
+        // [recovered]; add it back so canonicalizeCleartext drops that one and
+        // not a blank line that belongs to the text.
+        val documentData = CompositeSigPacket.canonicalizeCleartext(recovered + "\n")
         val sigPacket = CompositeSigPacket.dearmor(sigBlock)
         val (_, body) = CompositeSigPacket.firstPacket(sigPacket)
         return verifyParsed(compositePublic, body, documentData)

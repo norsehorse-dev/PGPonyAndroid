@@ -173,6 +173,21 @@ class CompositeSignerGateTest {
     }
 
     @Test
+    fun `desktop 9 a cleartext text that ends in blank lines still verifies`() {
+        val k = newKey(created = Date(System.currentTimeMillis() - 10 * day))
+        for (text in listOf("line one\n\n", "line one\n\n\n", "a\n\n b \n\n", "line one\n", "line one", "\n")) {
+            val clear = CompositeDocumentSigner.signCleartext(suite, k.secret, k.fp, text, random = rnd)
+            assertEquals(text, SignerStatus.VERIFIED, CompositeSignerGate.verifyCleartext(listOf(k.raw), clear).status)
+        }
+        // A blank line added or removed after signing still fails.
+        val clear = CompositeDocumentSigner.signCleartext(suite, k.secret, k.fp, "line one\n\n", random = rnd)
+        val shorter = clear.replace("line one\n\n-----BEGIN PGP SIGNATURE", "line one\n-----BEGIN PGP SIGNATURE")
+        val longer = clear.replace("line one\n\n-----BEGIN PGP SIGNATURE", "line one\n\n\n-----BEGIN PGP SIGNATURE")
+        assertEquals(SignerStatus.INVALID, CompositeSignerGate.verifyCleartext(listOf(k.raw), shorter).status)
+        assertEquals(SignerStatus.INVALID, CompositeSignerGate.verifyCleartext(listOf(k.raw), longer).status)
+    }
+
+    @Test
     fun `cleartext and inline forms are graded too`() {
         val k = newKey(created = Date(System.currentTimeMillis() - 10 * day))
         val text = "Hello,\n-----BEGIN PGP SIGNATURE-----\nsigned text\n"

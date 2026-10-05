@@ -280,14 +280,25 @@ object CertificateBindings {
          *  unexpired, and its key flags must allow encryption (3.0.0: a key
          *  flags subpacket without either encryption flag, including an empty
          *  one, rules the subkey out). Unsupported primaries are left to the
-         *  caller. */
+         *  caller.
+         *
+         *  4.7.0 (desktop #8): the self-signatures must be in force at [nowMs],
+         *  not only exist. A primary needs a self-signature alive now, and a
+         *  subkey a 0x18 binding alive now (RFC 9580 5.2.3.18: an expired
+         *  binding no longer binds). Expiry and key flags come from that
+         *  binding, as [signerValidityAt] reads them for a signer. A subkey
+         *  whose only binding carried a one-second signature expiration was
+         *  accepted before, where GnuPG reports it unusable. */
         fun isUsableEncryptionKey(fpHex: String, nowMs: Long): Boolean {
             if (!supported) return isPrimary(fpHex)
             if (!isPrimaryUsable(nowMs)) return false
-            if (isPrimary(fpHex)) return flagsAllowEncryption(activePrimarySig(nowMs)?.keyFlags)
+            val primarySig = activePrimarySig(nowMs) ?: return false
+            if (isPrimary(fpHex)) return flagsAllowEncryption(primarySig.keyFlags)
             val s = subkeyByFingerprint(fpHex) ?: return false
-            return s.bound && !s.revoked && (s.expiresAtMs == null || nowMs < s.expiresAtMs) &&
-                flagsAllowEncryption(s.keyFlags)
+            if (!s.bound || s.revoked) return false
+            val binding = activeAt(s.bindings, nowMs) ?: return false
+            return (binding.keyExpiresAtMs == null || nowMs < binding.keyExpiresAtMs) &&
+                flagsAllowEncryption(binding.keyFlags)
         }
 
         /**

@@ -53,6 +53,40 @@ class CertificateBindingsHardeningTest {
         return out.toByteArray()
     }
 
+    /**
+     * 4.7.0 (desktop #8): a synthetic certificate whose only subkey binding was made on
+     * 2020-09-13 with a one-second signature expiration. Neither key carries a key
+     * expiration. The binding is in force for that second only, so the subkey can take
+     * a message then and never after; GnuPG reports it unusable today.
+     */
+    @Test
+    fun `desktop 8 a subkey whose binding signature expired cannot be encrypted to`() {
+        val armored = """
+            -----BEGIN PGP PUBLIC KEY BLOCK-----
+
+            xjMEX14QABYJKwYBBAHaRw8BAQdAeO7dEqoK4mdD7b/Ylz2891MP6CAAC2c/D2FD
+            3eJOh6nNGkF1ZGl0IDxhdWRpdEBleGFtcGxlLnRlc3Q+wngEExYIACAFAl9eEAAW
+            IQSXsNeGP1YW4TiiUE/evxV9jLZz/QIbAwAKCRDevxV9jLZz/QNBAQDzPKqltwQQ
+            PBpR+Cth0rXgY9joF8qmS4BVCieSoaXOFQD9GyBvNql6pojNB9+Hc8soYMT4qnlV
+            KQ2uIGKbaxyg8QjOOARfXhAAEgorBgEEAZdVAQUBAQdAiaa+KsUPW89BLnc4Glbv
+            WJxMBfAT7C4V0IZ8XPHKLwEDAQgHwn4EGBYIACYFAl9eEAAWIQSXsNeGP1YW4Tii
+            UE/evxV9jLZz/QIbDAUDAAAAAQAKCRDevxV9jLZz/QQIAQCbW1jnegAlK0GUTExQ
+            xRV2sxj1DtHF/Csre3cwT5hPcgEAifv8szRqd+CVilzEgYX+cjtVTPqw8DaSHegM
+            bUAp5As=
+            =ROXh
+            -----END PGP PUBLIC KEY BLOCK-----
+        """.trimIndent()
+        val raw = org.bouncycastle.openpgp.PGPUtil.getDecoderStream(armored.byteInputStream()).readBytes()
+        val keys = ring(raw).publicKeys.asSequence().toList()
+        val subHex = keys.first { !it.isMasterKey }.fingerprint.joinToString("") { "%02X".format(it) }
+        val report = CertificateBindings.analyze(raw)!!
+        assertTrue(report.subkeyByFingerprint(subHex)!!.bound)
+        val boundAt = 1_600_000_000_000L
+        assertTrue("usable while the binding is alive", report.isUsableEncryptionKey(subHex, boundAt))
+        assertFalse("its binding expired one second later", report.isUsableEncryptionKey(subHex, boundAt + 1_000L))
+        assertFalse(report.isUsableEncryptionKey(subHex, System.currentTimeMillis()))
+    }
+
     @Test
     fun `a signature naming the primary by key id is treated as a self-signature and must verify`() {
         val raw = res("/keys/bindings/gpg-ed25519.pgp")

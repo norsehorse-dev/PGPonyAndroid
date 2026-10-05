@@ -185,7 +185,12 @@ object CompositeSignerGate {
         val text = recovered.toByteArray(Charsets.UTF_8)
         val raw = runCatching { CompositeSigPacket.dearmor(sigArmor) }.getOrNull()
             ?: return Graded(SignerStatus.INVALID, content = text)
-        val documentData = CompositeSigPacket.canonicalizeCleartext(recovered)
+        // 4.7.0 (desktop #9): cleartextContent has already removed the line
+        // ending that frames the signature block, while canonicalizeCleartext
+        // drops a final line ending as that framing. Hand it back first, or a
+        // text that ends in a blank line loses it and no longer matches what
+        // the signer hashed.
+        val documentData = CompositeSigPacket.canonicalizeCleartext(recovered + "\n")
         return gradeAny(certs, compositeSignatureBodies(raw), documentData, nowMs, content = text)
     }
 
