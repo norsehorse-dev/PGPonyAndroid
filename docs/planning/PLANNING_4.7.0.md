@@ -11,6 +11,8 @@ Context: 4.6.0 (versionCode 460) shipped Sep 24 2026 and is the tag submitted fo
 
 ## 1. Mail apps ignore the passphrase cache duration (#15)
 
+**Status:** Shipped in 4.6.3 (Oct 2026): the duration lives in its own file both processes read; checked on device with Thunderbird. See PLANNING_4.6.3.md item 2.
+
 Priority: high (bug, user-facing). Origin: antviro (#15), on 4.6.0.
 
 Reported: Settings lets you keep a passphrase unlocked for 1 minute to 1 hour, until you clear it, or until the
@@ -49,6 +51,8 @@ locks) with sign and decrypt variants, in every locale.
 
 
 ## 2. Shared images read as detached signatures, and .gpg / .pgp files route to encrypt (#67)
+
+**Status:** Shipped in 4.6.3: the packet-parse routing (#67). See PLANNING_4.6.3.md item 6.
 
 Priority: high (bug, user-facing). Origin: elnardosa (#67).
 
@@ -96,6 +100,8 @@ Plurals in all 8 locales.
 
 
 ## 5. Other places that load recipients with the plain BouncyCastle loader
+
+**Status:** Shipped in 4.6.3: every recipient loader that chooses recipients or signers fails on an unloadable key instead of dropping it. See PLANNING_4.6.3.md item 5.
 
 Priority: medium (correctness). Origin: the 4.6.1 share-menu fix (#67).
 
@@ -254,6 +260,8 @@ review together with the card code it extends.
 
 ## 14. v6 recipient key ID read from the wrong end of the fingerprint (#73)
 
+**Status:** Shipped in 4.6.3. See PLANNING_4.6.3.md item 3.
+
 Priority: high (bug, interop). Origin: #73.
 
 Reported: a message GpgFrontend (rPGP engine) encrypts to a PGPony-generated ML-DSA-65 v6 key fails with "no held
@@ -275,6 +283,8 @@ block (its user ID is personal data). Add a round trip with an in-test v6 ML-DSA
 
 ## 15. Package mode: ML-DSA signing, and encrypting or signing each file separately (#72)
 
+**Status:** The ML-DSA signing bug shipped in 4.6.3 (PLANNING_4.6.3.md item 5). Encrypting or signing each file separately is still open here.
+
 Priority: high for the bug, medium for the feature. Origin: #72.
 
 Bug: package (bundle) mode loads the signing key through a path that cannot read ML-DSA keys and then reports
@@ -287,6 +297,8 @@ failed file does not stop the rest. Decrypt and Verify accept several .gpg or .s
 
 
 ## 16. Keyring "tap the +" tip flashes on every launch (#74)
+
+**Status:** Shipped in 4.6.3. See PLANNING_4.6.3.md item 7.
 
 Priority: medium (bug, visible). Origin: #74.
 
@@ -316,6 +328,8 @@ option now covers it. Remove the alias so PGPony shows once in the share menu, a
 from every locale.
 
 ## 19. Play Console: user-perceived ANR rate above the bad behavior threshold
+
+**Status:** Shipped in 4.6.3 (A, B, C, E, F, G, the ProviderCardOpActivity read and StrictMode). D and H stay watch-only. See PLANNING_4.6.3.md item 8.
 
 Priority: high (store standing). Origin: Play Console Android vitals, Sep 28 2026.
 
@@ -398,6 +412,8 @@ the fixed build reaches most Play users.
 
 ## 20. Adding a User ID to a passphrase-protected ML-DSA key always fails
 
+**Status:** Shipped in 4.6.3. See PLANNING_4.6.3.md item 4.
+
 Priority: high (bug, blocks a basic edit). Origin: field report on 4.6.1, Pixel 8, Android 17. Still in 4.6.2.
 
 Reported: Key Detail > Add User ID on a passphrase-protected composite ML-DSA key fails even with the correct
@@ -425,6 +441,8 @@ the ring still unlocks with the same passphrase afterwards, and the public ring 
 revocation. Repeat on an unprotected key. On device, the reported case from Key Detail.
 
 ## 21. Pair with PGPony Desktop and move keys over the local network
+
+**Status:** Shipped in 4.6.3, with per-item confirmation rows and a summary on Done (PLANNING_4.6.3.md item 10). Left for main: an optional `"skipped": true` member on RESULT so a skip is not told from a failure by its reason text (unknown members are ignored, so v1 peers are unaffected), and the matching rows in desktop's PairDialog.
 
 Priority: medium (feature, cross-platform). Origin: desktop 3.0.0 F1. Protocol core landed Sep 30 2026; UI not
 scheduled, may slip to a later release without holding 4.7.0.
@@ -456,6 +474,82 @@ Work (when scheduled):
 Test: the unit tests in app/src/test/kotlin/com/pgpony/android/pair/ (loopback end to end, the three vector
 files). On device: pair with desktop as joiner (scan) and as host, a wrong typed code and a Different once, move
 one item of each kind both ways.
+
+
+## 22. Offline primary key: secret subkeys only, GnuPG stub primary (iOS 8.4.0 item 1.3)
+
+Priority: medium (feature, interop). Origin: an email report against iOS 8.3.0 build 7; Android checked by
+reading the code only. Written on 4.6.x and carried to main with the 4.6.3 merge.
+
+Reported (iOS): a GnuPG 2.5 key with an RSA 4096 certify-only primary kept offline and RSA 4096 [E] and [S]
+subkeys, exported with `gpg --export-secret-subkeys 'ENC!' 'SIGN!'`. The primary arrives as a GNU dummy stub:
+a complete public part, then S2K usage 0xFF, cipher 0x00, S2K type 101, hash 0x00, "GNU", mode 0x01 (1001,
+no secret material). Import works; encrypt with signing fails on iOS. The ask is support for offline
+primaries, as GnuPG and OpenKeychain have.
+
+Where Android stands: BouncyCastle parses the stub (S2K.GNU_DUMMY_S2K, isPrivateKeyEmpty), and
+pickSigningSecretKey prefers a signing subkey, so plain signing likely works already. Only the 4.6.3 pairing
+code knows what a stub is (PairKeyProtection). Everything that unlocks the primary does not: UserIdService,
+KeyExpirationService, RevocationService, subkey add and revoke, certification of other keys, and the
+signing-key picker, which lists an [SC] stub primary as a choice. On a stub, extractPrivateKey returns null
+or throws, and today that surfaces as a generic error or a passphrase prompt that can never succeed.
+
+Work:
+
+- One check, `isOfflineStub(secretKey)`: GNU dummy (1001) or divert-to-card (1002) S2K, or
+  isPrivateKeyEmpty. Use it everywhere a secret key is picked or unlocked.
+- Signing: signingSecretKeys and pickSigningSecretKey skip stubs; the picker never offers one. When the only
+  Sign-capable key is a stub, say "The primary key's secret is not on this device (offline primary). Sign
+  with a signing subkey." instead of asking for a passphrase.
+- Decrypt: the PKESK scan skips stubs as candidates, so a locked stub never sets sawLockedKey.
+- Key Detail: show the primary as "Offline primary (secret not on this device)"; disable add or revoke user
+  ID, add, revoke or extend a subkey, change expiry, certify another key and revoke the key, each with a line
+  saying why.
+- Import preview: "Key pair (offline primary)". The passphrase check unlocks a subkey, never the stub.
+- Export, backup and passphrase change keep the stub byte for byte, so the key goes back into gpg as
+  `sec#`. Pairing already skips stubs; keep that.
+- A divert-to-card stub (1002) imports with a note, or pairs with a card when one is linked.
+- New strings in all locales.
+
+Test: gpg fixtures (RSA [C] stub primary with [E] and [S]; Ed25519 [C] stub primary with Cv25519 [E] and
+Ed25519 [S]; an [SC] variant of each; a 1002 stub). Unit tests for isOfflineStub and signer selection. On
+device: import each, sign, encrypt and sign to self and to others, decrypt, sign through the OpenPGP provider
+from a mail app, export and re-import into gpg 2.5, `gpg --verify` every signature, and confirm each
+disabled Key Detail action explains itself.
+
+
+## 23. Encrypt and sign a large file with an ML-DSA key runs out of memory (#73 follow-up)
+
+Priority: high (bug). Origin: #73, after 4.6.3 RC1: a 500 MB file encrypts fine but encrypt and sign with an
+ML-DSA key fails with an out-of-memory error.
+
+Cause: with a composite signer, encryptFile reads the whole file (`readBytes()`), and
+CompositeDocumentSigner.signInline copies it again into the literal packet and again into the joined message,
+before encryption makes one more copy. The comment that a composite signature "cannot stream" is wrong: it signs
+a SHA-256 digest like any OpenPGP signature, so the data can be hashed as it streams.
+
+Work: a streaming composite inline signer (one-pass packet, literal data streamed through the hash, signature
+packet at the end) feeding the same streamed encryption encrypt-only uses; the same for package mode and for
+detached signing of a file. Test: a signed 500 MB file on a low-memory device, and a byte-for-byte check that the
+streamed output verifies in PGPony and in GpgFrontend.
+
+
+## 24. Re-importing your own key edited in gpg changes nothing (#78)
+
+Priority: medium-high (bug, interop). Origin: #78: preferences changed and binding signatures remade with
+SHA-512 in gpg, exported and imported back; PGPony keeps the old key and says it is already in the keyring.
+
+Cause: CertificateMerge (4.6.0 items 17.1 and 12) treats the local copy of a key pair as authoritative and takes
+only revocations and third-party certifications from an incoming copy, never self-signatures. The rule was meant
+to stop a keyserver adding or stripping parts of your own key; a newer self-signature that verifies against the
+primary can only come from the key's owner.
+
+Work: for key pairs, accept newer self-signatures (direct-key, User ID binding, subkey binding) that verify
+against the primary; newest wins per component, as OpenPGP reads them. Update the stored secret ring's copy too,
+so a key pair export carries them. The import result says what was applied, or why nothing was. Keep the rule
+for components the owner never bound (new User IDs and subkeys from a server). Test: the gpg setpref and SHA-512
+case, a stale older self-signature replayed (ignored), a server copy with a stripped User ID (unchanged), and an
+export afterwards that gpg reads with the new preferences.
 
 
 ## Release process notes (learned in 4.6.0)
