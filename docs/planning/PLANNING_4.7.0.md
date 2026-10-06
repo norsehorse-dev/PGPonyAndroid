@@ -92,6 +92,8 @@ screen. Keep the block's own action (Import, Decrypt, Verify) as it is. Update t
 
 ## 4. Days left on each key in Recently Deleted (#58)
 
+**Status:** Shipped in 4.6.4. See PLANNING_4.6.4.md item 2.
+
 Priority: low (polish). Origin: CertainBot (#58).
 
 Work: each row in Recently Deleted shows how long until it is destroyed ("10 days left", "Less than a day
@@ -145,6 +147,8 @@ support" line stands.
 
 
 ## 9. Subkey "Revoke this subkey instead" alignment (#36)
+
+**Status:** Shipped in 4.6.4. See PLANNING_4.6.4.md item 3.
 
 Priority: low (polish). Origin: CertainBot (#36).
 
@@ -313,6 +317,8 @@ empty-keyring state (KeyringScreen around line 233) on it.
 
 ## 17. User ID row: Make Primary shifts Revoke and Remove (#76)
 
+**Status:** Shipped in 4.6.4. See PLANNING_4.6.4.md item 4.
+
 Priority: low (polish). Origin: #76.
 
 Work: in KeyDetailSections' user ID row, order the actions Revoke, Remove, then Make Primary when shown, so the
@@ -320,6 +326,8 @@ first two line up on every row.
 
 
 ## 18. One PGPony entry in the share menu (#58)
+
+**Status:** Shipped in 4.6.4. See PLANNING_4.6.4.md item 5.
 
 Priority: low (polish). Origin: #58.
 

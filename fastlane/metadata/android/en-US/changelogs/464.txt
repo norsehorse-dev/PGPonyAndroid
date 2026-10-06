@@ -1,0 +1,1 @@
+Nitrokey 3 security keys now work over USB: PGPony read only the first part of longer replies from the key and showed a meaningless error. Recently Deleted shows how many days each key has left. PGPony now appears once in the share menu. Make Primary no longer shifts Revoke and Remove on User ID rows, and the subkey Revoke instead button matches the key delete sheet.
