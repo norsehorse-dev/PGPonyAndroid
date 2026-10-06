@@ -560,6 +560,94 @@ case, a stale older self-signature replayed (ignored), a server copy with a stri
 export afterwards that gpg reads with the new preferences.
 
 
+## 25. Quick Actions decrypt of an ML-DSA-signed file loses its name and shows as text (#67)
+
+Priority: high (bug, visible). Origin: #67 (Oct 5): an image encrypted and signed with an ML-DSA key, decrypted
+through the Quick Action, shows as text and offers to save as "message.txt". The same file through Decrypt Files
+keeps its name and type. Promised on the thread for the next update; 4.6.4 did not carry it.
+
+Cause: two gaps that add up. PGPCryptoService.parsePlain's composite-inline branch builds its DecryptResult without
+the literal packet's filename, where the classical branch carries it. ShareTargetViewModel.publishDecryptResult
+then decides text or binary by `String(data, UTF_8)`, which never throws, so with no filename to go on every
+result reads as text.
+
+Work: carry the literal filename through the composite branch. Classify the result by content, not by whether a
+lenient decode succeeds: a strict UTF-8 decoder (CodingErrorAction.REPORT), NUL bytes, and the known image and
+archive magic numbers the 4.6.3 share routing already recognizes. Save under the literal filename, falling back to
+an extension from the sniffed type. Test: a JPG encrypted and signed with an ML-DSA key opens as a file with its
+name through the Quick Action; the classical path is unchanged; a signed text message still shows as text.
+
+
+## 26. An ML-DSA-65 v6 key imported in 4.5.x can't be encrypted to after upgrading (#67)
+
+Priority: high (bug, data). Origin: #67 (Oct 5): in a Work Profile install dating from about 4.1.0, a v6 key with
+an ML-DSA-65 primary and only post-quantum subkeys, generated with sq and imported during 4.5.x, fails with a red
+error when chosen as a recipient on 4.6.3. A copy of the same key restored from another profile's backup works.
+
+Reading so far: since 4.6.1 a recipient that can't be loaded stops the operation instead of being left out, so a
+stored copy the current loader can't read now surfaces as an error. That points at the form 4.5.x stored the key
+in. It also means messages encrypted from that install before 4.6.1 may not have included the key (the 4.6.1
+notes already warn about the silent drop).
+
+Work: reproduce on a test phone: install 4.5.x, import an sq-generated all-PQ v6 ML-DSA-65 key, upgrade through
+4.6.0 to current, and encrypt to it. Compare the stored blob with a fresh import. Fix in the loader, or normalize
+old stored keys once at upgrade, whichever the comparison supports; never by dropping the key silently. Needs the
+reporter's public key (asked on Oct 5) if a fresh sq key does not reproduce it.
+
+
+## 27. User IDs bound with SHA-1 vanish on import or restore; the key shows "Unknown" (#67)
+
+Priority: medium-high (bug, visible). Origin: #67 (Oct 5): after restoring a backup, several older RSA 4096 public
+keys came back named "Unknown", while the same keys in the live install still showed their names.
+
+Cause (to confirm): since 4.6.0 an import keeps only components whose binding signature verifies under the current
+algorithm rules. Older keys often bind their User IDs with SHA-1 self-signatures, so every User ID is dropped and the
+key is left nameless. Restore re-imports every key, which is why it shows there and not in the live keyring.
+
+Work: keep a User ID whose only binding uses SHA-1, and mark it in Key Details as bound with a weak hash, so the key
+keeps its name. Decide what the weak binding means for trust (it must not make the key look verified) and for
+recipient lookup by address. Test: an RSA key with a SHA-1 User ID binding imports with its name and the weak mark;
+a backup holding it restores the same way; a key with both a SHA-1 and a SHA-256 binding uses the SHA-256 one.
+
+
+## 28. Thunderbird on Android fails to decrypt with a USB security key (#36)
+
+Priority: medium (bug, needs information). Origin: #36 (Sep 24): a key that works in PGPony over USB, and in
+Thunderbird with GnuPG on Linux, gives "error decrypting" in Thunderbird on Android. Not answered on the thread yet.
+
+The path is the OpenPGP API provider handing the card operation to ProviderCardOpActivity over USB. Candidates: the
+provider flow assuming NFC, the USB permission prompt when the request comes from the provider process, or a card
+that chains its responses (fixed in 4.6.4 for the Nitrokey 3).
+
+Work: ask on #36 for the key model, the PGPony version and the exact error; reproduce with Thunderbird and a USB
+key once a working YubiKey is on hand; fix whichever it is.
+
+
+## 29. Nitrokey 3 follow-ups (#43)
+
+Priority: medium. Origin: #43 and the 4.6.4 USB fix (PLANNING_4.6.4.md item 1).
+
+- A SELECT that fails over NFC (0x6A82 or 0x6985) shows the raw status. Say instead that the key did not open its
+  OpenPGP application over NFC and, if it has USB, to plug it in. Nitrokey 3 firmware turns OpenPGP off over NFC.
+- On-card key generation over USB on a Nitrokey 3 is untested (asked on #43). Reading, decrypting and signing are
+  confirmed on firmware 1.9.1.
+- Command chaining is still not implemented: an APDU larger than the reader's dwMaxCCIDMessageLength gets an
+  explicit error. Check the Nitrokey 3's limit against RSA-4096 PSO:DECIPHER (513 bytes of data); implement CCID
+  command chaining if it falls short.
+
+
+## 30. README: hardware keys and Verify a release (#43, #77)
+
+Priority: medium (docs, promised). Not gated on 4.7.0; can land on main at any time.
+
+- The hardware line says NFC only, with YubiKey 5 NFC and Token2. USB has worked since 4.1.0, and the Nitrokey 3 works
+  over USB since 4.6.4 (not over NFC). Promised on #43 in August.
+- Verify a release: list the four assets every release carries since 4.6.3 (APK, detached signature, armored release
+  key, signing-keys file), say releases are immutable, and say to check the OpenPGP fingerprint against pgpony.app,
+  keys.openpgp.org or keys.pgpony.app before trusting the key in a release. Promised on #77. The ".sha256 beside
+  every release APK" line describes the RC folder on pgpony.app, not the GitHub release; fix the wording.
+
+
 ## Release process notes (learned in 4.6.0)
 
 - F-Droid reads the changelog (fastlane/metadata/android/en-US/changelogs/<versionCode>.txt) from the tagged
