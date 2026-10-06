@@ -44,6 +44,23 @@ object Ccid {
     /** The reader needs longer; read another response from bulk-IN. */
     const val CMD_STATUS_TIME_EXTENSION = 2
 
+    // ── bChainParameter on RDR_to_PC_DataBlock ─────────────────────────
+    /** The whole response is in this block. */
+    const val CHAIN_BEGINS_AND_ENDS = 0x00
+    /** First block of a chained response; more follow. */
+    const val CHAIN_BEGINS = 0x01
+    /** Last block of a chained response. */
+    const val CHAIN_ENDS = 0x02
+    /** A middle block of a chained response; more follow. */
+    const val CHAIN_CONTINUES = 0x03
+
+    /**
+     * wLevelParameter on an empty PC_to_RDR_XfrBlock: the host asking the
+     * reader for the next block of a chained response. The reader waits for
+     * this before sending each block after the first.
+     */
+    const val LEVEL_EXPECTING_MORE = 0x10
+
     // ── bStatus, bits 0–1: bmICCStatus ─────────────────────────────────
     const val ICC_PRESENT_ACTIVE = 0
     const val ICC_PRESENT_INACTIVE = 1
@@ -209,6 +226,14 @@ data class CcidResponse(
         get() = commandStatus == Ccid.CMD_STATUS_TIME_EXTENSION
 
     val cardPresent: Boolean get() = iccStatus != Ccid.ICC_ABSENT
+
+    /**
+     * True when this DataBlock is the first or a middle block of a chained
+     * response and the reader is holding more for the host to request.
+     */
+    val moreBlocksFollow: Boolean
+        get() = messageType == Ccid.RDR_TO_PC_DATA_BLOCK &&
+            (chainParameter == Ccid.CHAIN_BEGINS || chainParameter == Ccid.CHAIN_CONTINUES)
 
     /** Human-readable reason, meaningful only when [isFailed]. */
     fun errorText(): String = Ccid.errorText(error)

@@ -67,8 +67,10 @@ class CcidExchangeTest {
         data: ByteArray = ByteArray(0),
         status: Int = 0,
         error: Int = 0,
+        chain: Int = 0,
     ): ByteArray {
         val out = ByteArray(Ccid.HEADER_LEN + data.size)
+        out[9] = chain.toByte()
         out[0] = Ccid.RDR_TO_PC_DATA_BLOCK.toByte()
         out[1] = (data.size and 0xFF).toByte()
         out[2] = ((data.size ushr 8) and 0xFF).toByte()
@@ -320,5 +322,61 @@ class CcidExchangeTest {
         val ex = CcidExchange(pipe, descriptor(maxMessageLength = 64L))
 
         assertArrayEquals(sw9000, ex.transceiveApdu(ByteArray(size)))
+    }
+
+    // ── response chaining ────────────────────────────────────────────────
+
+    /**
+     * The Nitrokey 3 splits any response longer than one USB packet into
+     * chained DataBlocks and waits for the host to request each one. Reading
+     * only the first block produced a status word from the middle of the
+     * data (0x0A3F in a user report).
+     */
+    @Test
+    fun chainedResponse_isRequestedBlockByBlockAndReassembled() {
+        val part1 = ByteArray(54) { it.toByte() }
+        val part2 = ByteArray(54) { (100 + it).toByte() }
+        val part3 = byteArrayOf(0x11, 0x22, 0x90.toByte(), 0x00)
+        val pipe = FakePipe(
+            mutableListOf(
+                dataBlock(1, part1, chain = Ccid.CHAIN_BEGINS),
+                dataBlock(2, part2, chain = Ccid.CHAIN_CONTINUES),
+                dataBlock(3, part3, chain = Ccid.CHAIN_ENDS),
+            )
+        )
+        val ex = CcidExchange(pipe, descriptor())
+
+        val out = ex.transceiveApdu(byteArrayOf(0x00, 0xCA.toByte(), 0x00, 0x6E, 0x00))
+
+        assertArrayEquals(part1 + part2 + part3, out)
+        assertEquals(3, pipe.written.size)
+        for (i in 1..2) {
+            val req = pipe.written[i]
+            assertEquals(Ccid.HEADER_LEN, req.size)
+            assertEquals(Ccid.PC_TO_RDR_XFR_BLOCK, req[0].toInt() and 0xFF)
+            assertEquals(i + 1, req[6].toInt() and 0xFF)
+            val level = (req[8].toInt() and 0xFF) or ((req[9].toInt() and 0xFF) shl 8)
+            assertEquals(Ccid.LEVEL_EXPECTING_MORE, level)
+        }
+    }
+
+    @Test
+    fun unchainedResponse_sendsNoExtraRequest() {
+        val pipe = FakePipe(mutableListOf(dataBlock(1, sw9000, chain = Ccid.CHAIN_BEGINS_AND_ENDS)))
+        val ex = CcidExchange(pipe, descriptor())
+
+        assertArrayEquals(sw9000, ex.transceiveApdu(byteArrayOf(0x00)))
+        assertEquals(1, pipe.written.size)
+    }
+
+    @Test
+    fun chainThatNeverEnds_failsInsteadOfLooping() {
+        val replies = MutableList(CcidExchange.MAX_CHAINED_BLOCKS + 1) { i ->
+            dataBlock(i + 1, byteArrayOf(0x01), chain = if (i == 0) Ccid.CHAIN_BEGINS else Ccid.CHAIN_CONTINUES)
+        }
+        val ex = CcidExchange(FakePipe(replies), descriptor())
+
+        val e = runCatching { ex.transceiveApdu(byteArrayOf(0x00)) }.exceptionOrNull()
+        assertTrue(e is OpenPgpCardException.Communication)
     }
 }
