@@ -17,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -171,6 +172,18 @@ private fun DeletedKeyRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // 4.6.4 (#58): how long until the key is destroyed. Read when the
+                // screen composes, which is every time it opens.
+                val daysLeft = RecycleBinCountdown.daysLeft(ts, System.currentTimeMillis())
+                Text(
+                    text = if (daysLeft >= 1) {
+                        pluralStringResource(R.plurals.recycle_bin_days_left, daysLeft, daysLeft)
+                    } else {
+                        stringResource(R.string.recycle_bin_less_than_a_day_left)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             Row(
                 modifier = Modifier.padding(top = 4.dp),
@@ -187,5 +200,23 @@ private fun DeletedKeyRow(
                 }
             }
         }
+    }
+}
+
+/**
+ * 4.6.4 (#58): whole days until a deleted key is destroyed. Keys are purged on
+ * the first launch after [KeyRepository.RECYCLE_BIN_RETENTION_MS] has passed
+ * since [deletedAt], so this counts down to that moment. Rounds to the
+ * nearest day, so a key deleted a minute ago reads as the full retention the
+ * delete sheet promised. Under one day left returns 0 (shown as "less than a
+ * day"), as does a key past retention still waiting for the next launch.
+ */
+internal object RecycleBinCountdown {
+    private const val DAY_MS = 24L * 60 * 60 * 1000
+
+    fun daysLeft(deletedAt: Long, now: Long): Int {
+        val remaining = deletedAt + KeyRepository.RECYCLE_BIN_RETENTION_MS - now
+        if (remaining < DAY_MS) return 0
+        return ((remaining + DAY_MS / 2) / DAY_MS).toInt()
     }
 }
