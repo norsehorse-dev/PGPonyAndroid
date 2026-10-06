@@ -16,9 +16,13 @@
 // release: put the logic where a test can reach it, and leave the platform
 // class as thin plumbing.
 //
-// SCOPE. No CCID-level chaining. An APDU larger than the reader's
-// dwMaxCCIDMessageLength is reported with the actual limit rather than
-// truncated or hung on. See transceiveApdu.
+// SCOPE. Response chaining is handled: a reader at extended-APDU level may
+// split one card response across several DataBlocks (bChainParameter) and
+// wait for the host to ask for each one after the first. The Nitrokey 3 does
+// this for anything longer than one USB packet. Command chaining is not
+// handled: an APDU larger than the reader's dwMaxCCIDMessageLength is
+// reported with the actual limit rather than truncated or hung on. See
+// transceiveApdu.
 
 package com.pgpony.android.crypto.card
 
@@ -92,10 +96,38 @@ class CcidExchange(
                     "or a smaller key size."
             )
         }
-        return exchange(
+        var response = exchange(
             CcidCommand.xfrBlock(nextSequence(), apdu, slot, bwi = bwi),
             timeoutMs,
-        ).data
+        )
+        if (!response.moreBlocksFollow) return response.data
+
+        // Chained response. Reading only the first block and treating its
+        // last two bytes as the status word turns a large response into a
+        // nonsense status (seen as 0x0A3F on a Nitrokey 3), so collect every
+        // block before handing anything up.
+        val assembled = java.io.ByteArrayOutputStream()
+        assembled.write(response.data)
+        var blocks = 1
+        while (response.moreBlocksFollow) {
+            if (++blocks > MAX_CHAINED_BLOCKS) {
+                throw OpenPgpCardException.Communication(
+                    "Reader kept chaining past $MAX_CHAINED_BLOCKS blocks without ending the response"
+                )
+            }
+            response = exchange(
+                CcidCommand.xfrBlock(
+                    nextSequence(),
+                    ByteArray(0),
+                    slot,
+                    bwi = bwi,
+                    levelParameter = Ccid.LEVEL_EXPECTING_MORE,
+                ),
+                timeoutMs,
+            )
+            assembled.write(response.data)
+        }
+        return assembled.toByteArray()
     }
 
     /**
@@ -258,5 +290,11 @@ class CcidExchange(
 
         const val MAX_STALE_REPLIES = 8
         const val MAX_CONTINUATION_READS = 64
+
+        /**
+         * A 64 KiB response in 54-byte blocks is about 1,200 blocks; this
+         * only stops a reader that never sends the last one.
+         */
+        const val MAX_CHAINED_BLOCKS = 2048
     }
 }
