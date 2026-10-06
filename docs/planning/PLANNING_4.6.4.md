@@ -1,6 +1,6 @@
 # PGPony Android 4.6.4: Planning
 
-Status: draft (Oct 6 2026). A small fixes release: Nitrokey 3 security keys over USB, plus four small items pulled
+Status: RC1 verified (Oct 6 2026): items 2 to 5 checked on device, item 1 confirmed working over USB by the reporter. A small fixes release: Nitrokey 3 security keys over USB, plus four small items pulled
 forward from PLANNING_4.7.0.md (4, 9, 17, 18).
 
 versionCode 464. Branch: `4.6.x` (at v4.6.3), not main. Every change is cherry-picked onto main after release, so
@@ -35,8 +35,8 @@ Work:
 Not a bug: NFC returns 0x6A82 (application not found) on the same key. Nitrokey disabled OpenPGP over NFC in
 firmware 1.5.0 and has not re-enabled it through 1.9.x, and OpenKeychain fails the same way over NFC.
 
-Verify on device: the reporter tests the RC over USB (no Nitrokey here). Regression check on a YubiKey over USB
-and NFC once one is available.
+Verified: the reporter confirmed RC1 works over USB with a Nitrokey 3 on firmware 1.9.1. Regression check on a
+YubiKey over USB and NFC once one is available.
 
 
 ## 2. Days left on each key in Recently Deleted (#58, 4.7.0 item 4)
