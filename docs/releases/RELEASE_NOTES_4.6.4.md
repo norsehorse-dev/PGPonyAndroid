@@ -30,4 +30,21 @@ does the same thing, so PGPony now appears once in the share menu.
 
 ## Verify this build
 
-Hashes and signatures are added when the release is published.
+Whole-file SHA-256 (is this download the published file):
+
+```
+3ae551b26577492d4b60fa8ded8d021d01c16957d19f2854f0790e500cd09547
+```
+
+Content hash (for rebuilders; excludes signature, see docs/REPRODUCIBLE_BUILDS_PLAYBOOK.md):
+
+```
+16c8e9484c7e1b89c426839cce7213768a7c76a19f482cb8f6fa662b41004451
+```
+
+The APK is signed with the NorseHorse release key
+(A0CBC8F65AACE56F1C5B767753F9798E4919DE62); the detached signature is attached to
+this release, along with the armored release key (NorseHorse-release-key.asc) and
+PGPony-4.6.4-signing-keys.txt with the OpenPGP fingerprint and the APK signing certificate's SHA-256. Check the
+fingerprint against pgpony.app, keys.openpgp.org or keys.pgpony.app rather than trusting the copy in the release
+alone.
