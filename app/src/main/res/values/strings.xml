@@ -925,6 +925,12 @@
     <string name="recycle_bin_restore">Restore</string>
     <string name="recycle_bin_delete_now">Delete permanently</string>
     <string name="recycle_bin_deleted_on">Deleted %1$s</string>
+    <!-- 4.6.4 (#58): time left before a deleted key is destroyed -->
+    <plurals name="recycle_bin_days_left">
+        <item quantity="one">%1$d day left</item>
+        <item quantity="other">%1$d days left</item>
+    </plurals>
+    <string name="recycle_bin_less_than_a_day_left">Less than a day left</string>
     <string name="recycle_bin_purge_confirm_body">Permanently destroy this key? This cannot be undone.</string>
     <string name="recycle_bin_empty_confirm_body">Permanently destroy every key in the bin? This cannot be undone.</string>
     <string name="recycle_bin_restored">Key restored</string>
@@ -1485,7 +1491,6 @@
          another app. Mirrors the iOS PGPonyAction extension.
     -->
     <string name="share_target_activity_label">PGPony Quick Action</string>
-    <string name="share_encrypt_text_label">Encrypt in PGPony</string>
     <string name="share_target_dismiss_cd">Dismiss</string>
 
     <!-- Root / classification screen -->

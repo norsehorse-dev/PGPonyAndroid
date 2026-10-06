@@ -918,6 +918,12 @@
     <string name="recycle_bin_restore">Geri Yükle</string>
     <string name="recycle_bin_delete_now">Kalıcı olarak sil</string>
     <string name="recycle_bin_deleted_on">Silinme: %1$s</string>
+    <!-- 4.6.4 (#58): time left before a deleted key is destroyed -->
+    <plurals name="recycle_bin_days_left">
+        <item quantity="one">%1$d gün kaldı</item>
+        <item quantity="other">%1$d gün kaldı</item>
+    </plurals>
+    <string name="recycle_bin_less_than_a_day_left">Bir günden az kaldı</string>
     <string name="recycle_bin_purge_confirm_body">Bu anahtar kalıcı olarak yok edilsin mi? Bu işlem geri alınamaz.</string>
     <string name="recycle_bin_empty_confirm_body">Çöp kutusundaki tüm anahtarlar kalıcı olarak yok edilsin mi? Bu işlem geri alınamaz.</string>
     <string name="recycle_bin_restored">Anahtar geri yüklendi</string>
@@ -1478,7 +1484,6 @@
          another app. Mirrors the iOS PGPonyAction extension.
     -->
     <string name="share_target_activity_label">PGPony Hızlı İşlem</string>
-    <string name="share_encrypt_text_label">PGPony ile şifrele</string>
     <string name="share_target_dismiss_cd">Kapat</string>
 
     <!-- Root / classification screen -->

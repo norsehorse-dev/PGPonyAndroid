@@ -841,6 +841,11 @@
     <string name="recycle_bin_restore">복원</string>
     <string name="recycle_bin_delete_now">영구히 삭제</string>
     <string name="recycle_bin_deleted_on">%1$s에 삭제됨</string>
+    <!-- 4.6.4 (#58): time left before a deleted key is destroyed -->
+    <plurals name="recycle_bin_days_left">
+        <item quantity="other">%1$d일 남음</item>
+    </plurals>
+    <string name="recycle_bin_less_than_a_day_left">1일 미만 남음</string>
     <string name="recycle_bin_purge_confirm_body">이 키를 영구히 파기할까요? 되돌릴 수 없습니다.</string>
     <string name="recycle_bin_empty_confirm_body">휴지통의 모든 키를 영구히 파기할까요? 되돌릴 수 없습니다.</string>
     <string name="recycle_bin_restored">키 복원됨</string>
@@ -2029,7 +2034,6 @@
     <string name="key_detail_subkey_remove_biometric_title">서브키 제거 확인</string>
     <string name="key_detail_subkey_remove_biometric_subtitle">인증하여 이 서브키를 제거합니다</string>
     <string name="kd_vm_status_subkey_removed">서브키가 제거됨</string>
-    <string name="share_encrypt_text_label">PGPony에서 암호화</string>
     <string name="provider_sign_per_address_title">주소별 서명 키</string>
     <string name="provider_sign_per_address_subtitle">한 주소에 내 서명 키가 여러 개일 때 PGPony가 어느 키로 서명할지 선택합니다. 전송 시 묻지 않고 즉시 적용됩니다.</string>
     <string name="provider_ask_sign_key_title">서명할 키 묻기</string>

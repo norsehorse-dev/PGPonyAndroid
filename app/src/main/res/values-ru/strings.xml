@@ -836,6 +836,14 @@
     <string name="recycle_bin_restore">Восстановить</string>
     <string name="recycle_bin_delete_now">Удалить навсегда</string>
     <string name="recycle_bin_deleted_on">Удалено %1$s</string>
+    <!-- 4.6.4 (#58): time left before a deleted key is destroyed -->
+    <plurals name="recycle_bin_days_left">
+        <item quantity="one">Остался %1$d день</item>
+        <item quantity="few">Осталось %1$d дня</item>
+        <item quantity="many">Осталось %1$d дней</item>
+        <item quantity="other">Осталось %1$d дня</item>
+    </plurals>
+    <string name="recycle_bin_less_than_a_day_left">Осталось меньше дня</string>
     <string name="recycle_bin_purge_confirm_body">Уничтожить этот ключ навсегда? Это действие нельзя отменить.</string>
     <string name="recycle_bin_empty_confirm_body">Уничтожить навсегда все ключи в корзине? Это действие нельзя отменить.</string>
     <string name="recycle_bin_restored">Ключ восстановлен</string>
@@ -2038,7 +2046,6 @@
     <string name="key_detail_subkey_remove_biometric_subtitle">Пройдите аутентификацию, чтобы удалить этот подключ</string>
     <string name="kd_vm_status_subkey_removed">Подключ удалён</string>
     <string name="verify_banner_unknown_signer_subtitle_offline_format">%1$s</string>
-    <string name="share_encrypt_text_label">Зашифровать в PGPony</string>
     <string name="settings_argon2_title">Усиленная защита парольной фразы (Argon2)</string>
     <string name="settings_argon2_subtitle">Использует Argon2id для файлов и сообщений, зашифрованных паролем. Труднее взломать перебором, но получателю нужен GnuPG 2.4 или новее, чтобы их открыть. По умолчанию выключено для наибольшей совместимости.</string>
     <string name="provider_sign_per_address_title">Ключ подписи по адресу</string>

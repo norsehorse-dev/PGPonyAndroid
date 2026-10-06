@@ -1741,6 +1741,12 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="recycle_bin_restore">Restaurar</string>
     <string name="recycle_bin_delete_now">Excluir permanentemente</string>
     <string name="recycle_bin_deleted_on">Excluída %1$s</string>
+    <!-- 4.6.4 (#58): time left before a deleted key is destroyed -->
+    <plurals name="recycle_bin_days_left">
+        <item quantity="one">Resta %1$d dia</item>
+        <item quantity="other">Restam %1$d dias</item>
+    </plurals>
+    <string name="recycle_bin_less_than_a_day_left">Resta menos de um dia</string>
     <string name="recycle_bin_purge_confirm_body">Destruir esta chave permanentemente? Isso não pode ser desfeito.</string>
     <string name="recycle_bin_empty_confirm_body">Destruir todas as chaves da lixeira? Isso não pode ser desfeito.</string>
     <string name="recycle_bin_restored">Chave restaurada</string>
@@ -1963,7 +1969,6 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="key_detail_subkey_remove_biometric_subtitle">Autentique-se para remover esta subchave</string>
     <string name="kd_vm_status_subkey_removed">Subchave removida</string>
     <string name="verify_banner_unknown_signer_subtitle_offline_format">%1$s</string>
-    <string name="share_encrypt_text_label">Criptografar no PGPony</string>
     <string name="bundle_result_section_email">Enviar como e-mail</string>
     <string name="bundle_result_section_file">Enviar como arquivo</string>
     <string name="settings_argon2_title">Proteção de frase-senha mais forte (Argon2)</string>
