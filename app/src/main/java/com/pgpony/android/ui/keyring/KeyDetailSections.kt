@@ -952,12 +952,9 @@ fun UserIdsSection(
                     )
                 }
                 if (canEdit && !uid.isRevoked) {
+                    // #76: Revoke and Remove come first so they sit in the same place on
+                    // every row; Make Primary, shown only on non-primary rows, goes last.
                     Row(modifier = Modifier.padding(top = 4.dp)) {
-                        if (!uid.isPrimary && onMakePrimary != null) {
-                            TextButton(onClick = { onMakePrimary(uid.raw) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                                Text(stringResource(R.string.key_detail_userids_make_primary), style = MaterialTheme.typography.labelMedium)
-                            }
-                        }
                         if (onRevoke != null) {
                             TextButton(onClick = { onRevoke(uid.raw) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
                                 Text(
@@ -974,6 +971,11 @@ fun UserIdsSection(
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.error
                                 )
+                            }
+                        }
+                        if (!uid.isPrimary && onMakePrimary != null) {
+                            TextButton(onClick = { onMakePrimary(uid.raw) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                                Text(stringResource(R.string.key_detail_userids_make_primary), style = MaterialTheme.typography.labelMedium)
                             }
                         }
                     }

@@ -79,6 +79,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -737,15 +739,21 @@ fun KeyDetailScreen(
                 Column {
                     Text(stringResource(R.string.key_detail_subkey_remove_confirm_body))
                     if (!subkeyRemoveTarget.isRevoked) {
-                        Spacer(Modifier.height(8.dp))
-                        TextButton(
+                        // #36: same shape as the key delete sheet's revoke-instead button,
+                        // full width with the Block icon, so the two read alike.
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedButton(
                             onClick = { viewModel.revokeSubkeyInstead() },
-                            enabled = !state.subkeyRemoveInFlight
+                            enabled = !state.subkeyRemoveInFlight,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                stringResource(R.string.key_detail_subkey_revoke_instead_button),
-                                color = MaterialTheme.colorScheme.primary
+                            Icon(
+                                imageVector = Icons.Filled.Block,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.key_detail_subkey_revoke_instead_button))
                         }
                     }
                 }
