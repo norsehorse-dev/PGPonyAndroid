@@ -1741,6 +1741,12 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="recycle_bin_restore">Wiederherstellen</string>
     <string name="recycle_bin_delete_now">Endgültig löschen</string>
     <string name="recycle_bin_deleted_on">Gelöscht %1$s</string>
+    <!-- 4.6.4 (#58): time left before a deleted key is destroyed -->
+    <plurals name="recycle_bin_days_left">
+        <item quantity="one">Noch %1$d Tag</item>
+        <item quantity="other">Noch %1$d Tage</item>
+    </plurals>
+    <string name="recycle_bin_less_than_a_day_left">Weniger als ein Tag übrig</string>
     <string name="recycle_bin_purge_confirm_body">Diesen Schlüssel endgültig löschen? Das kann nicht rückgängig gemacht werden.</string>
     <string name="recycle_bin_empty_confirm_body">Alle Schlüssel im Papierkorb endgültig löschen? Das kann nicht rückgängig gemacht werden.</string>
     <string name="recycle_bin_restored">Schlüssel wiederhergestellt</string>
@@ -1963,7 +1969,6 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="key_detail_subkey_remove_biometric_subtitle">Authentifiziere dich, um diesen Unterschlüssel zu entfernen</string>
     <string name="kd_vm_status_subkey_removed">Unterschlüssel entfernt</string>
     <string name="verify_banner_unknown_signer_subtitle_offline_format">%1$s</string>
-    <string name="share_encrypt_text_label">In PGPony verschlüsseln</string>
     <string name="bundle_result_section_email">Als E-Mail senden</string>
     <string name="bundle_result_section_file">Als Datei senden</string>
     <string name="settings_argon2_title">Stärkerer Passphrasenschutz (Argon2)</string>

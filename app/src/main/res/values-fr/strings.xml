@@ -1741,6 +1741,12 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="recycle_bin_restore">Restaurer</string>
     <string name="recycle_bin_delete_now">Supprimer définitivement</string>
     <string name="recycle_bin_deleted_on">Supprimée %1$s</string>
+    <!-- 4.6.4 (#58): time left before a deleted key is destroyed -->
+    <plurals name="recycle_bin_days_left">
+        <item quantity="one">%1$d jour restant</item>
+        <item quantity="other">%1$d jours restants</item>
+    </plurals>
+    <string name="recycle_bin_less_than_a_day_left">Moins d\'un jour restant</string>
     <string name="recycle_bin_purge_confirm_body">Détruire définitivement cette clé ? Cette action est irréversible.</string>
     <string name="recycle_bin_empty_confirm_body">Détruire définitivement toutes les clés de la corbeille ? Cette action est irréversible.</string>
     <string name="recycle_bin_restored">Clé restaurée</string>
@@ -1963,7 +1969,6 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="key_detail_subkey_remove_biometric_subtitle">Authentifiez-vous pour retirer cette sous-clé</string>
     <string name="kd_vm_status_subkey_removed">Sous-clé retirée</string>
     <string name="verify_banner_unknown_signer_subtitle_offline_format">%1$s</string>
-    <string name="share_encrypt_text_label">Chiffrer dans PGPony</string>
     <string name="bundle_result_section_email">Envoyer par e-mail</string>
     <string name="bundle_result_section_file">Envoyer comme fichier</string>
     <string name="settings_argon2_title">Protection renforcée de la phrase secrète (Argon2)</string>

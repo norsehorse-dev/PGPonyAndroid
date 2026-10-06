@@ -922,6 +922,14 @@
     <string name="recycle_bin_restore">Відновити</string>
     <string name="recycle_bin_delete_now">Видалити назавжди</string>
     <string name="recycle_bin_deleted_on">Видалено %1$s</string>
+    <!-- 4.6.4 (#58): time left before a deleted key is destroyed -->
+    <plurals name="recycle_bin_days_left">
+        <item quantity="one">Залишився %1$d день</item>
+        <item quantity="few">Залишилося %1$d дні</item>
+        <item quantity="many">Залишилося %1$d днів</item>
+        <item quantity="other">Залишилося %1$d дня</item>
+    </plurals>
+    <string name="recycle_bin_less_than_a_day_left">Залишилося менше дня</string>
     <string name="recycle_bin_purge_confirm_body">Знищити цей ключ назавжди? Цю дію неможливо скасувати.</string>
     <string name="recycle_bin_empty_confirm_body">Знищити назавжди всі ключі в кошику? Цю дію неможливо скасувати.</string>
     <string name="recycle_bin_restored">Ключ відновлено</string>
@@ -1482,7 +1490,6 @@
          another app. Mirrors the iOS PGPonyAction extension.
     -->
     <string name="share_target_activity_label">Швидка дія PGPony</string>
-    <string name="share_encrypt_text_label">Зашифрувати в PGPony</string>
     <string name="share_target_dismiss_cd">Закрити</string>
 
     <!-- Root / classification screen -->

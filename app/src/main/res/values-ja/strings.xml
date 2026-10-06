@@ -1738,6 +1738,11 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="recycle_bin_restore">復元</string>
     <string name="recycle_bin_delete_now">完全に削除</string>
     <string name="recycle_bin_deleted_on">削除日 %1$s</string>
+    <!-- 4.6.4 (#58): time left before a deleted key is destroyed -->
+    <plurals name="recycle_bin_days_left">
+        <item quantity="other">残り %1$d 日</item>
+    </plurals>
+    <string name="recycle_bin_less_than_a_day_left">残り 1 日未満</string>
     <string name="recycle_bin_purge_confirm_body">この鍵を完全に削除しますか？元に戻せません。</string>
     <string name="recycle_bin_empty_confirm_body">ゴミ箱内のすべての鍵を完全に削除しますか？元に戻せません。</string>
     <string name="recycle_bin_restored">鍵を復元しました</string>
@@ -1960,7 +1965,6 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="key_detail_subkey_remove_biometric_subtitle">認証してこのサブキーを削除します</string>
     <string name="kd_vm_status_subkey_removed">サブキーを削除しました</string>
     <string name="verify_banner_unknown_signer_subtitle_offline_format">%1$s</string>
-    <string name="share_encrypt_text_label">PGPonyで暗号化</string>
     <string name="bundle_result_section_email">メールとして送信</string>
     <string name="bundle_result_section_file">ファイルとして送信</string>
     <string name="settings_argon2_title">より強力なパスフレーズ保護（Argon2）</string>

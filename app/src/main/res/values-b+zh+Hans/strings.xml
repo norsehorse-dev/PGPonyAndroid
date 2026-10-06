@@ -916,6 +916,11 @@
     <string name="recycle_bin_restore">恢复</string>
     <string name="recycle_bin_delete_now">永久删除</string>
     <string name="recycle_bin_deleted_on">删除于 %1$s</string>
+    <!-- 4.6.4 (#58): time left before a deleted key is destroyed -->
+    <plurals name="recycle_bin_days_left">
+        <item quantity="other">剩余 %1$d 天</item>
+    </plurals>
+    <string name="recycle_bin_less_than_a_day_left">剩余不到 1 天</string>
     <string name="recycle_bin_purge_confirm_body">要永久销毁此密钥吗？此操作无法撤销。</string>
     <string name="recycle_bin_empty_confirm_body">要永久销毁「最近删除」中的所有密钥吗？此操作无法撤销。</string>
     <string name="recycle_bin_restored">密钥已恢复</string>
@@ -1476,7 +1481,6 @@
          another app. Mirrors the iOS PGPonyAction extension.
     -->
     <string name="share_target_activity_label">PGPony 快捷操作</string>
-    <string name="share_encrypt_text_label">在 PGPony 中加密</string>
     <string name="share_target_dismiss_cd">关闭</string>
 
     <!-- Root / classification screen -->
