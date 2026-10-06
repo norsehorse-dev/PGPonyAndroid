@@ -260,8 +260,9 @@ android {
         // 4.6.3: the 4.7.0 bug fixes pulled forward (#15, #67, #68, #72, #73,
         // #74, Play vitals, message handling hardening) and pairing with
         // PGPony Desktop.
-        versionCode = 463
-        versionName = "4.6.3"
+        // 4.6.4: Nitrokey 3 over USB, and four small 4.7.0 items (#36, #58, #76).
+        versionCode = 464
+        versionName = "4.6.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
