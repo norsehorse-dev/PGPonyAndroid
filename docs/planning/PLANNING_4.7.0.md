@@ -648,6 +648,39 @@ Priority: medium (docs, promised). Not gated on 4.7.0; can land on main at any t
   every release APK" line describes the RC folder on pgpony.app, not the GitHub release; fix the wording.
 
 
+## 31. Certify other people's keys, like gpg's --sign-key (#79)
+
+Priority: medium-high (feature). Origin: #79: certify another person's User IDs with your own key to take part in
+the Web of Trust from the phone, including when the certifying primary lives on an OpenPGP card.
+
+Where Android stands: imports keep third-party certifications (CertificateBindings), but nothing creates one.
+UserIdService already builds certification signatures over User IDs (self-signatures only), and the card path
+signs through the Signature slot (CardPGPContentSigner), so both halves exist.
+
+Work:
+
+- Key Details of a public key gets Certify: pick the User IDs, pick the certifying key pair (only primaries with
+  the certify capability; with item 22, never an offline stub), and compare the full fingerprint before signing.
+- Level as gpg's --ask-cert-level: no claim (0x10, the default, as gpg), persona (0x11), casual (0x12), positive
+  (0x13). Optional expiry.
+- Local-only certification, the equivalent of --lsign-key: Exportable Certification subpacket set to false, never
+  included in an export, share or backup sent elsewhere.
+- Card: when the certifying primary is on the card's Signature slot, sign the certification on the card after the
+  PIN, over NFC or USB.
+- Afterwards: share the certified key back to its owner as a file or QR. keys.openpgp.org drops third-party
+  certifications, so the sheet says to send it directly or through another keyserver.
+- Revoke a certification you made (certification revocation, 0x30).
+- Key Details lists who certified each User ID, marking certifiers already in the keyring, and whether each
+  certification verifies.
+- With item 10: certifying offers to set the key to Verified.
+- Merge: an incoming copy of a key you certified keeps your certification (CertificateMerge already keeps
+  third-party certifications); a later re-import of your own key pair (item 24) does not touch it.
+
+Test: a certification made in PGPony verifies in gpg (`gpg --check-sigs`) at each level; a local-only one is
+absent from every export; a card certification over NFC and USB; a revoked certification shows as revoked in gpg
+and in PGPony; v4 and v6 keys, including an ML-DSA certifier.
+
+
 ## Release process notes (learned in 4.6.0)
 
 - F-Droid reads the changelog (fastlane/metadata/android/en-US/changelogs/<versionCode>.txt) from the tagged
