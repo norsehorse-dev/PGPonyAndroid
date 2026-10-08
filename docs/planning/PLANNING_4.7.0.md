@@ -681,6 +681,58 @@ absent from every export; a card certification over NFC and USB; a revoked certi
 and in PGPony; v4 and v6 keys, including an ML-DSA certifier.
 
 
+## 32. Duress PIN: a second PIN that wipes PGPony (user email, Oct 8)
+
+Priority: medium-high (feature, security). Origin: user email (Oct 8, on 4.6.4): a duress PIN that, entered at
+the app lock, destroys every key and resets the app. Asked for on every platform: iOS is PGPony_8_4_0_Planning.md
+item 1.4, desktop is PLANNING_DESKTOP_3_1_0.md.
+
+Where Android stands: the app lock (biometric_lock) is the system prompt, BIOMETRIC_STRONG or DEVICE_CREDENTIAL
+through BiometricGate. PGPony never sees what is typed there, so it cannot tell a duress PIN from the real one. A
+duress PIN therefore needs PGPony's own PIN first.
+
+Work:
+
+- App lock gains a choice: device unlock (as today) or a PGPony PIN (6 to 16 digits). The PIN is stored as an
+  Argon2id hash with its own salt, never the PIN itself.
+- With a PGPony PIN set, an optional duress PIN (must differ from the PIN). Both are checked on every attempt the
+  same way, so the time taken does not tell them apart. Setting one up explains what it does, that it cannot be
+  undone, and that it is never tested by entering it.
+- With a duress PIN set, offer to turn off fingerprint unlock, since a finger can be forced and the duress PIN only
+  helps if the PIN is what is asked for. Recommend it, don't force it.
+- Entering the duress PIN wipes without any prompt or progress that says so: crypto-erase first (delete the
+  Android Keystore key that wraps SecureKeyStore, so the secret material is unreadable even if the rest of the
+  wipe is interrupted), then the same reset as Clear All Data, including Recently Deleted (see item 33), every
+  provider, SSH and pairing approval, held passphrases and the card PIN cache. Then the app opens as a fresh
+  install, on onboarding.
+- Every place the lock is asked: the app, the Quick Action (ShareTargetActivity), and any provider path that shows
+  the lock. The duress PIN works the same in each.
+- Optional, off by default: wipe after a set number of wrong PIN attempts, on the same wipe path.
+- Not touched, and said so in the setup text: keys on a hardware key (the card keeps its own PIN counters), and
+  backups the user saved outside the app. It also does not help against a copy of the phone's storage taken
+  before the PIN is entered.
+
+Test: unit tests for the PIN hashing and the duress check (both PINs, wrong PINs, the attempt counter); on device,
+the duress PIN from the app and from the Quick Action leaves no keys (live or in Recently Deleted), no settings
+and no provider approvals, and opens onboarding; the real PIN still unlocks normally; device-unlock mode is
+unchanged.
+
+
+## 33. Clear All Data leaves the keys in Recently Deleted behind
+
+Priority: high (bug, privacy). Found while planning item 32.
+
+SettingsViewModel.clearAllData deletes every key from repo.getAllKeys(), and that query is `deletedAt IS NULL`, so
+keys already in Recently Deleted are skipped. Their rows and their secret material in SecureKeyStore survive the
+reset, and they show up in Recently Deleted on the fresh install. iOS (performFullReset) and desktop
+(ClearAllData) both clear the bin; Android does not.
+
+Work: purge the bin in clearAllData too (purgeKey on every soft-deleted key, or one DAO delete of all rows plus a
+SecureKeyStore wipe). Test: delete a key pair, Clear All Data, check Recently Deleted is empty and the secret
+material is gone from SecureKeyStore. Confirm on device first, and decide whether it waits for 4.7.0 or goes out
+as a 4.6.x fix.
+
+
 ## Release process notes (learned in 4.6.0)
 
 - F-Droid reads the changelog (fastlane/metadata/android/en-US/changelogs/<versionCode>.txt) from the tagged
