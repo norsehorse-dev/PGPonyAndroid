@@ -2053,8 +2053,6 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="share_target_action_verify_subtitle">Mira quién la firmó. Este mensaje está firmado, no cifrado</string>
     <string name="share_target_action_sign">Firmar, o cifrar y firmar</string>
     <string name="share_target_action_sign_subtitle">Abrir este texto en la pantalla Cifrar de PGPony</string>
-    <string name="share_target_action_encrypt_other">Cifrar el resto del texto</string>
-    <string name="share_target_action_encrypt_other_subtitle">Cifrar el texto compartido junto al bloque PGP</string>
     <string name="share_target_decrypt_result_unknown_signer">Firmado con una clave que no está en tu llavero</string>
     <!-- 4.6.0 (item 16): SSH authentication -->
     <string name="ssh_cardop_body">PGPony firmará un inicio de sesión SSH con la ranura de autenticación de tu llave de hardware. Introduce el PIN de la tarjeta y acerca la llave a la parte trasera del teléfono.</string>

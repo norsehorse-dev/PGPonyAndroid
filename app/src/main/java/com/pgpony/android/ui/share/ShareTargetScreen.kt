@@ -573,12 +573,15 @@ private fun ShareRootContent(
             onClick = { onForwardEncryptText(payload.otherText ?: sharedText.orEmpty()) },
         )
     } else {
+        // 4.7.0 (item 3, #58): encrypt the whole shared text, PGP block
+        // included, and let the user trim it on the Encrypt screen. Encrypting
+        // only the text around the block had no real use.
         payload.otherText?.let { other ->
             ShareActionCard(
-                title = stringResource(R.string.share_target_action_encrypt_other),
-                subtitle = stringResource(R.string.share_target_action_encrypt_other_subtitle),
+                title = stringResource(R.string.share_target_action_encrypt_all),
+                subtitle = stringResource(R.string.share_target_action_encrypt_all_subtitle),
                 icon = Icons.Default.Lock,
-                onClick = { onForwardEncryptText(other) },
+                onClick = { onForwardEncryptText(sharedText ?: other) },
             )
         }
     }

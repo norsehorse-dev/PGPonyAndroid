@@ -2053,8 +2053,6 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="share_target_action_verify_subtitle">Voir qui l\'a signé. Ce message est signé, pas chiffré</string>
     <string name="share_target_action_sign">Signer, ou chiffrer et signer</string>
     <string name="share_target_action_sign_subtitle">Ouvrir ce texte dans l\'écran Chiffrer de PGPony</string>
-    <string name="share_target_action_encrypt_other">Chiffrer le reste du texte</string>
-    <string name="share_target_action_encrypt_other_subtitle">Chiffrer le texte partagé avec le bloc PGP</string>
     <string name="share_target_decrypt_result_unknown_signer">Signé par une clé absente de votre trousseau</string>
     <!-- 4.6.0 (item 16): SSH authentication -->
     <string name="ssh_cardop_body">PGPony va signer une connexion SSH avec l\'emplacement d\'authentification de ta clé matérielle. Saisis le PIN de la carte, puis tiens la clé contre le dos de ton téléphone.</string>

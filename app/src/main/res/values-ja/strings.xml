@@ -2046,8 +2046,6 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="share_target_action_verify_subtitle">署名者を確認します。このメッセージは署名済みで、暗号化されていません</string>
     <string name="share_target_action_sign">署名、または暗号化して署名</string>
     <string name="share_target_action_sign_subtitle">このテキストを PGPony の暗号化画面で開きます</string>
-    <string name="share_target_action_encrypt_other">残りのテキストを暗号化</string>
-    <string name="share_target_action_encrypt_other_subtitle">PGP ブロックと一緒に共有されたテキストを暗号化します</string>
     <string name="share_target_decrypt_result_unknown_signer">キーリングにないキーで署名されています</string>
     <!-- 4.6.0 (item 16): SSH authentication -->
     <string name="ssh_cardop_body">PGPony はハードウェアキーの認証スロットで SSH ログインに署名します。カードの PIN を入力してから、キーをスマートフォンの背面にかざしてください。</string>

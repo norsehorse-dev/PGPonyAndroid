@@ -2134,8 +2134,6 @@
     <string name="share_target_action_verify_subtitle">查看签名者。此消息已签名，但未加密</string>
     <string name="share_target_action_sign">签名，或加密并签名</string>
     <string name="share_target_action_sign_subtitle">在 PGPony 的「加密」界面中打开此文本</string>
-    <string name="share_target_action_encrypt_other">加密其他文本</string>
-    <string name="share_target_action_encrypt_other_subtitle">加密与 PGP 块一同共享的文本</string>
     <string name="share_target_decrypt_result_unknown_signer">由不在你密钥环中的密钥签名</string>
     <!-- 4.6.0 (item 16): SSH authentication -->
     <string name="ssh_cardop_body">PGPony 将使用你硬件密钥的身份验证槽位为 SSH 登录签名。请输入卡 PIN，然后将密钥贴紧手机背面。</string>

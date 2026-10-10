@@ -2107,8 +2107,6 @@
     <string name="share_target_action_verify_subtitle">누가 서명했는지 확인합니다. 이 메시지는 서명만 되었고 암호화되지 않았습니다</string>
     <string name="share_target_action_sign">서명 또는 암호화 후 서명</string>
     <string name="share_target_action_sign_subtitle">이 텍스트를 PGPony 암호화 화면에서 엽니다</string>
-    <string name="share_target_action_encrypt_other">나머지 텍스트 암호화</string>
-    <string name="share_target_action_encrypt_other_subtitle">PGP 블록과 함께 공유된 텍스트를 암호화합니다</string>
     <string name="share_target_decrypt_result_unknown_signer">키링에 없는 키로 서명됨</string>
     <!-- 4.6.0 (item 16): SSH authentication -->
     <string name="ssh_cardop_body">PGPony가 하드웨어 키의 인증 슬롯으로 SSH 로그인에 서명합니다. 카드 PIN을 입력한 다음 키를 휴대폰 뒷면에 대세요.</string>

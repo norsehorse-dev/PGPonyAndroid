@@ -2143,8 +2143,6 @@
     <string name="share_target_action_verify_subtitle">Kimin imzaladığını görün. Bu mesaj imzalı, şifreli değil</string>
     <string name="share_target_action_sign">İmzala veya şifrele ve imzala</string>
     <string name="share_target_action_sign_subtitle">Bu metni PGPony\'nin Şifrele ekranında açın</string>
-    <string name="share_target_action_encrypt_other">Diğer metni şifrele</string>
-    <string name="share_target_action_encrypt_other_subtitle">PGP bloğuyla birlikte paylaşılan metni şifreleyin</string>
     <string name="share_target_decrypt_result_unknown_signer">Anahtarlığınızda bulunmayan bir anahtarla imzalandı</string>
     <!-- 4.6.0 (item 16): SSH authentication -->
     <string name="ssh_cardop_body">PGPony, donanım anahtarınızın kimlik doğrulama yuvasıyla bir SSH oturum açma işlemini imzalayacak. Kart PIN\'ini girin, ardından anahtarı telefonunuzun arkasına yaklaştırın.</string>

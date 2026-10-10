@@ -2154,10 +2154,11 @@
     <string name="share_target_action_import_encrypt_subtitle">Check its fingerprint, then tap Encrypt to this key</string>
     <string name="share_target_action_verify">Verify signature</string>
     <string name="share_target_action_verify_subtitle">See who signed it. This message is signed, not encrypted</string>
+    <!-- 4.7.0 (item 3, #58): replaces "Encrypt the other text". -->
+    <string name="share_target_action_encrypt_all">Encrypt all of it</string>
+    <string name="share_target_action_encrypt_all_subtitle">Open the whole shared text, PGP block included, on the Encrypt screen to trim and encrypt</string>
     <string name="share_target_action_sign">Sign, or encrypt and sign</string>
     <string name="share_target_action_sign_subtitle">Open this text on PGPony\'s Encrypt screen</string>
-    <string name="share_target_action_encrypt_other">Encrypt the other text</string>
-    <string name="share_target_action_encrypt_other_subtitle">Encrypt the text shared along with the PGP block</string>
     <string name="share_target_decrypt_result_unknown_signer">Signed by a key that is not in your keyring</string>
     <!-- 4.6.0 (item 16): SSH authentication -->
     <string name="ssh_cardop_body">PGPony will sign an SSH login with your hardware key\'s authentication slot. Enter the card PIN, then hold the key against the back of your phone.</string>

@@ -2161,8 +2161,6 @@
     <string name="share_target_action_verify_subtitle">Дізнайтеся, хто його підписав. Це повідомлення підписане, а не зашифроване</string>
     <string name="share_target_action_sign">Підписати або зашифрувати й підписати</string>
     <string name="share_target_action_sign_subtitle">Відкрити цей текст на екрані шифрування PGPony</string>
-    <string name="share_target_action_encrypt_other">Зашифрувати інший текст</string>
-    <string name="share_target_action_encrypt_other_subtitle">Зашифрувати текст, надісланий разом із блоком PGP</string>
     <string name="share_target_decrypt_result_unknown_signer">Підписано ключем, якого немає у вашій зв’язці ключів</string>
     <!-- 4.6.0 (item 16): SSH authentication -->
     <string name="ssh_cardop_body">PGPony підпише вхід через SSH за допомогою слота автентифікації вашого апаратного ключа. Введіть PIN картки, а потім прикладіть ключ до задньої панелі телефона.</string>

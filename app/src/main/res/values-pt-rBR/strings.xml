@@ -2053,8 +2053,6 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="share_target_action_verify_subtitle">Veja quem assinou. Esta mensagem está assinada, não criptografada</string>
     <string name="share_target_action_sign">Assinar, ou criptografar e assinar</string>
     <string name="share_target_action_sign_subtitle">Abrir este texto na tela Criptografar do PGPony</string>
-    <string name="share_target_action_encrypt_other">Criptografar o restante do texto</string>
-    <string name="share_target_action_encrypt_other_subtitle">Criptografar o texto compartilhado junto com o bloco PGP</string>
     <string name="share_target_decrypt_result_unknown_signer">Assinado por uma chave que não está no seu chaveiro</string>
     <!-- 4.6.0 (item 16): SSH authentication -->
     <string name="ssh_cardop_body">O PGPony vai assinar um login SSH com o slot de autenticação da sua chave de hardware. Digite o PIN do cartão e encoste a chave na parte de trás do celular.</string>

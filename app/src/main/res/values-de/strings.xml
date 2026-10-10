@@ -2053,8 +2053,6 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="share_target_action_verify_subtitle">Sehen, wer sie signiert hat. Diese Nachricht ist signiert, nicht verschlüsselt</string>
     <string name="share_target_action_sign">Signieren oder verschlüsseln und signieren</string>
     <string name="share_target_action_sign_subtitle">Diesen Text im Verschlüsseln-Bildschirm von PGPony öffnen</string>
-    <string name="share_target_action_encrypt_other">Den übrigen Text verschlüsseln</string>
-    <string name="share_target_action_encrypt_other_subtitle">Den Text verschlüsseln, der zusammen mit dem PGP-Block geteilt wurde</string>
     <string name="share_target_decrypt_result_unknown_signer">Signiert mit einem Schlüssel, der nicht in deinem Schlüsselbund ist</string>
     <!-- 4.6.0 (item 16): SSH authentication -->
     <string name="ssh_cardop_body">PGPony signiert eine SSH-Anmeldung mit dem Authentifizierungs-Slot deines Hardware-Schlüssels. Gib die Karten-PIN ein und halte den Schlüssel dann an die Rückseite deines Telefons.</string>
