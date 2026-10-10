@@ -65,7 +65,10 @@ enum class ImportMethod(val displayName: String) {
  */
 data class DuplicateImportOutcome(
     val fingerprint: String,
-    val keyName: String
+    val keyName: String,
+    /** 4.7.0 (item 24, #78): the existing row is your key pair, so the dialog
+     *  says why nothing from the import was applied. */
+    val isKeyPair: Boolean = false
 )
 
 data class KeyringUiState(
@@ -1101,7 +1104,8 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                         importPreview = null,
                         duplicateImportResult = DuplicateImportOutcome(
                             fingerprint = outcome.entity.fingerprint,
-                            keyName = name
+                            keyName = name,
+                            isKeyPair = outcome.entity.isKeyPair
                         )
                     )
                     loadKeys()
@@ -1109,7 +1113,10 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                 }
                 val message = when (outcome.resolution) {
                     ImportResolution.MERGED_NEW_MATERIAL ->
-                        PGPonyApp.instance.getString(R.string.import_result_merged)
+                        PGPonyApp.instance.getString(
+                            if (outcome.selfSignaturesApplied > 0) R.string.import_result_own_key_updated
+                            else R.string.import_result_merged
+                        )
                     ImportResolution.UPGRADED_TO_KEY_PAIR ->
                         PGPonyApp.instance.getString(R.string.keyring_status_key_upgraded)
                     else -> PGPonyApp.instance.getString(

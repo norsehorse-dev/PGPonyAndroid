@@ -492,7 +492,14 @@ fun KeyringScreen(
             onDismissRequest = { viewModel.dismissDuplicateAlert() },
             title = { Text(stringResource(R.string.import_duplicate_alert_title)) },
             text = {
-                Text(stringResource(R.string.import_duplicate_alert_body_format, dup.keyName))
+                Column {
+                    Text(stringResource(R.string.import_duplicate_alert_body_format, dup.keyName))
+                    if (dup.isKeyPair) {
+                        // 4.7.0 (item 24, #78).
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(stringResource(R.string.import_duplicate_own_key_note))
+                    }
+                }
             },
             confirmButton = {
                 TextButton(

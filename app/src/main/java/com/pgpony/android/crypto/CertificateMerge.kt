@@ -14,9 +14,15 @@
 //     new subkey, a new User ID (unless the user removed it, see
 //     RemovedUserIdStore) and any new signature are added.
 //   * Key pairs: the local copy is authoritative. A fetched copy contributes
-//     only revocations (0x20 on the primary, 0x28 on subkeys, 0x30 on User
-//     IDs) and third-party certifications on User IDs already present. It
-//     never adds or changes self-certifications, User IDs, subkeys or expiry.
+//     revocations (0x20 on the primary, 0x28 on subkeys, 0x30 on User IDs),
+//     third-party certifications on User IDs already present, and (4.7.0
+//     item 24, #78) self-signatures newer than every local one of the same
+//     kind on a component already present: a direct-key signature (0x1F), a
+//     User ID certification (0x10 to 0x13) or a subkey binding (0x18). The
+//     fetched copy is sanitized first, so each of those verifies against the
+//     primary and can only come from the key's owner (a preference change or
+//     a SHA-512 rebinding in gpg, say). A replayed older one is ignored. It
+//     never adds User IDs or subkeys.
 //
 // Packet identity: key packets by fingerprint, User IDs and attributes by
 // their bytes, signatures by their bytes (a re-encoded copy of the same
@@ -35,6 +41,8 @@ object CertificateMerge {
 
     private const val SIG_CERT_GENERIC = 0x10
     private const val SIG_CERT_POSITIVE = 0x13
+    private const val SIG_SUBKEY_BINDING = 0x18
+    private const val SIG_DIRECT_KEY = 0x1F
     private const val SIG_KEY_REVOCATION = 0x20
     private const val SIG_SUBKEY_REVOCATION = 0x28
     private const val SIG_CERT_REVOCATION = 0x30
@@ -50,14 +58,32 @@ object CertificateMerge {
         fetched: ByteArray,
         isKeyPair: Boolean,
         removedUserIds: Set<String> = emptySet()
-    ): ByteArray {
+    ): ByteArray = mergeDetailed(stored, fetched, isKeyPair, removedUserIds).bytes
+
+    /** 4.7.0 (item 24): the merged octets and how many newer self-signatures
+     *  of a key pair's owner were taken from the fetched copy. */
+    data class MergeResult(val bytes: ByteArray, val selfSignaturesApplied: Int)
+
+    fun mergeDetailed(
+        stored: ByteArray,
+        fetched: ByteArray,
+        isKeyPair: Boolean,
+        removedUserIds: Set<String> = emptySet()
+    ): MergeResult {
+        val unchanged = MergeResult(stored, 0)
         // A primary this app cannot verify gets no remote changes at all:
         // nothing from the fetched copy could be checked.
-        if (CertificateBindings.analyze(stored)?.supported != true) return stored
-        val local = CertificateBindings.parse(CertificateBindings.sanitized(stored)) ?: return stored
-        val remote = CertificateBindings.parse(CertificateBindings.sanitized(fetched)) ?: return stored
-        if (!local.primary.fingerprint.contentEquals(remote.primary.fingerprint)) return stored
+        if (CertificateBindings.analyze(stored)?.supported != true) return unchanged
+        val local = CertificateBindings.parse(CertificateBindings.sanitized(stored)) ?: return unchanged
+        val remote = CertificateBindings.parse(CertificateBindings.sanitized(fetched)) ?: return unchanged
+        if (!local.primary.fingerprint.contentEquals(remote.primary.fingerprint)) return unchanged
         val primary = local.primary
+        var selfApplied = 0
+
+        fun createdOf(b: ByteArray): Long = CertificateBindings.sigOrNull(b)?.createdMs ?: Long.MIN_VALUE
+
+        /** Same kind of self-signature for the newest-wins rule. */
+        fun selfKind(t: Int): Int = if (t in SIG_CERT_GENERIC..SIG_CERT_POSITIVE) SIG_CERT_GENERIC else t
 
         fun sigKey(b: ByteArray): String {
             val s = CertificateBindings.sigOrNull(b) ?: return "raw:" + b.contentHashCode()
@@ -76,6 +102,20 @@ object CertificateMerge {
 
         fun typeOf(b: ByteArray): Int = CertificateBindings.sigOrNull(b)?.type ?: -1
 
+        /**
+         * 4.7.0 (item 24): [b] is an owner self-signature of one of [kinds],
+         * made after every local self-signature of the same kind in [localSigs].
+         */
+        fun newerSelf(b: ByteArray, localSigs: List<ByteArray>, kinds: Set<Int>): Boolean {
+            val t = typeOf(b)
+            if (t !in kinds || !isSelf(b)) return false
+            val kind = selfKind(t)
+            val newestLocal = localSigs
+                .filter { isSelf(it) && selfKind(typeOf(it)) == kind }
+                .maxOfOrNull { createdOf(it) } ?: Long.MIN_VALUE
+            return createdOf(b) > newestLocal
+        }
+
         fun addSigs(into: MutableList<ByteArray>, from: List<ByteArray>, allow: (ByteArray) -> Boolean) {
             val seen = into.mapTo(HashSet()) { sigKey(it) }
             for (b in from) {
@@ -90,7 +130,9 @@ object CertificateMerge {
         // Primary-level signatures (direct-key, key revocation).
         val primarySigs = local.primarySigs.toMutableList()
         addSigs(primarySigs, remote.primarySigs) { b ->
-            if (isKeyPair) typeOf(b) == SIG_KEY_REVOCATION else true
+            if (!isKeyPair) return@addSigs true
+            if (typeOf(b) == SIG_KEY_REVOCATION) return@addSigs true
+            newerSelf(b, local.primarySigs, setOf(SIG_DIRECT_KEY)).also { if (it) selfApplied++ }
         }
         primarySigs.forEach { out.write(CertificateBindings.frame(TAG_SIGNATURE, it)) }
         local.primaryOther.forEach { out.write(CertificateBindings.frame(it.tag, it.body)) }
@@ -119,9 +161,13 @@ object CertificateMerge {
                     addSigs(sigs, r.sigs) { b ->
                         if (!isKeyPair) return@addSigs true
                         val t = typeOf(b)
-                        if (wantSubkeys) t == SIG_SUBKEY_REVOCATION
+                        val revocationOrThirdParty = if (wantSubkeys) t == SIG_SUBKEY_REVOCATION
                         else t == SIG_CERT_REVOCATION ||
                             (!isSelf(b) && t in SIG_CERT_GENERIC..SIG_CERT_POSITIVE)
+                        if (revocationOrThirdParty) return@addSigs true
+                        val kinds = if (wantSubkeys) setOf(SIG_SUBKEY_BINDING)
+                        else (SIG_CERT_GENERIC..SIG_CERT_POSITIVE).toSet()
+                        newerSelf(b, c.sigs, kinds).also { if (it) selfApplied++ }
                     }
                 }
                 writeComponent(out, c, sigs)
@@ -136,7 +182,7 @@ object CertificateMerge {
                 }
             }
         }
-        return out.toByteArray()
+        return MergeResult(out.toByteArray(), selfApplied)
     }
 
     private fun writeComponent(out: ByteArrayOutputStream, c: CertificateBindings.Component, sigs: List<ByteArray>) {

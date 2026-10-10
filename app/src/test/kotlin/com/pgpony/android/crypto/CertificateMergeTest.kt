@@ -86,6 +86,61 @@ class CertificateMergeTest {
         assertTrue("revocation arrives", CertificateBindings.analyze(m2)!!.primaryRevoked)
     }
 
+    /** The public ring of [sec] with its first User ID re-certified at [at], preferring [hashes]. */
+    private fun recertified(sec: PGPSecretKeyRing, at: Date, hashes: IntArray, base: ByteArray? = null): ByteArray {
+        val sk = sec.secretKey
+        val uid = sk.publicKey.userIDs.next()
+        val g = PGPSignatureGenerator(BcPGPContentSignerBuilder(sk.publicKey.algorithm, HashAlgorithmTags.SHA512), sk.publicKey)
+        g.init(PGPSignature.POSITIVE_CERTIFICATION, sk.extractPrivateKey(null))
+        g.setHashedSubpackets(PGPSignatureSubpacketGenerator().apply {
+            setSignatureCreationTime(false, at)
+            setIssuerFingerprint(false, sk.publicKey)
+            setPreferredHashAlgorithms(false, hashes)
+        }.generate())
+        val cert = g.generateCertification(uid, sk.publicKey)
+        val pubRing = base?.let { pub(it) } ?: PGPPublicKeyRing(sec.publicKeys.asSequence().toList())
+        return PGPPublicKeyRing.insertPublicKey(pubRing, PGPPublicKey.addCertification(pubRing.publicKey, uid, cert)).encoded
+    }
+
+    private fun newestCertPrefs(raw: ByteArray): List<Int> {
+        val key = pub(raw).publicKey
+        val uid = key.userIDs.next()
+        val newest = key.getSignaturesForID(uid).asSequence().maxBy { it.creationTime.time }
+        return newest.hashedSubPackets.preferredHashAlgorithms?.toList().orEmpty()
+    }
+
+    @Test
+    fun `a key pair takes its owner's newer self-certification (#78)`() {
+        val k = gen("Erin <erin@pgpony.app>")
+        val sec = secret(k)
+        val edited = recertified(sec, Date(System.currentTimeMillis() + 5_000L), intArrayOf(HashAlgorithmTags.SHA512))
+        val result = CertificateMerge.mergeDetailed(k.publicKeyData, edited, isKeyPair = true)
+        assertEquals(1, result.selfSignaturesApplied)
+        assertEquals(listOf(HashAlgorithmTags.SHA512), newestCertPrefs(result.bytes))
+        assertEquals(uids(k.publicKeyData), uids(result.bytes))
+    }
+
+    @Test
+    fun `a replayed older self-certification is ignored`() {
+        val k = gen("Finn <finn@pgpony.app>")
+        val sec = secret(k)
+        val now = System.currentTimeMillis()
+        val older = recertified(sec, Date(now + 5_000L), intArrayOf(HashAlgorithmTags.SHA256))
+        val local = recertified(sec, Date(now + 10_000L), intArrayOf(HashAlgorithmTags.SHA512))
+        val result = CertificateMerge.mergeDetailed(local, older, isKeyPair = true)
+        assertEquals(0, result.selfSignaturesApplied)
+        assertEquals(listOf(HashAlgorithmTags.SHA512), newestCertPrefs(result.bytes))
+    }
+
+    @Test
+    fun `a key pair keeps a User ID a server copy stripped`() {
+        val k = gen("Gale <gale@pgpony.app>")
+        val local = withUid(secret(k), "Gale Work <gale@work.example>")
+        val result = CertificateMerge.mergeDetailed(local, k.publicKeyData, isKeyPair = true)
+        assertEquals(0, result.selfSignaturesApplied)
+        assertEquals(uids(local), uids(result.bytes))
+    }
+
     @Test
     fun `a User ID the primary never certified does not arrive`() {
         val k = gen("Dan <dan@pgpony.app>")

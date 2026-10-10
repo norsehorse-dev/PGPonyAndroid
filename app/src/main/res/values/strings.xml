@@ -727,6 +727,9 @@
     <string name="import_duplicate_view_key">View Key</string>
     <string name="import_result_merged">This key was already in your keyring. It has been updated with the newer key material.</string>
     <string name="import_result_already_in_keyring">This key is already in your keyring.</string>
+    <!-- 4.7.0 (item 24, #78): re-importing your own key pair edited elsewhere. -->
+    <string name="import_result_own_key_updated">Your key pair was updated with the newer self-signatures in this copy (preferences, expiry or bindings).</string>
+    <string name="import_duplicate_own_key_note">This is your key pair. An import only adds self-signatures newer than the ones you have, and this copy has none.</string>
 
     <!-- ── Confirm/cancel buttons (preview card) ────────────────────── -->
     <string name="import_button_upgrade_key">Upgrade Key</string>

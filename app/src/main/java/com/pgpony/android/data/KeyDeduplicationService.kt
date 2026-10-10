@@ -64,6 +64,14 @@ class KeyDeduplicationService(
         MERGED_NEW_MATERIAL
     }
 
+    /** 4.7.0 (item 24): [resolveDuplicateDetailed]'s outcome, with the number of
+     *  the owner's newer self-signatures applied to a key pair (0 otherwise). */
+    data class Resolved(
+        val entity: PGPKeyEntity,
+        val resolution: DuplicateResolution,
+        val selfSignaturesApplied: Int = 0
+    )
+
     companion object {
         /** Run-once flag for the duplicate-collapse sweep. */
         const val SWEEP_FLAG_KEY = "pgpony_4_0_dedupe_sweep_done_r2"
@@ -130,18 +138,30 @@ class KeyDeduplicationService(
         newPublicRing: PGPPublicKeyRing,
         newArmoredPublicKey: String?,
         newExpiresAtMs: Long?
-    ): Pair<PGPKeyEntity, DuplicateResolution> {
+    ): Pair<PGPKeyEntity, DuplicateResolution> =
+        resolveDuplicateDetailed(existing, newPublicRing, newArmoredPublicKey, newExpiresAtMs)
+            .let { it.entity to it.resolution }
+
+    suspend fun resolveDuplicateDetailed(
+        existing: PGPKeyEntity,
+        newPublicRing: PGPPublicKeyRing,
+        newArmoredPublicKey: String?,
+        newExpiresAtMs: Long?
+    ): Resolved {
         val fetchedBytes = newPublicRing.encoded
         val stored = store.loadPublicKey(existing.fingerprint)
         // 4.6.0 (items 17.1 and 12): a verified union of the stored and fetched
         // copies, not a replacement. See CertificateMerge.
+        var selfApplied = 0
         val newBytes = if (stored != null && stored.isNotEmpty()) {
-            com.pgpony.android.crypto.CertificateMerge.merge(
+            val result = com.pgpony.android.crypto.CertificateMerge.mergeDetailed(
                 stored = stored,
                 fetched = fetchedBytes,
                 isKeyPair = existing.isKeyPair,
                 removedUserIds = RemovedUserIdStore.removed(existing.fingerprint)
             )
+            selfApplied = if (existing.isKeyPair) result.selfSignaturesApplied else 0
+            result.bytes
         } else {
             com.pgpony.android.crypto.CertificateBindings.sanitized(fetchedBytes)
         }
@@ -149,13 +169,16 @@ class KeyDeduplicationService(
             (newBytes.contentEquals(stored) ||
                 newBytes.contentEquals(com.pgpony.android.crypto.CertificateBindings.sanitized(stored)))
         ) {
-            return existing to DuplicateResolution.ALREADY_IN_KEYRING
+            return Resolved(existing, DuplicateResolution.ALREADY_IN_KEYRING)
         }
         // item 24 guard: never let a fetched copy strip or shorten a primary
         // expiry the stored key already has. A published revocation is scanned
         // separately upstream (KeyRefreshService), so this does not suppress one.
-        if (isExpiryDowngrade(existing.expiresAt, newExpiresAtMs)) {
-            return existing to DuplicateResolution.ALREADY_IN_KEYRING
+        // 4.7.0 (item 24): when the owner's newer self-signatures were applied
+        // to a key pair, the expiry they set is the owner's choice and is read
+        // from the merged certificate below, so the guard does not apply.
+        if (selfApplied == 0 && isExpiryDowngrade(existing.expiresAt, newExpiresAtMs)) {
+            return Resolved(existing, DuplicateResolution.ALREADY_IN_KEYRING)
         }
         // The cached armor and expiry follow the merged certificate, not the
         // fetched copy. Key pairs keep their own expiry (local is authoritative).
@@ -168,6 +191,8 @@ class KeyDeduplicationService(
             runCatching { com.pgpony.android.crypto.PGPCryptoService.shared.exportArmoredPublicKey(it) }.getOrNull()
         } ?: newArmoredPublicKey
         val unionExpiresAt = when {
+            existing.isKeyPair && selfApplied > 0 ->
+                com.pgpony.android.crypto.CertificateBindings.analyze(newBytes)?.primaryExpiresAtMs
             existing.isKeyPair -> existing.expiresAt
             unionRing != null -> unionRing.publicKey.validSeconds.takeIf { it > 0 }?.let {
                 unionRing.publicKey.creationTime.time + it * 1000L
@@ -180,7 +205,8 @@ class KeyDeduplicationService(
             armoredPublicKey = unionArmored,
             expiresAtMs = unionExpiresAt
         )
-        return merged to DuplicateResolution.MERGED_NEW_MATERIAL
+        if (selfApplied > 0) updateSecretRingPublicParts(existing.fingerprint, newBytes)
+        return Resolved(merged, DuplicateResolution.MERGED_NEW_MATERIAL, selfApplied)
     }
 
     /**
@@ -215,6 +241,25 @@ class KeyDeduplicationService(
         )
         dao.update(merged)
         return merged
+    }
+
+    /**
+     * 4.7.0 (item 24, #78): carry the owner's newer self-signatures into the
+     * stored secret ring as well, so a key pair export or backup holds them.
+     * Each secret key keeps its secret material; only its public part (User
+     * IDs and signatures) is taken from [publicBytes]. A secret ring Bouncy
+     * Castle cannot read (a composite key) is left as it is; its public copy
+     * still carries the update.
+     */
+    private fun updateSecretRingPublicParts(fingerprint: String, publicBytes: ByteArray) {
+        runCatching {
+            val secretBytes = store.loadPrivateKey(fingerprint) ?: return
+            val calc = org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator()
+            val secretRing = org.bouncycastle.openpgp.PGPSecretKeyRing(secretBytes, calc)
+            val publicRing = PGPPublicKeyRing(publicBytes, calc)
+            val updated = org.bouncycastle.openpgp.PGPSecretKeyRing.replacePublicKeys(secretRing, publicRing)
+            store.storePrivateKey(fingerprint, updated.encoded)
+        }.onFailure { Log.w(TAG, "secret ring self-signature update skipped: ${it.message}") }
     }
 
     // ── One-time certificate re-validation (4.6.0 item 17.1) ──────────

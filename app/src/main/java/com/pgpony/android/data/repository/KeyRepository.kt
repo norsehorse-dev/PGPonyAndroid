@@ -154,7 +154,10 @@ enum class ImportResolution {
 /** Entity + resolution pair returned by [KeyRepository.importArmoredKeyDetailed]. */
 data class ImportOutcome(
     val entity: PGPKeyEntity,
-    val resolution: ImportResolution
+    val resolution: ImportResolution,
+    /** 4.7.0 (item 24, #78): newer self-signatures of a key pair's owner taken
+     *  from the import (preferences, expiry or bindings changed elsewhere). */
+    val selfSignaturesApplied: Int = 0
 )
 
 class KeyRepository(
@@ -918,12 +921,14 @@ class KeyRepository(
                 val validSec = key.getValidSeconds()
                 if (validSec > 0) (key.creationTime.time + validSec * 1000) else null
             }
-            val (resolved, resolution) = dedup.resolveDuplicate(
+            val detailed = dedup.resolveDuplicateDetailed(
                 existing = existing,
                 newPublicRing = dupPub,
                 newArmoredPublicKey = crypto.exportArmoredPublicKey(dupPub),
                 newExpiresAtMs = dupExpiresAtMs
             )
+            val resolved = detailed.entity
+            val resolution = detailed.resolution
             return ImportOutcome(
                 resolved,
                 when (resolution) {
@@ -931,7 +936,8 @@ class KeyRepository(
                         ImportResolution.ALREADY_IN_KEYRING
                     KeyDeduplicationService.DuplicateResolution.MERGED_NEW_MATERIAL ->
                         ImportResolution.MERGED_NEW_MATERIAL
-                }
+                },
+                selfSignaturesApplied = detailed.selfSignaturesApplied
             )
         }
 
