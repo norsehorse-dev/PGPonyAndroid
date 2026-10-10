@@ -11,8 +11,9 @@ package com.pgpony.android.crypto.card
 sealed class OpenPgpCardException(message: String, cause: Throwable? = null) :
     Exception(message, cause) {
 
-    /** SELECT failed or the AID isn't an OpenPGP application. */
-    class NotAnOpenPgpCard(message: String = "This card is not an OpenPGP card") :
+    /** SELECT failed or the AID isn't an OpenPGP application. [sw] is the
+     *  status word SELECT returned, when it got that far. */
+    class NotAnOpenPgpCard(message: String = "This card is not an OpenPGP card", val sw: Int? = null) :
         OpenPgpCardException(message)
 
     /** Tag/IO error while talking to the card (link dropped, removed mid-op). */

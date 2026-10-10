@@ -2548,6 +2548,10 @@
     <string name="err_secret_mpi_truncated">secret MPI truncated</string>
     <string name="err_security_key_was_disconnected_plug_back">The security key was disconnected. Plug it back in and try again.</string>
     <string name="err_select_openpgp_application_failed">SELECT OpenPGP application failed (%1$s)</string>
+    <!-- 4.7.0 (item 29, #43). -->
+    <!-- 4.7.0 (item 23): a composite signed message that streamed in the wrong shape. -->
+    <string name="err_malformed_signed_message">The signed message is malformed and was not opened.</string>
+    <string name="err_nfc_openpgp_unavailable">This key did not open its OpenPGP application over NFC. Some keys, the Nitrokey 3 among them, turn OpenPGP off over NFC. If your key has USB, plug it in and try again.</string>
     <string name="err_session_key_block_too_short">session key block too short</string>
     <string name="err_session_key_checksum_mismatch">session key checksum mismatch</string>
     <string name="err_short_form_apdu_data_limited_255">Short-form APDU data limited to 255 bytes (was %1$s). Use command chaining or set extended = true for larger payloads.</string>

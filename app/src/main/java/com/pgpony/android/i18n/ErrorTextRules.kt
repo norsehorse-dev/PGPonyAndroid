@@ -224,6 +224,8 @@ internal object ErrorTextRules {
             ErrorText.Rule("""\Qcommand not supported by this reader\E""", R.string.err_command_not_supported_by_reader),
             ErrorText.Rule("""\QWrong PIN \E\u2014\Q \E(\d+)\Q \E(?:try|tries)\Q remaining\E""", R.string.err_wrong_pin_remaining),
             ErrorText.Rule("""\QSELECT OpenPGP application failed (\E(.*?)\Q)\E""", R.string.err_select_openpgp_application_failed),
+            ErrorText.Rule("""\QThis key did not open its OpenPGP application over NFC. Some keys, the Nitrokey 3 among them, turn OpenPGP off over NFC. If your key has USB, plug it in and try again.\E""", R.string.err_nfc_openpgp_unavailable),
+            ErrorText.Rule("""\QMalformed signed message\E""", R.string.err_malformed_signed_message),
             ErrorText.Rule("""\QIncorrect passphrase for signing key\E""", R.string.err_incorrect_passphrase_signing_key),
             ErrorText.Rule("""\QPrivate key material for \E(.*?)\Q is missing\E""", R.string.err_private_key_material_missing),
             ErrorText.Rule("""\QPassphrase is required for this key\E""", R.string.err_passphrase_required_key),

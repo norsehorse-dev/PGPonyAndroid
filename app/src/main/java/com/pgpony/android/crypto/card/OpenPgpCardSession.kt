@@ -114,7 +114,8 @@ class OpenPgpCardSession(private val transport: CardTransport) {
         val resp = transmit(cmd, throwOnError = false)
         if (!resp.isSuccess) {
             throw OpenPgpCardException.NotAnOpenPgpCard(
-                "SELECT OpenPGP application failed (${resp.swHex()})"
+                "SELECT OpenPGP application failed (${resp.swHex()})",
+                sw = resp.sw
             )
         }
     }

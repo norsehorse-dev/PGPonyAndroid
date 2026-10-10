@@ -225,6 +225,8 @@ class ErrorTextTest {
         "command not supported by this reader" to R.string.err_command_not_supported_by_reader,
         "Wrong PIN \u2014 2 tries remaining" to R.string.err_wrong_pin_remaining,
         "SELECT OpenPGP application failed (7)" to R.string.err_select_openpgp_application_failed,
+        "This key did not open its OpenPGP application over NFC. Some keys, the Nitrokey 3 among them, turn OpenPGP off over NFC. If your key has USB, plug it in and try again." to R.string.err_nfc_openpgp_unavailable,
+        "Malformed signed message" to R.string.err_malformed_signed_message,
         "Incorrect passphrase for signing key" to R.string.err_incorrect_passphrase_signing_key,
         "Private key material for 7 is missing" to R.string.err_private_key_material_missing,
         "Passphrase is required for this key" to R.string.err_passphrase_required_key,

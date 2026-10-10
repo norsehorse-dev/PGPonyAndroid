@@ -2620,7 +2620,7 @@ class PGPCryptoService private constructor() {
         val streamed = try {
             com.pgpony.android.crypto.pqc.CompositeInlineStreamReader.read(bin) { b, off, len -> sink.write(b, off, len) }
         } catch (e: com.pgpony.android.crypto.pqc.CompositeInlineStreamReader.Malformed) {
-            throw PGPCryptoError.DecryptionFailed("Malformed signed message: ${e.message}")
+            throw PGPCryptoError.DecryptionFailed("Malformed signed message")
         }
         return DecryptStreamResult(
             bytesWritten = streamed.bytesWritten,
