@@ -34,6 +34,11 @@ object CompositeInlineStreamReader {
     /** Larger than any composite signature or one-pass packet (ML-DSA-87 included). */
     private const val MAX_SMALL_PACKET = 1 shl 20
     private const val MAX_SIGNATURE_PACKETS = 32
+    private const val MAX_ONE_PASS_PACKETS = 32
+    /** Every octet outside the literal content (one-pass, signature, marker
+     *  and padding packets) counts against this, so a crafted compressed
+     *  packet cannot spin on padding or pile up one-pass hashers. */
+    private const val MAX_NON_LITERAL_BYTES = 4L shl 20
 
     /** The message does not have the shape of a composite inline message. */
     class Malformed(msg: String) : Exception(msg)
@@ -66,7 +71,7 @@ object CompositeInlineStreamReader {
             val algo = body.read()
             packets = when (algo) {
                 0 -> body
-                1 -> java.util.zip.InflaterInputStream(body, java.util.zip.Inflater(true), 1 shl 16)
+                1 -> ZipInflaterStream(body)
                 2 -> java.util.zip.InflaterInputStream(body, java.util.zip.Inflater(false), 1 shl 16)
                 3 -> org.bouncycastle.apache.bzip2.CBZip2InputStream(body)
                 else -> throw Malformed("unknown compression algorithm $algo")
@@ -76,6 +81,11 @@ object CompositeInlineStreamReader {
             packets = input
         }
 
+        var nonLiteral = 0L
+        fun charge(n: Long) {
+            nonLiteral += n
+            if (nonLiteral > MAX_NON_LITERAL_BYTES) throw Malformed("too much data outside the literal")
+        }
         val onePass = ArrayList<ByteArray>()
         val hashers = ArrayList<Pair<ByteArray, ContentHasher>>()
         var header: Header? = first
@@ -83,11 +93,13 @@ object CompositeInlineStreamReader {
         while (header != null && header.tag != TAG_LITERAL) {
             when (header.tag) {
                 TAG_OPS -> {
+                    if (onePass.size >= MAX_ONE_PASS_PACKETS) throw Malformed("too many one-pass signatures")
                     val body = BodyStream(packets, header).readAllCapped(MAX_SMALL_PACKET)
+                    charge(body.size.toLong())
                     onePass.add(body)
                     hasherFor(body)?.let { hashers.add(body to it) }
                 }
-                TAG_MARKER, TAG_PADDING -> BodyStream(packets, header).skipAll()
+                TAG_MARKER, TAG_PADDING -> charge(BodyStream(packets, header).skipAll())
                 else -> throw Malformed("unexpected packet ${header.tag} before the literal")
             }
             header = Header.read(packets)
@@ -119,16 +131,18 @@ object CompositeInlineStreamReader {
             when (h.tag) {
                 TAG_SIGNATURE -> {
                     if (sigs.size >= MAX_SIGNATURE_PACKETS) throw Malformed("too many signatures")
-                    sigs.add(BodyStream(packets, h).readAllCapped(MAX_SMALL_PACKET))
+                    val body = BodyStream(packets, h).readAllCapped(MAX_SMALL_PACKET)
+                    charge(body.size.toLong())
+                    sigs.add(body)
                 }
-                TAG_MARKER, TAG_PADDING -> BodyStream(packets, h).skipAll()
+                TAG_MARKER, TAG_PADDING -> charge(BodyStream(packets, h).skipAll())
                 else -> throw Malformed("unexpected packet ${h.tag} after the literal")
             }
         }
         if (sigs.isEmpty()) throw Malformed("no signature after the literal")
         if (compressedBody != null) {
             // Nothing may follow the compressed packet.
-            compressedBody.skipAll()
+            if (compressedBody.skipAll() > MAX_NON_LITERAL_BYTES) throw Malformed("data after the compressed content")
             if (Header.read(input) != null) throw Malformed("data after the compressed packet")
         }
 
@@ -267,6 +281,26 @@ object CompositeInlineStreamReader {
         }
     }
 
+    /**
+     * ZIP (raw DEFLATE) with the one dummy octet at the end of input that
+     * java.util.zip.Inflater needs in nowrap mode, as Bouncy Castle's
+     * PGPCompressedData supplies; without it a valid stream can end in EOFException.
+     */
+    private class ZipInflaterStream(input: InputStream) :
+        java.util.zip.InflaterInputStream(input, java.util.zip.Inflater(true), 1 shl 16) {
+        private var eof = false
+        override fun fill() {
+            if (eof) throw java.io.EOFException("Unexpected end of ZIP input stream")
+            len = `in`.read(buf, 0, buf.size)
+            if (len == -1) {
+                buf[0] = 0
+                len = 1
+                eof = true
+            }
+            inf.setInput(buf, 0, len)
+        }
+    }
+
     /** A packet body, partial chunks included, as a stream. */
     private class BodyStream(private val input: InputStream, header: Header) : InputStream() {
         private var remaining = header.length
@@ -333,9 +367,17 @@ object CompositeInlineStreamReader {
             return out.toByteArray()
         }
 
-        fun skipAll() {
+        /** Skip to the end of the body, at most [MAX_NON_LITERAL_BYTES] + 1
+         *  octets; returns how many were skipped. */
+        fun skipAll(): Long {
             val buf = ByteArray(8192)
-            while (read(buf, 0, buf.size) >= 0) { }
+            var total = 0L
+            while (total <= MAX_NON_LITERAL_BYTES) {
+                val n = read(buf, 0, buf.size)
+                if (n < 0) break
+                total += n
+            }
+            return total
         }
     }
 }

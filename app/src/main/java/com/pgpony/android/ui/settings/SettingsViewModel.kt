@@ -481,12 +481,15 @@ class SettingsViewModel(
             try {
                 // 4.7.0 (item 33): live keys and Recently Deleted together,
                 // then the whole secure store.
-                repo.clearAllKeys()
-                // Provider and SSH approvals (allowed_api_clients) and
-                // Autocrypt peers lived on after the reset too. Clear every
-                // table so the database matches a fresh install.
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    PGPonyApp.instance.database.clearAllTables()
+                try {
+                    repo.clearAllKeys()
+                } finally {
+                    // Provider and SSH approvals (allowed_api_clients) and
+                    // Autocrypt peers lived on after the reset too. Clear every
+                    // table so the database matches a fresh install.
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        PGPonyApp.instance.database.clearAllTables()
+                    }
                 }
                 // RC5 (Kevin): reinstall semantics. Wipe the whole prefs
                 // file — onboarding_completed, biometric_lock, theme,

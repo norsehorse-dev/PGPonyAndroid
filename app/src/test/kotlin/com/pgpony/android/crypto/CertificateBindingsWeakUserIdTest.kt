@@ -49,6 +49,32 @@ class CertificateBindingsWeakUserIdTest {
         return g.generateCertification(uid, pair.publicKey)
     }
 
+    private fun certifyId(pair: PGPKeyPair, id: String, hash: Int, created: Date): PGPSignature {
+        val g = PGPSignatureGenerator(BcPGPContentSignerBuilder(pair.publicKey.algorithm, hash), pair.publicKey)
+        g.init(PGPSignature.POSITIVE_CERTIFICATION, pair.privateKey)
+        g.setHashedSubpackets(PGPSignatureSubpacketGenerator().apply {
+            setSignatureCreationTime(false, created)
+            setKeyFlags(false, KeyFlags.CERTIFY_OTHER)
+            setIssuerFingerprint(false, pair.publicKey)
+        }.generate())
+        return g.generateCertification(id, pair.publicKey)
+    }
+
+    @Test
+    fun `a weak-only User ID does not speak for the primary when an accepted one exists`() {
+        val pair = ed25519Pair()
+        val now = System.currentTimeMillis()
+        val second = "Second <second@pgpony.app>"
+        var key: PGPPublicKey = pair.publicKey
+        key = PGPPublicKey.addCertification(key, uid, certify(pair, HashAlgorithmTags.SHA256, Date(now - 60_000L), 0))
+        key = PGPPublicKey.addCertification(key, second, certifyId(pair, second, HashAlgorithmTags.SHA1, Date(now - 1_000L)))
+        val r = CertificateBindings.analyze(PGPPublicKeyRing(listOf(key)).encoded)!!
+        assertEquals(setOf(second), r.weakUserIds)
+        val active = r.activePrimarySig(now)
+        assertNotNull(active)
+        assertFalse("the SHA-256 certification is the one in force", active!!.weakHash)
+    }
+
     private fun ring(pair: PGPKeyPair, vararg sigs: PGPSignature): ByteArray {
         var key: PGPPublicKey = pair.publicKey
         for (s in sigs) key = PGPPublicKey.addCertification(key, uid, s)

@@ -106,15 +106,28 @@ object CertificateMerge {
          * 4.7.0 (item 24): [b] is an owner self-signature of one of [kinds],
          * made after every local self-signature of the same kind in [localSigs].
          */
-        fun newerSelf(b: ByteArray, localSigs: List<ByteArray>, kinds: Set<Int>): Boolean {
+        fun newerSelf(b: ByteArray, localSigs: List<ByteArray>, kinds: Set<Int>, sameKindOnly: Boolean = true): Boolean {
             val t = typeOf(b)
             if (t !in kinds || !isSelf(b)) return false
+            val sig = CertificateBindings.sigOrNull(b) ?: return false
+            val created = sig.createdMs ?: return false
+            // A weak-hash certification never wins over the local copy (analyze
+            // would not use it), and one dated in the future would win over
+            // every later local edit.
+            if (SignaturePolicy.isWeakCertificationDigest(sig.hashAlg, created)) return false
+            if (SignaturePolicy.isFromTheFuture(java.util.Date(created))) return false
             val kind = selfKind(t)
             val newestLocal = localSigs
-                .filter { isSelf(it) && selfKind(typeOf(it)) == kind }
+                .filter { isSelf(it) && (!sameKindOnly || selfKind(typeOf(it)) == kind) }
                 .maxOfOrNull { createdOf(it) } ?: Long.MIN_VALUE
-            return createdOf(b) > newestLocal
+            return created > newestLocal
         }
+
+        // A direct-key signature competes with the User ID certifications for
+        // the primary's state, so it must be newer than all of them.
+        val localPrimarySelfSigs = local.primarySigs + local.components
+            .filter { !CertificateBindings.isSubkeyTag(it.tag) }
+            .flatMap { c -> c.sigs.filter { typeOf(it) in SIG_CERT_GENERIC..SIG_CERT_POSITIVE } }
 
         fun addSigs(into: MutableList<ByteArray>, from: List<ByteArray>, allow: (ByteArray) -> Boolean) {
             val seen = into.mapTo(HashSet()) { sigKey(it) }
@@ -132,7 +145,7 @@ object CertificateMerge {
         addSigs(primarySigs, remote.primarySigs) { b ->
             if (!isKeyPair) return@addSigs true
             if (typeOf(b) == SIG_KEY_REVOCATION) return@addSigs true
-            newerSelf(b, local.primarySigs, setOf(SIG_DIRECT_KEY)).also { if (it) selfApplied++ }
+            newerSelf(b, localPrimarySelfSigs, setOf(SIG_DIRECT_KEY), sameKindOnly = false).also { if (it) selfApplied++ }
         }
         primarySigs.forEach { out.write(CertificateBindings.frame(TAG_SIGNATURE, it)) }
         local.primaryOther.forEach { out.write(CertificateBindings.frame(it.tag, it.body)) }

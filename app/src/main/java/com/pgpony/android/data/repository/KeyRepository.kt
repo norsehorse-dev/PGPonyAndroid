@@ -1673,9 +1673,13 @@ class KeyRepository(
      * Purges live and binned keys alike, then wipes the secure store wholesale.
      */
     suspend fun clearAllKeys() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        dao.getAllKeys().forEach { deleteKey(it) }
-        dao.getDeletedKeys().forEach { purgeKey(it) }
-        store.wipeAll()
+        try {
+            dao.getAllKeys().forEach { deleteKey(it) }
+            dao.getDeletedKeys().forEach { purgeKey(it) }
+        } finally {
+            // Whatever a single delete did, the store goes.
+            store.wipeAll()
+        }
     }
 
     /** Empty the bin. */

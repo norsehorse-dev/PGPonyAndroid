@@ -2621,6 +2621,10 @@ class PGPCryptoService private constructor() {
             com.pgpony.android.crypto.pqc.CompositeInlineStreamReader.read(bin) { b, off, len -> sink.write(b, off, len) }
         } catch (e: com.pgpony.android.crypto.pqc.CompositeInlineStreamReader.Malformed) {
             throw PGPCryptoError.DecryptionFailed("Malformed signed message")
+        } catch (e: java.util.zip.ZipException) {
+            throw PGPCryptoError.DecryptionFailed("Malformed signed message")
+        } catch (e: java.io.EOFException) {
+            throw PGPCryptoError.DecryptionFailed("Malformed signed message")
         }
         return DecryptStreamResult(
             bytesWritten = streamed.bytesWritten,

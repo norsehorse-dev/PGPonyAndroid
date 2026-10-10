@@ -257,8 +257,15 @@ class KeyDeduplicationService(
             val calc = org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator()
             val secretRing = org.bouncycastle.openpgp.PGPSecretKeyRing(secretBytes, calc)
             val publicRing = PGPPublicKeyRing(publicBytes, calc)
-            val updated = org.bouncycastle.openpgp.PGPSecretKeyRing.replacePublicKeys(secretRing, publicRing)
-            store.storePrivateKey(fingerprint, updated.encoded)
+            // Key by key: a secret key whose public part is missing from the
+            // merged copy (sanitize dropped it) keeps its own, unchanged.
+            val updated = secretRing.secretKeys.asSequence().map { sk ->
+                val pk = publicRing.getPublicKey(sk.keyID)
+                if (pk != null && pk.fingerprint.contentEquals(sk.publicKey.fingerprint))
+                    org.bouncycastle.openpgp.PGPSecretKey.replacePublicKey(sk, pk)
+                else sk
+            }.toList()
+            store.storePrivateKey(fingerprint, org.bouncycastle.openpgp.PGPSecretKeyRing(updated).encoded)
         }.onFailure { Log.w(TAG, "secret ring self-signature update skipped: ${it.message}") }
     }
 

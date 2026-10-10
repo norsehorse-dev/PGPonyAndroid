@@ -284,6 +284,12 @@ object CertificateBindings {
 
         fun isPrimary(fpHex: String): Boolean = primaryFingerprintHex.equals(fpHex, ignoreCase = true)
 
+        /** 4.7.0 (item 27): the User IDs whose certifications speak for the
+         *  primary (validity, expiry, key flags). A weak-only User ID counts
+         *  only when no direct-key signature or accepted certification exists. */
+        private fun primaryUserIds(): List<UserIdState> =
+            if (directKeySigs.isNotEmpty() || userIds.any { !it.weakOnly }) userIds.filter { !it.weakOnly } else userIds
+
         /** The primary is not revoked and not expired at [nowMs]. */
         fun isPrimaryUsable(nowMs: Long): Boolean =
             !primaryRevoked && (primaryExpiresAtMs == null || nowMs < primaryExpiresAtMs)
@@ -326,7 +332,7 @@ object CertificateBindings {
         fun mayDecryptWith(fpHex: String): Boolean {
             if (!supported) return true
             if (isPrimary(fpHex)) {
-                val newest = (directKeySigs + userIds.flatMap { it.certifications }).maxByOrNull { it.createdMs }
+                val newest = (directKeySigs + primaryUserIds().flatMap { it.certifications }).maxByOrNull { it.createdMs }
                 return flagsAllowEncryption(newest?.keyFlags)
             }
             val s = subkeyByFingerprint(fpHex) ?: return true
@@ -351,7 +357,7 @@ object CertificateBindings {
         fun activePrimarySig(t: Long): SelfSig? {
             val candidates = ArrayList<SelfSig>()
             activeAt(directKeySigs, t)?.let { candidates.add(it) }
-            for (u in userIds) {
+            for (u in primaryUserIds()) {
                 if (u.revokedAt(t)) continue
                 activeAt(u.certifications, t)?.let { candidates.add(it) }
             }
@@ -977,7 +983,11 @@ object CertificateBindings {
                 }
                 // A User ID with any certification made with an accepted digest
                 // uses only those; the weak ones count only when nothing else binds it.
-                val chosen = if (strongCerts.isNotEmpty()) strongCerts else weakCerts
+                val chosen = when {
+                    strongCerts.isNotEmpty() -> strongCerts
+                    c.tag == TAG_USER_ID -> weakCerts
+                    else -> emptyList()
+                }
                 chosen.forEach { (s, selfSig) -> considerSelf(s, weak = selfSig.weakHash) }
                 val certifications = chosen.map { it.second }
                 if (c.tag != TAG_USER_ID || certifications.isEmpty()) continue
