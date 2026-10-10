@@ -154,8 +154,8 @@ class OpenPgpCardReader(private val activity: Activity) {
             // OpenPGP application over NFC (the Nitrokey 3 turns it off there)
             // gets a plain explanation instead of the raw status word.
             Result.failure(
-                if (e.sw == OpenPgpCard.SW_FILE_NOT_FOUND || e.sw == OpenPgpCard.SW_CONDITIONS_NOT_SATISFIED)
-                    OpenPgpCardException.NotAnOpenPgpCard(NFC_OPENPGP_UNAVAILABLE, e.sw)
+                if (e.noResponse || e.sw == OpenPgpCard.SW_FILE_NOT_FOUND || e.sw == OpenPgpCard.SW_CONDITIONS_NOT_SATISFIED)
+                    OpenPgpCardException.NotAnOpenPgpCard(NFC_OPENPGP_UNAVAILABLE, e.sw, e.noResponse)
                 else e
             )
         } catch (e: OpenPgpCardException) {

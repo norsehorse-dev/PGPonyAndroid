@@ -13,12 +13,20 @@ sealed class OpenPgpCardException(message: String, cause: Throwable? = null) :
 
     /** SELECT failed or the AID isn't an OpenPGP application. [sw] is the
      *  status word SELECT returned, when it got that far. */
-    class NotAnOpenPgpCard(message: String = "This card is not an OpenPGP card", val sw: Int? = null) :
-        OpenPgpCardException(message)
+    class NotAnOpenPgpCard(
+        message: String = "This card is not an OpenPGP card",
+        val sw: Int? = null,
+        /** 4.7.0 (item 29, #43): SELECT got no status word back at all. */
+        val noResponse: Boolean = false
+    ) : OpenPgpCardException(message)
 
     /** Tag/IO error while talking to the card (link dropped, removed mid-op). */
-    class Communication(message: String, cause: Throwable? = null) :
-        OpenPgpCardException(message, cause)
+    class Communication(
+        message: String,
+        cause: Throwable? = null,
+        /** 4.7.0 (item 29): the reply was shorter than a status word. */
+        val shortResponse: Boolean = false
+    ) : OpenPgpCardException(message, cause)
 
     /** The card left the field before the operation completed. */
     class TagLost(message: String = "Card moved away — hold it still and try again", cause: Throwable? = null) :

@@ -111,7 +111,14 @@ class OpenPgpCardSession(private val transport: CardTransport) {
             data = OpenPgpCard.AID_PREFIX,
             le = 256
         )
-        val resp = transmit(cmd, throwOnError = false)
+        // 4.7.0 (item 29, #43): a Nitrokey 3 over NFC answers SELECT with
+        // nothing at all on current firmware, not with a status word.
+        val resp = try {
+            transmit(cmd, throwOnError = false)
+        } catch (e: OpenPgpCardException.Communication) {
+            if (!e.shortResponse) throw e
+            throw OpenPgpCardException.NotAnOpenPgpCard(e.message ?: "", noResponse = true)
+        }
         if (!resp.isSuccess) {
             throw OpenPgpCardException.NotAnOpenPgpCard(
                 "SELECT OpenPGP application failed (${resp.swHex()})",

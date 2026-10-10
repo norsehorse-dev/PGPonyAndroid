@@ -104,4 +104,26 @@ class OpenPgpCardSessionTest {
         }
         OpenPgpCardSession(failing).readCardInfo()
     }
+
+    @Test
+    fun selectStatusIsCarriedOnTheException() {
+        val failing = object : CardTransport {
+            override fun transceive(commandApdu: ByteArray): ByteArray =
+                byteArrayOf(0x6A.toByte(), 0x82.toByte())
+        }
+        val e = runCatching { OpenPgpCardSession(failing).readCardInfo() }.exceptionOrNull()
+        assertTrue(e is OpenPgpCardException.NotAnOpenPgpCard)
+        assertEquals(0x6A82, (e as OpenPgpCardException.NotAnOpenPgpCard).sw)
+    }
+
+    @Test
+    fun emptySelectReplyIsNotAnOpenPgpCard() {
+        // 4.7.0 (item 29, #43): a Nitrokey 3 over NFC answers SELECT with no bytes.
+        val silent = object : CardTransport {
+            override fun transceive(commandApdu: ByteArray): ByteArray = ByteArray(0)
+        }
+        val e = runCatching { OpenPgpCardSession(silent).readCardInfo() }.exceptionOrNull()
+        assertTrue("got $e", e is OpenPgpCardException.NotAnOpenPgpCard)
+        assertTrue((e as OpenPgpCardException.NotAnOpenPgpCard).noResponse)
+    }
 }

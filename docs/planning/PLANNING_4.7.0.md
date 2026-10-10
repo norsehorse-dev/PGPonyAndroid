@@ -637,7 +637,7 @@ key once a working YubiKey is on hand; fix whichever it is.
 
 ## 29. Nitrokey 3 follow-ups (#43)
 
-**Status:** NFC SELECT message built for RC1 (err_nfc_openpgp_unavailable). Command chaining checked in code: OpenPgpCardSession.sendCommand already sends any data field over 255 bytes with ISO 7816-4 command chaining (CLA 0x10), and no path builds an extended APDU, so the largest APDU over USB is a short one (261 bytes). CCID-level chaining would only matter for a reader whose dwMaxCCIDMessageLength is under 271, below what an APDU-level reader can work with; not needed. On-card keygen over USB still waits on #43.
+**Status:** NFC SELECT message built for RC1 (err_nfc_openpgp_unavailable), for a SELECT that fails with 0x6A82 or 0x6985 and for one that gets no reply at all (a Nitrokey 3C on firmware 1.9.0 over NFC, reported on #43 as 0 bytes received). Command chaining checked in code: OpenPgpCardSession.sendCommand already sends any data field over 255 bytes with ISO 7816-4 command chaining (CLA 0x10), and no path builds an extended APDU, so the largest APDU over USB is a short one (261 bytes). CCID-level chaining would only matter for a reader whose dwMaxCCIDMessageLength is under 271, below what an APDU-level reader can work with; not needed. On-card keygen over USB on a Nitrokey 3C (firmware 1.9.0) confirmed working on #43 (4.6.4). The same report found three display bugs for a key generated on a card, now item 34.
 
 Priority: medium. Origin: #43 and the 4.6.4 USB fix (PLANNING_4.6.4.md item 1).
 
@@ -749,6 +749,15 @@ material is gone from SecureKeyStore. Confirm on device first, and decide whethe
 as a 4.6.x fix.
 
 
+## 34. A key generated on a card shows like a public key (#43)
+
+Priority: medium (bug, visible). Origin: #43, a Nitrokey 3C over USB on 4.6.4.
+
+Reported: after on-card key generation the key is listed under Key Pairs but styled as a public key (avatar color, public key text, tap to encrypt to it). Key Details shows only the encryption subkey (with ON CARD), though the card holds a signing and an encryption subkey and the + > NFC menu shows both. Suggested: an ON CARD label (or the NFC symbol used in the recipient list) beside the name on the Keyring row, styled like DEFAULT.
+
+Work: style card-backed key pairs as key pairs on the Keyring and its row action; list every card slot's subkey in Key Details with ON CARD; add the card label to the Keyring row. Test with a card-generated key on a YubiKey and a Nitrokey 3.
+
+
 ## RC breakdown (set Oct 9 2026)
 
 One RC at a time: the next RC's work starts only after the current one is built and tested. versionCode 470 /
@@ -761,7 +770,7 @@ uk, b+zh+Hans).
   Certifying on a card waits for RC4.
 - RC3: 15 (each file separately), 32 (duress PIN, builds on 33), 6, 21 remainder (protocol change shared with
   desktop and iOS PGPonyPair), 8.
-- RC4, card work: 13 (keytocard) and card certification for 31, once a working card is on hand for testing.
+- RC4, card work: 13 (keytocard), card certification for 31, and 34 (card-generated key display), once a working card is on hand for testing.
 - Last RC: the 12a on-device checks (Tor with Orbot, custom proxy, OpenKeychain restore, protected key over a
   contact, the provider with Thunderbird including a card).
 - Not RC-gated: 30 (README), 11 (SOP wrapper), 12 (external review follow-up).

@@ -39,7 +39,8 @@ data class ResponseApdu(val data: ByteArray, val sw1: Int, val sw2: Int) {
         fun parse(raw: ByteArray): ResponseApdu {
             if (raw.size < 2) {
                 throw OpenPgpCardException.Communication(
-                    "Response too short (${raw.size} bytes) — expected at least the status word"
+                    "Response too short (${raw.size} bytes) — expected at least the status word",
+                    shortResponse = true
                 )
             }
             val sw1 = raw[raw.size - 2].toInt() and 0xFF
