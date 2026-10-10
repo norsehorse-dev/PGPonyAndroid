@@ -1,7 +1,8 @@
 # PGPony for Android
 
 OpenPGP for Android. Encrypt, decrypt, sign, and verify messages and files,
-manage your keyring, and use a hardware security key over NFC, all on device.
+manage your keyring, and use a hardware security key over NFC or USB, all on
+device.
 
 PGPony has no accounts, no ads, no analytics, and no tracking. The `foss`
 build contains no Google services and runs fully on de-Googled devices.
@@ -11,8 +12,10 @@ build contains no Google services and runs fully on de-Googled devices.
 - Encrypt, decrypt, sign, and verify text and files
 - Modern key generation, including RFC 9580 (OpenPGP v6) Ed25519 and X25519,
   with Argon2id passphrase protection
-- Hardware security keys over NFC (YubiKey 5 NFC, Token2): on-card key
-  generation, decrypt, sign, PIN management, and factory reset
+- Hardware security keys over NFC and USB (YubiKey 5 NFC, Token2): on-card
+  key generation, decrypt, sign, PIN management, and factory reset. USB has
+  worked since 4.1.0. The Nitrokey 3 works over USB since 4.6.4 for decrypt
+  and sign; its firmware turns OpenPGP off over NFC, so it does not work there
 - Read-only password-store (pass) support, including hardware-key entries
 - Key discovery via WKD and the keys.openpgp.org verifying keyserver
 - Optional contacts integration, QR import and scanning
@@ -53,10 +56,29 @@ apksigner verify --print-certs PGPony-<version>-foss.apk
 ```
 
 The printed "certificate SHA-256 digest" must equal the fingerprint
-above. A detached OpenPGP signature (`.asc`) and a `.sha256` are
-published beside every release APK; the release notes carry the
-whole-file SHA-256 for downloaders and a content hash for rebuilders,
-each labeled with what it means.
+above.
+
+Since 4.6.3 every GitHub release carries four assets, and releases are
+immutable, so the assets cannot be swapped after publishing:
+
+- `PGPony-<version>-foss.apk`, the APK
+- `PGPony-<version>-foss.apk.asc`, its detached OpenPGP signature
+- `NorseHorse-release-key.asc`, the armored OpenPGP release key
+- `PGPony-<version>-signing-keys.txt`, the OpenPGP release key
+  fingerprint and the APK signing certificate SHA-256
+
+```
+gpg --import NorseHorse-release-key.asc
+gpg --verify PGPony-<version>-foss.apk.asc PGPony-<version>-foss.apk
+```
+
+Before trusting the key that ships with a release, check its OpenPGP
+fingerprint against a source GitHub does not control: the verify page
+on pgpony.app, keys.openpgp.org, or keys.pgpony.app. The release notes
+carry the whole-file SHA-256 for downloaders and a content hash for
+rebuilders, each labeled with what it means. Release candidates on
+pgpony.app have a `.sha256` file beside each APK; GitHub releases do
+not.
 
 Rebuild from source and compare. The release gate script clones a tag
 twice into clean, isolated build roots, proves the two builds are
