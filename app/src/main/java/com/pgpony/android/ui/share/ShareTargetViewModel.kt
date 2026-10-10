@@ -1011,11 +1011,16 @@ class ShareTargetViewModel(
             return
         }
         val literalName = result.filename?.takeIf { it.isNotBlank() }
+        // 4.7.0 (item 25, #67): decide by content. The lenient UTF-8 decode
+        // behind result.plaintext never fails, so without a literal name every
+        // result read as text, images included.
         val isFile = literalName != null ||
-            (result.plaintext.isEmpty() && result.data.isNotEmpty())
+            (result.data.isNotEmpty() && !com.pgpony.android.intent.PlaintextKind.isText(result.data))
         if (isFile) {
+            val sniffedExt = com.pgpony.android.intent.PlaintextKind.extensionFor(result.data)
             val outName = literalName
                 ?: sourceFilename?.let { stripPgpExtension(it) }
+                ?: sniffedExt?.let { "decrypted_file.$it" }
                 ?: "decrypted_file"
             _state.update {
                 it.copy(

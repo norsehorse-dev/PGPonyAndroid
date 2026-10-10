@@ -123,6 +123,25 @@ object CompositeDocumentVerifier {
         return literalData(literal.body)
     }
 
+    /**
+     * 4.7.0 (item 25, #67): the literal packet's file name, sanitized, or null
+     * when it is empty or unusable. The classical path carries it; the composite
+     * path dropped it, so a decrypted file lost its name.
+     */
+    fun inlineFilename(message: ByteArray): String? = try {
+        val literal = walk(decompress(message)).firstOrNull { it.tag == TAG_LITERAL }
+        literal?.let { lit ->
+            val body = lit.body
+            if (body.size < 2) return@let null
+            val nameLen = body[1].toInt() and 0xFF
+            if (2 + nameLen > body.size) return@let null
+            val raw = String(body, 2, nameLen, Charsets.UTF_8)
+            com.pgpony.android.crypto.LiteralFilename.sanitize(raw)
+        }
+    } catch (_: Exception) {
+        null
+    }
+
     /** The claimed signer fingerprint (uppercase hex) of an inline message. */
     fun claimedSignerOfInline(message: ByteArray): String? = try {
         val sig = walk(decompress(message)).lastOrNull { it.tag == TAG_SIGNATURE } ?: return null

@@ -2046,7 +2046,8 @@ class PGPCryptoService private constructor() {
                         hasSignature = true,
                         compositeInline = true,
                         compositeInlineBytes = plainBytes,
-                        compositeClaimedSignerFp = claimedFp
+                        compositeClaimedSignerFp = claimedFp,
+                        filename = com.pgpony.android.crypto.pqc.CompositeDocumentVerifier.inlineFilename(plainBytes)
                     )
                 }
                 return processDecryptedContent(
@@ -2614,7 +2615,7 @@ class PGPCryptoService private constructor() {
         val claimedFp = V.claimedSignerOfInline(plainBytes)
         return DecryptStreamResult(
             bytesWritten = content.size.toLong(),
-            filename = null,
+            filename = V.inlineFilename(plainBytes),
             signatureVerified = false,
             signerKeyID = null,
             hasSignature = true,

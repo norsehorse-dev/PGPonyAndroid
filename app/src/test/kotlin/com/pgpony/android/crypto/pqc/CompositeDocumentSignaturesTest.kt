@@ -11,7 +11,9 @@ import org.bouncycastle.bcpg.ArmoredInputStream
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
 import org.bouncycastle.pqc.crypto.mldsa.MLDSAPrivateKeyParameters
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -84,6 +86,18 @@ class CompositeDocumentSignaturesTest {
         val result = CompositeDocumentVerifier.verifyInline(pub, message)
         assertTrue("inline signature must verify", result.valid)
         assertArrayEquals("literal content must be recovered", data, result.content)
+    }
+
+    @Test
+    fun `inline message keeps its literal file name`() {
+        val (sec, _) = freshKeypair()
+        val jpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte()) + ByteArray(32) { 9 }
+        val named = CompositeDocumentSigner.signInline(suite, sec, fingerprint, jpeg, fileName = "photo.jpg", random = rnd)
+        assertEquals("photo.jpg", CompositeDocumentVerifier.inlineFilename(named))
+        val unnamed = CompositeDocumentSigner.signInline(suite, sec, fingerprint, jpeg, random = rnd)
+        assertNull(CompositeDocumentVerifier.inlineFilename(unnamed))
+        val pathy = CompositeDocumentSigner.signInline(suite, sec, fingerprint, jpeg, fileName = "../../etc/photo.jpg", random = rnd)
+        assertEquals("photo.jpg", CompositeDocumentVerifier.inlineFilename(pathy))
     }
 
     @Test
