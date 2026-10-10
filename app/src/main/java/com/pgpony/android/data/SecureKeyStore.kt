@@ -493,6 +493,32 @@ class SecureKeyStore(context: Context) {
         }
     }
 
+    /**
+     * 4.7.0 (item 33): Clear All Data. Removes every blob and DEK envelope in
+     * the store, whatever fingerprint it belongs to (live keys, Recently
+     * Deleted, and anything orphaned), drops the legacy store's entries, and
+     * deletes the hardware wrapping key so a file that survives an interrupted
+     * delete can no longer be opened. The next write creates a fresh hardware key.
+     */
+    fun wipeAll() {
+        crossProcess {
+            dir.listFiles()?.forEach { f ->
+                if (f.name != lockFile.name) f.delete()
+            }
+            legacyPrefs?.let { prefs ->
+                try { prefs.edit().clear().apply() } catch (_: Exception) { }
+            }
+            try {
+                val ks = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+                if (ks.containsAlias(HW_ALIAS)) ks.deleteEntry(HW_ALIAS)
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not delete hardware key on wipe: ${e.message}")
+            }
+            sawUnrecoverable = false
+            sawRecoverable = false
+        }
+    }
+
     fun hasPublicKey(fingerprint: String): Boolean {
         val fp = fingerprint.lowercase()
         if (blobFile(pubName(fp)).exists()) return true

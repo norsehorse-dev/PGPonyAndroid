@@ -1660,6 +1660,18 @@ class KeyRepository(
         dao.purgeById(entity.id)
     }
 
+    /**
+     * 4.7.0 (item 33): Clear All Data. Before this, the reset deleted only live
+     * keys (getAllKeys is `deletedAt IS NULL`), so keys in Recently Deleted kept
+     * their rows and secret material and came back in the bin after the reset.
+     * Purges live and binned keys alike, then wipes the secure store wholesale.
+     */
+    suspend fun clearAllKeys() = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        dao.getAllKeys().forEach { deleteKey(it) }
+        dao.getDeletedKeys().forEach { purgeKey(it) }
+        store.wipeAll()
+    }
+
     /** Empty the bin. */
     suspend fun emptyRecycleBin() {
         dao.getDeletedKeys().forEach { purgeKey(it) }
