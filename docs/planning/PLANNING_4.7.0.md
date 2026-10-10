@@ -81,6 +81,8 @@ armored one, a binary and an armored encrypted message, and a key. On device, sh
 
 ## 3. Encrypt the whole shared text, PGP block included (#58)
 
+**Status:** Built for RC1: "Encrypt all of it" opens the whole shared text on Encrypt (new keys share_target_action_encrypt_all and _subtitle; the _other keys are gone from every locale).
+
 Priority: low-medium (behavior). Origin: CertainBot (#58), on 4.6.0 RC1.
 
 Reported: for text with a PGP block inside it, "Encrypt the other text" has no real-world use; offer to encrypt
@@ -528,6 +530,8 @@ disabled Key Detail action explains itself.
 
 ## 23. Encrypt and sign a large file with an ML-DSA key runs out of memory (#73 follow-up)
 
+**Status:** Built for RC1. encryptStream takes a composite signer (CompositeDocumentSigner.InlineStream), used by single files above the inline limit and by package mode; detached file signing and verifying stream (signDetachedStream, CompositeSignerGate.verifyDetachedStream). The streaming decrypt no longer buffers a composite inline message: CompositeInlineStreamReader hashes the literal as it is written and CompositeSignerGate.verifyStreamed grades the signatures from their digests. The large-file encrypt path also passes the chosen recipient subkeys now. Unit tests: CompositeStreamingTest. On device: the 500 MB case, and the GpgFrontend check.
+
 Priority: high (bug). Origin: #73, after 4.6.3 RC1: a 500 MB file encrypts fine but encrypt and sign with an
 ML-DSA key fails with an out-of-memory error.
 
@@ -543,6 +547,8 @@ streamed output verifies in PGPony and in GpgFrontend.
 
 
 ## 24. Re-importing your own key edited in gpg changes nothing (#78)
+
+**Status:** Built for RC1: CertificateMerge.mergeDetailed takes newer owner self-signatures (0x1F, 0x10 to 0x13, 0x18) on components already present; the secret ring gets the same public parts (PGPSecretKeyRing.replacePublicKeys, BC rings only, so a composite key pair updates its public copy only); the import says what was applied, or why nothing was. Unit tests in CertificateMergeTest. On device: the gpg setpref and SHA-512 case, then export and `gpg --import`.
 
 Priority: medium-high (bug, interop). Origin: #78: preferences changed and binding signatures remade with
 SHA-512 in gpg, exported and imported back; PGPony keeps the old key and says it is already in the keyring.
@@ -561,6 +567,8 @@ export afterwards that gpg reads with the new preferences.
 
 
 ## 25. Quick Actions decrypt of an ML-DSA-signed file loses its name and shows as text (#67)
+
+**Status:** Built for RC1: CompositeDocumentVerifier.inlineFilename on both composite decrypt paths; PlaintextKind classifies the Quick Action result. Unit tests: PlaintextKindTest, CompositeDocumentSignaturesTest.
 
 Priority: high (bug, visible). Origin: #67 (Oct 5): an image encrypted and signed with an ML-DSA key, decrypted
 through the Quick Action, shows as text and offers to save as "message.txt". The same file through Decrypt Files
@@ -597,6 +605,8 @@ reporter's public key (asked on Oct 5) if a fresh sq key does not reproduce it.
 
 ## 27. User IDs bound with SHA-1 vanish on import or restore; the key shows "Unknown" (#67)
 
+**Status:** Built for RC1 per the Oct 9 decision (see RC breakdown). SignaturePolicy.isWeakCertificationDigest; CertificateBindings keeps a weak-only User ID through analyze and sanitize; Key Details shows a Weak hash mark. Keys already restored without their names need one more restore or re-import. Unit tests: CertificateBindingsWeakUserIdTest.
+
 Priority: medium-high (bug, visible). Origin: #67 (Oct 5): after restoring a backup, several older RSA 4096 public
 keys came back named "Unknown", while the same keys in the live install still showed their names.
 
@@ -624,6 +634,8 @@ key once a working YubiKey is on hand; fix whichever it is.
 
 
 ## 29. Nitrokey 3 follow-ups (#43)
+
+**Status:** NFC SELECT message built for RC1 (err_nfc_openpgp_unavailable). Command chaining checked in code: OpenPgpCardSession.sendCommand already sends any data field over 255 bytes with ISO 7816-4 command chaining (CLA 0x10), and no path builds an extended APDU, so the largest APDU over USB is a short one (261 bytes). CCID-level chaining would only matter for a reader whose dwMaxCCIDMessageLength is under 271, below what an APDU-level reader can work with; not needed. On-card keygen over USB still waits on #43.
 
 Priority: medium. Origin: #43 and the 4.6.4 USB fix (PLANNING_4.6.4.md item 1).
 
@@ -719,6 +731,8 @@ unchanged.
 
 
 ## 33. Clear All Data leaves the keys in Recently Deleted behind
+
+**Status:** Built for RC1 (4.7.0 only, no 4.6.x release). Clear All Data purges live and binned keys (KeyRepository.clearAllKeys), wipes the secure store with its hardware wrapping key (SecureKeyStore.wipeAll), and clears every database table, which also drops mail app and SSH approvals and Autocrypt peers that survived the reset before. Confirm on device.
 
 Priority: high (bug, privacy). Found while planning item 32.
 
