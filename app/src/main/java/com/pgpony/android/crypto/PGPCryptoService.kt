@@ -258,6 +258,9 @@ data class DecryptStreamResult(
     val compositeInline: Boolean = false,
     val compositeInlineBytes: ByteArray? = null,
     val compositeClaimedSignerFp: String? = null,
+    /** 4.7.0 (item 23): a composite inline message read as it streamed; graded
+     *  with CompositeSignerGate.verifyStreamed instead of [compositeInlineBytes]. */
+    val compositeStreamed: com.pgpony.android.crypto.pqc.CompositeInlineStreamReader.Result? = null,
     /** 4.7.0 (#64, SOP): see [DecryptResult.signaturePackets]. */
     val signaturePackets: List<ByteArray> = emptyList(),
     /** 3.0.0 (5d-3): see [DecryptResult.signerWeakKey]. */
@@ -1481,13 +1484,27 @@ class PGPCryptoService private constructor() {
         // item 14 (#56): v4 Ed25519 + algo-35 interop recipients. Not BC rings, so
         // they travel their own channel (raw public material + v4 fingerprint) and
         // force SEIPDv2, exactly as in encrypt().
-        v4Algo35Recipients: List<com.pgpony.android.crypto.pqc.V4Algo35Recipient> = emptyList()
+        v4Algo35Recipients: List<com.pgpony.android.crypto.pqc.V4Algo35Recipient> = emptyList(),
+        // 4.7.0 (item 23, #73): a composite ML-DSA signer, as in encrypt(). The
+        // composite signature hashes the content as it streams, so encrypt and
+        // sign no longer reads the whole file into memory. Unlocked by the
+        // caller (the secret is raw material); [compositeSignInSeipdV1] = false
+        // leaves the signature out when some recipient forces SEIPDv1.
+        compositeSignSuite: com.pgpony.android.crypto.pqc.CompositeSignSuite? = null,
+        compositeSignSecret: ByteArray? = null,
+        compositeSignerFingerprint: ByteArray? = null,
+        compositeSignInSeipdV1: Boolean = true
     ) {
+        val compositeRequested = compositeSignSuite != null && compositeSignSecret != null &&
+            compositeSignerFingerprint != null
         // 1) Build the signer FIRST. Software: unlock up front (clean
         //    output guarantee). Card: the content-signer defers the tap
         //    to getSignature() at the very end.
         var sigGen: PGPSignatureGenerator? = null
-        if (cardSession != null && cardSigningPublicKey != null && cardPin != null) {
+        if (compositeRequested) {
+            // Composite signing goes through compositeInline below; no
+            // classical signer stands in for it.
+        } else if (cardSession != null && cardSigningPublicKey != null && cardPin != null) {
             sigGen = PGPSignatureGenerator(
                 CardPGPContentSignerBuilder(cardSession, cardPin, cardSigningPublicKey),
                 cardSigningPublicKey
@@ -1631,6 +1648,13 @@ class PGPCryptoService private constructor() {
                 compGen?.open(encryptedOut) ?: encryptedOut
 
             sigGen?.generateOnePassVersion(false)?.encode(signAndLitOut)
+            // 4.7.0 (item 23): the composite one-pass packet, same placement.
+            val compositeInline = if (compositeRequested && (allRecipientsV6 || compositeSignInSeipdV1)) {
+                com.pgpony.android.crypto.pqc.CompositeDocumentSigner.InlineStream(
+                    compositeSignSuite!!, compositeSignSecret!!, compositeSignerFingerprint!!
+                )
+            } else null
+            compositeInline?.let { signAndLitOut.write(it.onePassPacket()) }
 
             // Partial-length literal: the buffer overload streams without
             // a declared total size.
@@ -1648,9 +1672,11 @@ class PGPCryptoService private constructor() {
                 if (n < 0) break
                 litOut.write(buf, 0, n)
                 sigGen?.update(buf, 0, n)
+                compositeInline?.update(buf, 0, n)
             }
             litOut.close()
             litGen.close()
+            compositeInline?.let { signAndLitOut.write(it.signaturePacket()) }
 
             // The card tap happens HERE (getSignature) — after the fast
             // AES pass, so the card was connected only briefly.
@@ -2553,10 +2579,10 @@ class PGPCryptoService private constructor() {
      * so a composite inline signed message would fail to verify (or fail to
      * open) on the file-decrypt and OpenPGP-API paths even though [decrypt]
      * (text) handles it. This sniffs a bounded head: if the inner content is a
-     * composite inline message it is buffered (composite payloads are produced
-     * buffered and bounded by [SecurityLimits.MAX_MESSAGE_PLAINTEXT_BYTES]), the
-     * literal is written to [output], and the composite fields are surfaced for
-     * the caller to verify against the stored composite public key. A classical
+     * composite inline message it is read as it streams (4.7.0 item 23,
+     * CompositeInlineStreamReader), the literal written to [output] and the
+     * signatures with their digests surfaced for the caller to grade against
+     * the stored composite certificates. A classical
      * message keeps the true streaming path untouched: the head is read from a
      * mark/reset buffer and, on a miss, streaming continues from the same bytes
      * with no full-message buffering.
@@ -2583,47 +2609,31 @@ class PGPCryptoService private constructor() {
         if (!looksComposite) {
             return streamDecryptedContent(JcaPGPObjectFactory(bin), verificationKeys, output) { counted.count }
         }
-        // Composite inline: buffer the whole inner content (bounded), then route
-        // to the composite verifier, mirroring [decrypt]'s parsePlain.
-        val cap = SecurityLimits.MAX_MESSAGE_PLAINTEXT_BYTES
-        val bufOut = java.io.ByteArrayOutputStream()
-        val chunk = ByteArray(1 shl 16)
-        var total = 0L
-        var n = bin.read(chunk)
-        while (n >= 0) {
-            total += n
-            if (total > cap)
-                throw PGPCryptoError.ResourceLimitExceeded("decrypted message exceeds size cap")
-            bufOut.write(chunk, 0, n)
-            n = bin.read(chunk)
+        // 4.7.0 (item 23, #73): read the composite inline message as it
+        // streams. The literal content goes to [output] through the same size
+        // and expansion bounds as the classical path while each one-pass
+        // packet's hash is updated; the signatures are graded by the caller
+        // (CompositeSignerGate.verifyStreamed). This used to buffer the whole
+        // content under MAX_MESSAGE_PLAINTEXT_BYTES, so a large file signed
+        // with an ML-DSA key could not be opened.
+        val sink = ContentWalker.StreamSink(output) { counted.count }
+        val streamed = try {
+            com.pgpony.android.crypto.pqc.CompositeInlineStreamReader.read(bin) { b, off, len -> sink.write(b, off, len) }
+        } catch (e: com.pgpony.android.crypto.pqc.CompositeInlineStreamReader.Malformed) {
+            throw PGPCryptoError.DecryptionFailed("Malformed signed message: ${e.message}")
         }
-        // The same grammar check [decrypt] applies before its composite test.
-        val plainBytes = plaintextChecked(bufOut.toByteArray())
-        if (!V.isCompositeInline(plainBytes)) {
-            // Head matched a composite one-pass packet but the full message is
-            // not a valid composite inline (e.g. truncated): fall back to the
-            // classical parse over the buffered bytes so content is never
-            // silently dropped.
-            return streamDecryptedContent(
-                JcaPGPObjectFactory(java.io.ByteArrayInputStream(plainBytes)),
-                verificationKeys, output
-            )
-        }
-        val content = V.inlineContent(plainBytes)
-            ?: throw PGPCryptoError.DecryptionFailed("No literal data in composite inline message")
-        output.write(content)
-        val claimedFp = V.claimedSignerOfInline(plainBytes)
         return DecryptStreamResult(
-            bytesWritten = content.size.toLong(),
-            filename = V.inlineFilename(plainBytes),
+            bytesWritten = streamed.bytesWritten,
+            filename = streamed.filename,
             signatureVerified = false,
             signerKeyID = null,
             hasSignature = true,
             signatureKeyIDRaw = null,
             signerStatus = SignerStatus.NONE,
             compositeInline = true,
-            compositeInlineBytes = plainBytes,
-            compositeClaimedSignerFp = claimedFp
+            compositeInlineBytes = null,
+            compositeClaimedSignerFp = streamed.claimedSignerFp,
+            compositeStreamed = streamed
         )
     }
 

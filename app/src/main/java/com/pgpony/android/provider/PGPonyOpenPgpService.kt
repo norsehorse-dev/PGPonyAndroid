@@ -1422,6 +1422,10 @@ class PGPonyOpenPgpService : Service() {
         // BouncyCastle cannot parse. decryptStream extracted the payload;
         // A2 (ENGINE-4) grades it with CompositeSignerGate against the stored
         // composite certificates, as EncryptDecryptViewModel does.
+        // 4.7.0 (item 23): a composite inline message read as it streamed.
+        result.compositeStreamed?.let { streamed ->
+            return compositeInlineSignatureResult(null, result.compositeClaimedSignerFp, senderAddress, streamed)
+        }
         val inline = result.compositeInlineBytes
         if (result.compositeInline && inline != null) {
             return compositeInlineSignatureResult(inline, result.compositeClaimedSignerFp, senderAddress)
@@ -1523,13 +1527,15 @@ class PGPonyOpenPgpService : Service() {
      * (certIndex), never a match on the claimed issuer fingerprint.
      */
     private fun compositeInlineSignatureResult(
-        inline: ByteArray,
+        inline: ByteArray?,
         claimedFp: String?,
-        senderAddress: String?
+        senderAddress: String?,
+        streamed: com.pgpony.android.crypto.pqc.CompositeInlineStreamReader.Result? = null
     ): OpenPgpSignatureResult {
         val certs = runBlocking { repo.loadCompositeSignerCerts() }
         val graded = runCatching {
-            CompositeSignerGate.verifyInline(certs.map { it.second }, inline)
+            if (streamed != null) CompositeSignerGate.verifyStreamed(certs.map { it.second }, streamed)
+            else CompositeSignerGate.verifyInline(certs.map { it.second }, inline!!)
         }.getOrNull() ?: return OpenPgpSignatureResult.createWithInvalidSignature()
         val keyId = parseKeyId(graded.signingKeyFingerprint?.take(16))
             ?: parseKeyId((graded.claimedFingerprint ?: claimedFp)?.take(16))

@@ -54,11 +54,8 @@ object CompositeSigPacket {
         creationTimeSeconds: Int,
         random: SecureRandom = SecureRandom()
     ): ByteArray {
-        val hashed = ByteArrayOutputStream().apply {
-            write(subpacket(SUBPKT_CREATION_TIME or 0x80, uint32(creationTimeSeconds)))
-            write(issuerFingerprintSubpacket(signerFingerprint))
-        }.toByteArray()
-        val salt = ByteArray(SALT_SHA256).also { random.nextBytes(it) }
+        val hashed = hashedArea(creationTimeSeconds, signerFingerprint)
+        val salt = newSalt(random)
         val digest = CompositeSigHash.v6DocumentDigest(
             hashAlgorithm = HASH_SHA256,
             salt = salt,
@@ -67,6 +64,34 @@ object CompositeSigPacket {
             publicKeyAlgorithm = suite.algId,
             hashedSubpacketBody = hashed
         )
+        return signaturePacket(suite, compositeSecret, sigType, hashed, salt, digest, random)
+    }
+
+    /** 4.7.0 (item 23): a fresh v6 salt for a SHA-256 document signature. */
+    fun newSalt(random: SecureRandom = SecureRandom()): ByteArray =
+        ByteArray(SALT_SHA256).also { random.nextBytes(it) }
+
+    /** 4.7.0 (item 23): the hashed subpacket area every document signature carries. */
+    fun hashedArea(creationTimeSeconds: Int, signerFingerprint: ByteArray): ByteArray =
+        ByteArrayOutputStream().apply {
+            write(subpacket(SUBPKT_CREATION_TIME or 0x80, uint32(creationTimeSeconds)))
+            write(issuerFingerprintSubpacket(signerFingerprint))
+        }.toByteArray()
+
+    /**
+     * 4.7.0 (item 23): sign [digest] (computed over [salt], the document and
+     * the trailer for [hashed]) and frame the signature PACKET. Shared by the
+     * buffered and the streaming signers so both produce the same bytes.
+     */
+    fun signaturePacket(
+        suite: CompositeSignSuite,
+        compositeSecret: ByteArray,
+        sigType: Int,
+        hashed: ByteArray,
+        salt: ByteArray,
+        digest: ByteArray,
+        random: SecureRandom = SecureRandom()
+    ): ByteArray {
         val signature = CompositeSigner.sign(suite, compositeSecret, digest, random)
         val body = ByteArrayOutputStream().apply {
             write(6)

@@ -1775,7 +1775,13 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         messagePassword: String?,
         signingKeyId: Long? = null,
         v4Recipients: List<com.pgpony.android.crypto.pqc.V4Algo35Recipient> = emptyList(),
-        totalBytes: Long
+        totalBytes: Long,
+        // 4.7.0 (item 23, #73): a composite ML-DSA signer streams too.
+        compositeSuite: com.pgpony.android.crypto.pqc.CompositeSignSuite? = null,
+        compositeSecret: ByteArray? = null,
+        compositeFingerprint: ByteArray? = null,
+        compositeSignInSeipdV1: Boolean = true,
+        recipientSubkeyChoices: Map<String, Long> = emptyMap()
     ): java.io.File = withContext(Dispatchers.IO) {
         val job = coroutineContext[kotlinx.coroutines.Job]
         val out = ScratchFiles.allocate(PGPonyApp.instance, outName, ScratchFiles.SCOPE_ENCRYPT)
@@ -1804,7 +1810,12 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     messagePassword = messagePassword,
                     useArgon2 = useArgon2Pref,
                     signingKeyId = signingKeyId,
-                    v4Algo35Recipients = v4Recipients
+                    v4Algo35Recipients = v4Recipients,
+                    recipientSubkeyChoices = recipientSubkeyChoices,
+                    compositeSignSuite = compositeSuite,
+                    compositeSignSecret = compositeSecret,
+                    compositeSignerFingerprint = compositeFingerprint,
+                    compositeSignInSeipdV1 = compositeSignInSeipdV1
                 )
             }
         }
@@ -1917,10 +1928,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 }
 
                 // 4.0.4 — buffered below INLINE_FILE_LIMIT (unchanged),
-                // streamed above it (issue #6). #65: a composite signature covers
-                // the whole document and cannot stream, so a composite signer
-                // buffers the file and takes the crypto.encrypt path even above
-                // the streaming threshold.
+                // streamed above it (issue #6). 4.7.0 (item 23, #73): a composite
+                // signer streams above the threshold as well; it used to buffer
+                // the whole file and ran out of memory on large ones.
                 // 4.6.0 (item 14): an ML-DSA signature to a v4 recipient reads
                 // in PGPony but not in GnuPG or Thunderbird; ask first.
                 val pqcInV1 = compositeInfo != null &&
@@ -1956,31 +1966,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             compositeSignInSeipdV1 = !droppedPqcSignature
                         )
                     }
-                } else if (compositeInfo != null) {
-                    val fileBytes = withContext(Dispatchers.IO) {
-                        PGPonyApp.instance.contentResolver.openInputStream(srcUri!!)?.use { it.readBytes() }
-                    } ?: throw SigningError.SigningFailed(
-                        PGPonyApp.instance.getString(R.string.sign_verify_error_file_unreadable)
-                    )
-                    withContext(Dispatchers.Default) {
-                        crypto.encrypt(
-                            data = fileBytes,
-                            recipientPublicKeys = recipientRings,
-                            signingSecretKey = null,
-                            passphrase = passphrase,
-                            filename = s.selectedFileName,
-                            armor = false,
-                            signingKeyId = s.selectedSigningKeyId,
-                            recipientSubkeyChoices = s.recipientSubkeyChoices,
-                            v4Algo35Recipients = v4Recipients,
-                            compositeSignSuite = compositeInfo.suite,
-                            compositeSignSecret = compositeInfo.compositeSecret,
-                            compositeSignerFingerprint = compositeInfo.fingerprint,
-                            compositeSignInSeipdV1 = !droppedPqcSignature
-                        )
-                    }
                 } else null
-                val streamedOut = if (bytes == null && compositeInfo == null) {
+                val streamedOut = if (bytes == null) {
                     streamEncryptToScratch(
                         uri = srcUri!!,
                         outName = "${s.selectedFileName ?: "file"}.gpg",
@@ -1991,7 +1978,12 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         messagePassword = null,
                         signingKeyId = s.selectedSigningKeyId,
                         v4Recipients = v4Recipients,
-                        totalBytes = s.selectedFileSize ?: 0L
+                        totalBytes = s.selectedFileSize ?: 0L,
+                        compositeSuite = compositeInfo?.suite,
+                        compositeSecret = compositeInfo?.compositeSecret,
+                        compositeFingerprint = compositeInfo?.fingerprint,
+                        compositeSignInSeipdV1 = !droppedPqcSignature,
+                        recipientSubkeyChoices = s.recipientSubkeyChoices
                     )
                 } else null
                 _encryptState.value = _encryptState.value.copy(
@@ -2555,32 +2547,10 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         totalBytes = payloadBytes + mimeFile.length()
                     )
                     val cipherFile = java.io.File(mimeFile.parentFile, "message.asc")
-                    if (compositeInfo != null) {
-                        // 4.6.3 (#72): a composite signature covers the whole
-                        // document and cannot stream, so the assembled package
-                        // takes the buffered crypto.encrypt path, as a composite
-                        // signer does for a single file (#65).
-                        val container = mimeFile.readBytes()
-                        val out = crypto.encrypt(
-                            data = container,
-                            recipientPublicKeys = recipientRings,
-                            signingSecretKey = null,
-                            passphrase = passphrase,
-                            filename = null,
-                            armor = true,
-                            signingKeyId = s.selectedSigningKeyId,
-                            recipientSubkeyChoices = s.recipientSubkeyChoices,
-                            v4Algo35Recipients = v4Recipients,
-                            compositeSignSuite = compositeInfo.suite,
-                            compositeSignSecret = compositeInfo.compositeSecret,
-                            compositeSignerFingerprint = compositeInfo.fingerprint,
-                            compositeSignInSeipdV1 = !droppedPqcSignature
-                        )
-                        cipherFile.writeBytes(out)
-                        _encryptState.value = _encryptState.value.copy(
-                            processedBytes = payloadBytes + container.size
-                        )
-                    } else {
+                    // 4.7.0 (item 23, #73): a composite ML-DSA signer streams the
+                    // assembled package like any other signer; it used to read
+                    // the whole container into memory.
+                    run {
                         val input = ProgressInputStream(
                             delegate = mimeFile.inputStream(),
                             isCancelled = { job?.isActive == false },
@@ -2601,7 +2571,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                                     armor = true,
                                     signingKeyId = s.selectedSigningKeyId,
                                     recipientSubkeyChoices = s.recipientSubkeyChoices,
-                                    v4Algo35Recipients = v4Recipients
+                                    v4Algo35Recipients = v4Recipients,
+                                    compositeSignSuite = compositeInfo?.suite,
+                                    compositeSignSecret = compositeInfo?.compositeSecret,
+                                    compositeSignerFingerprint = compositeInfo?.fingerprint,
+                                    compositeSignInSeipdV1 = !droppedPqcSignature
                                 )
                             }
                         }
@@ -3226,7 +3200,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      * 4.4.0 RC3 (#30/#31): verify a detached composite signature over the file
      * at [signedUri]. Returns null when the signature is not composite, so the
      * caller falls back to the BouncyCastle detached-verify path. The signed
-     * content is read whole (composite verify hashes the full document).
+     * content is hashed as it streams (4.7.0 item 23).
      * A2 (ENGINE-4): graded by CompositeSignerGate.
      */
     private suspend fun compositeDetachedFileResult(
@@ -3245,17 +3219,17 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             )
         }
         if (!runCatching { CompositeDocumentVerifier.isCompositeSignature(sigPacket) }.getOrDefault(false)) return null
-        val data = withContext(Dispatchers.IO) {
-            PGPonyApp.instance.contentResolver.openInputStream(signedUri)?.use { it.readBytes() }
+        // 4.7.0 (item 23, #73): hashed as the file streams instead of read whole.
+        val certs = compositeSignerCerts()
+        val graded = withContext(Dispatchers.IO) {
+            PGPonyApp.instance.contentResolver.openInputStream(signedUri)?.use { input ->
+                CompositeSignerGate.verifyDetachedStream(certs.map { it.second }, sig, input)
+            }
         } ?: return VerificationResult.Invalid(
             reason = PGPonyApp.instance.getString(R.string.sign_verify_error_file_unreadable),
             signerKeyID = null,
             signedContent = null
         )
-        val certs = compositeSignerCerts()
-        val graded = withContext(Dispatchers.Default) {
-            CompositeSignerGate.verifyDetached(certs.map { it.second }, sig, data)
-        }
         return compositeVerificationResult(graded, certs, null)
     }
 
@@ -3780,6 +3754,14 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     private suspend fun buildVerificationResultForStream(
         result: com.pgpony.android.crypto.DecryptStreamResult
     ): VerificationResult {
+        // 4.7.0 (item 23): a composite inline message read as it streamed.
+        result.compositeStreamed?.let { streamed ->
+            val certs = compositeSignerCerts()
+            val graded = withContext(Dispatchers.Default) {
+                CompositeSignerGate.verifyStreamed(certs.map { it.second }, streamed)
+            }
+            return compositeVerificationResult(graded, certs, null)
+        }
         val inline = result.compositeInlineBytes
         if (result.compositeInline && inline != null) {
             val certs = compositeSignerCerts()
@@ -5284,9 +5266,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // #65: a composite ML-DSA signing key is not a BouncyCastle
                 // ring, so the classical detached signer threw "no
                 // signing-capable key found." Route composite keys through
-                // CompositeDocumentSigner over the buffered file (the composite
-                // signature covers the whole document, so it cannot stream).
-                // Classical keys keep the streaming path.
+                // CompositeDocumentSigner. 4.7.0 (item 23, #73): hashed as the
+                // file streams, like the classical path, instead of reading
+                // the whole file into memory.
                 val sig: ByteArray = if (key.algorithm.isCompositeSign) {
                     val info = withContext(Dispatchers.IO) {
                         repo.loadCompositeKeyInfo(
@@ -5294,20 +5276,14 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         )
                     }
                     val secret = info?.compositeSecret ?: throw SigningError.PassphraseRequired()
-                    val fileBytes = withContext(Dispatchers.IO) {
-                        PGPonyApp.instance.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                    } ?: throw SigningError.SigningFailed(
-                        PGPonyApp.instance.getString(R.string.sign_verify_error_file_unreadable)
-                    )
-                    withContext(Dispatchers.Default) {
-                        if (s.signFileArmor)
-                            CompositeDocumentSigner.signDetachedArmored(
-                                info.suite, secret, info.fingerprint, fileBytes
-                            ).toByteArray(Charsets.UTF_8)
-                        else
-                            CompositeDocumentSigner.signDetached(
-                                info.suite, secret, info.fingerprint, fileBytes
+                    withContext(Dispatchers.IO) {
+                        PGPonyApp.instance.contentResolver.openInputStream(uri)?.use { input ->
+                            CompositeDocumentSigner.signDetachedStream(
+                                info.suite, secret, info.fingerprint, input, armor = s.signFileArmor
                             )
+                        } ?: throw SigningError.SigningFailed(
+                            PGPonyApp.instance.getString(R.string.sign_verify_error_file_unreadable)
+                        )
                     }
                 } else {
                     val secRing = withContext(Dispatchers.IO) {

@@ -37,6 +37,8 @@ object CompositeSignerGate {
 
     /** Composite keys tried beyond the ones an issuer subpacket names. */
     private const val MAX_TRIAL_KEYS = 64
+    /** 4.7.0 (item 23): signatures in one detached block hashed over a stream. */
+    private const val MAX_STREAMED_SIGNATURES = 16
 
     /**
      * The graded outcome. Only [status] == VERIFIED may be shown as verified;
@@ -166,6 +168,48 @@ object CompositeSignerGate {
         return gradeAny(certs, compositeSignatureBodies(raw), data, nowMs, content = null)
     }
 
+    /**
+     * 4.7.0 (item 23, #73): [verifyDetached] over content read from [input] in
+     * 64 KiB chunks, so a large file is never held in memory. Does not close
+     * [input].
+     */
+    fun verifyDetachedStream(
+        certs: List<ByteArray>,
+        signature: ByteArray,
+        input: java.io.InputStream,
+        nowMs: Long = System.currentTimeMillis()
+    ): Graded {
+        val raw = runCatching { CompositeDocumentVerifier.rawSignaturePacket(signature) }.getOrNull()
+            ?: return Graded(SignerStatus.INVALID)
+        val sigs = compositeSignatureBodies(raw).take(MAX_STREAMED_SIGNATURES).mapNotNull { body ->
+            runCatching {
+                val parsed = CompositeSigPacket.parse(body)
+                val hasher = CompositeInlineStreamReader.ContentHasher(
+                    CompositeSigHash.V6DocumentHasher(parsed.hashAlgo, parsed.salt),
+                    text = parsed.sigType == CompositeSigPacket.TYPE_TEXT
+                )
+                Triple(body, parsed, hasher)
+            }.getOrNull()
+        }
+        if (sigs.isEmpty()) return Graded(SignerStatus.INVALID)
+        val buf = ByteArray(1 shl 16)
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            for ((_, _, h) in sigs) h.update(buf, 0, n)
+        }
+        var best: Graded? = null
+        for ((body, parsed, hasher) in sigs) {
+            val digest = hasher.finish(parsed.sigType, parsed.pubAlgo, parsed.hashed)
+            val g = grade(certs, body, ByteArray(0), nowMs, content = null) { suite, material, p ->
+                CompositeSigVerifier.verify(suite, material, p.signature, digest)
+            }
+            if (g.verified) return g
+            if (best == null || rank(g.status) > rank(best.status)) best = g
+        }
+        return best ?: Graded(SignerStatus.INVALID)
+    }
+
     /** A clear-signed composite message, graded against [certs]. */
     fun verifyCleartext(
         certs: List<ByteArray>,
@@ -218,6 +262,35 @@ object CompositeSignerGate {
         val sigs = packets.subList(li + 1, packets.size).filter { it.first == TAG_SIGNATURE }.map { it.second }
             .filter { it.size > 2 && CompositeSignSuite.forAlgId(it[2].toInt() and 0xFF) != null }
         return gradeAny(certs, sigs, content, nowMs, content = content, onePass = opsBodies)
+    }
+
+    /**
+     * 4.7.0 (item 23, #73): an inline composite message read as it streamed
+     * (CompositeInlineStreamReader). Each signature carries the digest of the
+     * content under its one-pass packet's salt; the same policy, one-pass
+     * binding and signer grade apply as for [verifyInline].
+     */
+    fun verifyStreamed(
+        certs: List<ByteArray>,
+        streamed: CompositeInlineStreamReader.Result,
+        nowMs: Long = System.currentTimeMillis()
+    ): Graded {
+        var best: Graded? = null
+        for (part in streamed.signatures) {
+            val sig = part.signatureBody
+            if (sig.size <= 2 || CompositeSignSuite.forAlgId(sig[2].toInt() and 0xFF) == null) continue
+            val digest = part.digest
+            val g = if (digest == null) {
+                Graded(SignerStatus.INVALID)
+            } else {
+                grade(certs, sig, ByteArray(0), nowMs, content = null, onePass = streamed.onePass) { suite, material, parsed ->
+                    CompositeSigVerifier.verify(suite, material, parsed.signature, digest)
+                }
+            }
+            if (g.verified) return g
+            if (best == null || rank(g.status) > rank(best.status)) best = g
+        }
+        return best ?: Graded(SignerStatus.INVALID)
     }
 
     /**
@@ -297,7 +370,10 @@ object CompositeSignerGate {
         rawData: ByteArray,
         nowMs: Long,
         content: ByteArray?,
-        onePass: List<ByteArray>? = null
+        onePass: List<ByteArray>? = null,
+        // 4.7.0 (item 23): the signature math over a digest computed elsewhere
+        // (streamed content); null means hash [rawData] here.
+        math: ((CompositeSignSuite, ByteArray, CompositeSigPacket.Parsed) -> Boolean)? = null
     ): Graded {
         val s = CertificateBindings.sigOrNull(sigBody) ?: return Graded(SignerStatus.INVALID, content = content)
         val claimedFps = s.allIssuerFingerprints()
@@ -319,8 +395,10 @@ object CompositeSignerGate {
         val signer = (named + others).firstOrNull { c ->
             if (!tried.add(c.fpHex.uppercase())) return@firstOrNull false
             if (onePass != null && !boundToOnePass(onePass, parsed, c.fpHex)) return@firstOrNull false
-            runCatching { CompositeSigPacket.verifyDocumentSignature(suite, c.material, parsed, data) }
-                .getOrDefault(false)
+            runCatching {
+                if (math != null) math(suite, c.material, parsed)
+                else CompositeSigPacket.verifyDocumentSignature(suite, c.material, parsed, data)
+            }.getOrDefault(false)
         } ?: return if (named.isEmpty()) base.copy(status = SignerStatus.UNKNOWN_SIGNER) else base
         // The same key (same fingerprint, so same material) may sit on more
         // than one supplied certificate; each is graded, the binding one wins.

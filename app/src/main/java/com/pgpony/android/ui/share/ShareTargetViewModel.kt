@@ -534,7 +534,7 @@ class ShareTargetViewModel(
                 val sig = summarizeSignature(
                     result.signatureVerified, result.signerKeyID, result.hasSignature,
                     result.compositeInline, result.compositeInlineBytes, result.compositeClaimedSignerFp,
-                    result.signerPrimaryFingerprint
+                    result.signerPrimaryFingerprint, result.compositeStreamed
                 )
                 _state.update {
                     it.copy(
@@ -872,12 +872,15 @@ class ShareTargetViewModel(
         compositeInlineBytes: ByteArray?,
         compositeClaimedSignerFp: String?,
         signerPrimaryFingerprint: String?,
+        compositeStreamed: com.pgpony.android.crypto.pqc.CompositeInlineStreamReader.Result? = null,
     ): SignatureSummary {
-        if (compositeInline && compositeInlineBytes != null) {
+        if (compositeInline && (compositeInlineBytes != null || compositeStreamed != null)) {
             val certs = withContext(Dispatchers.IO) { repository.loadCompositeSignerCerts() }
             val graded = withContext(Dispatchers.Default) {
                 runCatching {
-                    CompositeSignerGate.verifyInline(certs.map { it.second }, compositeInlineBytes)
+                    // 4.7.0 (item 23): a streamed decrypt carries digests, not bytes.
+                    if (compositeStreamed != null) CompositeSignerGate.verifyStreamed(certs.map { it.second }, compositeStreamed)
+                    else CompositeSignerGate.verifyInline(certs.map { it.second }, compositeInlineBytes!!)
                 }.getOrNull()
             }
             val keyId = graded?.signerKeyID ?: compositeClaimedSignerFp?.take(16)

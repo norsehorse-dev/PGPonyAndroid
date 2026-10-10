@@ -103,24 +103,8 @@ object CompositeDocumentSigner {
         random: SecureRandom = SecureRandom()
     ): ByteArray {
         val ctime = (creationTime.time / 1000L).toInt()
-        val sigPacket = CompositeSigPacket.buildDocumentSignature(
-            suite, compositeSecret, CompositeSigPacket.TYPE_BINARY, data,
-            signerFingerprint, ctime, random
-        )
-        val (_, sigBody) = CompositeSigPacket.firstPacket(sigPacket)
-        val salt = CompositeSigPacket.parse(sigBody).salt
-
-        val opsBody = ByteArrayOutputStream().apply {
-            write(6)
-            write(CompositeSigPacket.TYPE_BINARY)
-            write(CompositeSigPacket.HASH_SHA256)
-            write(suite.algId)
-            write(salt.size)
-            write(salt)
-            write(signerFingerprint) // 32 octets, v6
-            write(1) // nested flag: this is the only/last one-pass signature
-        }.toByteArray()
-        val ops = CompositeSigPacket.packet(TAG_ONE_PASS, opsBody)
+        val stream = InlineStream(suite, compositeSecret, signerFingerprint, creationTime, random)
+        stream.update(data, 0, data.size)
 
         val nameBytes = fileName.toByteArray(Charsets.UTF_8)
         val literalBody = ByteArrayOutputStream().apply {
@@ -132,6 +116,79 @@ object CompositeDocumentSigner {
         }.toByteArray()
         val literal = CompositeSigPacket.packet(TAG_LITERAL, literalBody)
 
-        return ops + literal + sigPacket
+        return stream.onePassPacket() + literal + stream.signaturePacket()
+    }
+
+    /**
+     * 4.7.0 (item 23, #73): a one-pass composite signature over data that
+     * streams. The caller writes [onePassPacket] first, then the literal data
+     * packet (any framing, partial lengths included) while passing every
+     * content octet to [update], then [signaturePacket] last. A composite
+     * signature is over a SHA-256 digest like any OpenPGP signature, so the
+     * content never has to be held in memory.
+     */
+    class InlineStream(
+        private val suite: CompositeSignSuite,
+        private val compositeSecret: ByteArray,
+        private val signerFingerprint: ByteArray,
+        creationTime: Date = Date(),
+        private val random: SecureRandom = SecureRandom()
+    ) {
+        private val hashed = CompositeSigPacket.hashedArea((creationTime.time / 1000L).toInt(), signerFingerprint)
+        private val salt = CompositeSigPacket.newSalt(random)
+        private val hasher = CompositeSigHash.V6DocumentHasher(CompositeSigPacket.HASH_SHA256, salt)
+
+        fun onePassPacket(): ByteArray {
+            val opsBody = ByteArrayOutputStream().apply {
+                write(6)
+                write(CompositeSigPacket.TYPE_BINARY)
+                write(CompositeSigPacket.HASH_SHA256)
+                write(suite.algId)
+                write(salt.size)
+                write(salt)
+                write(signerFingerprint) // 32 octets, v6
+                write(1) // nested flag: this is the only/last one-pass signature
+            }.toByteArray()
+            return CompositeSigPacket.packet(TAG_ONE_PASS, opsBody)
+        }
+
+        fun update(buf: ByteArray, off: Int, len: Int) = hasher.update(buf, off, len)
+
+        fun signaturePacket(): ByteArray {
+            val digest = hasher.finish(CompositeSigPacket.TYPE_BINARY, suite.algId, hashed)
+            return CompositeSigPacket.signaturePacket(
+                suite, compositeSecret, CompositeSigPacket.TYPE_BINARY, hashed, salt, digest, random
+            )
+        }
+    }
+
+    /**
+     * 4.7.0 (item 23, #73): a detached binary signature over [input], hashed in
+     * 64 KiB chunks. Armored when [armor] is set. Does not close [input].
+     */
+    fun signDetachedStream(
+        suite: CompositeSignSuite,
+        compositeSecret: ByteArray,
+        signerFingerprint: ByteArray,
+        input: java.io.InputStream,
+        armor: Boolean,
+        creationTime: Date = Date(),
+        random: SecureRandom = SecureRandom()
+    ): ByteArray {
+        val hashed = CompositeSigPacket.hashedArea((creationTime.time / 1000L).toInt(), signerFingerprint)
+        val salt = CompositeSigPacket.newSalt(random)
+        val hasher = CompositeSigHash.V6DocumentHasher(CompositeSigPacket.HASH_SHA256, salt)
+        val buf = ByteArray(1 shl 16)
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            hasher.update(buf, 0, n)
+        }
+        val digest = hasher.finish(CompositeSigPacket.TYPE_BINARY, suite.algId, hashed)
+        val packet = CompositeSigPacket.signaturePacket(
+            suite, compositeSecret, CompositeSigPacket.TYPE_BINARY, hashed, salt, digest, random
+        )
+        return if (armor) CompositeSigPacket.armor(SIG_ARMOR_HEADER, SIG_ARMOR_TAIL, packet).toByteArray(Charsets.UTF_8)
+        else packet
     }
 }

@@ -39,28 +39,40 @@ object CompositeSigHash {
         signatureType: Int,
         publicKeyAlgorithm: Int,
         hashedSubpacketBody: ByteArray
-    ): ByteArray {
-        val md = messageDigestFor(hashAlgorithm)
+    ): ByteArray = V6DocumentHasher(hashAlgorithm, salt)
+        .also { it.update(data, 0, data.size) }
+        .finish(signatureType, publicKeyAlgorithm, hashedSubpacketBody)
 
-        // v6: salt first, then the document body.
-        md.update(salt)
-        md.update(data)
+    /**
+     * 4.7.0 (item 23, #73): the same digest fed incrementally, so a large file
+     * is hashed as it streams instead of being held in memory. The salt goes
+     * in first (v6), then every [update], then [finish] adds the trailer.
+     */
+    class V6DocumentHasher(private val hashAlgorithm: Int, salt: ByteArray) {
+        private val md = messageDigestFor(hashAlgorithm).also { it.update(salt) }
 
-        // The hashed fields from the version octet through the hashed
-        // subpacket body, which the trailer length then counts.
-        val hashedFields = ByteArrayOutputStream().apply {
-            write(0x06)
-            write(signatureType and 0xFF)
-            write(publicKeyAlgorithm and 0xFF)
-            write(hashAlgorithm and 0xFF)
-            write(uint32(hashedSubpacketBody.size))
-            write(hashedSubpacketBody)
-        }.toByteArray()
+        fun update(buf: ByteArray, off: Int, len: Int) = md.update(buf, off, len)
 
-        md.update(hashedFields)
-        md.update(byteArrayOf(0x06, 0xFF.toByte()))
-        md.update(uint32(hashedFields.size))
-        return md.digest()
+        /** The digest with the trailer for these fields. The hasher itself is
+         *  left as it was, so it can be finished again for another signature. */
+        fun finish(signatureType: Int, publicKeyAlgorithm: Int, hashedSubpacketBody: ByteArray): ByteArray {
+            val md = this.md.clone() as MessageDigest
+            // The hashed fields from the version octet through the hashed
+            // subpacket body, which the trailer length then counts.
+            val hashedFields = ByteArrayOutputStream().apply {
+                write(0x06)
+                write(signatureType and 0xFF)
+                write(publicKeyAlgorithm and 0xFF)
+                write(hashAlgorithm and 0xFF)
+                write(uint32(hashedSubpacketBody.size))
+                write(hashedSubpacketBody)
+            }.toByteArray()
+
+            md.update(hashedFields)
+            md.update(byteArrayOf(0x06, 0xFF.toByte()))
+            md.update(uint32(hashedFields.size))
+            return md.digest()
+        }
     }
 
     private fun uint32(v: Int): ByteArray = byteArrayOf(
