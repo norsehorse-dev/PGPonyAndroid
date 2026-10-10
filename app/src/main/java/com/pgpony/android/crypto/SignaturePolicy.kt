@@ -64,6 +64,16 @@ object SignaturePolicy {
         else -> false
     }
 
+    /**
+     * 4.7.0 (item 27, #67): a User ID self-certification or revocation that
+     * fails [isAcceptableCertificationDigest] only because it uses SHA-1 or
+     * RIPEMD-160 after the key-signature cutoff. Such a User ID is kept with a
+     * weak-hash mark rather than dropped, so an older key keeps its name. MD5
+     * and unknown algorithms are never in this set.
+     */
+    fun isWeakCertificationDigest(hashAlg: Int, createdMs: Long?): Boolean =
+        hashAlg in LEGACY && !isAcceptableCertificationDigest(hashAlg, createdMs)
+
     /** True when [created] lies more than the skew allowance ahead of [now]. */
     fun isFromTheFuture(created: Date, now: Date = Date()): Boolean =
         created.time > now.time + FUTURE_SKEW_MS

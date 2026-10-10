@@ -806,6 +806,9 @@
     <string name="kd_vm_refresh_failed_format">Keyserver refresh failed: %1$s</string>
     <string name="key_detail_userids_title">User IDs</string>
     <string name="key_detail_userids_primary">Primary</string>
+    <!-- 4.7.0 (item 27, #67): a User ID bound only by a SHA-1 self-signature. -->
+    <string name="key_detail_userid_weak_hash_badge">Weak hash</string>
+    <string name="key_detail_userid_weak_hash_note">Bound with SHA-1, which is no longer considered safe. The name is kept, but it does not make the key verified.</string>
 
     <!-- ── 4.2.0 RC3 workstream I (#29): add/revoke/promote User IDs ── -->
     <string name="key_detail_userids_make_primary">Make Primary</string>

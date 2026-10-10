@@ -929,6 +929,18 @@ fun UserIdsSection(
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
+                    if (uid.weakHash) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.key_detail_userid_weak_hash_badge).uppercase(),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black,
+                            modifier = Modifier
+                                .background(Color(0xFFF59E0B), RoundedCornerShape(999.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                     if (uid.isRevoked) {
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
@@ -941,6 +953,14 @@ fun UserIdsSection(
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
+                }
+                if (uid.weakHash) {
+                    // 4.7.0 (item 27, #67).
+                    Text(
+                        text = stringResource(R.string.key_detail_userid_weak_hash_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 if (uid.email.isNotEmpty() && uid.name.isNotEmpty()) {
                     // #45: tap the email to copy it.

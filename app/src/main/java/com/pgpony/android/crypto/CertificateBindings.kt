@@ -164,7 +164,10 @@ object CertificateBindings {
         /** Subkey bindings: a verified 0x19 back-signature is embedded. */
         val backSigned: Boolean = false,
         /** Expiration of that back-signature, epoch ms; null = none. */
-        val backSigExpiresAtMs: Long? = null
+        val backSigExpiresAtMs: Long? = null,
+        /** 4.7.0 (item 27): a User ID certification accepted only under the
+         *  weak-hash rule (SHA-1 or RIPEMD-160 after the key-signature cutoff). */
+        val weakHash: Boolean = false
     ) {
         /** Created at or before [t] and not yet expired at [t]. */
         fun aliveAt(t: Long): Boolean = createdMs <= t && (sigExpiresAtMs == null || t < sigExpiresAtMs)
@@ -192,6 +195,11 @@ object CertificateBindings {
         val certifications: List<SelfSig>,
         val revocations: List<Revocation>
     ) {
+        /** 4.7.0 (item 27): every certification of this User ID is weak-hash
+         *  (none made with an accepted digest). Shown with its name and a weak
+         *  mark; it must never make the key look verified. */
+        val weakOnly: Boolean get() = certifications.isNotEmpty() && certifications.all { it.weakHash }
+
         /** A User ID revocation takes effect when made and ends when its
          *  signature expires, whatever its reason: it withdraws a claim about a
          *  name, never the key material. */
@@ -264,6 +272,11 @@ object CertificateBindings {
         /** 3.0.0 (5d-1): every User ID with at least one verified self-signature. */
         val userIds: List<UserIdState> = emptyList()
     ) {
+        /** 4.7.0 (item 27): User IDs (in [certifiedUserIds]) bound only by a
+         *  weak-hash self-certification. */
+        val weakUserIds: Set<String>
+            get() = userIds.filter { it.weakOnly && it.userId in certifiedUserIds }.map { it.userId }.toSet()
+
         /** Subkey state by fingerprint (hex, any case). Key IDs are not used:
          *  a v3 key ID is attacker-choosable, fingerprints are not. */
         fun subkeyByFingerprint(fpHex: String): SubkeyState? =
@@ -717,12 +730,12 @@ object CertificateBindings {
 
     /** Bounded signature verification (see MAX_VERIFICATIONS / MAX_HASHED_BYTES). */
     private class Budget(var remaining: Int = MAX_VERIFICATIONS, var bytesLeft: Long = MAX_HASHED_BYTES) {
-        fun verify(sig: SigBody, signer: KeyBody, prefix: ByteArray): Boolean {
+        fun verify(sig: SigBody, signer: KeyBody, prefix: ByteArray, allowWeakHash: Boolean = false): Boolean {
             val cost = prefix.size.toLong() + sig.hashed.size
             if (remaining <= 0 || cost > bytesLeft) return false
             remaining--
             bytesLeft -= cost
-            return CertificateBindings.verify(sig, signer, prefix)
+            return CertificateBindings.verify(sig, signer, prefix, allowWeakHash)
         }
     }
 
@@ -743,7 +756,7 @@ object CertificateBindings {
      * identity octets that precede the signature trailer). False on any
      * failure, including an unparseable signature or a hash / version mismatch.
      */
-    internal fun verify(sig: SigBody, signer: KeyBody, hashPrefix: ByteArray): Boolean = runCatching {
+    internal fun verify(sig: SigBody, signer: KeyBody, hashPrefix: ByteArray, allowWeakHash: Boolean = false): Boolean = runCatching {
         if (sig.pkAlg != signer.algorithm) return false
         // Signature version must match the key version (v6 keys make v6
         // signatures; v4 keys v4; LibrePGP v5 keys v5 or v4).
@@ -757,7 +770,11 @@ object CertificateBindings {
         // 5.2.3.7, 5.2.3.11).
         if (sig.createdMs == null) return false
         if (sig.hasCriticalUnknown) return false
-        if (!SignaturePolicy.isAcceptableCertificationDigest(sig.hashAlg, sig.createdMs)) return false
+        // 4.7.0 (item 27): [allowWeakHash] admits SHA-1 / RIPEMD-160 past the
+        // cutoff. Only User ID certifications and revocations pass it.
+        if (!SignaturePolicy.isAcceptableCertificationDigest(sig.hashAlg, sig.createdMs) &&
+            !(allowWeakHash && SignaturePolicy.isWeakCertificationDigest(sig.hashAlg, sig.createdMs))
+        ) return false
         val composite = CompositeSignSuite.forAlgId(signer.algorithm)
         if (composite != null) {
             if (sig.version != 6) return false
@@ -865,9 +882,14 @@ object CertificateBindings {
         // Newest verified self-signature over the primary (direct-key or a User
         // ID certification): where the primary's expiry is read from.
         var newestSelf: SigBody? = null
-        fun considerSelf(s: SigBody) {
-            val cur = newestSelf
-            if (cur == null || (s.createdMs ?: 0L) >= (cur.createdMs ?: 0L)) newestSelf = s
+        // 4.7.0 (item 27): a weak-hash User ID certification sets the primary's
+        // expiry only when no certification made with an accepted digest exists.
+        var newestWeakSelf: SigBody? = null
+        fun considerSelf(s: SigBody, weak: Boolean = false) {
+            val cur = if (weak) newestWeakSelf else newestSelf
+            if (cur == null || (s.createdMs ?: 0L) >= (cur.createdMs ?: 0L)) {
+                if (weak) newestWeakSelf = s else newestSelf = s
+            }
         }
         val directKeySigs = ArrayList<SelfSig>()
         val primaryRevocations = ArrayList<Revocation>()
@@ -935,20 +957,29 @@ object CertificateBindings {
                 )
             } else {
                 val prefix = primaryFrame + idFraming(c.tag, c.body)
-                val certifications = ArrayList<SelfSig>()
+                val strongCerts = ArrayList<Pair<SigBody, SelfSig>>()
+                val weakCerts = ArrayList<Pair<SigBody, SelfSig>>()
                 val revocations = ArrayList<Revocation>()
                 val check = selfSigsToCheck(c.sigs, primary)
                 for ((i, b) in c.sigs.withIndex()) {
                     if (i !in check) continue
                     val s = sigOrNull(b) ?: continue
+                    // 4.7.0 (item 27): SHA-1 past the cutoff is checked under the
+                    // weak-hash rule for User IDs only.
+                    val weak = SignaturePolicy.isWeakCertificationDigest(s.hashAlg, s.createdMs)
                     when (s.type) {
-                        in SIG_CERT_GENERIC..SIG_CERT_POSITIVE -> if (idBudget.verify(s, primary, prefix)) {
-                            considerSelf(s)
-                            certifications.add(selfSigOf(s, primaryCreated))
+                        in SIG_CERT_GENERIC..SIG_CERT_POSITIVE -> if (idBudget.verify(s, primary, prefix, allowWeakHash = weak)) {
+                            val selfSig = selfSigOf(s, primaryCreated).copy(weakHash = weak)
+                            if (weak) weakCerts.add(s to selfSig) else strongCerts.add(s to selfSig)
                         }
-                        SIG_CERT_REVOCATION -> if (idBudget.verify(s, primary, prefix)) revocations.add(revocationOf(s))
+                        SIG_CERT_REVOCATION -> if (idBudget.verify(s, primary, prefix, allowWeakHash = weak)) revocations.add(revocationOf(s))
                     }
                 }
+                // A User ID with any certification made with an accepted digest
+                // uses only those; the weak ones count only when nothing else binds it.
+                val chosen = if (strongCerts.isNotEmpty()) strongCerts else weakCerts
+                chosen.forEach { (s, selfSig) -> considerSelf(s, weak = selfSig.weakHash) }
+                val certifications = chosen.map { it.second }
                 if (c.tag != TAG_USER_ID || certifications.isEmpty()) continue
                 val state = UserIdState(String(c.body, Charsets.UTF_8), certifications, revocations)
                 userIds.add(state)
@@ -960,7 +991,7 @@ object CertificateBindings {
             primaryRevoked = primaryRevocations.any { it.inEffectAt(now) },
             subkeys = subkeys,
             certifiedUserIds = uids,
-            primaryExpiresAtMs = expiryOf(primaryCreated, newestSelf),
+            primaryExpiresAtMs = expiryOf(primaryCreated, newestSelf ?: newestWeakSelf),
             primaryCreatedAtMs = primaryCreated,
             directKeySigs = directKeySigs,
             primaryRevocations = primaryRevocations,
@@ -1054,16 +1085,23 @@ object CertificateBindings {
             } else {
                 val prefix = primaryFrame + idFraming(c.tag, c.body)
                 val keep = ArrayList<ByteArray>()
+                // 4.7.0 (item 27): weak-hash certifications are held apart and
+                // kept only when no certification with an accepted digest binds
+                // the User ID, the same choice analyze() makes.
+                val weakKeep = ArrayList<ByteArray>()
                 var certified = false
                 val check = selfSigsToCheck(c.sigs, primary)
                 for ((i, b) in c.sigs.withIndex()) {
                     val s = sigOrNull(b) ?: continue
                     val self = issuedBy(s, primary)
+                    val weak = SignaturePolicy.isWeakCertificationDigest(s.hashAlg, s.createdMs)
                     when {
                         s.type in SIG_CERT_GENERIC..SIG_CERT_POSITIVE && self ->
-                            if (i in check && idBudget.verify(s, primary, prefix)) { keep.add(b); certified = true }
+                            if (i in check && idBudget.verify(s, primary, prefix, allowWeakHash = weak)) {
+                                if (weak) weakKeep.add(b) else { keep.add(b); certified = true }
+                            }
                         s.type == SIG_CERT_REVOCATION && self ->
-                            if (i in check && idBudget.verify(s, primary, prefix)) keep.add(b)
+                            if (i in check && idBudget.verify(s, primary, prefix, allowWeakHash = weak)) keep.add(b)
                         // Third-party certification or revocation: cannot be
                         // checked here and carries no authority over the
                         // certificate's own capabilities; kept for display.
@@ -1073,6 +1111,10 @@ object CertificateBindings {
                         !self && (s.type in SIG_CERT_GENERIC..SIG_CERT_POSITIVE || s.type == SIG_CERT_REVOCATION) ->
                             if (bcSignature(b) != null) keep.add(b)
                     }
+                }
+                if (!certified && weakKeep.isNotEmpty() && c.tag == TAG_USER_ID) {
+                    keep.addAll(0, weakKeep)
+                    certified = true
                 }
                 if (!certified) continue
                 out.write(frame(c.tag, c.body))

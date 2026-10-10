@@ -1553,7 +1553,9 @@ private fun LoadedBody(
         // one (RC3 §17.2 I / #29) — software key pairs only, same
         // gating as the Subkeys section's Add button.
         val canEditUserIds = key.isKeyPair && !key.isCardBacked
-        if (state.userIds.size > 1 || canEditUserIds) {
+        // 4.7.0 (item 27): also shown for a single User ID carrying the
+        // weak-hash mark, so the mark is never hidden.
+        if (state.userIds.size > 1 || canEditUserIds || state.userIds.any { it.weakHash }) {
             item {
                 UserIdsSection(
                     userIds = state.userIds,

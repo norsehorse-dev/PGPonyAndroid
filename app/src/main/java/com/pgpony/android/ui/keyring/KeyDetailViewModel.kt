@@ -71,7 +71,10 @@ data class KeyUserIdInfo(
     val name: String,
     val email: String,
     val isPrimary: Boolean,
-    val isRevoked: Boolean = false
+    val isRevoked: Boolean = false,
+    /** 4.7.0 (item 27, #67): bound only by a SHA-1 self-certification made
+     *  after the cutoff. Shown with a weak-hash mark. */
+    val weakHash: Boolean = false
 )
 
 /**
@@ -930,7 +933,11 @@ class KeyDetailViewModel(
     // this was jank rather than an ANR — but it is the same mistake.
     private suspend fun deriveUserIds(entity: PGPKeyEntity): List<KeyUserIdInfo> {
         val fromRing = mutableListOf<KeyUserIdInfo>()
-        val primaryPub = withContext(Dispatchers.IO) { repo.loadPublicKeyRing(entity.fingerprint) }?.publicKey
+        val pubRing = withContext(Dispatchers.IO) { repo.loadPublicKeyRing(entity.fingerprint) }
+        val primaryPub = pubRing?.publicKey
+        val weakUids = withContext(Dispatchers.Default) {
+            pubRing?.let { runCatching { com.pgpony.android.crypto.CertificateBindings.analyze(it.encoded)?.weakUserIds }.getOrNull() }
+        }.orEmpty()
         primaryPub?.userIDs?.let { ids ->
             while (ids.hasNext()) {
                 val raw = ids.next() as? String ?: continue
@@ -942,7 +949,8 @@ class KeyDetailViewModel(
                         name = parsed.first,
                         email = parsed.second,
                         isPrimary = false,
-                        isRevoked = primaryPub?.let { UserIdService.shared.isRevoked(it, raw) } ?: false
+                        isRevoked = primaryPub?.let { UserIdService.shared.isRevoked(it, raw) } ?: false,
+                        weakHash = raw in weakUids
                     )
                 )
             }
