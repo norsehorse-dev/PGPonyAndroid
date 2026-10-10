@@ -724,6 +724,8 @@
     <string name="import_duplicate_view_key">Переглянути ключ</string>
     <string name="import_result_merged">Цей ключ уже був у вашій зв’язці ключів. Його оновлено новішим ключовим матеріалом.</string>
     <string name="import_result_already_in_keyring">Цей ключ уже є у вашій зв’язці ключів.</string>
+    <string name="import_result_own_key_updated">Вашу пару ключів оновлено новішими самопідписами з цієї копії (налаштування, термін дії або прив’язки).</string>
+    <string name="import_duplicate_own_key_note">Це ваша пара ключів. Імпорт додає лише самопідписи, новіші за наявні у вас, а в цій копії таких немає.</string>
 
     <!-- ── Confirm/cancel buttons (preview card) ────────────────────── -->
     <string name="import_button_upgrade_key">Доповнити ключ</string>
@@ -803,6 +805,8 @@
     <string name="kd_vm_refresh_failed_format">Не вдалося оновити із сервера ключів: %1$s</string>
     <string name="key_detail_userids_title">Ідентифікатори користувача</string>
     <string name="key_detail_userids_primary">Основний</string>
+    <string name="key_detail_userid_weak_hash_badge">СЛАБКИЙ ХЕШ</string>
+    <string name="key_detail_userid_weak_hash_note">Прив’язано за допомогою SHA-1, який більше не вважається безпечним. Ім’я збережено, але ключ від цього не стає перевіреним.</string>
 
     <!-- ── 4.2.0 RC3 workstream I (#29): add/revoke/promote User IDs ── -->
     <string name="key_detail_userids_make_primary">Зробити основним</string>
@@ -2159,6 +2163,8 @@
     <string name="share_target_action_import_encrypt_subtitle">Перевірте його відбиток, а потім натисніть «Зашифрувати для цього ключа»</string>
     <string name="share_target_action_verify">Перевірити підпис</string>
     <string name="share_target_action_verify_subtitle">Дізнайтеся, хто його підписав. Це повідомлення підписане, а не зашифроване</string>
+    <string name="share_target_action_encrypt_all">Зашифрувати все</string>
+    <string name="share_target_action_encrypt_all_subtitle">Відкрити весь переданий текст разом із блоком PGP на екрані шифрування, щоб обрізати й зашифрувати</string>
     <string name="share_target_action_sign">Підписати або зашифрувати й підписати</string>
     <string name="share_target_action_sign_subtitle">Відкрити цей текст на екрані шифрування PGPony</string>
     <string name="share_target_decrypt_result_unknown_signer">Підписано ключем, якого немає у вашій зв’язці ключів</string>
@@ -2560,6 +2566,8 @@
     <string name="err_secret_mpi_truncated">закритий MPI обрізано</string>
     <string name="err_security_key_was_disconnected_plug_back">Ключ безпеки від’єднано. Під’єднайте його знову і спробуйте ще раз.</string>
     <string name="err_select_openpgp_application_failed">Не вдалося виконати SELECT для застосунку OpenPGP (%1$s)</string>
+    <string name="err_malformed_signed_message">Підписане повідомлення має неправильний формат, тому його не відкрито.</string>
+    <string name="err_nfc_openpgp_unavailable">Цей ключ не відкрив застосунок OpenPGP через NFC. Деякі ключі, зокрема Nitrokey 3, вимикають OpenPGP через NFC. Якщо ваш ключ має USB, під’єднайте його і спробуйте ще раз.</string>
     <string name="err_session_key_block_too_short">блок сеансового ключа закороткий</string>
     <string name="err_session_key_checksum_mismatch">контрольна сума сеансового ключа не збігається</string>
     <string name="err_short_form_apdu_data_limited_255">Дані APDU короткої форми обмежені 255 байтами (було: %1$s). Для більших обсягів використовуйте ланцюжок команд або задайте extended = true.</string>

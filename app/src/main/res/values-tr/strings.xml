@@ -720,6 +720,8 @@
     <string name="import_duplicate_view_key">Anahtarı Görüntüle</string>
     <string name="import_result_merged">Bu anahtar zaten anahtarlığınızdaydı. Daha yeni anahtar malzemesiyle güncellendi.</string>
     <string name="import_result_already_in_keyring">Bu anahtar zaten anahtarlığınızda.</string>
+    <string name="import_result_own_key_updated">Anahtar çiftiniz bu kopyadaki daha yeni öz imzalarla güncellendi (tercihler, son kullanma tarihi veya bağlamalar).</string>
+    <string name="import_duplicate_own_key_note">Bu sizin anahtar çiftiniz. İçe aktarma yalnızca sizdekilerden daha yeni öz imzaları ekler ve bu kopyada böyle bir imza yok.</string>
 
     <!-- ── Confirm/cancel buttons (preview card) ────────────────────── -->
     <string name="import_button_upgrade_key">Anahtarı Yükselt</string>
@@ -799,6 +801,8 @@
     <string name="kd_vm_refresh_failed_format">Anahtar sunucusundan yenileme başarısız: %1$s</string>
     <string name="key_detail_userids_title">Kullanıcı Kimlikleri</string>
     <string name="key_detail_userids_primary">BİRİNCİL</string>
+    <string name="key_detail_userid_weak_hash_badge">Zayıf hash</string>
+    <string name="key_detail_userid_weak_hash_note">Artık güvenli kabul edilmeyen SHA-1 ile bağlanmış. Ad korunur, ancak bu anahtarı doğrulanmış yapmaz.</string>
 
     <!-- ── 4.2.0 RC3 workstream I (#29): add/revoke/promote User IDs ── -->
     <string name="key_detail_userids_make_primary">Birincil Yap</string>
@@ -2141,6 +2145,8 @@
     <string name="share_target_action_import_encrypt_subtitle">Parmak izini kontrol edin, ardından \"Bu anahtara şifrele\" düğmesine dokunun</string>
     <string name="share_target_action_verify">İmzayı doğrula</string>
     <string name="share_target_action_verify_subtitle">Kimin imzaladığını görün. Bu mesaj imzalı, şifreli değil</string>
+    <string name="share_target_action_encrypt_all">Tümünü şifrele</string>
+    <string name="share_target_action_encrypt_all_subtitle">PGP bloğu dahil paylaşılan metnin tamamını kırpıp şifrelemek için Şifrele ekranında aç</string>
     <string name="share_target_action_sign">İmzala veya şifrele ve imzala</string>
     <string name="share_target_action_sign_subtitle">Bu metni PGPony\'nin Şifrele ekranında açın</string>
     <string name="share_target_decrypt_result_unknown_signer">Anahtarlığınızda bulunmayan bir anahtarla imzalandı</string>
@@ -2532,6 +2538,8 @@
     <string name="err_secret_mpi_truncated">gizli MPI kesik</string>
     <string name="err_security_key_was_disconnected_plug_back">Güvenlik anahtarının bağlantısı kesildi. Yeniden takıp tekrar deneyin.</string>
     <string name="err_select_openpgp_application_failed">SELECT OpenPGP uygulaması başarısız oldu (%1$s)</string>
+    <string name="err_malformed_signed_message">İmzalı mesaj bozuk biçimli ve açılmadı.</string>
+    <string name="err_nfc_openpgp_unavailable">Bu anahtar OpenPGP uygulamasını NFC üzerinden açmadı. Nitrokey 3 dahil bazı anahtarlar NFC üzerinden OpenPGP\'yi kapatır. Anahtarınızda USB varsa takın ve tekrar deneyin.</string>
     <string name="err_session_key_block_too_short">oturum anahtarı bloğu çok kısa</string>
     <string name="err_session_key_checksum_mismatch">oturum anahtarı sağlama toplamı eşleşmiyor</string>
     <string name="err_short_form_apdu_data_limited_255">Kısa biçimli APDU verisi 255 baytla sınırlıdır (gelen: %1$s). Daha büyük yükler için komut zincirleme kullanın veya extended = true ayarlayın.</string>

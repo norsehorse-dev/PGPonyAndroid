@@ -1459,6 +1459,8 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="import_paste_from_clipboard">Aus Zwischenablage einfügen</string>
     <string name="import_preview_source_keyserver">Über deine Schlüsselserver gefunden</string>
     <string name="import_result_already_in_keyring">Dieser Schlüssel ist bereits in deinem Schlüsselbund.</string>
+    <string name="import_result_own_key_updated">Dein Schlüsselpaar wurde mit den neueren Selbstsignaturen aus dieser Kopie aktualisiert (Präferenzen, Ablaufdatum oder Bindungen).</string>
+    <string name="import_duplicate_own_key_note">Das ist dein Schlüsselpaar. Ein Import fügt nur Selbstsignaturen hinzu, die neuer sind als deine vorhandenen, und diese Kopie enthält keine.</string>
     <string name="import_result_merged">Dieser Schlüssel war bereits in deinem Schlüsselbund. Er wurde mit dem neueren Schlüsselmaterial aktualisiert.</string>
     <string name="kd_vm_refresh_failed_format">Schlüsselserver-Aktualisierung fehlgeschlagen: %1$s</string>
     <string name="kd_vm_refresh_merged">Aktualisiert. Dieser Schlüssel wurde mit dem neueren Material vom Schlüsselserver aktualisiert.</string>
@@ -1480,6 +1482,8 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="key_detail_expiry_sheet_subtitle">Lege ein neues Ablaufdatum für %1$s fest. Der Schlüssel und seine Unterschlüssel werden neu signiert; der Fingerabdruck bleibt gleich.</string>
     <string name="key_detail_expiry_sheet_title">Ablaufdatum bearbeiten</string>
     <string name="key_detail_userids_primary">Primär</string>
+    <string name="key_detail_userid_weak_hash_badge">Schwacher Hash</string>
+    <string name="key_detail_userid_weak_hash_note">Mit SHA-1 gebunden, das nicht mehr als sicher gilt. Der Name bleibt erhalten, aber der Schlüssel gilt dadurch nicht als verifiziert.</string>
     <string name="key_detail_userids_title">Benutzer-IDs</string>
     <string name="key_refresh_notif_expired_body">Der Schlüssel von %1$s ist laut einem Schlüsselserver abgelaufen.</string>
     <string name="key_refresh_notif_expired_title">Ein Schlüssel ist abgelaufen</string>
@@ -2051,6 +2055,8 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="share_target_action_import_encrypt_subtitle">Fingerabdruck prüfen, dann auf „An diesen Schlüssel verschlüsseln“ tippen</string>
     <string name="share_target_action_verify">Signatur prüfen</string>
     <string name="share_target_action_verify_subtitle">Sehen, wer sie signiert hat. Diese Nachricht ist signiert, nicht verschlüsselt</string>
+    <string name="share_target_action_encrypt_all">Alles verschlüsseln</string>
+    <string name="share_target_action_encrypt_all_subtitle">Den gesamten geteilten Text samt PGP-Block im Verschlüsseln-Bildschirm öffnen, um ihn zu kürzen und zu verschlüsseln</string>
     <string name="share_target_action_sign">Signieren oder verschlüsseln und signieren</string>
     <string name="share_target_action_sign_subtitle">Diesen Text im Verschlüsseln-Bildschirm von PGPony öffnen</string>
     <string name="share_target_decrypt_result_unknown_signer">Signiert mit einem Schlüssel, der nicht in deinem Schlüsselbund ist</string>
@@ -2456,6 +2462,8 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="err_secret_mpi_truncated">geheime MPI abgeschnitten</string>
     <string name="err_security_key_was_disconnected_plug_back">Der Sicherheitsschlüssel wurde getrennt. Schließe ihn wieder an und versuche es erneut.</string>
     <string name="err_select_openpgp_application_failed">SELECT der OpenPGP-Anwendung fehlgeschlagen (%1$s)</string>
+    <string name="err_malformed_signed_message">Die signierte Nachricht ist fehlerhaft und wurde nicht geöffnet.</string>
+    <string name="err_nfc_openpgp_unavailable">Dieser Schlüssel hat seine OpenPGP-Anwendung über NFC nicht geöffnet. Manche Schlüssel, darunter der Nitrokey 3, schalten OpenPGP über NFC ab. Wenn dein Schlüssel USB hat, steck ihn ein und versuche es erneut.</string>
     <string name="err_session_key_block_too_short">Sitzungsschlüssel-Block zu kurz</string>
     <string name="err_session_key_checksum_mismatch">Prüfsumme des Sitzungsschlüssels stimmt nicht</string>
     <string name="err_short_form_apdu_data_limited_255">APDU-Daten in Kurzform sind auf 255 Bytes begrenzt (waren %1$s). Verwende Command Chaining oder setze extended = true für größere Nutzdaten.</string>

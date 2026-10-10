@@ -1459,6 +1459,8 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="import_paste_from_clipboard">クリップボードから貼り付け</string>
     <string name="import_preview_source_keyserver">鍵サーバーで見つかりました</string>
     <string name="import_result_already_in_keyring">この鍵はすでに鍵束にあります。</string>
+    <string name="import_result_own_key_updated">このコピーに含まれる新しい自己署名（設定、有効期限、バインディング）で鍵ペアを更新しました。</string>
+    <string name="import_duplicate_own_key_note">これはあなたの鍵ペアです。インポートでは手元の自己署名より新しいものだけが追加されますが、このコピーには新しいものがありません。</string>
     <string name="import_result_merged">この鍵はすでに鍵束にありました。新しい鍵データで更新しました。</string>
     <string name="kd_vm_refresh_failed_format">鍵サーバーからの更新に失敗しました: %1$s</string>
     <string name="kd_vm_refresh_merged">更新しました。鍵サーバーの新しいデータでこの鍵を更新しました。</string>
@@ -1480,6 +1482,8 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="key_detail_expiry_sheet_subtitle">%1$s の新しい有効期限を設定します。鍵とサブ鍵が再署名されますが、フィンガープリントは変わりません。</string>
     <string name="key_detail_expiry_sheet_title">有効期限を編集</string>
     <string name="key_detail_userids_primary">プライマリ</string>
+    <string name="key_detail_userid_weak_hash_badge">弱いハッシュ</string>
+    <string name="key_detail_userid_weak_hash_note">SHA-1 で紐付けられていますが、SHA-1 はもう安全とは見なされていません。名前は保持されますが、これで鍵が確認済みになるわけではありません。</string>
     <string name="key_detail_userids_title">ユーザー ID</string>
     <string name="key_refresh_notif_expired_body">鍵サーバーによると %1$s の鍵は期限切れです。</string>
     <string name="key_refresh_notif_expired_title">鍵が期限切れになりました</string>
@@ -2044,6 +2048,8 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="share_target_action_import_encrypt_subtitle">フィンガープリントを確認して「この鍵に暗号化」をタップ</string>
     <string name="share_target_action_verify">署名を検証</string>
     <string name="share_target_action_verify_subtitle">署名者を確認します。このメッセージは署名済みで、暗号化されていません</string>
+    <string name="share_target_action_encrypt_all">すべて暗号化</string>
+    <string name="share_target_action_encrypt_all_subtitle">PGP ブロックを含む共有テキスト全体を暗号化画面で開き、整えてから暗号化</string>
     <string name="share_target_action_sign">署名、または暗号化して署名</string>
     <string name="share_target_action_sign_subtitle">このテキストを PGPony の暗号化画面で開きます</string>
     <string name="share_target_decrypt_result_unknown_signer">キーリングにないキーで署名されています</string>
@@ -2442,6 +2448,8 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="err_secret_mpi_truncated">秘密 MPI が途中で切れています</string>
     <string name="err_security_key_was_disconnected_plug_back">セキュリティキーが切断されました。差し込み直して、もう一度お試しください。</string>
     <string name="err_select_openpgp_application_failed">OpenPGP アプリケーションの SELECT に失敗しました (%1$s)</string>
+    <string name="err_malformed_signed_message">署名済みメッセージの形式が正しくないため、開きませんでした。</string>
+    <string name="err_nfc_openpgp_unavailable">この鍵は NFC 経由で OpenPGP アプリケーションを開きませんでした。Nitrokey 3 など一部の鍵は、NFC 経由では OpenPGP を無効にしています。鍵に USB がある場合は、接続してもう一度お試しください。</string>
     <string name="err_session_key_block_too_short">セッション鍵ブロックが短すぎます</string>
     <string name="err_session_key_checksum_mismatch">セッション鍵のチェックサムが一致しません</string>
     <string name="err_short_form_apdu_data_limited_255">短形式 APDU のデータは 255 バイトまでです (%1$s バイトでした)。より大きなペイロードにはコマンドチェーンを使うか、extended = true を設定してください。</string>

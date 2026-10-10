@@ -675,6 +675,8 @@
     <string name="import_duplicate_view_key">키 보기</string>
     <string name="import_result_merged">이 키는 이미 키링에 있었습니다. 더 새로운 키 자료로 갱신되었습니다.</string>
     <string name="import_result_already_in_keyring">이 키는 이미 키링에 있습니다.</string>
+    <string name="import_result_own_key_updated">이 사본에 있는 더 새로운 자체 서명(환경설정, 만료일 또는 바인딩)으로 키 쌍을 업데이트했습니다.</string>
+    <string name="import_duplicate_own_key_note">내 키 쌍입니다. 가져오기는 이미 있는 것보다 새로운 자체 서명만 추가하며, 이 사본에는 그런 서명이 없습니다.</string>
 
     <!-- ── Confirm/cancel buttons (preview card) ────────────────────── -->
     <string name="import_button_upgrade_key">키 업그레이드</string>
@@ -750,6 +752,8 @@
     <string name="kd_vm_refresh_failed_format">키 서버 새로 고침 실패: %1$s</string>
     <string name="key_detail_userids_title">사용자 ID</string>
     <string name="key_detail_userids_primary">기본</string>
+    <string name="key_detail_userid_weak_hash_badge">약한 해시</string>
+    <string name="key_detail_userid_weak_hash_note">더 이상 안전하지 않은 SHA-1로 바인딩되어 있습니다. 이름은 유지되지만 이것으로 키가 검증됨 상태가 되지는 않습니다.</string>
 
     <!-- ── 4.2.0 RC3 workstream I (#29): add/revoke/promote User IDs ── -->
     <string name="key_detail_userids_make_primary">기본으로 만들기</string>
@@ -2105,6 +2109,8 @@
     <string name="share_target_action_import_encrypt_subtitle">지문을 확인한 뒤 이 키로 암호화를 누르세요</string>
     <string name="share_target_action_verify">서명 검증</string>
     <string name="share_target_action_verify_subtitle">누가 서명했는지 확인합니다. 이 메시지는 서명만 되었고 암호화되지 않았습니다</string>
+    <string name="share_target_action_encrypt_all">전체 암호화</string>
+    <string name="share_target_action_encrypt_all_subtitle">PGP 블록을 포함한 공유 텍스트 전체를 암호화 화면에서 열어 다듬은 뒤 암호화</string>
     <string name="share_target_action_sign">서명 또는 암호화 후 서명</string>
     <string name="share_target_action_sign_subtitle">이 텍스트를 PGPony 암호화 화면에서 엽니다</string>
     <string name="share_target_decrypt_result_unknown_signer">키링에 없는 키로 서명됨</string>

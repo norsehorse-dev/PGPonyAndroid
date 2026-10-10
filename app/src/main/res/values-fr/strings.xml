@@ -1459,6 +1459,8 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="import_paste_from_clipboard">Coller depuis le presse-papiers</string>
     <string name="import_preview_source_keyserver">Trouvée via vos serveurs de clés</string>
     <string name="import_result_already_in_keyring">Cette clé est déjà dans votre trousseau.</string>
+    <string name="import_result_own_key_updated">Votre paire de clés a été mise à jour avec les autosignatures plus récentes de cette copie (préférences, expiration ou liaisons).</string>
+    <string name="import_duplicate_own_key_note">Il s\'agit de votre paire de clés. Une importation n\'ajoute que des autosignatures plus récentes que celles que vous avez, et cette copie n\'en contient aucune.</string>
     <string name="import_result_merged">Cette clé était déjà dans votre trousseau. Elle a été mise à jour avec le matériel de clé plus récent.</string>
     <string name="kd_vm_refresh_failed_format">Échec de l\'actualisation depuis le serveur de clés : %1$s</string>
     <string name="kd_vm_refresh_merged">Actualisée. Cette clé a été mise à jour avec le matériel plus récent du serveur de clés.</string>
@@ -1480,6 +1482,8 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="key_detail_expiry_sheet_subtitle">Définissez une nouvelle expiration pour %1$s. La clé et ses sous-clés sont re-signées ; l\'empreinte reste la même.</string>
     <string name="key_detail_expiry_sheet_title">Modifier l\'expiration</string>
     <string name="key_detail_userids_primary">Principale</string>
+    <string name="key_detail_userid_weak_hash_badge">Hachage faible</string>
+    <string name="key_detail_userid_weak_hash_note">Lié avec SHA-1, qui n\'est plus considéré comme sûr. Le nom est conservé, mais il ne suffit pas à rendre la clé vérifiée.</string>
     <string name="key_detail_userids_title">Identités</string>
     <string name="key_refresh_notif_expired_body">La clé de %1$s a expiré selon un serveur de clés.</string>
     <string name="key_refresh_notif_expired_title">Une clé a expiré</string>
@@ -2051,6 +2055,8 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="share_target_action_import_encrypt_subtitle">Vérifiez son empreinte, puis touchez Chiffrer vers cette clé</string>
     <string name="share_target_action_verify">Vérifier la signature</string>
     <string name="share_target_action_verify_subtitle">Voir qui l\'a signé. Ce message est signé, pas chiffré</string>
+    <string name="share_target_action_encrypt_all">Tout chiffrer</string>
+    <string name="share_target_action_encrypt_all_subtitle">Ouvrir tout le texte partagé, bloc PGP compris, dans l\'écran Chiffrer pour le raccourcir et le chiffrer</string>
     <string name="share_target_action_sign">Signer, ou chiffrer et signer</string>
     <string name="share_target_action_sign_subtitle">Ouvrir ce texte dans l\'écran Chiffrer de PGPony</string>
     <string name="share_target_decrypt_result_unknown_signer">Signé par une clé absente de votre trousseau</string>
@@ -2456,6 +2462,8 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="err_secret_mpi_truncated">MPI secret tronqué</string>
     <string name="err_security_key_was_disconnected_plug_back">La clé de sécurité a été déconnectée. Rebranchez-la et réessayez.</string>
     <string name="err_select_openpgp_application_failed">Échec de SELECT sur l\'application OpenPGP (%1$s)</string>
+    <string name="err_malformed_signed_message">Le message signé est mal formé et n\'a pas été ouvert.</string>
+    <string name="err_nfc_openpgp_unavailable">Cette clé n\'a pas ouvert son application OpenPGP via NFC. Certaines clés, dont la Nitrokey 3, désactivent OpenPGP via NFC. Si votre clé dispose d\'un port USB, branchez-la et réessayez.</string>
     <string name="err_session_key_block_too_short">bloc de clé de session trop court</string>
     <string name="err_session_key_checksum_mismatch">somme de contrôle de la clé de session incorrecte</string>
     <string name="err_short_form_apdu_data_limited_255">Les données d\'une APDU courte sont limitées à 255 octets (reçu : %1$s). Utilisez le chaînage de commandes ou définissez extended = true pour des charges plus grandes.</string>

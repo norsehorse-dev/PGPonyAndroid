@@ -718,6 +718,8 @@
     <string name="import_duplicate_view_key">查看密钥</string>
     <string name="import_result_merged">此密钥已在你的密钥环中。它已用较新的密钥材料更新。</string>
     <string name="import_result_already_in_keyring">此密钥已在你的密钥环中。</string>
+    <string name="import_result_own_key_updated">你的密钥对已用此副本中较新的自签名（首选项、过期时间或绑定）更新。</string>
+    <string name="import_duplicate_own_key_note">这是你的密钥对。导入只会添加比你现有的更新的自签名，而此副本中没有。</string>
 
     <!-- ── Confirm/cancel buttons (preview card) ────────────────────── -->
     <string name="import_button_upgrade_key">升级密钥</string>
@@ -797,6 +799,8 @@
     <string name="kd_vm_refresh_failed_format">密钥服务器刷新失败：%1$s</string>
     <string name="key_detail_userids_title">用户 ID</string>
     <string name="key_detail_userids_primary">主要</string>
+    <string name="key_detail_userid_weak_hash_badge">弱哈希</string>
+    <string name="key_detail_userid_weak_hash_note">使用 SHA-1 绑定，该算法已不再被视为安全。名称仍会保留，但密钥不会因此变为已验证。</string>
 
     <!-- ── 4.2.0 RC3 workstream I (#29): add/revoke/promote User IDs ── -->
     <string name="key_detail_userids_make_primary">设为主要</string>
@@ -2132,6 +2136,8 @@
     <string name="share_target_action_import_encrypt_subtitle">核对其指纹，然后轻点「向此密钥加密」</string>
     <string name="share_target_action_verify">验证签名</string>
     <string name="share_target_action_verify_subtitle">查看签名者。此消息已签名，但未加密</string>
+    <string name="share_target_action_encrypt_all">全部加密</string>
+    <string name="share_target_action_encrypt_all_subtitle">在加密界面中打开整段共享文本（包括 PGP 块），修剪后加密</string>
     <string name="share_target_action_sign">签名，或加密并签名</string>
     <string name="share_target_action_sign_subtitle">在 PGPony 的「加密」界面中打开此文本</string>
     <string name="share_target_decrypt_result_unknown_signer">由不在你密钥环中的密钥签名</string>
@@ -2518,6 +2524,8 @@
     <string name="err_secret_mpi_truncated">私钥 MPI 被截断</string>
     <string name="err_security_key_was_disconnected_plug_back">硬件密钥已断开连接。请重新插入后重试。</string>
     <string name="err_select_openpgp_application_failed">SELECT OpenPGP 应用失败（%1$s）</string>
+    <string name="err_malformed_signed_message">签名消息格式不正确，因此未打开。</string>
+    <string name="err_nfc_openpgp_unavailable">此密钥未通过 NFC 打开其 OpenPGP 应用。部分密钥（例如 Nitrokey 3）会在 NFC 下关闭 OpenPGP。如果你的密钥支持 USB，请插入后重试。</string>
     <string name="err_session_key_block_too_short">会话密钥块过短</string>
     <string name="err_session_key_checksum_mismatch">会话密钥校验和不匹配</string>
     <string name="err_short_form_apdu_data_limited_255">短格式 APDU 数据最多 255 字节（实际为 %1$s）。较大的数据请使用命令链接，或设置 extended = true。</string>

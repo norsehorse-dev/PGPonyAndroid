@@ -1459,6 +1459,8 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="import_paste_from_clipboard">Colar da área de transferência</string>
     <string name="import_preview_source_keyserver">Encontrada nos seus servidores de chaves</string>
     <string name="import_result_already_in_keyring">Esta chave já está no seu chaveiro.</string>
+    <string name="import_result_own_key_updated">Seu par de chaves foi atualizado com as autoassinaturas mais recentes desta cópia (preferências, validade ou vínculos).</string>
+    <string name="import_duplicate_own_key_note">Este é o seu par de chaves. Uma importação só adiciona autoassinaturas mais recentes que as que você já tem, e esta cópia não tem nenhuma.</string>
     <string name="import_result_merged">Esta chave já estava no seu chaveiro. Ela foi atualizada com o material de chave mais recente.</string>
     <string name="kd_vm_refresh_failed_format">Falha ao atualizar do servidor de chaves: %1$s</string>
     <string name="kd_vm_refresh_merged">Atualizada. Esta chave foi atualizada com o material mais recente do servidor de chaves.</string>
@@ -1480,6 +1482,8 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="key_detail_expiry_sheet_subtitle">Defina uma nova validade para %1$s. A chave e suas subchaves são reassinadas; a impressão digital continua a mesma.</string>
     <string name="key_detail_expiry_sheet_title">Editar validade</string>
     <string name="key_detail_userids_primary">Principal</string>
+    <string name="key_detail_userid_weak_hash_badge">Hash fraco</string>
+    <string name="key_detail_userid_weak_hash_note">Vinculado com SHA-1, que não é mais considerado seguro. O nome é mantido, mas não torna a chave verificada.</string>
     <string name="key_detail_userids_title">IDs de usuário</string>
     <string name="key_refresh_notif_expired_body">A chave de %1$s expirou segundo um servidor de chaves.</string>
     <string name="key_refresh_notif_expired_title">Uma chave expirou</string>
@@ -2051,6 +2055,8 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="share_target_action_import_encrypt_subtitle">Confira a impressão digital e toque em Criptografar para esta chave</string>
     <string name="share_target_action_verify">Verificar assinatura</string>
     <string name="share_target_action_verify_subtitle">Veja quem assinou. Esta mensagem está assinada, não criptografada</string>
+    <string name="share_target_action_encrypt_all">Criptografar tudo</string>
+    <string name="share_target_action_encrypt_all_subtitle">Abrir todo o texto compartilhado, incluindo o bloco PGP, na tela Criptografar para recortar e criptografar</string>
     <string name="share_target_action_sign">Assinar, ou criptografar e assinar</string>
     <string name="share_target_action_sign_subtitle">Abrir este texto na tela Criptografar do PGPony</string>
     <string name="share_target_decrypt_result_unknown_signer">Assinado por uma chave que não está no seu chaveiro</string>
@@ -2456,6 +2462,8 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="err_secret_mpi_truncated">MPI secreto truncado</string>
     <string name="err_security_key_was_disconnected_plug_back">A chave de segurança foi desconectada. Conecte-a novamente e tente de novo.</string>
     <string name="err_select_openpgp_application_failed">Falha no SELECT do aplicativo OpenPGP (%1$s)</string>
+    <string name="err_malformed_signed_message">A mensagem assinada está malformada e não foi aberta.</string>
+    <string name="err_nfc_openpgp_unavailable">Esta chave não abriu seu aplicativo OpenPGP via NFC. Algumas chaves, como a Nitrokey 3, desativam o OpenPGP via NFC. Se sua chave tiver USB, conecte-a e tente novamente.</string>
     <string name="err_session_key_block_too_short">bloco da chave de sessão curto demais</string>
     <string name="err_session_key_checksum_mismatch">checksum da chave de sessão não confere</string>
     <string name="err_short_form_apdu_data_limited_255">Os dados de APDU em formato curto são limitados a 255 bytes (eram %1$s). Use encadeamento de comandos ou defina extended = true para cargas maiores.</string>

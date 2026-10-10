@@ -1459,6 +1459,8 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="import_paste_from_clipboard">Pegar del portapapeles</string>
     <string name="import_preview_source_keyserver">Encontrada en tus servidores de claves</string>
     <string name="import_result_already_in_keyring">Esta clave ya está en tu llavero.</string>
+    <string name="import_result_own_key_updated">Tu par de claves se actualizó con las autofirmas más recientes de esta copia (preferencias, caducidad o vinculaciones).</string>
+    <string name="import_duplicate_own_key_note">Este es tu par de claves. Una importación solo añade autofirmas más recientes que las que ya tienes, y esta copia no tiene ninguna.</string>
     <string name="import_result_merged">Esta clave ya estaba en tu llavero. Se ha actualizado con el material de clave más reciente.</string>
     <string name="kd_vm_refresh_failed_format">Falló la actualización desde el servidor de claves: %1$s</string>
     <string name="kd_vm_refresh_merged">Actualizada. Esta clave se ha actualizado con el material más reciente del servidor de claves.</string>
@@ -1480,6 +1482,8 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="key_detail_expiry_sheet_subtitle">Establece una nueva caducidad para %1$s. Se vuelven a firmar la clave y sus subclaves; la huella digital no cambia.</string>
     <string name="key_detail_expiry_sheet_title">Editar caducidad</string>
     <string name="key_detail_userids_primary">Principal</string>
+    <string name="key_detail_userid_weak_hash_badge">Hash débil</string>
+    <string name="key_detail_userid_weak_hash_note">Vinculado con SHA-1, que ya no se considera seguro. El nombre se conserva, pero no hace que la clave quede verificada.</string>
     <string name="key_detail_userids_title">ID de usuario</string>
     <string name="key_refresh_notif_expired_body">La clave de %1$s ha caducado según un servidor de claves.</string>
     <string name="key_refresh_notif_expired_title">Una clave ha caducado</string>
@@ -2051,6 +2055,8 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="share_target_action_import_encrypt_subtitle">Comprueba su huella y toca Cifrar a esta clave</string>
     <string name="share_target_action_verify">Verificar firma</string>
     <string name="share_target_action_verify_subtitle">Mira quién la firmó. Este mensaje está firmado, no cifrado</string>
+    <string name="share_target_action_encrypt_all">Cifrar todo</string>
+    <string name="share_target_action_encrypt_all_subtitle">Abrir todo el texto compartido, bloque PGP incluido, en la pantalla Cifrar para recortarlo y cifrarlo</string>
     <string name="share_target_action_sign">Firmar, o cifrar y firmar</string>
     <string name="share_target_action_sign_subtitle">Abrir este texto en la pantalla Cifrar de PGPony</string>
     <string name="share_target_decrypt_result_unknown_signer">Firmado con una clave que no está en tu llavero</string>
@@ -2456,6 +2462,8 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="err_secret_mpi_truncated">MPI secreto truncado</string>
     <string name="err_security_key_was_disconnected_plug_back">La llave de seguridad se desconectó. Vuelve a conectarla e inténtalo de nuevo.</string>
     <string name="err_select_openpgp_application_failed">Falló SELECT de la aplicación OpenPGP (%1$s)</string>
+    <string name="err_malformed_signed_message">El mensaje firmado está mal formado y no se abrió.</string>
+    <string name="err_nfc_openpgp_unavailable">Esta llave no abrió su aplicación OpenPGP por NFC. Algunas llaves, como la Nitrokey 3, desactivan OpenPGP por NFC. Si tu llave tiene USB, conéctala e inténtalo de nuevo.</string>
     <string name="err_session_key_block_too_short">bloque de clave de sesión demasiado corto</string>
     <string name="err_session_key_checksum_mismatch">la suma de comprobación de la clave de sesión no coincide</string>
     <string name="err_short_form_apdu_data_limited_255">Los datos de una APDU de formato corto están limitados a 255 bytes (había %1$s). Usa el encadenamiento de comandos o establece extended = true para cargas más grandes.</string>
