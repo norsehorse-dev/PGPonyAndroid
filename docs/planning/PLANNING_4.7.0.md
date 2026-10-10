@@ -87,7 +87,7 @@ Reported: for text with a PGP block inside it, "Encrypt the other text" has no r
 the whole thing (text plus block) and let the user trim it in the text field.
 
 Work: replace "Encrypt the other text" with "Encrypt all of it", which opens the full shared text on the Encrypt
-screen. Keep the block's own action (Import, Decrypt, Verify) as it is. Update the string in all 8 locales.
+screen. Keep the block's own action (Import, Decrypt, Verify) as it is. Update the string in all 10 locales.
 
 
 ## 4. Days left on each key in Recently Deleted (#58)
@@ -98,7 +98,7 @@ Priority: low (polish). Origin: CertainBot (#58).
 
 Work: each row in Recently Deleted shows how long until it is destroyed ("10 days left", "Less than a day
 left"), computed from deletedAt and KeyRepository.RECYCLE_BIN_RETENTION_DAYS, refreshed when the screen opens.
-Plurals in all 8 locales.
+Plurals in all 10 locales.
 
 
 ## 5. Other places that load recipients with the plain BouncyCastle loader
@@ -731,6 +731,27 @@ Work: purge the bin in clearAllData too (purgeKey on every soft-deleted key, or 
 SecureKeyStore wipe). Test: delete a key pair, Clear All Data, check Recently Deleted is empty and the secret
 material is gone from SecureKeyStore. Confirm on device first, and decide whether it waits for 4.7.0 or goes out
 as a 4.6.x fix.
+
+
+## RC breakdown (set Oct 9 2026)
+
+One RC at a time: the next RC's work starts only after the current one is built and tested. versionCode 470 /
+4.7.0 from RC1 on, unchanged across RCs. New strings go into all 10 locales (de, es, fr, ja, ko, pt-rBR, ru, tr,
+uk, b+zh+Hans).
+
+- RC1, bugs and promises already made: 33, 25, 27, 24, 23, 3, 29. Item 26 joins once it reproduces; items 7 and
+  28 join if their reporters answer. Item 33 ships in 4.7.0 only (no 4.6.x point release).
+- RC2, key management on soft keys: 22, then 10, then 31 (31 needs 22's stub check and 10's Verified level).
+  Certifying on a card waits for RC4.
+- RC3: 15 (each file separately), 32 (duress PIN, builds on 33), 6, 21 remainder (protocol change shared with
+  desktop and iOS PGPonyPair), 8.
+- RC4, card work: 13 (keytocard) and card certification for 31, once a working card is on hand for testing.
+- Last RC: the 12a on-device checks (Tor with Orbot, custom proxy, OpenKeychain restore, protected key over a
+  contact, the provider with Thunderbird including a card).
+- Not RC-gated: 30 (README), 11 (SOP wrapper), 12 (external review follow-up).
+
+Item 27 decision: a User ID whose only binding uses SHA-1 is kept with its name and a weak-hash mark, still
+matches recipient lookup by address, and never counts toward Verified.
 
 
 ## Release process notes (learned in 4.6.0)

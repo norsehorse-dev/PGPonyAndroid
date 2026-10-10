@@ -254,8 +254,10 @@ android {
         // Quick Action, SSH authentication service (#68), key-server merge and
         // the security review remediation. versionCode 460 so it installs over
         // 4.5.3.
-        versionCode = 461
-        versionName = "4.6.1"
+        // 4.7.0: 4.6.2 to 4.6.4 shipped from the 4.6.x branch (up to 464), so
+        // main moves straight from 461 to 470. Unchanged across the RCs.
+        versionCode = 470
+        versionName = "4.7.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
