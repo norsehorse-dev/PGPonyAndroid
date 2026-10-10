@@ -588,6 +588,8 @@ name through the Quick Action; the classical path is unchanged; a signed text me
 
 ## 26. An ML-DSA-65 v6 key imported in 4.5.x can't be encrypted to after upgrading (#67)
 
+**Status (Oct 9 2026):** desk reproduction built (ImportedPqcKeyUpgradeTest, with sq 1.5.0 fixtures). Every stored shape an upgrade leaves behind loads as a recipient and decrypts, and sq's own encrypted and signed message decrypts and verifies, so the stored public key is not the cause. The run found a different bug that every sq key hits in every shape: composite signing always used the primary, and sq makes a certify-only primary with a separate ML-DSA signing subkey, so each signature PGPony made with such a key graded "Signer key is not allowed to sign" (NOT_SIGNING_KEY), in PGPony and in other verifiers. Fixed for RC1: CompositeKeyFacade picks the signing key (the primary when its self-signature allows signing, else the newest valid composite signing subkey) and every composite signing path uses it. Whether this is the reported red error still needs the message wording; the old key store path (keys imported on 4.5.0 to 4.5.2, before the 4.5.3 store) remains to check on a phone.
+
 Priority: high (bug, data). Origin: #67 (Oct 5): in a Work Profile install dating from about 4.1.0, a v6 key with
 an ML-DSA-65 primary and only post-quantum subkeys, generated with sq and imported during 4.5.x, fails with a red
 error when chosen as a recipient on 4.6.3. A copy of the same key restored from another profile's backup works.

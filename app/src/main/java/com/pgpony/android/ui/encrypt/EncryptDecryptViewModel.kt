@@ -1339,17 +1339,17 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     } catch (e: Exception) {
                         throw SigningError.InvalidPassphrase()
                     } ?: throw SigningError.NoSigningKey()
-                    val secret = info.compositeSecret
+                    val secret = info.signingSecret
                         ?: throw SigningError.PassphraseRequired()
                     if (effPass != null) com.pgpony.android.session.InAppPassphraseCache.put(signFp, effPass)
                     if (s.detachedSignature) {
                         CompositeDocumentSigner.signDetachedArmored(
-                            info.suite, secret, info.fingerprint,
+                            info.signingSuite, secret, info.signingFingerprint,
                             s.inputText.toByteArray(Charsets.UTF_8)
                         )
                     } else {
                         CompositeDocumentSigner.signCleartext(
-                            info.suite, secret, info.fingerprint, s.inputText
+                            info.signingSuite, secret, info.signingFingerprint, s.inputText
                         )
                     }
                 } else {
@@ -1497,7 +1497,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     else null
                 }
                 if (effectiveSigner != null && effectiveSigner.algorithm.isCompositeSign &&
-                    compositeInfo?.compositeSecret == null
+                    compositeInfo?.signingSecret == null
                 ) {
                     throw com.pgpony.android.crypto.SigningError.PassphraseRequired()
                 }
@@ -1530,9 +1530,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         signingKeyId = s.selectedSigningKeyId,
                         recipientSubkeyChoices = s.recipientSubkeyChoices,
                         v4Algo35Recipients = v4Recipients,
-                        compositeSignSuite = compositeInfo?.suite,
-                        compositeSignSecret = compositeInfo?.compositeSecret,
-                        compositeSignerFingerprint = compositeInfo?.fingerprint,
+                        compositeSignSuite = compositeInfo?.signingSuite,
+                        compositeSignSecret = compositeInfo?.signingSecret,
+                        compositeSignerFingerprint = compositeInfo?.signingFingerprint,
                         compositeSignInSeipdV1 = !droppedPqcSignature
                     )
                 }
@@ -1922,7 +1922,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     else null
                 }
                 if (effectiveSigner != null && effectiveSigner.algorithm.isCompositeSign &&
-                    compositeInfo?.compositeSecret == null
+                    compositeInfo?.signingSecret == null
                 ) {
                     throw SigningError.PassphraseRequired()
                 }
@@ -1960,9 +1960,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             signingKeyId = s.selectedSigningKeyId,
                             recipientSubkeyChoices = s.recipientSubkeyChoices,
                             v4Algo35Recipients = v4Recipients,
-                            compositeSignSuite = compositeInfo?.suite,
-                            compositeSignSecret = compositeInfo?.compositeSecret,
-                            compositeSignerFingerprint = compositeInfo?.fingerprint,
+                            compositeSignSuite = compositeInfo?.signingSuite,
+                            compositeSignSecret = compositeInfo?.signingSecret,
+                            compositeSignerFingerprint = compositeInfo?.signingFingerprint,
                             compositeSignInSeipdV1 = !droppedPqcSignature
                         )
                     }
@@ -1979,9 +1979,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         signingKeyId = s.selectedSigningKeyId,
                         v4Recipients = v4Recipients,
                         totalBytes = s.selectedFileSize ?: 0L,
-                        compositeSuite = compositeInfo?.suite,
-                        compositeSecret = compositeInfo?.compositeSecret,
-                        compositeFingerprint = compositeInfo?.fingerprint,
+                        compositeSuite = compositeInfo?.signingSuite,
+                        compositeSecret = compositeInfo?.signingSecret,
+                        compositeFingerprint = compositeInfo?.signingFingerprint,
                         compositeSignInSeipdV1 = !droppedPqcSignature,
                         recipientSubkeyChoices = s.recipientSubkeyChoices
                     )
@@ -2463,7 +2463,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     else null
                 }
                 if (effectiveSigner != null && effectiveSigner.algorithm.isCompositeSign &&
-                    compositeInfo?.compositeSecret == null
+                    compositeInfo?.signingSecret == null
                 ) {
                     throw SigningError.PassphraseRequired()
                 }
@@ -2572,9 +2572,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                                     signingKeyId = s.selectedSigningKeyId,
                                     recipientSubkeyChoices = s.recipientSubkeyChoices,
                                     v4Algo35Recipients = v4Recipients,
-                                    compositeSignSuite = compositeInfo?.suite,
-                                    compositeSignSecret = compositeInfo?.compositeSecret,
-                                    compositeSignerFingerprint = compositeInfo?.fingerprint,
+                                    compositeSignSuite = compositeInfo?.signingSuite,
+                                    compositeSignSecret = compositeInfo?.signingSecret,
+                                    compositeSignerFingerprint = compositeInfo?.signingFingerprint,
                                     compositeSignInSeipdV1 = !droppedPqcSignature
                                 )
                             }
@@ -5275,11 +5275,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             key.fingerprint, s.signFilePassphrase.ifEmpty { null }?.toCharArray()
                         )
                     }
-                    val secret = info?.compositeSecret ?: throw SigningError.PassphraseRequired()
+                    val secret = info?.signingSecret ?: throw SigningError.PassphraseRequired()
                     withContext(Dispatchers.IO) {
                         PGPonyApp.instance.contentResolver.openInputStream(uri)?.use { input ->
                             CompositeDocumentSigner.signDetachedStream(
-                                info.suite, secret, info.fingerprint, input, armor = s.signFileArmor
+                                info.signingSuite, secret, info.signingFingerprint, input, armor = s.signFileArmor
                             )
                         } ?: throw SigningError.SigningFailed(
                             PGPonyApp.instance.getString(R.string.sign_verify_error_file_unreadable)

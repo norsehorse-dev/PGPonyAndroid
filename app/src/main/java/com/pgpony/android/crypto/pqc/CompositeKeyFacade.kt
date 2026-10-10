@@ -74,7 +74,20 @@ object CompositeKeyFacade {
          *  with or sign with: it is NOT a validity filter (the primary is
          *  listed even when revoked, expired or not sign flagged). Grade a
          *  verified signature with CompositeSignerGate. */
-        val compositeSigners: List<CompositeComponent>
+        val compositeSigners: List<CompositeComponent>,
+        /**
+         * 4.7.0 (item 26, #67): the key that makes this certificate's data
+         * signatures. The primary when its self-signature allows signing (a
+         * PGPony-generated key), otherwise the newest composite subkey that is
+         * a valid signer now: bound, back-signed, sign flagged, unexpired and
+         * unrevoked (sq makes a certify-only primary with a signing subkey).
+         * Signing with the primary of such a key made signatures every
+         * verifier, PGPony included, reports as made by a key not allowed to
+         * sign. [signingSecret] is null when the key is locked or public only.
+         */
+        val signingSuite: CompositeSignSuite = suite,
+        val signingSecret: ByteArray? = compositeSecret,
+        val signingFingerprint: ByteArray = fingerprint
     )
 
     /** True if the first key packet in [ring] is a composite signing key (algo 30/31). */
@@ -403,7 +416,7 @@ object CompositeKeyFacade {
         return out.toByteArray()
     }
 
-    fun parse(ring: ByteArray, passphrase: CharArray? = null): Info {
+    fun parse(ring: ByteArray, passphrase: CharArray? = null, unlockSigner: Boolean = false): Info {
         val packets = walk(ring)
         val primary = packets.first { it.tag == 5 || it.tag == 6 }
         val primaryPublicBody = publicKeyBody(primary.body)
@@ -454,6 +467,39 @@ object CompositeKeyFacade {
             )
         }
 
+        // 4.7.0 (item 26): the signing key (see Info.signingSecret).
+        val nowMs = System.currentTimeMillis()
+        val primarySigns = !checked() ||
+            bindings!!.signerValidityAt(primaryFpHex, nowMs) == com.pgpony.android.crypto.CertificateBindings.SignerValidity.VALID
+        val signingSub = if (primarySigns) null else keyPackets
+            .filter { it.tag == 7 || it.tag == 14 }
+            .mapNotNull { pkt ->
+                val pb = publicKeyBody(pkt.body)
+                val algId = pb[1 + 4].toInt() and 0xFF
+                val compSuite = CompositeSignSuite.forAlgId(algId) ?: return@mapNotNull null
+                val fp = v6Fingerprint(pb)
+                val fpHex = fp.joinToString("") { "%02x".format(it) }
+                if (bindings!!.signerValidityAt(fpHex, nowMs) != com.pgpony.android.crypto.CertificateBindings.SignerValidity.VALID) return@mapNotNull null
+                val created = beInt(pb, 1).toLong() and 0xFFFFFFFFL
+                Triple(pkt, compSuite, fp) to created
+            }
+            .maxByOrNull { it.second }?.first
+        val signingSecret: ByteArray?
+        val signingSuite: CompositeSignSuite
+        val signingFingerprint: ByteArray
+        if (signingSub != null) {
+            val (pkt, compSuite, fp) = signingSub
+            signingSuite = compSuite
+            signingFingerprint = fp
+            // Unlocked only for a caller that is about to sign ([unlockSigner]),
+            // so a decrypt does not pay a second Argon2 run.
+            signingSecret = if (pkt.tag == 7 && unlockSigner) secretMaterial(pkt.body, compSuite.compositeSecretLen, passphrase) else null
+        } else {
+            signingSuite = suite
+            signingFingerprint = fingerprint
+            signingSecret = compositeSecret
+        }
+
         // The ML-KEM encryption subkey (algo 35/36), if any: the first one the
         // primary bound with a verified 0x18 (4.6.0 item 17.1).
         val subIdx = packets.indexOfFirst { pkt ->
@@ -493,7 +539,10 @@ object CompositeKeyFacade {
             compositePublic = compositePublic,
             compositeSecret = compositeSecret,
             encryptionSubkey = subkey,
-            compositeSigners = compositeSigners
+            compositeSigners = compositeSigners,
+            signingSuite = signingSuite,
+            signingSecret = signingSecret,
+            signingFingerprint = signingFingerprint
         )
     }
 

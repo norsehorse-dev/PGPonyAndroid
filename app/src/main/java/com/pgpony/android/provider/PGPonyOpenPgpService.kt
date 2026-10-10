@@ -769,7 +769,7 @@ class PGPonyOpenPgpService : Service() {
                         compSigner.passphrase?.takeIf { it.isNotEmpty() }?.toCharArray()
                     )
                 }
-                val secret = info?.compositeSecret
+                val secret = info?.signingSecret
                     ?: return passphraseRequiredResult(data, compSigner.keyId, compSigner.label, wasWrong = false)
                 val plaintext = ParcelFileDescriptor.AutoCloseInputStream(input).use { readBounded(it) }
                 val encrypted = crypto.encrypt(
@@ -777,9 +777,9 @@ class PGPonyOpenPgpService : Service() {
                     recipientPublicKeys = rings.values.toList(),
                     filename = filename,
                     armor = armor,
-                    compositeSignSuite = info.suite,
+                    compositeSignSuite = info.signingSuite,
                     compositeSignSecret = secret,
-                    compositeSignerFingerprint = info.fingerprint
+                    compositeSignerFingerprint = info.signingFingerprint
                 )
                 ParcelFileDescriptor.AutoCloseOutputStream(output).use { it.write(encrypted) }
                 rememberProviderUnlock(compSigner.entity.fingerprint, compSigner.passphrase)
@@ -856,10 +856,10 @@ class PGPonyOpenPgpService : Service() {
                         resolved.passphrase?.takeIf { it.isNotEmpty() }?.toCharArray()
                     )
                 }
-                val secret = info?.compositeSecret
+                val secret = info?.signingSecret
                     ?: return passphraseRequiredResult(data, resolved.keyId, resolved.label, wasWrong = false)
                 val signed = com.pgpony.android.crypto.pqc.CompositeDocumentSigner.signCleartext(
-                    info.suite, secret, info.fingerprint, text
+                    info.signingSuite, secret, info.signingFingerprint, text
                 )
                 writeAll(output, signed.toByteArray(Charsets.UTF_8))
                 successResult()
@@ -957,15 +957,15 @@ class PGPonyOpenPgpService : Service() {
                         resolved.passphrase?.takeIf { it.isNotEmpty() }?.toCharArray()
                     )
                 }
-                val secret = info?.compositeSecret
+                val secret = info?.signingSecret
                     ?: return passphraseRequiredResult(data, resolved.keyId, resolved.label, wasWrong = false)
                 val signature: ByteArray = if (armor) {
                     com.pgpony.android.crypto.pqc.CompositeDocumentSigner
-                        .signDetachedArmored(info.suite, secret, info.fingerprint, payload)
+                        .signDetachedArmored(info.signingSuite, secret, info.signingFingerprint, payload)
                         .toByteArray(Charsets.UTF_8)
                 } else {
                     com.pgpony.android.crypto.pqc.CompositeDocumentSigner
-                        .signDetached(info.suite, secret, info.fingerprint, payload)
+                        .signDetached(info.signingSuite, secret, info.signingFingerprint, payload)
                 }
                 successResult().apply {
                     putExtra(OpenPgpApi.RESULT_DETACHED_SIGNATURE, signature)

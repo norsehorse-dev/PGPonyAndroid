@@ -1384,7 +1384,8 @@ class KeyRepository(
         // #26 (RC4): parse threads the passphrase to unlock a protected signing
         // key. A wrong passphrase propagates (the sign path maps it to a retry);
         // a locked key with no passphrase yields Info with a null compositeSecret.
-        return CompositeKeyFacade.parse(data, passphrase)
+        // 4.7.0 (item 26): every caller signs, so unlock the signing key too.
+        return CompositeKeyFacade.parse(data, passphrase, unlockSigner = true)
     }
 
     /**

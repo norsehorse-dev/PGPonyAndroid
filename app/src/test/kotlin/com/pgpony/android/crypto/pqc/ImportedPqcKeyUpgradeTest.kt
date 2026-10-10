@@ -22,6 +22,7 @@ import com.pgpony.android.crypto.CertificateBindings
 import com.pgpony.android.crypto.PGPCryptoService
 import org.bouncycastle.bcpg.ArmoredInputStream
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -83,14 +84,14 @@ class ImportedPqcKeyUpgradeTest {
                 try {
                     val recipient = CompositeKeyFacade.encryptionSubkeyRing(pub)
                     assertNotNull("$label: no recipient ring from the stored public key", recipient)
-                    val info = CompositeKeyFacade.parse(sec, fx.passphrase?.toCharArray())
-                    assertNotNull("$label: signing secret did not unlock", info.compositeSecret)
+                    val info = CompositeKeyFacade.parse(sec, fx.passphrase?.toCharArray(), unlockSigner = true)
+                    assertNotNull("$label: signing secret did not unlock", info.signingSecret)
                     val plaintext = "item 26 $label".toByteArray()
                     val message = svc.encrypt(
                         plaintext, listOf(recipient!!),
-                        compositeSignSuite = info.suite,
-                        compositeSignSecret = info.compositeSecret,
-                        compositeSignerFingerprint = info.fingerprint
+                        compositeSignSuite = info.signingSuite,
+                        compositeSignSecret = info.signingSecret,
+                        compositeSignerFingerprint = info.signingFingerprint
                     )
                     val result = svc.decrypt(
                         message, secretKeyRings = emptyList(), passphrase = fx.passphrase,
@@ -140,5 +141,26 @@ class ImportedPqcKeyUpgradeTest {
             )
             assertArrayEquals("$shape: round trip", plaintext, back.data)
         }
+    }
+
+    @Test
+    fun `an sq key signs with its signing subkey, a PGPony key with its primary`() {
+        for (fx in fixtures) {
+            val raw = res(fx.name)?.let { deArmor(it) } ?: continue
+            val info = CompositeKeyFacade.parse(raw, fx.passphrase?.toCharArray(), unlockSigner = true)
+            assertFalse(
+                "${fx.name}: sq's primary is certify-only, so a subkey must sign",
+                info.signingFingerprint.contentEquals(info.fingerprint)
+            )
+            assertTrue(
+                "${fx.name}: the signer is one of the key's composite signing subkeys",
+                info.compositeSigners.any { it.fingerprintHex.equals(info.signingFingerprint.joinToString("") { b -> "%02x".format(b) }, ignoreCase = true) }
+            )
+            assertNotNull("${fx.name}: signing secret", info.signingSecret)
+        }
+        val own = CompositePrimaryKeyGen.assemble("PGPony key <own@pgpony.app>")
+        val ownInfo = CompositeKeyFacade.parse(own, null, unlockSigner = true)
+        assertArrayEquals("a PGPony key signs with its primary", ownInfo.fingerprint, ownInfo.signingFingerprint)
+        assertArrayEquals(ownInfo.compositeSecret, ownInfo.signingSecret)
     }
 }
