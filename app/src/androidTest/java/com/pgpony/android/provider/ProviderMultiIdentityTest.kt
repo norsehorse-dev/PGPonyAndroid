@@ -57,7 +57,7 @@ class ProviderMultiIdentityTest {
         ApiClientAuthorizer(
             dao = app.database.apiClientDao(),
             signatureSha256Of = ApiClientAuthorizer.platformSignatureLookup(app.packageManager)
-        ).grant(app.packageName)
+        ).grant(app.packageName, com.pgpony.android.data.ApiClientEntity.SCOPE_OPENPGP)
         val entity = app.keyRepository.generateKey(
             name = "Provider Multi Identity",
             email = PRIMARY,

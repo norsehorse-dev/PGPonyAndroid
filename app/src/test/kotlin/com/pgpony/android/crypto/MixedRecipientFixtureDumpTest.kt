@@ -4,13 +4,9 @@
 // Generator, not a test of anything: produces fresh keys, encrypts one message
 // per cell of the multi-recipient matrix through PGPCryptoService (the exact
 // wire shapes 4.5.x writes), asserts every holder decrypts here, and writes
-// the messages plus each holder's secret key to ~/pony-mixed-fixtures/android-mixed.
-// Copy that folder into the iOS tree as PGPonyTests/Resources/android-mixed
-// and MultiRecipientEnvelopeTests.testAndroidMixedFixturesDecrypt stops
-// skipping. Same pattern as InteropVectorGenTest. Delete or keep; it does not
-// run in CI unless invoked by name:
-//
-//   ./gradlew :app:testFossDebugUnitTest --tests '*MixedRecipientFixtureDumpTest*'
+// the messages plus each holder's secret key into a temporary test directory.
+// Set PGPONY_INTEROP_OUTPUT_DIR for a deliberate persistent export to the iOS fixtures.
+// The round-trip assertions run in the default suite; artifacts are cleaned up afterwards.
 
 package com.pgpony.android.crypto
 
@@ -19,15 +15,25 @@ import org.bouncycastle.openpgp.PGPSecretKeyRing
 import org.bouncycastle.openpgp.PGPUtil
 import org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator
 import org.junit.Assert.assertArrayEquals
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.File
 
 class MixedRecipientFixtureDumpTest {
+    @get:Rule val temporary = TemporaryFolder()
+
+    // Default runs are hermetic; deliberate external exports can select a persistent directory.
+    private val artifactDirectory by lazy {
+        System.getenv("PGPONY_INTEROP_OUTPUT_DIR")?.let { File(it, "android-mixed").apply { mkdirs() } }
+            ?: temporary.newFolder("android-mixed")
+    }
+
 
     private val svc = PGPCryptoService.shared
     private val plaintext = "Android 4.5.x mixed-recipient fixture for PGPony iOS 8.3.0 build 2.".toByteArray()
-    private val outDir = File(System.getProperty("user.home"), "pony-mixed-fixtures/android-mixed").apply { mkdirs() }
+    private val outDir get() = artifactDirectory
 
     private class Holder(val name: String, val sec: PGPSecretKeyRing, val pub: PGPPublicKeyRing, val armoredSecret: String)
 

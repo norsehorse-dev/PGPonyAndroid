@@ -55,7 +55,7 @@ class ProviderSendPathTest {
             ApiClientAuthorizer(
                 dao = app.database.apiClientDao(),
                 signatureSha256Of = ApiClientAuthorizer.platformSignatureLookup(app.packageManager)
-            ).grant(app.packageName)
+            ).grant(app.packageName, com.pgpony.android.data.ApiClientEntity.SCOPE_OPENPGP)
             // Ensure the test key pair exists (passphrase-less Ed25519).
             if (app.keyRepository.getByEmail(TEST_EMAIL).isEmpty()) {
                 app.keyRepository.generateKey(
