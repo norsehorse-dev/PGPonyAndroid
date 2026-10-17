@@ -1,6 +1,8 @@
 package com.pgpony.android.crypto
 
 import org.junit.Assert.assertEquals
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
 import org.junit.Test
 import java.io.File
 
@@ -8,15 +10,24 @@ import java.io.File
  * Throwaway generator for the Crake interop test vectors. Not a real test of
  * anything; it produces fresh PGPony-native v6 and v4 keys, encrypts through
  * PGPCryptoService, and asserts each round-trips. Delete after use.
- * Output: ~/pony-interop-vectors
+ * Output is temporary unless PGPONY_INTEROP_OUTPUT_DIR explicitly selects an export directory.
  */
 class InteropVectorGenTest {
+    @get:Rule val temporary = TemporaryFolder()
+
+    // Default runs are hermetic; deliberate external exports can select a persistent directory.
+    private val artifactDirectory by lazy {
+        System.getenv("PGPONY_INTEROP_OUTPUT_DIR")?.let { File(it, "pony-interop-vectors").apply { mkdirs() } }
+            ?: temporary.newFolder("pony-interop-vectors")
+    }
+
 
     private val plaintext =
         "Crake <> Pony interop test vector. If you can read this, decryption works."
 
-    private val outDir =
-        File(System.getProperty("user.home"), "pony-interop-vectors").apply { mkdirs() }
+    private val outDir by lazy {
+        artifactDirectory
+    }
 
     @Test
     fun generatePgpVectors() {

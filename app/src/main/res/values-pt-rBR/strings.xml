@@ -2150,7 +2150,7 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="settings_allow_expired_title">Permitir chaves expiradas</string>
     <string name="settings_allow_expired_subtitle">Permite usar chaves expiradas para assinar e criptografar. Desativado por padrão.</string>
     <plurals name="keyring_regen_hint_title">
-        <item quantity="one">Uma chave precisa ser regenerada</item>
+        <item quantity="one">%1$d chave precisa ser regenerada</item>
         <item quantity="other">%1$d chaves precisam ser regeneradas</item>
     </plurals>
     <plurals name="import_preview_more_keys">

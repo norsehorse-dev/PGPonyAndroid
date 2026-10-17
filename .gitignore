@@ -27,6 +27,7 @@ CLAUDE.md
 build/
 app/build/
 .gradle/
+.kotlin/
 local.properties
 .DS_Store
 

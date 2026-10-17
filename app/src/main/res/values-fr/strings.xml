@@ -2150,7 +2150,7 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="settings_allow_expired_title">Autoriser les clés expirées</string>
     <string name="settings_allow_expired_subtitle">Permet d\'utiliser les clés expirées pour la signature et le chiffrement. Désactivé par défaut.</string>
     <plurals name="keyring_regen_hint_title">
-        <item quantity="one">Une clé doit être régénérée</item>
+        <item quantity="one">%1$d clé doit être régénérée</item>
         <item quantity="other">%1$d clés doivent être régénérées</item>
     </plurals>
     <plurals name="import_preview_more_keys">
