@@ -1,5 +1,6 @@
 package com.pgpony.android.qr
 
+import com.pgpony.android.crypto.ArmorExtractor
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -40,5 +41,28 @@ class PublicKeyQrCollectorTest {
         val armor = "-----BEGIN PGP PUBLIC KEY BLOCK-----\nbody\n-----END PGP PUBLIC KEY BLOCK-----"
         assertEquals(PublicKeyQrResult.Complete(armor), PublicKeyQrCollector().offer(armor))
         assertEquals(PublicKeyQrResult.Malformed, PublicKeyQrCollector().offer("https://example.org"))
+    }
+
+    @Test fun `public key surrounded by explanatory text reaches import preview unchanged`() {
+        val armor = javaClass.getResource("/rfc9580/a3_cert.asc")!!.readText().trim()
+        val text = "Alice's public key:\n$armor\nCompare the fingerprint before importing."
+        val result = PublicKeyQrCollector().offer(text)
+
+        assertEquals(PublicKeyQrResult.Complete(text), result)
+        assertEquals(armor, ArmorExtractor.extractForImport((result as PublicKeyQrResult.Complete).text))
+    }
+
+    @Test fun `unframed private key retains existing import preview path`() {
+        val armor = javaClass.getResource("/rfc9580/a4_secret.asc")!!.readText().trim()
+        assertEquals(PublicKeyQrResult.Complete(armor), PublicKeyQrCollector().offer(armor))
+    }
+
+    @Test fun `private key surrounded by explanatory text reaches import preview unchanged`() {
+        val armor = javaClass.getResource("/rfc9580/a4_secret.asc")!!.readText().trim()
+        val text = "Key import:\n$armor\nEnd of export."
+        val result = PublicKeyQrCollector().offer(text)
+
+        assertEquals(PublicKeyQrResult.Complete(text), result)
+        assertEquals(armor, ArmorExtractor.extractForImport((result as PublicKeyQrResult.Complete).text))
     }
 }

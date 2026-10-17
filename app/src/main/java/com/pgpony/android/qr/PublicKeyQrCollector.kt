@@ -1,5 +1,6 @@
 package com.pgpony.android.qr
 
+import com.pgpony.android.crypto.ArmorExtractor
 import com.pgpony.android.qr.v2.EnhancedQrCollector
 import com.pgpony.android.qr.v2.EnhancedQrResult
 
@@ -53,7 +54,9 @@ class PublicKeyQrCollector(private val acceptOtherText: Boolean = false) {
             }
         }
         if (text.startsWith("PGPONY")) return PublicKeyQrResult.Unsupported
-        return if (acceptOtherText || text.trimStart().startsWith("-----BEGIN PGP PUBLIC KEY BLOCK-----")) {
+        // Import preview extracts armor from surrounding text and supports private-key imports.
+        // Preserve the original payload; parsing and confirmation remain the preview's job.
+        return if (acceptOtherText || ArmorExtractor.extractForImport(text) != null) {
             PublicKeyQrResult.Complete(text)
         } else PublicKeyQrResult.Malformed
     }
