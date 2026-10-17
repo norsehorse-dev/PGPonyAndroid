@@ -1526,6 +1526,30 @@ those rows ticked and disabled with "Already included for <address>", and return
 service dedupes by fingerprint), so confirming with only those keys works as before. 1 string. Test:
 RecipientReviewTest (two new cases).
 
+## 68. Public-key QR exchange: scanning and missing parts
+
+**Status:** Code and automated checks complete; physical phone-to-phone validation pending.
+
+Reported: animated public-key QR codes cycle repeatedly while the receiver's progress stops short of all
+parts. Exchange and Key Details now share rendering and playback: a complete white quiet zone, whole
+physical pixels per module, one QR version per sequence, a three-bitmap cache, and optional larger-module
+and slower playback settings. Enlarging keeps the selected part, pause state and fingerprint visible.
+Compatible PGPONY1 remains the default, including its raw single codes, 32-part/32,000-character limits,
+1,000/L profile and 500 ms normal cadence. Reassembly checks the content ID and profiles with the same
+part count use deterministic boundaries.
+
+The scanner reuses decoder/luminance storage, maps the visible region through CameraX with full-frame
+fallback, supports tap-to-focus, and rejects stale results after pause or exit. Collection and recovery
+run on a serialized worker; the existing import preview and pairing invitation path are retained.
+Optional PGPONY2 transfers complete binary certificates with Base45 and Reed-Solomon erasure recovery,
+per-frame CRC and a full-content digest. Receivers must support this format; fingerprint comparison is
+still required to verify the owner. See `docs/QR_EXCHANGE_PROTOCOL.md` for the wire format and
+`docs/qa/QR_EXCHANGE_BENCHMARK.md` for reproducible inputs and the physical checks still needed.
+
+Tests: 81 QR JVM tests, independent erasure-code vectors and 12 Android 15 QR tests passed; FOSS and Play
+release APK assembly succeeded. Camera timing, reflections, focus and old/new physical-device scanning
+remain unmeasured. No measured speedup or new optimal default is claimed.
+
 ## RC breakdown (set Oct 9 2026)
 
 Release note (Oct 14): the new store listing (fastlane/metadata/android: localized descriptions in 11 locales, 7 screenshots per locale, feature graphics) is committed for 4.7.0. F-Droid reads the listing from the tagged commit it builds, so it appears with the v4.7.0 build; 4.6.4 was built from a tree with the old screenshots. The F-Droid changelog 470.txt is still to write before tagging.

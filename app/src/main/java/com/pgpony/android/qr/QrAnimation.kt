@@ -7,11 +7,8 @@
 package com.pgpony.android.qr
 
 object QrAnimation {
-    // Per-frame interval. RC4: halved from the 1000ms provisional to 500ms
-    // on CertainBot's RC3 scanner test (3 Android devices, per-tile read
-    // under 1/4 of the old window, i.e. <250ms, so 500ms keeps a 2x margin).
-    // The manual next/prev buttons stay. Remaining check before 4.3.0 final:
-    // an iOS device scanning an Android animated QR at this rate, the one
-    // path CertainBot's Android-only test did not cover (§5.6.5 gate).
+    // Keep the legacy cadence until physical-device measurements justify a new default.
+    // PGPONY1 has no return channel; the sender cannot follow receiver progress.
     const val FRAME_INTERVAL_MS = 500L
+    const val SLOW_FRAME_INTERVAL_MS = 1_000L
 }

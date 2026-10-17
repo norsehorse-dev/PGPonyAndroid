@@ -270,6 +270,7 @@ fun PairScreen(
 
     if (scanning) {
         QRScannerScreen(
+            acceptOtherText = true,
             onScanned = { text ->
                 scanning = false
                 stage = PairStage.Joining

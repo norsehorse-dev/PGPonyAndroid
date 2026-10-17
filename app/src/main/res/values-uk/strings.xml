@@ -3158,4 +3158,20 @@
     <string name="key_detail_resign_biometric_title">Підтвердьте нові підписи</string>
     <string name="key_detail_resign_biometric_subtitle">Пройдіть автентифікацію, щоб повторно підписати цей ключ</string>
     <string name="provider_review_included_format">Уже включено для %1$s</string>
+
+    <!-- Public-key QR exchange controls and recovery feedback. -->
+    <string name="qr_mode_compatible">Сумісний</string>
+    <string name="qr_mode_enhanced">Розширений</string>
+    <string name="qr_enhanced_hint">Телефон одержувача має підтримувати розширений QR-обмін. Ви можете будь-коли повернутися до сумісного режиму.</string>
+    <string name="qr_density_normal">Звичайні точки</string>
+    <string name="qr_density_roomy">Більші точки</string>
+    <string name="qr_playback_slow">Повільніше</string>
+    <string name="qr_enlarge">Збільшити QR-код</string>
+    <string name="qr_render_small">Збільште код або зменште масштаб екрана.</string>
+    <string name="qr_unsupported_version">Для цього QR-формату потрібна новіша версія PGPony. Попросіть відправника використати сумісний режим.</string>
+    <string name="qr_integrity_error">Частини не збігаються. Відскануйте цей ключ знову.</string>
+    <string name="qr_enhanced_progress_format">Отримано %1$d із %2$d потрібних частин. Продовжуйте сканування.</string>
+    <string name="qr_camera_error">Не вдалося запустити камеру. Закрийте інші програми камери та спробуйте знову.</string>
+    <string name="qr_retry">Спробувати знову</string>
+    <string name="qr_focus_hint">Торкніться коду для фокусування.</string>
 </resources>

@@ -3043,4 +3043,20 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="key_detail_resign_biometric_subtitle">Autentícate para volver a firmar esta clave</string>
     <!-- 4.7.0 RC6: the recipient review shows keys the request already includes (item 67, #25) -->
     <string name="provider_review_included_format">Ya incluida para %1$s</string>
+
+    <!-- Public-key QR exchange controls and recovery feedback. -->
+    <string name="qr_mode_compatible">Compatible</string>
+    <string name="qr_mode_enhanced">Mejorado</string>
+    <string name="qr_enhanced_hint">El teléfono receptor debe admitir el intercambio QR mejorado. Puedes volver al modo Compatible en cualquier momento.</string>
+    <string name="qr_density_normal">Estándar</string>
+    <string name="qr_density_roomy">Puntos más grandes</string>
+    <string name="qr_playback_slow">Reproducción más lenta</string>
+    <string name="qr_enlarge">Ampliar código QR</string>
+    <string name="qr_render_small">Amplía el código o reduce la escala de pantalla.</string>
+    <string name="qr_unsupported_version">Este formato QR necesita una versión más reciente de PGPony. Pide al emisor que use el modo Compatible.</string>
+    <string name="qr_integrity_error">Las partes no coinciden. Vuelve a escanear esta clave.</string>
+    <string name="qr_enhanced_progress_format">Recibidas %1$d de %2$d partes necesarias. Sigue escaneando.</string>
+    <string name="qr_camera_error">No se pudo iniciar la cámara. Cierra otras aplicaciones de cámara e inténtalo de nuevo.</string>
+    <string name="qr_retry">Reintentar</string>
+    <string name="qr_focus_hint">Toca el código para enfocar.</string>
 </resources>
