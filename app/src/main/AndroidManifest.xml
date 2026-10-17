@@ -86,9 +86,9 @@
               filters, and the whole VIEW set bar .pgpony, are GONE from
               here. ShareTargetActivity registers every one of them, so
               declaring them twice put two PGPony entries in front of the
-              user for a single share, which is what the A15 comment below
-              anticipated and what reporters have been picking the wrong
-              one of.
+              user for a single share. Generic content VIEW matching remains
+              on both activities because backup filenames may be available
+              only through provider metadata.
 
               The share target reaches the main app by EXPLICIT intent
               where it needs to — a forwarded public key arrives as
@@ -142,20 +142,19 @@
               OneDrive all hand over content:// URIs, so this is the filter
               a tap actually goes through on a modern device.
 
-              Both mimeTypes are kept because a .pgpony can arrive typed
-              either way, and the path pattern is what keeps PGPony out of
-              the chooser for every text file on the device — see the 4.0.4
-              note that used to live here, now on ShareTargetActivity's copy
-              of this filter, which retains the full pattern list.
+              A provider can label a backup as either generic MIME type
+              and expose an opaque document ID in its URI. Its filename
+              may exist only in OpenableColumns.DISPLAY_NAME, which manifest
+              path patterns cannot inspect. Keep generic MIME dispatch and
+              let IntentHandler classify provider metadata and content.
             -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="content" />
+                <!-- URI paths may be opaque IDs; classify DISPLAY_NAME and content after dispatch. -->
                 <data android:mimeType="application/octet-stream" />
                 <data android:mimeType="text/plain" />
-                <!-- 4.0.0 Phase 3 — encrypted keyring backup opens to Restore -->
-                <data android:pathPattern=".*\\.pgpony" />
             </intent-filter>
         </activity>
 
@@ -186,11 +185,11 @@
           About the duplicate intent filters with MainActivity:
 
             DONE, 4.1.0 Phase 7b. They are removed. MainActivity now
-            declares only what this activity does NOT: MAIN/LAUNCHER,
-            SEND_MULTIPLE (the bundle entry point, which was never
-            registered here) and VIEW for .pgpony (keyring restore, which
-            has no share-target equivalent). Everything a share or a tap
-            can offer twice, it no longer does.
+            keeps MAIN/LAUNCHER, SEND_MULTIPLE and the .pgpony file URI
+            filter for keyring restore. Generic content VIEW filters remain
+            on both activities because provider filenames can exist only
+            in metadata. Those MIME matches may offer both entry points;
+            specific PGP MIME and file extension filters belong here.
 
             The reason the note above hedged — "once we are confident no
             existing install relies on them" — resolved on its own: the
@@ -217,10 +216,10 @@
             * ACTION_VIEW file:// + path patterns — fallback for file
               managers that don't bother setting the MIME type and
               just hand us a file URI with a recognizable extension.
-            * ACTION_VIEW content:// application/octet-stream + path
-              patterns — DocumentsUI / Drive / OneDrive on Android
-              hand a content URI with octet-stream MIME, and the
-              path-pattern is the only signal we have.
+            * ACTION_VIEW content:// with generic MIME types — providers
+              may expose opaque document IDs and keep filenames only in
+              DISPLAY_NAME. Classification reads provider metadata and
+              content after dispatch; URI paths cannot filter those names.
         -->
         <activity
             android:name=".ui.share.ShareTargetActivity"
@@ -295,24 +294,9 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="content" />
+                <!-- URI paths may be opaque IDs; classify DISPLAY_NAME and content after dispatch. -->
                 <data android:mimeType="application/octet-stream" />
-                <!-- 4.0.4 (origin: Meino) — armored keys and signatures are
-                     plain text, and plenty of providers type them exactly
-                     that way, which left tap-to-open with no matching
-                     filter at all. Deliberately kept inside THIS filter
-                     rather than given its own: the path patterns below
-                     apply to every mimeType listed here, so PGPony offers
-                     itself for a text/plain .asc but NOT for every .txt on
-                     the device. A bare text/plain VIEW filter would put us
-                     in the chooser for every text file the user opens. -->
                 <data android:mimeType="text/plain" />
-                <data android:pathPattern=".*\\.asc" />
-                <data android:pathPattern=".*\\.pgp" />
-                <data android:pathPattern=".*\\.gpg" />
-                <!-- 3.1.0 Phase 1 (C1) -->
-                <data android:pathPattern=".*\\.sig" />
-                <!-- 3.1.0 Phase 4 (J2) -->
-                <data android:pathPattern=".*\\.eml" />
             </intent-filter>
         </activity>
         <!--

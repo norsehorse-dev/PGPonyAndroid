@@ -8,7 +8,8 @@
 //
 // Validate with sequoia-sq 1.4.0-pqc.1:
 //   sq decrypt --recipient-file <path-to>/rfc9580-pqc-sample-key.asc \
-//       $TMPDIR/pgpony-ietf-out.asc
+//       <PGPONY_INTEROP_OUTPUT_DIR>/pgpony-interop/pgpony-ietf-out.asc
+// Artifacts are temporary unless the export directory is explicitly provided.
 // Expected plaintext: "ietf interop test"
 
 package com.pgpony.android.crypto.pqc
@@ -22,11 +23,21 @@ import org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.File
 
 class CompositeIetfEncryptArtifactTest {
+    @get:Rule val temporary = TemporaryFolder()
+
+    // Default runs are hermetic; deliberate external exports can select a persistent directory.
+    private val artifactDirectory by lazy {
+        System.getenv("PGPONY_INTEROP_OUTPUT_DIR")?.let { File(it, "pgpony-interop").apply { mkdirs() } }
+            ?: temporary.newFolder("pgpony-interop")
+    }
+
 
     private fun res(name: String): ByteArray? =
         javaClass.getResourceAsStream("/pqc/$name")?.use { it.readBytes() }
@@ -51,7 +62,7 @@ class CompositeIetfEncryptArtifactTest {
         // body: ver(1) | count(1) | keyVer(1) | fp(32) | algo → algo at +35
         assertEquals("PKESK algo", 35, bin[i + 35].toInt() and 0xFF)
 
-        val out = File(File(System.getProperty("user.home"), "pgpony-interop").apply { mkdirs() }, "pgpony-ietf-out.asc")
+        val out = File(artifactDirectory, "pgpony-ietf-out.asc")
         out.writeBytes(armored)
         println("[ietf] wrote ${out.absolutePath} — validate: sq decrypt --recipient-file rfc9580-pqc-sample-key.asc ${out.absolutePath}")
         assertTrue(out.length() > 0)
