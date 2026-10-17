@@ -2,7 +2,7 @@
 // PGPony Android — Phase A4a
 //
 // Backing state for KeyDetailScreen. Loads the key by fingerprint
-// (passed via NavController route arg), generates the QR-code bitmap
+// (passed via NavController route arg), prepares the QR sequence
 // lazily when the QR sheet opens, manages the brief "Copied!" badge
 // flip on fingerprint tap, and exposes a "coming soon" channel for the
 // action buttons whose real implementations land in Phase A4b.
@@ -15,7 +15,6 @@
 
 package com.pgpony.android.ui.keyring
 
-import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pgpony.android.PGPonyApp
@@ -33,7 +32,7 @@ import com.pgpony.android.crypto.UserIdService
 import com.pgpony.android.data.KeyRefreshResult
 import com.pgpony.android.data.KeyRefreshService
 import com.pgpony.android.data.PGPKeyEntity
-import com.pgpony.android.qr.QrBitmap
+import com.pgpony.android.qr.*
 import com.pgpony.android.data.RevocationReason
 import com.pgpony.android.data.TrustLevel
 import com.pgpony.android.data.repository.KeyRepository
@@ -49,6 +48,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -230,15 +231,11 @@ data class KeyDetailUiState(
     /** Set if the fingerprint passed in didn't resolve to anything. The
      *  screen renders a "Key not found — go back" placeholder. */
     val notFound: Boolean = false,
-    /** Generated lazily when the user opens the QR sheet. We cache it
-     *  so re-opening doesn't re-encode.
-     *
-     *  4.1.0 Phase 9 (issue #3): a LIST, because a post-quantum key does not
-     *  fit in one symbol. One entry for anything that fits, which is what
-     *  every classic key still produces. */
-    val qrFrames: List<Bitmap> = emptyList(),
-    /** Which frame the QR sheet is showing. */
-    val qrIndex: Int = 0,
+    /** Lazily built immutable sequence; rendered bitmaps use a bounded cache. */
+    val qrStore: QrFrameStore? = null,
+    val qrError: String? = null,
+    val qrMode: QrTransferMode = QrTransferMode.COMPATIBLE,
+    val qrPolicy: QrEncodingPolicy = QrEncodingPolicy.BASELINE,
     /** Flipped briefly true on fingerprint tap → drives the "Copied!"
      *  green check + label in FingerprintSection. Reset to false after
      *  2 seconds by a coroutine in copyFingerprintFeedback(). */
@@ -441,6 +438,8 @@ class KeyDetailViewModel(
     // ride one HTTP stack.
     private val keyRefresh by lazy { KeyRefreshService(repo, keyServer) }
 
+    private var qrJob: Job? = null
+    private var qrGeneration = 0L
     private val _state = MutableStateFlow(KeyDetailUiState())
     val state: StateFlow<KeyDetailUiState> = _state.asStateFlow()
 
@@ -686,79 +685,63 @@ class KeyDetailViewModel(
         }
     }
 
-    /**
-     * Open the QR sheet. Generates the QR bitmap on the first open so
-     * we don't spend ZXing cycles for users who never tap the button.
-     * Subsequent opens reuse the cached bitmap.
-     */
+    /** Opens immediately; re-export on each open so certificate edits never reuse a stale QR. */
     fun showQR() {
+        _state.value = _state.value.copy(showQRSheet = true)
+        generateQR()
+    }
+
+    fun setQrMode(mode: QrTransferMode) {
+        if (mode == _state.value.qrMode) return
+        _state.value = _state.value.copy(qrMode = mode)
+        generateQR()
+    }
+
+    fun setQrPolicy(policy: QrEncodingPolicy) {
+        if (policy == _state.value.qrPolicy) return
+        _state.value = _state.value.copy(qrPolicy = policy)
+        generateQR()
+    }
+
+    private fun generateQR() {
         val key = _state.value.key ?: return
-        if (_state.value.qrFrames.isNotEmpty()) {
-            _state.value = _state.value.copy(showQRSheet = true, qrIndex = 0)
-            return
-        }
-        // #36 (AraafRoyall): open the sheet immediately so the tap feels live.
-        // With no frames yet the sheet shows its spinner while ZXing runs,
-        // instead of the tap sitting dead until the QR is fully encoded.
-        _state.value = _state.value.copy(showQRSheet = true, qrFrames = emptyList(), qrIndex = 0)
-        viewModelScope.launch {
-            // §5.6.5 (#37): export + QR encode off the main thread so a
-            // large post-quantum key does not stall the sheet on open.
-            val armored = withContext(Dispatchers.IO) { repo.exportArmoredPublicKey(key.fingerprint) }
-            if (armored.isNullOrBlank()) {
-                _state.value = _state.value.copy(
-                    errorMessage = PGPonyApp.instance.getString(R.string.kd_vm_error_export_for_qr),
-                    showQRSheet = false
-                )
-                return@launch
+        qrJob?.cancel()
+        val generation = ++qrGeneration
+        val mode = _state.value.qrMode
+        val policy = _state.value.qrPolicy
+        _state.value.qrStore?.clear()
+        _state.value = _state.value.copy(qrStore = null, qrError = null)
+        qrJob = viewModelScope.launch {
+            try {
+                val armored = withContext(Dispatchers.IO) { repo.exportArmoredPublicKey(key.fingerprint) }
+                if (armored.isNullOrBlank()) error("Public key export failed")
+                val store = withContext(Dispatchers.Default) { PublicKeyQrSequence.create(armored, mode, policy) }
+                if (generation != qrGeneration || !_state.value.showQRSheet) return@launch
+                _state.value = _state.value.copy(qrStore = store,
+                    showQRSheet = store != null,
+                    qrError = if (store == null) PGPonyApp.instance.getString(R.string.qr_too_large) else null,
+                    errorMessage = if (store == null) PGPonyApp.instance.getString(R.string.qr_too_large) else null)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (generation == qrGeneration) _state.value = _state.value.copy(showQRSheet = false,
+                    errorMessage = PGPonyApp.instance.getString(R.string.kd_vm_error_qr_failed_format,
+                        ErrorText.detail(error.message) ?: ""))
             }
-            // 4.1.0 Phase 9 (issue #3) — a key too large for one symbol is
-            // now split across several instead of failing. Past even that,
-            // encodeFrames returns null and the user gets an instruction
-            // rather than ZXing's "data too big", which is the half of #3
-            // that could always have been fixed cheaply.
-            val frames = try {
-                withContext(Dispatchers.Default) { QrBitmap.encodeFrames(armored) }
-            } catch (e: Exception) {
-                _state.value = _state.value.copy(
-                    errorMessage = PGPonyApp.instance.getString(R.string.kd_vm_error_qr_failed_format, ErrorText.detail(e.message) ?: ""),
-                    showQRSheet = false
-                )
-                return@launch
-            }
-            if (frames.isNullOrEmpty()) {
-                _state.value = _state.value.copy(
-                    errorMessage = PGPonyApp.instance.getString(R.string.qr_too_large),
-                    showQRSheet = false
-                )
-                return@launch
-            }
-            _state.value = _state.value.copy(
-                qrFrames = frames,
-                qrIndex = 0,
-                showQRSheet = true
-            )
         }
     }
 
     fun hideQR() {
-        _state.value = _state.value.copy(showQRSheet = false)
+        qrJob?.cancel()
+        qrGeneration++
+        _state.value.qrStore?.clear()
+        _state.value = _state.value.copy(showQRSheet = false, qrStore = null)
     }
 
-    /** 4.1.0 Phase 9 — step through a multi-part QR. Wraps at both ends so
-     *  the other person can keep the camera up and let it cycle. */
-    fun qrNext() {
-        val s = _state.value
-        if (s.qrFrames.size < 2) return
-        _state.value = s.copy(qrIndex = (s.qrIndex + 1) % s.qrFrames.size)
-    }
-
-    fun qrPrev() {
-        val s = _state.value
-        if (s.qrFrames.size < 2) return
-        _state.value = s.copy(
-            qrIndex = (s.qrIndex - 1 + s.qrFrames.size) % s.qrFrames.size
-        )
+    override fun onCleared() {
+        qrJob?.cancel()
+        _state.value.qrStore?.clear()
+        super.onCleared()
     }
 
     /**

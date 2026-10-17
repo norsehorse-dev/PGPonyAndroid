@@ -54,7 +54,7 @@ class ProviderReceivePathTest {
             ApiClientAuthorizer(
                 dao = app.database.apiClientDao(),
                 signatureSha256Of = ApiClientAuthorizer.platformSignatureLookup(app.packageManager)
-            ).grant(app.packageName)
+            ).grant(app.packageName, com.pgpony.android.data.ApiClientEntity.SCOPE_OPENPGP)
             if (app.keyRepository.getByEmail(TEST_EMAIL).isEmpty()) {
                 app.keyRepository.generateKey(
                     name = "Provider Send Test",

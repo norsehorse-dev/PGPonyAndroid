@@ -27,11 +27,21 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeNoException
 import org.junit.Assume.assumeTrue
+import org.junit.Rule
+import org.junit.rules.TemporaryFolder
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.File
 
 class CompositeLibrePGPEncryptTest {
+    @get:Rule val temporary = TemporaryFolder()
+
+    // Preserve intentional external export without writing artifacts into user.home during CI.
+    private val artifactDirectory by lazy {
+        System.getenv("PGPONY_INTEROP_OUTPUT_DIR")?.let { File(it, "pgpony-interop").apply { mkdirs() } }
+            ?: temporary.newFolder("pgpony-interop")
+    }
+
 
     private fun res(name: String): ByteArray? =
         javaClass.getResourceAsStream("/pqc/$name")?.use { it.readBytes() }
@@ -61,7 +71,7 @@ class CompositeLibrePGPEncryptTest {
         assertEquals("PKESK version", 3, bin[h.bodyStart].toInt() and 0xFF)
         assertEquals("PKESK algorithm", 8, bin[h.bodyStart + 9].toInt() and 0xFF)
 
-        val out = File(File(System.getProperty("user.home"), "pgpony-interop").apply { mkdirs() }, "pgpony-librepgp-out.asc")
+        val out = File(artifactDirectory, "pgpony-librepgp-out.asc")
         out.writeBytes(armored)
         println("[librepgp] wrote ${out.absolutePath} — validate with: gpg --decrypt ${out.absolutePath}")
         assertTrue(out.length() > 0)

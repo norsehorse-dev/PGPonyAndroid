@@ -49,7 +49,7 @@ class ProviderHandshakeTest {
         ApiClientAuthorizer(
             dao = app.database.apiClientDao(),
             signatureSha256Of = ApiClientAuthorizer.platformSignatureLookup(app.packageManager)
-        ).grant(ownPackage)
+        ).grant(ownPackage, com.pgpony.android.data.ApiClientEntity.SCOPE_OPENPGP)
     }
 
     private fun revokeSelf() = runBlocking {
