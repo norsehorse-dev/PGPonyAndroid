@@ -176,10 +176,17 @@ class ContactsService(private val context: Context) {
 
         cursor?.use {
             if (it.moveToFirst()) {
-                val contactId = it.getString(it.getColumnIndex(ContactsContract.CommonDataKinds.Email.CONTACT_ID)) ?: return null
-                val name = it.getString(it.getColumnIndex(ContactsContract.CommonDataKinds.Email.DISPLAY_NAME_PRIMARY)) ?: ""
-                val addr = it.getString(it.getColumnIndex(ContactsContract.CommonDataKinds.Email.ADDRESS)) ?: email
-                val photoUri = it.getString(it.getColumnIndex(ContactsContract.CommonDataKinds.Email.PHOTO_URI))
+                val idCol = it.getColumnIndex(ContactsContract.CommonDataKinds.Email.CONTACT_ID)
+                val nameCol = it.getColumnIndex(ContactsContract.CommonDataKinds.Email.DISPLAY_NAME_PRIMARY)
+                val emailCol = it.getColumnIndex(ContactsContract.CommonDataKinds.Email.ADDRESS)
+                val photoCol = it.getColumnIndex(ContactsContract.CommonDataKinds.Email.PHOTO_URI)
+                if (idCol < 0) return null
+
+                // Providers may omit optional columns; keep the same fallbacks as null values.
+                val contactId = it.getString(idCol) ?: return null
+                val name = if (nameCol >= 0) it.getString(nameCol) ?: "" else ""
+                val addr = if (emailCol >= 0) it.getString(emailCol) ?: email else email
+                val photoUri = if (photoCol >= 0) it.getString(photoCol) else null
 
                 return DeviceContact(
                     contactId = contactId,
