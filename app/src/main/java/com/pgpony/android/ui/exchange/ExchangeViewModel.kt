@@ -6,13 +6,12 @@
 
 package com.pgpony.android.ui.exchange
 
-import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pgpony.android.PGPonyApp
 import com.pgpony.android.R
 import com.pgpony.android.data.PGPKeyEntity
-import com.pgpony.android.qr.QrBitmap
+import com.pgpony.android.qr.*
 import com.pgpony.android.data.repository.ImportResolution
 import com.pgpony.android.data.repository.KeyRepository
 import com.pgpony.android.i18n.ErrorText
@@ -21,6 +20,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -37,10 +38,10 @@ data class ExchangeUiState(
     val section: ExchangeSection = ExchangeSection.SHOW_KEY,
     val myKeyPairs: List<PGPKeyEntity> = emptyList(),
     val selectedKey: PGPKeyEntity? = null,
-    /** 4.1.0 Phase 9 (issue #3): a list, because a post-quantum key does
-     *  not fit in one symbol. One entry for anything that does. */
-    val qrFrames: List<Bitmap> = emptyList(),
-    val qrIndex: Int = 0,
+    /** Immutable text/matrix sequence; only current and adjacent bitmaps are cached. */
+    val qrStore: QrFrameStore? = null,
+    val qrError: String? = null,
+    val qrPolicy: QrEncodingPolicy = QrEncodingPolicy.BASELINE,
     val armoredPublicKey: String? = null,
     // Key server
     val searchQuery: String = "",
@@ -66,6 +67,9 @@ class ExchangeViewModel(
 
     private val _state = MutableStateFlow(ExchangeUiState())
     val state: StateFlow<ExchangeUiState> = _state.asStateFlow()
+
+    private var qrJob: Job? = null
+    private var qrGeneration = 0L
 
     init { loadKeys() }
 
@@ -99,42 +103,45 @@ class ExchangeViewModel(
         generateQR(key)
     }
 
+    fun setQrPolicy(policy: QrEncodingPolicy) {
+        if (policy == _state.value.qrPolicy) return
+        _state.value = _state.value.copy(qrPolicy = policy)
+        _state.value.selectedKey?.let(::generateQR)
+    }
+
     private fun generateQR(key: PGPKeyEntity) {
-        // §5.6.5 (#37): export + QR encode off the main thread so a large
-        // post-quantum key does not stall the Exchange tab on selection.
-        viewModelScope.launch {
-            val armored = withContext(Dispatchers.IO) {
-                repo.exportArmoredPublicKey(key.fingerprint)
-            } ?: return@launch
-            _state.value = _state.value.copy(armoredPublicKey = armored)
+        qrJob?.cancel()
+        val generation = ++qrGeneration
+        val policy = _state.value.qrPolicy
+        _state.value.qrStore?.clear()
+        _state.value = _state.value.copy(qrStore = null, qrError = null, armoredPublicKey = null)
+        qrJob = viewModelScope.launch {
             try {
-                val frames = withContext(Dispatchers.Default) { QrBitmap.encodeFrames(armored) }
-                if (frames.isNullOrEmpty()) {
-                    _state.value = _state.value.copy(
-                        qrFrames = emptyList(),
-                        qrIndex = 0,
-                        errorMessage = PGPonyApp.instance.getString(R.string.qr_too_large)
-                    )
-                    return@launch
-                }
-                _state.value = _state.value.copy(qrFrames = frames, qrIndex = 0)
-            } catch (e: Exception) {
-                _state.value = _state.value.copy(errorMessage = PGPonyApp.instance.getString(R.string.exchange_vm_error_qr_failed_format, ErrorText.detail(e.message) ?: ""))
+                val armored = withContext(Dispatchers.IO) {
+                    repo.exportArmoredPublicKey(key.fingerprint)
+                } ?: error("Public key export failed")
+                // Keep sending compatible until the other clients can receive PGPONY2.
+                val store = withContext(Dispatchers.Default) { QrFrameStore.create(armored, policy) }
+                // Cancellation is cooperative; a finished old encoder must not replace a newer selection.
+                if (generation != qrGeneration) return@launch
+                _state.value = _state.value.copy(armoredPublicKey = armored, qrStore = store,
+                    qrError = if (store == null) PGPonyApp.instance.getString(R.string.qr_too_large) else null,
+                    errorMessage = if (store == null) PGPonyApp.instance.getString(R.string.qr_too_large) else null)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (generation == qrGeneration) _state.value = _state.value.copy(
+                    qrError = PGPonyApp.instance.getString(R.string.exchange_vm_error_qr_failed_format, ErrorText.detail(error.message) ?: ""),
+                    errorMessage = PGPonyApp.instance.getString(R.string.exchange_vm_error_qr_failed_format,
+                        ErrorText.detail(error.message) ?: ""))
             }
         }
     }
 
-    /** 4.1.0 Phase 9 — step through a multi-part QR. */
-    fun qrNext() {
-        val s = _state.value
-        if (s.qrFrames.size < 2) return
-        _state.value = s.copy(qrIndex = (s.qrIndex + 1) % s.qrFrames.size)
-    }
-
-    fun qrPrev() {
-        val s = _state.value
-        if (s.qrFrames.size < 2) return
-        _state.value = s.copy(qrIndex = (s.qrIndex - 1 + s.qrFrames.size) % s.qrFrames.size)
+    override fun onCleared() {
+        qrJob?.cancel()
+        _state.value.qrStore?.clear()
+        super.onCleared()
     }
 
     // ── Scan Key ───────────────────────────────────────────────────────

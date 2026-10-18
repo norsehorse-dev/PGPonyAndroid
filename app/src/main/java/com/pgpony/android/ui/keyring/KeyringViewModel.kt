@@ -168,6 +168,7 @@ data class KeyringUiState(
      *  navigation destination — keeps the import sheet's state
      *  intact while scanning. */
     val showImportQRScanner: Boolean = false,
+    val qrPreviewTiming: com.pgpony.android.qr.QrPreviewTiming? = null,
     // ── 4.0.0 Phase 1 (iOS v7.1.1 F3): duplicate-import alert ──────────
     /** Set when an import commit resolved ALREADY_IN_KEYRING. Drives
      *  the "Already in Keyring" dialog (with its View Key jump) hosted
@@ -998,7 +999,8 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
         armoredText: String,
         source: KeyLookupSource? = null,
         sourceFilename: String? = null,
-        sourceUrl: String? = null
+        sourceUrl: String? = null,
+        qrTiming: com.pgpony.android.qr.QrPreviewTiming? = null,
     ) {
         // item 19 (#58): a shared browser text selection wraps the key in page
         // text; pull out the armored key block(s) and ignore the surrounding
@@ -1019,6 +1021,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                 _state.value = _state.value.copy(
                     isPreviewing = false,
                     importPreview = preview,
+                    qrPreviewTiming = qrTiming,
                     importLookupSource = source,
                     importSourceFilename = sourceFilename,
                     importSourceUrl = sourceUrl,
@@ -1090,9 +1093,9 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
 
     /** A10a — QR scanner callback. Closes scanner overlay, feeds
      *  scanned text through the preview pipeline. */
-    fun onImportQRScanned(scannedText: String) {
+    fun onImportQRScanned(scannedText: String, timing: com.pgpony.android.qr.QrPreviewTiming? = null) {
         _state.value = _state.value.copy(showImportQRScanner = false)
-        previewArmoredKey(scannedText)
+        previewArmoredKey(scannedText, qrTiming = timing)
     }
 
     /**

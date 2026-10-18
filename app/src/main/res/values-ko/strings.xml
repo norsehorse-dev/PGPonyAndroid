@@ -2688,4 +2688,17 @@
     <string name="key_detail_resign_biometric_title">새 서명 확인</string>
     <string name="key_detail_resign_biometric_subtitle">이 키에 다시 서명하려면 인증하세요</string>
     <string name="provider_review_included_format">%1$s을(를) 통해 이미 포함됨</string>
+
+    <!-- Public-key QR exchange controls and recovery feedback. -->
+    <string name="qr_density_normal">표준</string>
+    <string name="qr_density_roomy">큰 점</string>
+    <string name="qr_playback_slow">느리게 재생</string>
+    <string name="qr_enlarge">QR 코드 확대</string>
+    <string name="qr_render_small">코드를 확대하거나 화면 배율을 줄이세요.</string>
+    <string name="qr_unsupported_version">이 QR 형식에는 더 최신 PGPony가 필요합니다. 발신자에게 호환 모드를 사용하도록 요청하세요.</string>
+    <string name="qr_integrity_error">조각이 일치하지 않습니다. 이 키를 다시 스캔하세요.</string>
+    <string name="qr_enhanced_progress_format">필요한 %2$d개 중 %1$d개를 받았습니다. 계속 스캔하세요.</string>
+    <string name="qr_camera_error">카메라를 시작할 수 없습니다. 다른 카메라 앱을 닫고 다시 시도하세요.</string>
+    <string name="qr_retry">다시 시도</string>
+    <string name="qr_focus_hint">코드를 눌러 초점을 맞추세요.</string>
 </resources>

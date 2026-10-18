@@ -3080,4 +3080,17 @@
     <string name="key_detail_resign_biometric_title">确认新的签名</string>
     <string name="key_detail_resign_biometric_subtitle">验证身份以重新签名此密钥</string>
     <string name="provider_review_included_format">已通过 %1$s 包含在内</string>
+
+    <!-- Public-key QR exchange controls and recovery feedback. -->
+    <string name="qr_density_normal">标准码点</string>
+    <string name="qr_density_roomy">较大码点</string>
+    <string name="qr_playback_slow">慢速播放</string>
+    <string name="qr_enlarge">放大二维码</string>
+    <string name="qr_render_small">请放大二维码或减小系统显示缩放。</string>
+    <string name="qr_unsupported_version">此二维码格式需要更新的 PGPony。请让发送方使用兼容模式。</string>
+    <string name="qr_integrity_error">分片内容不一致，请重新扫描此公钥。</string>
+    <string name="qr_enhanced_progress_format">已收到 %1$d / %2$d 个所需分片，请继续扫描。</string>
+    <string name="qr_camera_error">无法启动相机，请关闭其他使用相机的应用后重试。</string>
+    <string name="qr_retry">重试</string>
+    <string name="qr_focus_hint">点击二维码区域以对焦。</string>
 </resources>

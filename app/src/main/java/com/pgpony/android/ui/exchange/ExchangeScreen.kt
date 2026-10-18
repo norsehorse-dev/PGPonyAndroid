@@ -75,6 +75,7 @@ fun ExchangeScreen(viewModel: ExchangeViewModel, keyringViewModel: KeyringViewMo
     if (importState.showImportQRScanner) {
         com.pgpony.android.ui.scanner.QRScannerScreen(
             onScanned = { text -> keyringViewModel.onImportQRScanned(text) },
+            onScannedWithTiming = { text, timing -> keyringViewModel.onImportQRScanned(text, timing) },
             onDismiss = { keyringViewModel.dismissImportQRScanner() }
         )
         return
@@ -144,17 +145,6 @@ private fun ShowKeySection(
     clipboard: androidx.compose.ui.platform.ClipboardManager
 ) {
     val haptics = rememberHaptics()
-    // §5.6.5 (#37): auto-rotate multi-part frames on the Exchange QR. Manual
-    // next/prev stay for now; tapping one pauses so a part can be held.
-    var autoRotate by remember { mutableStateOf(true) }
-    LaunchedEffect(state.qrFrames.size, autoRotate) {
-        if (state.qrFrames.size > 1 && autoRotate) {
-            while (true) {
-                kotlinx.coroutines.delay(QrAnimation.FRAME_INTERVAL_MS)
-                viewModel.qrNext()
-            }
-        }
-    }
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp),
@@ -190,70 +180,11 @@ private fun ShowKeySection(
                 }
                 Spacer(modifier = Modifier.height(12.dp))
             }
-            // QR code
-            state.qrFrames.getOrNull(state.qrIndex)?.let { bitmap ->
-                Card(
-                    modifier = Modifier.size(280.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize().padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            bitmap = bitmap.asImageBitmap(),
-                            contentDescription = stringResource(R.string.exchange_qr_cd),
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                // 4.1.0 Phase 9 (issue #3) — only for keys too large for one
-                // symbol. Absent for every classic key.
-                if (state.qrFrames.size > 1) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedButton(onClick = { autoRotate = false; viewModel.qrPrev() }) {
-                            Icon(
-                                imageVector = Icons.Filled.FastRewind,
-                                contentDescription = stringResource(R.string.qr_part_previous)
-                            )
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { autoRotate = !autoRotate }) {
-                                Icon(
-                                    imageVector = if (autoRotate) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                    contentDescription = stringResource(
-                                        if (autoRotate) R.string.qr_autorotate_pause_cd
-                                        else R.string.qr_autorotate_play_cd
-                                    )
-                                )
-                            }
-                            Text(
-                                stringResource(
-                                    R.string.qr_part_of_format,
-                                    state.qrIndex + 1,
-                                    state.qrFrames.size
-                                ),
-                                style = MaterialTheme.typography.titleSmall
-                            )
-                        }
-                        OutlinedButton(onClick = { autoRotate = false; viewModel.qrNext() }) {
-                            Icon(
-                                imageVector = Icons.Filled.FastForward,
-                                contentDescription = stringResource(R.string.qr_part_next)
-                            )
-                        }
-                    }
-                    Text(
-                        stringResource(R.string.qr_multipart_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
+            com.pgpony.android.ui.components.PublicKeyQrDisplay(
+                store = state.qrStore, policy = state.qrPolicy,
+                onPolicyChange = viewModel::setQrPolicy, errorMessage = state.qrError,
+                fingerprint = state.selectedKey?.formattedFingerprint)
+            if (state.qrStore != null) {
                 state.selectedKey?.let { key ->
                     Text(key.userName.ifBlank { key.userEmail.ifBlank { key.userID } }, style = MaterialTheme.typography.titleSmall)
                     // 4.7.0 (item 35): the email too, so the shown key is unmistakable.

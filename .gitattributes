@@ -1,0 +1,5 @@
+# Keep pinned public fixtures and generated QR evidence byte-identical on Windows.
+app/src/test/resources/**/*.asc text eol=lf
+app/src/androidTest/assets/qr/*.asc text eol=lf
+docs/qa/qr-encoding.csv text eol=lf
+app/src/androidTest/assets/qr/*.y binary

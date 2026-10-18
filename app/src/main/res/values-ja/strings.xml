@@ -3006,4 +3006,17 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="key_detail_resign_biometric_title">新しい署名を確認</string>
     <string name="key_detail_resign_biometric_subtitle">この鍵を再署名するには認証してください</string>
     <string name="provider_review_included_format">%1$s によりすでに含まれています</string>
+
+    <!-- Public-key QR exchange controls and recovery feedback. -->
+    <string name="qr_density_normal">標準</string>
+    <string name="qr_density_roomy">大きいドット</string>
+    <string name="qr_playback_slow">ゆっくり再生</string>
+    <string name="qr_enlarge">QR コードを拡大</string>
+    <string name="qr_render_small">コードを拡大するか、画面の表示倍率を下げてください。</string>
+    <string name="qr_unsupported_version">この QR 形式には新しい PGPony が必要です。送信側に互換モードの使用を依頼してください。</string>
+    <string name="qr_integrity_error">分割データが一致しません。この鍵を再度スキャンしてください。</string>
+    <string name="qr_enhanced_progress_format">必要な %2$d 個中 %1$d 個を受信しました。スキャンを続けてください。</string>
+    <string name="qr_camera_error">カメラを起動できません。他のカメラアプリを閉じて再試行してください。</string>
+    <string name="qr_retry">再試行</string>
+    <string name="qr_focus_hint">コードをタップしてピントを合わせてください。</string>
 </resources>
