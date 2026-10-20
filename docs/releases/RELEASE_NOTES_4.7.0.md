@@ -158,13 +158,13 @@ a release section has the key and the git commands to check a tag.
 Whole-file SHA-256 (is this download the published file):
 
 ```
-WHOLE_FILE_SHA256
+a78977fe4b6c957cc7599389766a5df664f92a2e09133a171a1e3c9ad32ef059
 ```
 
 Content hash (for rebuilders; excludes signature, see docs/REPRODUCIBLE_BUILDS_PLAYBOOK.md):
 
 ```
-CONTENT_HASH
+9c1010def9fc2f4daae6fb99f1528c2fee8c0179c6221182d5eae409f0e503b3
 ```
 
 The APK is signed with the NorseHorse release key
