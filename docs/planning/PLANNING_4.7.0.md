@@ -1576,6 +1576,10 @@ justifies an RC8, and only for that fix. Everything else goes to the next releas
 - #96: Korean err_ strings (decision pending on Korean error strings).
 - #98: manifest content VIEW filters without the inert path patterns.
 - #71: signing new subkeys with a primary held on a card.
+- #102: ECDSA card signing (secp256k1, NIST): CardPGPContentSigner hands BC the card's raw r||s, which BC
+  decodes as DER ("exception decoding signature"); DER-encode it and match the hash to the curve. Also the
+  labels: subkeyAlgorithmLabel names every ECDH subkey X25519, and a card key on a curve PGPony does not model
+  falls back to Ed25519+Cv25519 (importCardKeyInternal). Not new in 4.7.0.
 
 ## RC breakdown (set Oct 9 2026)
 
@@ -1603,6 +1607,8 @@ uk, b+zh+Hans).
 - RC7 (release candidate): 68, 69, #94, #97, #99, then the 12a on-device checks below.
 - Last RC: the 12a on-device checks (Tor with Orbot, custom proxy, OpenKeychain restore, protected key over a
   contact, the provider with Thunderbird including a card).
+- Release (Oct 20): 4.7.0 is RC7's code with the release notes, the 470 changelog and the README's OpenKeychain
+  notes. No RC8: RC7 and the 12a on-device checks passed.
 - Not RC-gated: 30 (README), 11 (SOP wrapper), 12 (external review follow-up).
 
 Item 27 decision: a User ID whose only binding uses SHA-1 is kept with its name and a weak-hash mark, still

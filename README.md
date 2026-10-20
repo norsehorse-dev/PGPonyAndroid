@@ -13,13 +13,28 @@ build contains no Google services and runs fully on de-Googled devices.
 - Modern key generation, including RFC 9580 (OpenPGP v6) Ed25519 and X25519,
   with Argon2id passphrase protection
 - Hardware security keys over NFC and USB (YubiKey 5 NFC, Token2): on-card
-  key generation, decrypt, sign, PIN management, and factory reset. USB has
+  key generation, moving an existing key onto the card (since 4.7.0),
+  decrypt, sign, PIN management, and factory reset. USB has
   worked since 4.1.0. The Nitrokey 3 works over USB since 4.6.4 for decrypt
   and sign; its firmware turns OpenPGP off over NFC, so it does not work there
 - Read-only password-store (pass) support, including hardware-key entries
 - Key discovery via WKD and the keys.openpgp.org verifying keyserver
 - Optional contacts integration, QR import and scanning
 - Biometric lock and secure-screen protection
+
+## Coming from OpenKeychain
+
+- Keys: export them in OpenKeychain and import the file in PGPony; every key
+  in it imports at once. For an encrypted OpenKeychain backup (a .sec.pgp
+  file), use Settings, Backup, Restore and enter the 36-digit backup code.
+- Mail apps: in the mail app's OpenPGP settings, choose PGPony as the
+  OpenPGP app. Apps you allow are listed under Connected apps.
+- SSH: OkcAgent works with PGPony through a fork that lists PGPony as a
+  provider. Settings has the link and the Termux steps.
+- Signing subkeys: PGPony signs with the newest valid signing subkey, where
+  OpenKeychain used the older one. If others expect your signatures from a
+  particular subkey, pick it under Key Details, Use for signing (since
+  4.7.0). Automatic names the key it picks.
 
 ## Build
 
