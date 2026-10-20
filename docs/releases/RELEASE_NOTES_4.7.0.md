@@ -96,7 +96,7 @@ one. If others expect your signatures from a particular subkey, pick it under Us
   date (#90). A network failure during that check is reported as an error, not as "not found".
 - Keyring > Select keys exports several public keys as one .asc file (#93).
 - The list behind a key count badge scrolls (#87).
-- Key selectors show "Name <email>" with the short fingerprint.
+- Key selectors show the name and email with the short fingerprint.
 - Toggle and checkbox rows respond to a tap anywhere on the row (#79).
 
 ## App lock and duress PIN
