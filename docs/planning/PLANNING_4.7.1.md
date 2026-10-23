@@ -6,7 +6,7 @@ reported on 4.6.4, and ECDSA card signing (#102), moved here from PLANNING_4.8.0
 
 ## 1. ANR: opening the full text of a long message
 
-**Status:** code in (Oct 22).
+**Status:** in RC1 (Oct 22).
 
 Origin: Play Console, Crashes and ANRs, two ANRs on 4.6.4 (two devices, one a slow Unisoc phone). Both main
 threads were in a single text measure pass inside a dialog: AlertDialog, a scrolling Box, SelectionContainer,
@@ -25,7 +25,7 @@ block, Copy and paste the whole text elsewhere.
 
 ## 2. Crash: IllegalArgumentException in LayoutNodeSubcompositionsState
 
-**Status:** waiting for the stack trace from Play.
+**Status:** moved to 4.8.0 (Oct 23): 4.7.1 ships without it; the trace was not in hand.
 
 Origin: Play Console, two crash clusters on 4.6.4 (one user, 3 and 5 events). The exception comes from Compose's
 subcomposition (lazy lists, SubcomposeLayout); the usual cause is two items in one lazy list with the same key.
@@ -34,7 +34,7 @@ The trace names the screen.
 
 ## 3. ECDSA card signing and card key labels (#102)
 
-**Status:** code in (Oct 22).
+**Status:** in RC1 (Oct 22), confirmed on a secp256k1 Token2 by the reporter (Oct 23).
 
 Origin: #102 (on RC7; not new in 4.7.0). A card with all three slots on secp256k1 (card-generated layout,
 primary in the Signature slot) could not sign ("exception decoding signature"), and its keys showed as X25519
@@ -71,6 +71,6 @@ Left out: moving NIST or brainpool keys onto a card (4.7.0 item 13 left-out) sta
 
 ## Release
 
-versionCode 471, versionName 4.7.1. Changelog 471.txt and RELEASE_NOTES_4.7.1.md once item 2 is in. Same
+versionCode 471, versionName 4.7.1, from RC1's code (Oct 23). Changelog 471.txt and RELEASE_NOTES_4.7.1.md. Same
 release path as 4.7.0: signed commit and tag, reproducibility gate, GitHub release with four assets,
 pgpony.app, Play (notes in all 11 listing languages), F-Droid from the tag.

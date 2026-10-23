@@ -124,6 +124,26 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
   rebase on 4.7.0's Exchange changes, and its planning-doc edit taken out.
 
 
+## 4b. Requests after 4.7.0
+
+- #103: encrypt or sign selected text from the text selection menu (ACTION_PROCESS_TEXT), replacing the
+  selection in place when the field is editable and the result can be returned, as OpenKeychain does.
+- #72 follow-up: sign a single shared file from Quick Actions (detached .sig, or encrypt and sign). Several
+  files already have Sign only on the package screen.
+- #67 follow-up: restore a PGPony backup shared to Quick Actions (recognize the backup file and open Restore).
+- #104: compress large files too. Today a message or file up to 16 MB is compressed with ZLIB
+  (COMPRESSION_LIMIT) and a larger one is not; nothing is padded. Narrowed with the reporter (Oct 23, a CSV over
+  50 MB): one opt-in switch in Settings, off by default, that lifts the 16 MB limit so every file is compressed
+  with ZLIB. The Encrypt progress already covers the longer run. Other methods (ZIP, BZip2) and padding are not
+  planned unless someone asks for them.
+
+
+## 4c. Play crash on 4.6.4 (carried from 4.7.1 item 2)
+
+IllegalArgumentException in Compose's LayoutNodeSubcompositionsState, two clusters, one user. Usually two items
+in one lazy list with the same key. Needs the stack trace from Play Console to name the screen.
+
+
 ## 5. Contributor PRs waiting on a decision
 
 - #96: Korean err_ strings. Korean has had no err_ strings so far; decide whether that stands.
