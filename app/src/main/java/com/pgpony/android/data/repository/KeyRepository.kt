@@ -1387,6 +1387,12 @@ class KeyRepository(
         return null
     }
 
+    /** The algorithm a card's slots name: the Signature slot's, else the first
+     *  slot that maps to one. Null when no slot maps. */
+    private fun cardAlgorithm(cardInfo: CardInfo): KeyAlgorithm? =
+        cardInfo.slotFor(com.pgpony.android.crypto.card.CardSlot.SIGNATURE)?.algorithm
+            ?: cardInfo.slots.firstOrNull { it.algorithm != null }?.algorithm
+
     private suspend fun importCardKeyInternal(cardInfo: CardInfo): PGPKeyEntity {
         val primaryFp = cardInfo.primaryFingerprint
             ?: throw KeyRepoError.StorageFailed(
@@ -1411,7 +1417,16 @@ class KeyRepository(
         val existing = dao.getByFingerprint(primaryFp)
             ?: findEntityBySubkeyFingerprint(listOfNotNull(sigFp, decFp, authFp))
         if (existing != null) {
+            // 4.7.1 (#102): a row first stored with a wrong algorithm (a card on a
+            // curve PGPony did not map fell back to Ed25519 + Cv25519) is put
+            // right by scanning the card again: from the certificate when there
+            // is one, else from the card's own slot attributes.
+            val algorithm = loadPublicKeyRing(existing.fingerprint)
+                ?.let { ring -> ring.publicKey?.let { crypto.detectAlgorithm(it, ring) } }
+                ?: (if (existing.armoredPublicKey == null) cardAlgorithm(cardInfo) else null)
+                ?: existing.algorithm
             val linked = existing.copy(
+                algorithm = algorithm,
                 isCardBacked = true,
                 cardSerial = cardInfo.serialHex,
                 cardAid = cardInfo.aidHex,
@@ -1434,9 +1449,7 @@ class KeyRepository(
 
         // Fresh card-backed contact row. No SecureKeyStore writes — the
         // private key lives on the card and there's no cert to cache yet.
-        val algorithm = cardInfo.slotFor(com.pgpony.android.crypto.card.CardSlot.SIGNATURE)?.algorithm
-            ?: cardInfo.slots.firstOrNull { it.algorithm != null }?.algorithm
-            ?: KeyAlgorithm.ED25519_CV25519
+        val algorithm = cardAlgorithm(cardInfo) ?: KeyAlgorithm.ED25519_CV25519
 
         val label = "${cardInfo.manufacturerName} hardware key"
         val entity = PGPKeyEntity(

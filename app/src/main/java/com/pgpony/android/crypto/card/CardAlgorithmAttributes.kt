@@ -90,13 +90,16 @@ data class CardAlgorithmAttributes(
             return when {
                 startsWith(OID_ED25519) -> "Ed25519" to KeyAlgorithm.ED25519_CV25519
                 startsWith(OID_CV25519) -> "Cv25519" to KeyAlgorithm.ED25519_CV25519
-                startsWith(OID_NIST_P256) -> "NIST P-256" to null
-                startsWith(OID_NIST_P384) -> "NIST P-384" to null
-                startsWith(OID_NIST_P521) -> "NIST P-521" to null
-                startsWith(OID_SECP256K1) -> "secp256k1" to null
-                startsWith(OID_BRAINPOOL_P256) -> "brainpoolP256r1" to null
-                startsWith(OID_BRAINPOOL_P384) -> "brainpoolP384r1" to null
-                startsWith(OID_BRAINPOOL_P512) -> "brainpoolP512r1" to null
+                // 4.7.1 (#102): map the other curves to their ECDSA labels, so a
+                // card scanned before its public key is imported does not show
+                // as Ed25519 + Cv25519 (the fallback for an unmapped slot).
+                startsWith(OID_NIST_P256) -> "NIST P-256" to KeyAlgorithm.ECDSA_NIST_P256
+                startsWith(OID_NIST_P384) -> "NIST P-384" to KeyAlgorithm.ECDSA_NIST_P384
+                startsWith(OID_NIST_P521) -> "NIST P-521" to KeyAlgorithm.ECDSA_NIST_P521
+                startsWith(OID_SECP256K1) -> "secp256k1" to KeyAlgorithm.ECDSA_SECP256K1
+                startsWith(OID_BRAINPOOL_P256) -> "brainpoolP256r1" to KeyAlgorithm.ECDSA_BRAINPOOL_P256
+                startsWith(OID_BRAINPOOL_P384) -> "brainpoolP384r1" to KeyAlgorithm.ECDSA_BRAINPOOL_P384
+                startsWith(OID_BRAINPOOL_P512) -> "brainpoolP512r1" to KeyAlgorithm.ECDSA_BRAINPOOL_P512
                 else -> "EC (unrecognized curve)" to null
             }
         }

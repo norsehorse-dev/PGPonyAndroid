@@ -1268,9 +1268,17 @@ class KeyDetailViewModel(
      * way, so they still use [algorithm]'s own shortName.
      */
     private fun subkeyAlgorithmLabel(pubKey: PGPPublicKey, algorithm: KeyAlgorithm): String {
+        // 4.7.1 (#102): read the curve instead of assuming the 25519 family.
+        // An ECDH subkey on secp256k1 or a NIST curve showed as X25519, and an
+        // ECDSA subkey took the primary's label.
+        val curve = com.pgpony.android.crypto.EcCurveOid.label(pubKey)
         return when (pubKey.algorithm) {
-            org.bouncycastle.bcpg.PublicKeyAlgorithmTags.ECDH -> "X25519"
-            org.bouncycastle.bcpg.PublicKeyAlgorithmTags.EDDSA_LEGACY -> "Ed25519"
+            org.bouncycastle.bcpg.PublicKeyAlgorithmTags.ECDH -> when (curve) {
+                null, "Curve25519", "X25519" -> "X25519"
+                else -> "ECDH $curve"
+            }
+            org.bouncycastle.bcpg.PublicKeyAlgorithmTags.EDDSA_LEGACY -> curve ?: "Ed25519"
+            org.bouncycastle.bcpg.PublicKeyAlgorithmTags.ECDSA -> if (curve != null) "ECDSA $curve" else "ECDSA"
             else -> algorithm.shortName
         }
     }

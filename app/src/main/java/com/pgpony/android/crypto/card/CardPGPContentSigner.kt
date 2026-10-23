@@ -12,13 +12,16 @@
 // card output. BC then encodes it into MPIs by key algorithm:
 //   • EdDSA-legacy (22): BC splits the card's 64-byte R‖S into two MPIs.
 //   • RSA (1/2/3): BC wraps the card's raw signature as a single MPI.
-// (ECDSA is not supported here — the card returns r‖s but BC expects DER.)
+//   • ECDSA (19), from 4.7.1 (#102): the card returns r and s back to back,
+//     BC reads DER, so CardSigningFormat.rawEcdsaToDer converts it. The hash
+//     follows the curve (CardSigningFormat.ecdsaHashFor).
 //
-// Hash is fixed at SHA-256 to match CardSigningFormat's DigestInfo prefix
+// RSA and EdDSA keep SHA-256, to match CardSigningFormat's DigestInfo prefix
 // and PGPony's default signing hash.
 
 package com.pgpony.android.crypto.card
 
+import com.pgpony.android.crypto.EcCurveOid
 import org.bouncycastle.bcpg.HashAlgorithmTags
 import org.bouncycastle.openpgp.PGPPrivateKey
 import org.bouncycastle.openpgp.PGPPublicKey
@@ -49,7 +52,13 @@ class CardPGPContentSigner(
     private val publicKey: PGPPublicKey
 ) : PGPContentSigner {
 
-    private val digest = MessageDigest.getInstance("SHA-256")
+    private val isEcdsa = publicKey.algorithm == CardSigningFormat.ECDSA
+
+    private val hashAlgorithm: Int =
+        if (isEcdsa) CardSigningFormat.ecdsaHashFor(EcCurveOid.oidOf(publicKey))
+        else HashAlgorithmTags.SHA256
+
+    private val digest = MessageDigest.getInstance(CardSigningFormat.digestName(hashAlgorithm))
 
     private val sink = object : OutputStream() {
         override fun write(b: Int) {
@@ -93,11 +102,12 @@ class CardPGPContentSigner(
         val d = finalizedDigest()
         session.verify(OpenPgpCard.PW1_SIGN, pin)
         val input = CardSigningFormat.prepareInput(publicKey.algorithm, d)
-        return session.signDigest(input)
+        val raw = session.signDigest(input)
+        return if (isEcdsa) CardSigningFormat.rawEcdsaToDer(raw) else raw
     }
 
     override fun getType(): Int = signatureType
-    override fun getHashAlgorithm(): Int = HashAlgorithmTags.SHA256
+    override fun getHashAlgorithm(): Int = hashAlgorithm
     override fun getKeyAlgorithm(): Int = publicKey.algorithm
     override fun getKeyID(): Long = publicKey.keyID
 }

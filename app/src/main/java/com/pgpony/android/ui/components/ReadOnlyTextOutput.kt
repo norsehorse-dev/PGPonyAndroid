@@ -37,6 +37,7 @@ package com.pgpony.android.ui.components
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -50,6 +51,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import com.pgpony.android.R
 
 /**
@@ -163,10 +165,16 @@ fun ReadOnlyTextOutput(
 /**
  * The whole text, composed only once the user has asked for it.
  *
- * Still a single Text rather than a virtualised list: selection across a lazy
- * list does not work in Compose, and being able to select and copy a
- * decrypted message matters more than the last of the layout cost. The cost
- * is now paid on an explicit tap instead of on every decrypt.
+ * 4.7.1 (Play ANR, two devices on 4.6.4): this used to be one Text holding the
+ * entire string inside a scrolling Box. Opening a long message laid out every
+ * line of it on the main thread in one measure pass, which a slow phone could
+ * not finish in time. The text is now split into blocks at line breaks
+ * ([TextBlocks]) and shown in a lazy list, so only the blocks on screen are
+ * laid out. Each block is selectable on its own; a selection cannot span two
+ * blocks, so Copy (always the complete text) stays the way to take all of it.
+ *
+ * A plain Dialog rather than AlertDialog, so the list's height is set here and
+ * nothing asks the lazy list for intrinsic measurements.
  */
 @Composable
 private fun FullTextDialog(
@@ -175,30 +183,69 @@ private fun FullTextDialog(
     onCopy: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                SelectionContainer {
-                    Text(text = text, style = MaterialTheme.typography.bodyMedium)
+    val blocks = remember(text) { TextBlocks.split(text) }
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(title, style = MaterialTheme.typography.headlineSmall)
+                Spacer(modifier = Modifier.height(16.dp))
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .heightIn(max = 420.dp)
+                ) {
+                    items(blocks.size) { i ->
+                        SelectionContainer {
+                            Text(text = blocks[i], style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.common_button_close))
+                    }
+                    TextButton(onClick = onCopy) {
+                        Text(stringResource(R.string.common_button_copy))
+                    }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onCopy) {
-                Text(stringResource(R.string.common_button_copy))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.common_button_close))
-            }
         }
-    )
+    }
+}
+
+/**
+ * Splits a long text into blocks for [FullTextDialog]. Pure, so it is tested
+ * on the JVM. Blocks end at a line break where one falls within [maxChars];
+ * a single line longer than that (a decrypted file with no line breaks) is cut
+ * every [maxChars] characters. Joining the blocks gives back the text exactly.
+ */
+internal object TextBlocks {
+    const val MAX_CHARS = 2_000
+
+    fun split(text: String, maxChars: Int = MAX_CHARS): List<String> {
+        require(maxChars > 0)
+        if (text.length <= maxChars) return listOf(text)
+        val out = ArrayList<String>(text.length / maxChars + 1)
+        var start = 0
+        while (start < text.length) {
+            val limit = minOf(start + maxChars, text.length)
+            var end = limit
+            if (limit < text.length) {
+                val nl = text.lastIndexOf('\n', limit - 1)
+                if (nl >= start) end = nl + 1
+            }
+            out.add(text.substring(start, end))
+            start = end
+        }
+        return out
+    }
 }
