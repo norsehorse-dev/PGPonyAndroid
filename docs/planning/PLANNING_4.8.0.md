@@ -138,6 +138,11 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
   planned unless someone asks for them.
 
 
+- In-app viewer for decrypted files (user email, Oct 23): a decrypted PDF or image always goes to the Android
+  app chooser. Asked: show it inside PGPony instead (PdfRenderer for PDF, an image view for JPEG and PNG), with
+  Open in another app and Save still offered. Not planned yet; scope and whether iOS has the same gap to check.
+
+
 ## 4c. Play crash on 4.6.4 (carried from 4.7.1 item 2)
 
 IllegalArgumentException in Compose's LayoutNodeSubcompositionsState, two clusters, one user. Usually two items
