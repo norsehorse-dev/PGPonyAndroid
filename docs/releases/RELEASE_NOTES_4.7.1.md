@@ -26,13 +26,13 @@ corrected the next time you scan the card.
 Whole-file SHA-256 (is this download the published file):
 
 ```
-WHOLE_FILE_SHA256
+99d36b8c6aa7ac6bbfbea0a3f03bd3ba242fa28b8e3ddaa160aba6b721d1dc45
 ```
 
 Content hash (for rebuilders; excludes signature, see docs/REPRODUCIBLE_BUILDS_PLAYBOOK.md):
 
 ```
-CONTENT_HASH
+b4d1a98acf62b7d1d38d8c1a047785756869c238318c79f2e0e76668764de29b
 ```
 
 The APK is signed with the NorseHorse release key
