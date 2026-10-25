@@ -68,4 +68,55 @@ class ArmorExtractorTest {
         val out = ArmorExtractor.extractForImport("noise $sigBlock noise")
         assertEquals(sigBlock, out)
     }
+
+    // 4.7.2 RC3: messageOnly, the decrypt-side extraction.
+
+    private val msgBlock = buildString {
+        append("-----BEGIN PGP MESSAGE-----\n\n")
+        append("hF4DAAAAAAAAAAASAQdA...base64...\n")
+        append("=AbCd\n")
+        append("-----END PGP MESSAGE-----")
+    }
+
+    private val emailSignature = "Cheers\n\n------------------------------\nA Name\nname@example.org\nSomewhere"
+
+    @Test
+    fun `a clean message is returned unchanged`() {
+        val input = msgBlock + "\n"
+        assertTrue(input === ArmorExtractor.messageOnly(input))
+        assertTrue(msgBlock === ArmorExtractor.messageOnly(msgBlock))
+    }
+
+    @Test
+    fun `an email signature with a row of dashes above the message is dropped`() {
+        assertEquals(msgBlock + "\n", ArmorExtractor.messageOnly(emailSignature + "\n\n" + msgBlock))
+    }
+
+    @Test
+    fun `an email signature below the message is dropped`() {
+        assertEquals(msgBlock + "\n", ArmorExtractor.messageOnly(msgBlock + "\n\n" + emailSignature))
+    }
+
+    @Test
+    fun `the dash-dash-space signature separator above the message is dropped`() {
+        assertEquals(msgBlock + "\n", ArmorExtractor.messageOnly("Thanks\n-- \nA Name\n\n" + msgBlock))
+    }
+
+    @Test
+    fun `a message without its END line is returned unchanged`() {
+        val partial = emailSignature + "\n\n-----BEGIN PGP MESSAGE-----\n\nhF4DAAAA"
+        assertTrue(partial === ArmorExtractor.messageOnly(partial))
+    }
+
+    @Test
+    fun `text without a message block is returned unchanged`() {
+        val text = "just some text\n-----\nmore"
+        assertTrue(text === ArmorExtractor.messageOnly(text))
+    }
+
+    @Test
+    fun `the first of two messages is used`() {
+        val second = msgBlock.replace("base64", "second")
+        assertEquals(msgBlock + "\n", ArmorExtractor.messageOnly(msgBlock + "\n\n" + second))
+    }
 }

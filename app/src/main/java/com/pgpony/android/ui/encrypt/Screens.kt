@@ -2942,6 +2942,15 @@ private fun SignPassphraseDialog(
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
+                                // 4.7.2 RC3: the email too, so two keys with the same name can be
+                                // told apart here (the key pickers show it since 4.7.0).
+                                if (signingKey.userName.isNotBlank() && signingKey.userEmail.isNotBlank()) {
+                                    Text(
+                                        signingKey.userEmail,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                                 Text(
                                     signingKey.shortFingerprint,
                                     style = MaterialTheme.typography.bodySmall,
@@ -3088,6 +3097,15 @@ private fun DecryptPassphraseDialog(
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
+                                // 4.7.2 RC3: the email too, so two keys with the same name can be
+                                // told apart here (the key pickers show it since 4.7.0).
+                                if (selectedKey.userName.isNotBlank() && selectedKey.userEmail.isNotBlank()) {
+                                    Text(
+                                        selectedKey.userEmail,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                                 Text(
                                     selectedKey.shortFingerprint,
                                     style = MaterialTheme.typography.bodySmall,

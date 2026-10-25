@@ -3752,7 +3752,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         // a PGP MESSAGE that BouncyCastle cannot parse (algo-30/31 signature);
         // detect and verify it through the composite path before routing.
         val inlineBytes = if (s.inputText.contains("-----BEGIN PGP MESSAGE-----")) {
-            try { com.pgpony.android.crypto.pqc.CompositeSigPacket.dearmor(s.inputText) } catch (_: Exception) { null }
+            try { com.pgpony.android.crypto.pqc.CompositeSigPacket.dearmor(effectiveDecryptInput(s.inputText)) } catch (_: Exception) { null }
         } else null
         if (inlineBytes != null && CompositeDocumentVerifier.isCompositeInline(inlineBytes)) {
             verifyCompositeInlinePath(inlineBytes)
@@ -5531,7 +5531,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      * bare armored block is NOT an envelope and passes through as-is.
      */
     private fun effectiveDecryptInput(raw: String): String =
-        MimeEnvelope.unwrapText(raw)
+        // 4.7.2 RC3: then only the PGP MESSAGE block, so text pasted around it (an email
+        // signature with a row of dashes, say) cannot break the armor reader.
+        com.pgpony.android.crypto.ArmorExtractor.messageOnly(MimeEnvelope.unwrapText(raw))
 
     /**
      * 3.1.0 Phase 4 (J2) — file-mode variant: an encrypted .eml opened
