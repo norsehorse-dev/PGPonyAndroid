@@ -352,7 +352,9 @@ private fun SigningKeyList(
             .fillMaxWidth()
             .heightIn(max = 480.dp)
     ) {
-        items(keyPairs, key = { it.fingerprint }) { key ->
+        // 4.7.2 (Play crash on 4.6.4): two keyring rows with one fingerprint gave the lazy list
+        // the same key twice, which Compose rejects with IllegalArgumentException while scrolling.
+        items(keyPairs.distinctBy { it.fingerprint }, key = { it.fingerprint }) { key ->
             // The default-signer badge follows the persisted fingerprint when
             // set, else the generic isDefault flag (matches iOS's fallback).
             val isDefaultSigner = if (defaultSignerFingerprint.isEmpty()) {

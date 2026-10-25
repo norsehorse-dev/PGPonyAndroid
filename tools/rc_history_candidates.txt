@@ -1,0 +1,64 @@
+# Candidate source commits for each release candidate on pgpony.app/rc/ before RCs were tagged.
+# Format: <RC> <APK file name> <commit> [<commit> ...]
+# The first commit is the last one on the release line before the RC was uploaded. A second commit,
+# where listed, is the next commit that carries the same work, for RCs built from a working tree that
+# was committed after the upload. tools/rc_history_check.sh builds each commit from a clean clone and
+# reports which one, if any, has the same content hash as the RC APK.
+4.0.4-rc1 PGPony-4.0.4-rc1.apk 971fb65 5ac5756
+4.0.5-test PGPony-4.0.5-test.apk c3f137e 75e0190
+4.1.0-rc2 PGPony-4.1.0-rc2.apk 75e0190 c053a2e
+4.1.0-rc3 PGPony-4.1.0-rc3.apk 75e0190 c053a2e
+4.2.0-RC1 PGPony-4.2.0-RC1-foss.apk ee22242 f092573
+4.2.0-RC2 PGPony-4.2.0-RC2-foss.apk 7b3ff08 570104c
+4.2.0-RC3 PGPony-4.2.0-RC3-foss.apk 8e23cc8 87a9d7b
+4.2.0-RC4 PGPony-4.2.0-RC4-foss.apk 87a9d7b
+4.2.0-RC5 PGPony-4.2.0-RC5-foss.apk 87a9d7b 232f104
+4.2.0-RC6 PGPony-4.2.0-RC6-foss.apk 87a9d7b 232f104
+4.2.1-RC1 PGPony-4.2.1-RC1-foss.apk 5552b9b 4e12ce9
+4.3.0-RC1 PGPony-4.3.0-RC1-foss.apk 8395d8c 680b063
+4.3.0-RC2 PGPony-4.3.0-RC2-foss.apk 8395d8c 680b063
+4.3.0-RC3 PGPony-4.3.0-RC3-foss.apk 39f1eec 680b063
+4.3.0-RC4 PGPony-4.3.0-RC4-foss.apk 39f1eec 680b063
+4.3.0-RC5 PGPony-4.3.0-RC5-foss.apk 1110ec6 0ad5882
+4.3.1-RC1 PGPony-4.3.1-RC1-foss.apk 082b02c d96d1a2
+4.4.0-RC1 PGPony-4.4.0-RC1-foss.apk c9be1cf
+4.4.0-RC2 PGPony-4.4.0-RC2-foss.apk 484ca9c
+4.4.0-RC3 PGPony-4.4.0-RC3-foss.apk a02c4db
+4.4.0-RC4 PGPony-4.4.0-RC4-foss.apk b99682d
+4.4.0-RC5 PGPony-4.4.0-RC5-foss.apk b99682d 778f9a1
+4.4.0-RC6 PGPony-4.4.0-RC6-foss.apk 778f9a1
+4.4.0-RC7 PGPony-4.4.0-RC7-foss.apk af433cd
+4.4.0-RC8 PGPony-4.4.0-RC8-foss.apk 17c854a
+4.4.0-RC9 PGPony-4.4.0-RC9-foss.apk 0926f0d
+4.4.0-RC10 PGPony-4.4.0-RC10-foss.apk cca0d0d
+4.4.0-RC11 PGPony-4.4.0-RC11-foss.apk 7405999
+4.4.0-RC12 PGPony-4.4.0-RC12-foss.apk 1882826
+4.4.0-RC13 PGPony-4.4.0-RC13-foss.apk e494cee
+4.4.0-RC14 PGPony-4.4.0-RC14-foss.apk a337a58 ccda589
+4.4.1-RC1 PGPony-4.4.1-RC1-foss.apk ccda589 837337f
+4.5.0-RC1 PGPony-4.5.0-RC1-foss.apk 22dadb2 25ff1da
+4.5.0-RC2 PGPony-4.5.0-RC2-foss.apk f5503ca
+4.5.0-RC3 PGPony-4.5.0-RC3-foss.apk 37b6ebf 35a50cc
+4.5.0-RC4 PGPony-4.5.0-RC4-foss.apk a0e8e43
+4.5.0-RC5 PGPony-4.5.0-RC5-foss.apk 2a84de0
+4.5.0-RC6 PGPony-4.5.0-RC6-foss.apk 5695582
+4.5.0-RC7 PGPony-4.5.0-RC7-foss.apk 6c5f789
+4.5.0-RC8 PGPony-4.5.0-RC8-foss.apk ea3148d
+4.5.0-RC9 PGPony-4.5.0-RC9-foss.apk ea3148d 3b12e78
+4.5.1-RC1 PGPony-4.5.1-RC1-foss.apk 4f792d1 8c5f411
+4.5.1-RC2 PGPony-4.5.1-RC2-foss.apk 4f792d1 8c5f411
+4.5.3-RC1 PGPony-4.5.3-RC1-foss.apk 6c21d64 094fae9
+4.5.3-RC2 PGPony-4.5.3-RC2-foss.apk 6c21d64 094fae9
+4.5.3-RC3 PGPony-4.5.3-RC3-foss.apk 6c21d64 094fae9
+4.6.0-RC1 PGPony-4.6.0-RC1-foss.apk d333001
+4.6.1-RC1 PGPony-4.6.1-RC1-foss.apk ce13072
+4.6.3-RC1 PGPony-4.6.3-RC1-foss.apk bc00cb1 d304a58
+4.6.4-RC1 PGPony-4.6.4-RC1-foss.apk 863f8c4 c73de77
+4.7.0-RC1 PGPony-4.7.0-RC1-foss.apk 25a5137
+4.7.0-RC2 PGPony-4.7.0-RC2-foss.apk f663f7d
+4.7.0-RC3 PGPony-4.7.0-RC3-foss.apk c7b9957
+4.7.0-RC4 PGPony-4.7.0-RC4-foss.apk 7b1f92f
+4.7.0-RC5 PGPony-4.7.0-RC5-foss.apk 2b67bc1
+4.7.0-RC6 PGPony-4.7.0-RC6-foss.apk f04501a
+4.7.0-RC7 PGPony-4.7.0-RC7-foss.apk 34f4b8d
+4.7.1-RC1 PGPony-4.7.1-RC1-foss.apk 7662832 b127b2d

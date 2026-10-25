@@ -258,8 +258,10 @@ android {
         // main moves straight from 461 to 470. Unchanged across the RCs.
         // 4.7.1: the full-text dialog ANR, a Compose crash from Play, and ECDSA
         // card signing with the card key labels (#102). versionCode 471.
-        versionCode = 471
-        versionName = "4.7.1"
+        // 4.7.2: the keyboard closes on a tap away from a text field (Encrypt, Decrypt), and the
+        // recipient and signer lists drop a repeated fingerprint (Play crash). versionCode 472.
+        versionCode = 472
+        versionName = "4.7.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

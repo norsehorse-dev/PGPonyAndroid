@@ -78,6 +78,8 @@ import com.pgpony.android.crypto.card.CardSigningService
 import com.pgpony.android.crypto.card.CardDecryptService
 import com.pgpony.android.ui.components.ReadOnlyTextOutput
 import com.pgpony.android.ui.util.autofillPassword
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 import com.pgpony.android.crypto.PGPCryptoService
 import com.pgpony.android.crypto.card.OpenPgpCardException
 import com.pgpony.android.ui.components.KeyCard
@@ -164,6 +166,7 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp)
+                .dismissKeyboardOnTap()
                 .verticalScroll(rememberScrollState())
         ) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -257,7 +260,7 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
                             }
                         )
                     },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth().heightIn(min = 120.dp),
                     maxLines = 10
                 )
                 // Phase AU-3 — paste the clipboard into the message field,
@@ -727,7 +730,7 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         visualTransformation = PasswordVisualTransformation(),
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.keepsKeyboard().fillMaxWidth()
                     )
                 }
             },
@@ -1293,6 +1296,7 @@ private fun RecipientPickerSheet(
                 .navigationBarsPadding()
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 24.dp)
+                .dismissKeyboardOnTap()
         ) {
             Text(
                 stringResource(R.string.encrypt_recipients_choose),
@@ -1306,7 +1310,7 @@ private fun RecipientPickerSheet(
                 label = { Text(stringResource(R.string.encrypt_recipients_search_label)) },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.keepsKeyboard().fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -1346,7 +1350,8 @@ private fun RecipientPickerSheet(
                         .fillMaxWidth()
                         .heightIn(max = 360.dp)
                 ) {
-                    items(filtered, key = { it.fingerprint }) { key ->
+                    // 4.7.2 (Play crash on 4.6.4): see SignAsSheet, same duplicate-key guard.
+                    items(filtered.distinctBy { it.fingerprint }, key = { it.fingerprint }) { key ->
                         val isSel = selected.any { it.fingerprint == key.fingerprint }
                         RecipientPickerRow(
                             key = key,
@@ -1984,7 +1989,7 @@ private fun PasswordModeBody(state: EncryptUiState, viewModel: EncryptDecryptVie
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         visualTransformation = transformation,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.keepsKeyboard().fillMaxWidth()
     )
     Spacer(modifier = Modifier.height(8.dp))
 
@@ -1997,7 +2002,7 @@ private fun PasswordModeBody(state: EncryptUiState, viewModel: EncryptDecryptVie
         visualTransformation = transformation,
         isError = state.passwordConfirm.isNotEmpty() &&
             state.passwordConfirm != state.passwordPassphrase,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.keepsKeyboard().fillMaxWidth()
     )
     Spacer(modifier = Modifier.height(8.dp))
 
@@ -2064,7 +2069,7 @@ private fun BundleModeBody(state: EncryptUiState, viewModel: EncryptDecryptViewM
             value = state.bundleBody,
             onValueChange = { viewModel.updateBundleBody(it) },
             label = { Text(stringResource(R.string.encrypt_bundle_body_label)) },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+            modifier = Modifier.keepsKeyboard().fillMaxWidth().heightIn(min = 120.dp),
             maxLines = 10
         )
         // 4.0.0 Phase 9 (iOS v7.1.1 F6): character count + Paste + Clear on
@@ -2571,7 +2576,7 @@ private fun FileSection(state: EncryptUiState, viewModel: EncryptDecryptViewMode
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             visualTransformation = transformation,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.keepsKeyboard().fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
@@ -2583,7 +2588,7 @@ private fun FileSection(state: EncryptUiState, viewModel: EncryptDecryptViewMode
             visualTransformation = transformation,
             isError = state.passwordConfirm.isNotEmpty() &&
                 state.passwordConfirm != state.passwordPassphrase,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.keepsKeyboard().fillMaxWidth()
         )
         Spacer(modifier = Modifier.height(8.dp))
         FilledTonalButton(
@@ -2954,7 +2959,7 @@ private fun SignPassphraseDialog(
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     // 4.1.0 §3 (issue #8) — see ui/util/Autofill.kt.
-                    modifier = Modifier
+                    modifier = Modifier.keepsKeyboard()
                         .fillMaxWidth()
                         .focusRequester(fr)
                         .autofillPassword { viewModel.updateSignPassphrase(it) }
@@ -3103,7 +3108,7 @@ private fun DecryptPassphraseDialog(
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     // 4.1.0 §3 (issue #8) — see ui/util/Autofill.kt.
-                    modifier = Modifier
+                    modifier = Modifier.keepsKeyboard()
                         .fillMaxWidth()
                         .focusRequester(fr)
                         .autofillPassword { viewModel.updatePassphrase(it) }
@@ -3181,7 +3186,7 @@ private fun LegacySignPassphraseDialog(
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     // 4.1.0 §3 (issue #8) — see ui/util/Autofill.kt.
-                    modifier = Modifier
+                    modifier = Modifier.keepsKeyboard()
                         .fillMaxWidth()
                         .focusRequester(fr)
                         .autofillPassword { viewModel.updateSignPassphrase(it) }
@@ -3246,7 +3251,7 @@ private fun LegacyDecryptPassphraseDialog(
                 // 4.1.0 §3 (issue #8) — see ui/util/Autofill.kt. This is the
                 // prompt a decrypt raises mid-flow, so it is the one a manager
                 // most needs to recognise.
-                modifier = Modifier.focusRequester(fr).autofillPassword { viewModel.updatePassphrase(it) }
+                modifier = Modifier.keepsKeyboard().focusRequester(fr).autofillPassword { viewModel.updatePassphrase(it) }
             )
         },
         confirmButton = {
@@ -3375,7 +3380,7 @@ private fun SignFileModeBody(state: EncryptUiState, viewModel: EncryptDecryptVie
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
                 // 4.1.0 §3 (issue #8) — see ui/util/Autofill.kt.
-                modifier = Modifier
+                modifier = Modifier.keepsKeyboard()
                     .fillMaxWidth()
                     .autofillPassword { viewModel.setSignFilePassphrase(it) },
             )
@@ -3947,6 +3952,7 @@ fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 16.dp)
+                .dismissKeyboardOnTap()
                 .verticalScroll(rememberScrollState())
         ) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -3995,7 +4001,7 @@ fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
                     // text message. The Decrypt button auto-detects via
                     // VerifyService.detectInputType — single button covers both flows.
                     label = { Text(stringResource(R.string.decrypt_input_paste_label)) },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth().heightIn(min = 120.dp),
                     textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                     maxLines = 15
                 )
@@ -4055,7 +4061,7 @@ fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
                     label = { Text(stringResource(R.string.card_decrypt_pin_label)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth(),
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -4083,7 +4089,7 @@ fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
                     label = { Text(stringResource(R.string.decrypt_password_passphrase_label)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth(),
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -4151,7 +4157,7 @@ fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
                     label = { Text(stringResource(R.string.decrypt_passphrase_optional_label)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     // 4.1.0 §3 (issue #8) — see ui/util/Autofill.kt.
-                    modifier = Modifier
+                    modifier = Modifier.keepsKeyboard()
                         .fillMaxWidth()
                         .autofillPassword { viewModel.updatePassphrase(it) },
                     visualTransformation = PasswordVisualTransformation(),
@@ -4546,7 +4552,7 @@ private fun DecryptKeyPickerSheet(
                 label = { Text(stringResource(R.string.decrypt_picker_search)) },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.keepsKeyboard().fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(12.dp))
 
