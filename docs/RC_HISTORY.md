@@ -78,6 +78,7 @@ build for one fix, not a release candidate, and is listed because it is on the s
 | 4.7.0-RC6 | 2026-10-16 23:11 | `f04501a` | `d24c7bcc473d6c5753e079221547856f9d53032d1bb74def77eea90f22a8fe34` | `6e3eeb3bd0307dd193315d1bf4c9d97c6301786c866930cacaa339b0abdfb383` | Not yet rebuilt |
 | 4.7.0-RC7 | 2026-10-19 17:36 | `34f4b8d` | `2eefc88d6f7cb7f19beb7b6f68046b474aa076b5a378a45869a2961d23ba8c10` | `8efc9562c18712f780f06cfc7089020f8f5c5ff994afddd74dd08c3684df7130` | Not yet rebuilt |
 | 4.7.1-RC1 | 2026-10-23 01:24 | `7662832`, `b127b2d` | `b4d1a98acf62b7d1d38d8c1a047785756869c238318c79f2e0e76668764de29b` | `99d36b8c6aa7ac6bbfbea0a3f03bd3ba242fa28b8e3ddaa160aba6b721d1dc45` | Same file as the v4.7.1 release |
+| 4.7.2-RC1 | 2026-10-25 00:58 | `9ead039` (branch rc/4.7.2-rc1) | `66ed5523fec9b77dae2bc4b4725842a0b9d3fdb3a963b8625fac7f03700dbddf` | `07217a9a817cbb4d3737529659b405aa5b411aea3dcd8884b76247e6b6c9102a` | Verified: two clean-clone builds of the branch are identical, and the signed RC matches them |
 
 Four RCs were published unchanged as the release that followed them: the 4.2.0 RC4, 4.2.1 RC1, 4.6.4 RC1 and
 4.7.1 RC1 files have the same whole-file SHA-256 as the release files listed in docs/releases. They verify

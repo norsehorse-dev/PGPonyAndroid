@@ -1,7 +1,8 @@
 # PGPony Android 4.7.2: Planning
 
 Status: open (Oct 24 2026). A point release on main after 4.7.1 (versionCode 472): the keyboard staying up on
-Encrypt and Decrypt (user email, Oct 24), and the Play crash moved out of 4.7.1. One RC, then release. If 4.7.2
+Encrypt and Decrypt (user email, Oct 24), and the Play crash moved out of 4.7.1. RC1 built and checked on device
+Oct 24; RC2 adds item 3, found while testing RC1. If 4.7.2
 follows 4.7.1 within days, Play gets 4.7.2 directly instead of 4.7.1.
 
 
@@ -46,7 +47,26 @@ Left out (4.8.0): how two rows came to share a fingerprint, and a cleanup that m
 so the keyring itself holds one row per key.
 
 
+## 3. Encrypt and Decrypt do not scroll while the keyboard is up
+
+**Status:** code in (Oct 24), RC2.
+
+Origin: found on device while checking RC1 (item 1's scroll test). With the keyboard open, the Encrypt screen does
+not scroll, so the options and the Encrypt button under the keyboard cannot be reached without closing it first.
+Not caused by item 1 (its tap detection consumes nothing). MainActivity calls enableEdgeToEdge(), so the window
+never resizes for the keyboard, and unlike the sheets and the Keyring and Import screens, the Encrypt and Decrypt
+content never applied the IME insets. The scroll area stayed full height with the keyboard drawn over it.
+
+Work: the Encrypt and Decrypt content columns take consumeWindowInsets(padding) then imePadding() before
+verticalScroll, so the scroll area ends at the top of the keyboard. consumeWindowInsets keeps the tab bar and
+navigation bar space the Scaffolds already reserve from being counted twice. No new strings.
+
+On device: Encrypt and Decrypt, focus the message field, then scroll to the bottom with the keyboard up: every
+option and the Encrypt (Decrypt) button is reachable, with no gap between the content and the keyboard. Close the
+keyboard: the screen returns to full height with no leftover space.
+
+
 ## Release
 
-versionCode 472, versionName 4.7.2. Changelog 472.txt and RELEASE_NOTES_4.7.2.md after RC1 is checked. Same
+versionCode 472, versionName 4.7.2. Changelog 472.txt and RELEASE_NOTES_4.7.2.md after RC2 is checked. Same
 release path as 4.7.1.

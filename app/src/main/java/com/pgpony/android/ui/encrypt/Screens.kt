@@ -165,6 +165,12 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                // MainActivity calls enableEdgeToEdge(), so the window never resizes for the
+                // keyboard. Without imePadding the scroll area stays full height under the keyboard
+                // and nothing it covers can be scrolled to. consumeWindowInsets(padding) keeps the
+                // insets the Scaffolds already reserved from being added twice.
+                .consumeWindowInsets(padding)
+                .imePadding()
                 .padding(horizontal = 16.dp)
                 .dismissKeyboardOnTap()
                 .verticalScroll(rememberScrollState())
@@ -3819,7 +3825,7 @@ private fun DecryptFileSection(state: DecryptUiState, viewModel: EncryptDecryptV
 
 // ── Decrypt Screen ─────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
     val state by viewModel.decryptState.collectAsState()
@@ -3951,6 +3957,12 @@ fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                // MainActivity calls enableEdgeToEdge(), so the window never resizes for the
+                // keyboard. Without imePadding the scroll area stays full height under the keyboard
+                // and nothing it covers can be scrolled to. consumeWindowInsets(padding) keeps the
+                // insets the Scaffolds already reserved from being added twice.
+                .consumeWindowInsets(padding)
+                .imePadding()
                 .padding(horizontal = 16.dp)
                 .dismissKeyboardOnTap()
                 .verticalScroll(rememberScrollState())
