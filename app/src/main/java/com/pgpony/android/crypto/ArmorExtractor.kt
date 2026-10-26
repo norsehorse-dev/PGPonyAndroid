@@ -39,11 +39,12 @@ object ArmorExtractor {
     }
 
     /**
-     * 4.7.2 RC3: the first PGP MESSAGE block of [input], for decrypt. Bouncy Castle's armor
-     * reader skips text before the BEGIN line only until it meets a line starting with a dash,
-     * which it then takes as the armor header, so a pasted email signature above the message
-     * (a row of dashes, or the "-- " separator) failed as a malformed message. Everything
-     * outside the BEGIN and END markers is dropped.
+     * 4.7.2 RC3: the first PGP MESSAGE block of [input], for decrypt. The decrypt reads the
+     * armor to the end of the input, and after the END line Bouncy Castle's armor reader goes
+     * on looking for another block: the first line starting with a dash is taken as its armor
+     * header. A pasted email signature below the message (a row of dashes, or the "-- "
+     * separator) therefore failed as a malformed message, and the same line above the BEGIN
+     * line would too. Everything outside the BEGIN and END markers is dropped.
      *
      * [input] comes back unchanged when it holds no complete PGP MESSAGE block, so an
      * incomplete paste still reports as incomplete, and when the block is already all there

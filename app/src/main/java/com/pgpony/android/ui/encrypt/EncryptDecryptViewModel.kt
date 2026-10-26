@@ -3386,7 +3386,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
 
     fun updateDecryptInput(text: String) {
         _decryptState.value = _decryptState.value.copy(
-            inputText = text, outputText = "", outputData = null,
+            // 4.7.2 RC4: a new input starts with an empty passphrase field.
+            inputText = text, outputText = "", outputData = null, passphrase = "",
             errorMessage = null, signatureVerified = false,
             // Phase A3: clear any stale verification result when input changes
             verificationResult = null
@@ -4139,6 +4140,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             val cacheFp = s.selectedKeyFingerprint
             val effPass = s.passphrase.ifBlank { null }
                 ?: cacheFp?.let { com.pgpony.android.session.InAppPassphraseCache.get(it) }
+            // 4.7.2 RC4: a typed passphrase is good for this one attempt. Left in the field, it was
+            // tried ahead of the cache on every later decrypt (outliving the cache duration) and a
+            // paste landed after it, so a correct paste read as a wrong passphrase. The cache is
+            // the only place it is kept now.
+            if (s.passphrase.isNotEmpty()) clearTypedPassphrase()
             try {
                 // Put selected key first, then include the rest as fallbacks
                 // RC3 §N (#34): primary first, then its enabled fallbacks in
@@ -5097,6 +5103,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             val cacheFp = s.selectedKeyFingerprint
             val effPass = s.passphrase.ifBlank { null }
                 ?: cacheFp?.let { com.pgpony.android.session.InAppPassphraseCache.get(it) }
+            // 4.7.2 RC4: a typed passphrase is good for this one attempt. Left in the field, it was
+            // tried ahead of the cache on every later decrypt (outliving the cache duration) and a
+            // paste landed after it, so a correct paste read as a wrong passphrase. The cache is
+            // the only place it is kept now.
+            if (s.passphrase.isNotEmpty()) clearTypedPassphrase()
             try {
                 // RC3 §N (#34): primary first, then its enabled fallbacks in
                 // the user's order, then everything else (pre-#34 behavior as
@@ -5394,6 +5405,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             val cacheFp = s.selectedKeyFingerprint
             val effPass = s.passphrase.ifBlank { null }
                 ?: cacheFp?.let { com.pgpony.android.session.InAppPassphraseCache.get(it) }
+            // 4.7.2 RC4: a typed passphrase is good for this one attempt. Left in the field, it was
+            // tried ahead of the cache on every later decrypt (outliving the cache duration) and a
+            // paste landed after it, so a correct paste read as a wrong passphrase. The cache is
+            // the only place it is kept now.
+            if (s.passphrase.isNotEmpty()) clearTypedPassphrase()
             try {
                 // RC3 §N (#34): primary first, then its enabled fallbacks in
                 // the user's order, then everything else (pre-#34 behavior as
@@ -6043,7 +6059,12 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     }
 
     fun dismissPassphraseDialog() {
-        _decryptState.value = _decryptState.value.copy(showPassphraseDialog = false)
+        _decryptState.value = _decryptState.value.copy(showPassphraseDialog = false, passphrase = "")
+    }
+
+    /** 4.7.2 RC4: empty the Decrypt passphrase field (see the effPass reads). */
+    private fun clearTypedPassphrase() {
+        _decryptState.value = _decryptState.value.copy(passphrase = "")
     }
 
     fun clearEncryptError() {

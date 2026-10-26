@@ -2,7 +2,8 @@
 
 Status: open (Oct 24 2026). A point release on main after 4.7.1 (versionCode 472): the keyboard staying up on
 Encrypt and Decrypt (user email, Oct 24), and the Play crash moved out of 4.7.1. RC1 built and checked on device
-Oct 24; RC2 adds item 3, found while testing RC1. RC3 adds items 4 and 5 from the tester's RC2 report (Oct 24). If 4.7.2
+Oct 24; RC2 adds item 3, found while testing RC1. RC3 adds items 4 and 5 from the tester's RC2 report (Oct 24). RC4 adds items 6 and 7 from the tester's RC3
+report (Oct 25). If 4.7.2
 follows 4.7.1 within days, Play gets 4.7.2 directly instead of 4.7.1.
 
 
@@ -85,10 +86,13 @@ email, short fingerprint. Same on Decrypt when the passphrase is asked for.
 **Status:** code in (Oct 24), RC3.
 
 Origin: tester report on RC2 (Oct 24). A paste that included an email signature as well as the PGP MESSAGE block
-failed with a malformed message; the same message pasted marker to marker decrypted. The paste went to Bouncy
-Castle's armor reader whole. Before the BEGIN line, that reader skips text only until a line that starts with a
-dash, and takes that line as the armor header; a signature's row of dashes (or the "-- " separator) then became
-the header and the next line an invalid armor header ("the armor could not be read").
+failed with a malformed message; the same message pasted marker to marker decrypted. The signature was below
+the END line. The paste went to Bouncy Castle's armor reader whole and was read to the end of the input; after
+the END line the reader goes on looking for another armored block and takes the first line starting with a dash
+as its header, so the signature's row of dashes (or a "-- " separator) became a header and the next line an
+invalid one ("the armor could not be read"). The same line above the BEGIN line fails the same way. (RC3's
+first write-up of this said the line had to be above the message; the tester confirmed it was below, and the
+fix covers both.)
 
 Work: ArmorExtractor.messageOnly (crypto/ArmorExtractor.kt, already used for key import since 4.5.0) returns
 the first complete PGP MESSAGE block and drops everything around it. effectiveDecryptInput applies it after the
@@ -104,8 +108,46 @@ half of a message: still reported as incomplete.
 Left out: clear-signed text and file decrypt keep their own parsing; check them for the same case in 4.8.0. iOS:
 check both items against 8.4.0.
 
+## 6. A pasted passphrase reads as wrong on Decrypt
+
+**Status:** code in (Oct 25), RC4.
+
+Origin: tester report on RC3 (Oct 25). Pasting the key's passphrase from a password manager into the Decrypt
+passphrase prompt sometimes gave "incorrect passphrase", and it could take several pastes before one worked.
+Never on iOS.
+
+Cause: the Decrypt passphrase field was never emptied, not after a successful decrypt, not after a wrong
+passphrase and not when a new message was pasted; only the Clear button reset it. When the prompt opened it often
+still held an earlier passphrase behind the dots, and a paste went in after it. Each retry added another copy.
+The leftover passphrase was also tried ahead of the in-app passphrase cache on every later decrypt, so it kept
+working after the cache duration set in Settings had run out, for as long as the app process lived.
+
+Work (ui/encrypt/EncryptDecryptViewModel.kt): the text, file and streamed-file decrypt paths take the typed
+passphrase once and empty the field before trying it; a new input and closing the prompt empty it too. The
+in-app passphrase cache, with its duration, is the only place a passphrase is kept. No new strings.
+
+On device: decrypt with a passphrase, then decrypt a second message: the prompt opens empty (or the cache
+answers, within its duration). Enter a wrong passphrase: the error shows and the field is empty for the retry.
+Paste a new message after a decrypt: the field is empty.
+
+
+## 7. Show or hide the passphrase
+
+**Status:** code in (Oct 25), RC4.
+
+Origin: tester request with item 6 (Oct 25): with only dots showing, there was no way to see that a paste had
+gone wrong.
+
+Work: an eye button on the passphrase prompts (sign while encrypting, decrypt) and on the two passphrase fields
+on the Decrypt screen (key passphrase, password-encrypted message). Masked by default, and the prompt opens
+masked every time. Labels reuse encrypt_password_show and encrypt_password_hide, already in all 10 locales, so
+no new strings. Card PIN fields keep no button.
+
+Left out (4.8.0): the other passphrase fields in the app (Key Details sheets, Import, Settings, Pair, the
+provider prompt).
+
 
 ## Release
 
-versionCode 472, versionName 4.7.2. Changelog 472.txt and RELEASE_NOTES_4.7.2.md after RC3 is checked. Same
+versionCode 472, versionName 4.7.2. Changelog 472.txt and RELEASE_NOTES_4.7.2.md after RC4 is checked. Same
 release path as 4.7.1.

@@ -2856,6 +2856,7 @@ private fun SignPassphraseDialog(
     viewModel: EncryptDecryptViewModel
 ) {
     val fr = rememberAutoFocusRequester()
+    var shown by remember { mutableStateOf(false) }
     val signingKey = state.signingKey
     // Mode-driven copy. The primary button label changes with mode
     // (Sign vs Encrypt vs Encrypt File); the body text adapts the
@@ -2971,7 +2972,9 @@ private fun SignPassphraseDialog(
                     onValueChange = { viewModel.updateSignPassphrase(it) },
                     label = { Text(stringResource(R.string.encrypt_passphrase_label)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    visualTransformation = PasswordVisualTransformation(),
+                    // 4.7.2 RC4: show or hide, so a paste can be checked before it is used.
+                    visualTransformation = if (shown) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = { PassphraseVisibilityToggle(shown) { shown = !shown } },
                     singleLine = true,
                     // 4.1.0 §3 (issue #8) — see ui/util/Autofill.kt.
                     modifier = Modifier.keepsKeyboard()
@@ -3041,6 +3044,7 @@ private fun DecryptPassphraseDialog(
     viewModel: EncryptDecryptViewModel
 ) {
     val fr = rememberAutoFocusRequester()
+    var shown by remember { mutableStateOf(false) }
     // The key the passphrase belongs to is the one whose fingerprint
     // matches state.selectedKeyFingerprint, looked up in
     // state.availableKeys. Null-fall-through if neither is set
@@ -3129,7 +3133,9 @@ private fun DecryptPassphraseDialog(
                     onValueChange = { viewModel.updatePassphrase(it) },
                     label = { Text(stringResource(R.string.encrypt_passphrase_label)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    visualTransformation = PasswordVisualTransformation(),
+                    // 4.7.2 RC4: show or hide, so a paste can be checked before it is used.
+                    visualTransformation = if (shown) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = { PassphraseVisibilityToggle(shown) { shown = !shown } },
                     singleLine = true,
                     // 4.1.0 §3 (issue #8) — see ui/util/Autofill.kt.
                     modifier = Modifier.keepsKeyboard()
@@ -3847,6 +3853,7 @@ private fun DecryptFileSection(state: DecryptUiState, viewModel: EncryptDecryptV
 @Composable
 fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
     val state by viewModel.decryptState.collectAsState()
+    var passphraseShown by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val haptics = rememberHaptics()
 
@@ -4118,7 +4125,9 @@ fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
                     onValueChange = { viewModel.updatePassphrase(it) },
                     label = { Text(stringResource(R.string.decrypt_password_passphrase_label)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    visualTransformation = PasswordVisualTransformation(),
+                    // 4.7.2 RC4: show or hide, so a paste can be checked before it is used.
+                    visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
                     modifier = Modifier.keepsKeyboard().fillMaxWidth(),
                     singleLine = true
                 )
@@ -4190,7 +4199,9 @@ fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
                     modifier = Modifier.keepsKeyboard()
                         .fillMaxWidth()
                         .autofillPassword { viewModel.updatePassphrase(it) },
-                    visualTransformation = PasswordVisualTransformation(),
+                    // 4.7.2 RC4: show or hide, so a paste can be checked before it is used.
+                    visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -4719,4 +4730,20 @@ private fun loadCardRecipients(
     }
     if (loaded.isEmpty) throw OpenPgpCardException.Malformed(noRecipientsMsg)
     return loaded.rings to loaded.v4Algo35
+}
+
+/**
+ * 4.7.2 RC4: the eye button on a passphrase field. Masked by default; the tester who asked for it could not tell
+ * that a paste had gone wrong because only dots showed. Card PIN fields deliberately do not get one.
+ */
+@Composable
+private fun PassphraseVisibilityToggle(shown: Boolean, onToggle: () -> Unit) {
+    IconButton(onClick = onToggle) {
+        Icon(
+            if (shown) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+            contentDescription = stringResource(
+                if (shown) R.string.encrypt_password_hide else R.string.encrypt_password_show
+            )
+        )
+    }
 }
