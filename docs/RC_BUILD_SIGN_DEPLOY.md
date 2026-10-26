@@ -12,19 +12,21 @@ the earlier RCs is in docs/RC_HISTORY.md.
 Fill in `<X.Y.Z>` (the release, e.g. 4.7.2) and `<N>` (the RC number). The RC keeps the release's versionCode and
 versionName; the tag and the asset names carry the RC number.
 
-## 0. Before the first RC tag: F-Droid must ignore RC tags
+## 0. F-Droid ignores RC tags (done, Oct 25 2026)
 
-The fdroiddata recipe for com.pgpony.android uses `UpdateCheckMode: Tags`, which considers every tag. An RC tag
-would be built as the release (same versionCode), and the real release with that versionCode would then never be
-picked up. The recipe must read:
+An RC keeps the versionCode of its release, so with the fdroiddata recipe's old `UpdateCheckMode: Tags` (every
+tag) an RC tag would have been built as the release, and the real release with that versionCode never picked up.
+The recipe for com.pgpony.android has read this since fdroiddata merge request 54057 was merged on Oct 25 2026:
 
 ```
 UpdateCheckMode: Tags ^v[0-9]+\.[0-9]+\.[0-9]+$
 ```
 
-Until that MR is merged, do not push a `-rc` tag. An RC in that window is built through the gate from a pushed
-branch `rc/<X.Y.Z>-rc<N>` (the gate clones a branch the same way), and gets its tag and pre-release once the
-recipe change is live.
+RC tags (`v<X.Y.Z>-rc<N>`) do not match it. Release tags must stay exactly `v<X.Y.Z>`. If the recipe ever changes,
+check this line before pushing an RC tag.
+
+4.7.2 RC1 to RC4 were built before the merge, through the gate from the pushed branches `rc/4.7.2-rc1` to
+`rc/4.7.2-rc4`; each got its signed tag on the same commit and its pre-release after the merge.
 
 ## 1. Commit and tag
 
