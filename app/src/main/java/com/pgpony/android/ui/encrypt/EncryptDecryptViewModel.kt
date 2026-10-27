@@ -3559,6 +3559,22 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         CardDetection()
     }
 
+    /**
+     * 4.7.2 RC6: the card offered after a hidden-recipient message defeats the
+     * software keys, for the file detectors. The text detector picked this
+     * card since 4.1.0, but the two file detectors never did, so a
+     * hidden-recipient FILE ended at "none of your keys opened it" with no
+     * offer to try the card. Same rule as the text path: the first paired card
+     * with an encryption-capable key. Blocking ring loads; call off the main
+     * thread.
+     */
+    private fun hiddenRecipientFallbackCard(): PGPKeyEntity? =
+        repo.getAllKeys()
+            .filter { it.isCardBacked && it.armoredPublicKey != null }
+            .firstOrNull { entity ->
+                repo.loadPublicKeyRing(entity.fingerprint)?.let { ringHasEncryptionKey(it) } == true
+            }
+
     /** True when [ring] carries any encryption-capable key (primary or subkey). */
     private fun ringHasEncryptionKey(
         ring: org.bouncycastle.openpgp.PGPPublicKeyRing
@@ -4602,6 +4618,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     private fun detectCardRecipientFileStreaming(uri: android.net.Uri) {
         viewModelScope.launch {
             var isPassword = false
+            var hidden = false
+            var hiddenCard: PGPKeyEntity? = null
             val match: PGPKeyEntity? = try {
                 val info = withContext(Dispatchers.IO) {
                     PGPonyApp.instance.contentResolver.openInputStream(uri)?.use { input ->
@@ -4609,8 +4627,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     }
                 }
                 isPassword = info?.isSymmetricOnly ?: false
-                val recipientIds = info?.publicKeyIDs ?: emptyList()
-                if (recipientIds.isEmpty()) {
+                hidden = info?.hasHiddenRecipient ?: false
+                // 4.7.2 RC6: addressed ids only, as in the text and byte
+                // detectors. The wildcard matches nothing on any ring.
+                val recipientIds = info?.addressedKeyIDs ?: emptyList()
+                val found = if (recipientIds.isEmpty()) {
                     null
                 } else {
                     withContext(Dispatchers.IO) {
@@ -4623,8 +4644,14 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                         }
                     }
                 }
+                if (hidden && found == null) {
+                    hiddenCard = withContext(Dispatchers.IO) { hiddenRecipientFallbackCard() }
+                }
+                found
             } catch (e: Exception) {
                 isPassword = false
+                hidden = false
+                hiddenCard = null
                 null
             }
             if (_decryptState.value.selectedFileUri == uri) {
@@ -4632,6 +4659,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     isCardMessage = match != null,
                     cardMessageKeyFingerprint = match?.fingerprint,
                     cardMessageKeyName = match?.let { it.userName.ifBlank { it.userEmail } },
+                    isHiddenRecipientMessage = hidden,
+                    hiddenRecipientCardFingerprint = hiddenCard?.fingerprint,
+                    hiddenRecipientCardName = hiddenCard?.let { it.userName.ifBlank { it.userEmail } },
                     isPasswordMessage = isPassword
                 )
             }
@@ -4650,12 +4680,15 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             // A picked file can be large, so the inspection itself is worth
             // moving too, not just the key lookups.
             var isPassword = false
+            var hidden = false
+            var hiddenCard: PGPKeyEntity? = null
             val match: PGPKeyEntity? = withContext(Dispatchers.IO) {
                 try {
                     val info = crypto.inspectEncryptedMessage(bytes)
                     isPassword = info.isSymmetricOnly
+                    hidden = info.hasHiddenRecipient
                     val recipientIds = info.addressedKeyIDs
-                    if (recipientIds.isEmpty()) {
+                    val found = if (recipientIds.isEmpty()) {
                         null
                     } else {
                         val cardEntities = repo.getAllKeys().filter {
@@ -4666,8 +4699,12 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                             ring != null && ringContainsAnyKeyId(ring, recipientIds)
                         }
                     }
+                    if (hidden && found == null) hiddenCard = hiddenRecipientFallbackCard()
+                    found
                 } catch (e: Exception) {
                     isPassword = false
+                    hidden = false
+                    hiddenCard = null
                     null
                 }
             }
@@ -4677,6 +4714,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     isCardMessage = match != null,
                     cardMessageKeyFingerprint = match?.fingerprint,
                     cardMessageKeyName = match?.let { it.userName.ifBlank { it.userEmail } },
+                    isHiddenRecipientMessage = hidden,
+                    hiddenRecipientCardFingerprint = hiddenCard?.fingerprint,
+                    hiddenRecipientCardName = hiddenCard?.let { it.userName.ifBlank { it.userEmail } },
                     isPasswordMessage = isPassword
                 )
             }

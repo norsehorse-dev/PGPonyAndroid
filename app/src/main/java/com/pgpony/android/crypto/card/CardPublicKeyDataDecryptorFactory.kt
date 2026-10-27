@@ -29,6 +29,7 @@ package com.pgpony.android.crypto.card
 
 import org.bouncycastle.bcpg.ECDHPublicBCPGKey
 import org.bouncycastle.bcpg.RSAPublicBCPGKey
+import org.bouncycastle.openpgp.PGPException
 import org.bouncycastle.openpgp.PGPPrivateKey
 import org.bouncycastle.openpgp.PGPPublicKey
 import org.bouncycastle.openpgp.operator.bc.BcPublicKeyDataDecryptorFactory
@@ -115,8 +116,49 @@ class CardPublicKeyDataDecryptorFactory(
         val curveOid = curveOidDer.copyOfRange(2, curveOidDer.size)
         val param = Rfc6637.kdfParam(curveOid, kdfHashId, kekAlgoId, recipientFingerprint)
         val kek = Rfc6637.deriveKek(shared, param, kdfHashId, kekAlgoId)
-        val padded = Rfc6637.aesKeyUnwrap(kek, wrapped)
-        return Rfc6637.stripPad(padded)
+        // 4.7.2 RC6: an unwrap that fails is reported, not leaked. Unlike RSA,
+        // the card's ECDH step succeeds for any packet, so a packet for another
+        // key only shows up here, as Bouncy Castle's InvalidCipherTextException
+        // ("checksum failed") or a bad pad. Neither is a PGPException, so it
+        // escaped CardDecryptService's hidden-recipient trial (one wrong
+        // candidate ended the trial before the right one was tried) and reached
+        // the user as a bare "checksum failed".
+        val padded = try {
+            Rfc6637.aesKeyUnwrap(kek, wrapped)
+        } catch (e: org.bouncycastle.crypto.InvalidCipherTextException) {
+            throw ecdhUnwrapFailure(e)
+        }
+        return try {
+            Rfc6637.stripPad(padded)
+        } catch (e: IllegalArgumentException) {
+            throw ecdhUnwrapFailure(e)
+        }
+    }
+
+    /**
+     * The ECDH twin of [keyMismatchOrOriginal]. When [encryptionKey] is not the
+     * key in the card's decryption slot, the packet was never this card's to
+     * open, and the user gets the same "different key" message the RSA path
+     * gives. Otherwise the slot key really failed on this packet, which is a
+     * PGPException like any other failed session-key recovery. Reading the
+     * slot (GET DATA, no PIN) happens only on this failure path.
+     */
+    private fun ecdhUnwrapFailure(cause: Exception): Exception {
+        val slotFingerprint = try {
+            session.getApplicationRelatedData().decFingerprint
+        } catch (e: OpenPgpCardException.TagLost) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+        val keyFingerprint = encryptionKey.fingerprint.joinToString("") { "%02X".format(it.toInt() and 0xFF) }
+        return if (slotFingerprint != null && !slotFingerprint.equals(keyFingerprint, ignoreCase = true)) {
+            OpenPgpCardException.Malformed(
+                "This message was encrypted to a different key than the one in this card's decryption slot."
+            )
+        } else {
+            PGPException(cause.message ?: "checksum failed", cause)
+        }
     }
 
     /**

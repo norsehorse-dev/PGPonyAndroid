@@ -93,17 +93,27 @@ class CardDecryptService private constructor() {
         var clearStream: java.io.InputStream? = null
         var sawWildcard = false
 
-        // Pass 1 - addressed packets. Unchanged behaviour and cost: no card
-        // operation happens until a packet has been chosen.
-        for (obj in pkesks) {
-            if (obj.keyID == WILDCARD_KEY_ID) {
-                sawWildcard = true
-                continue
-            }
-            val k = pubRing.getPublicKey(obj.keyID) ?: continue
-            pked = obj
-            encKey = k
-            break
+        // Pass 1 - addressed packets. No PSO:DECIPHER happens until a packet
+        // has been chosen.
+        //
+        // 4.7.2 RC6 (#108): when more than one addressed packet names a key
+        // in the ring, the one addressed to the key in the card's decryption
+        // slot is opened. Before this the first match won, and a message
+        // encrypted to an authentication subkey, an ADSK or an older
+        // encryption subkey ahead of the card's own key failed with "encrypted
+        // to a different key" although the card could open it. The slot is
+        // read from Application Related Data (GET DATA, no PIN) and only when
+        // there is a choice to make, so the common one-recipient case costs
+        // nothing extra. See CardPkeskSelection.
+        sawWildcard = pkesks.any { it.keyID == WILDCARD_KEY_ID }
+        val addressedIds = pkesks.map { it.keyID }
+        val inRing: (Long) -> Boolean = { pubRing.getPublicKey(it) != null }
+        val ringMatches = addressedIds.count { it != WILDCARD_KEY_ID && inRing(it) }
+        val slotKeyId = if (ringMatches > 1) decryptionSlotKeyId(session) else null
+        val pick = CardPkeskSelection.pickAddressed(addressedIds, slotKeyId, inRing)
+        if (pick >= 0) {
+            pked = pkesks[pick]
+            encKey = pubRing.getPublicKey(pkesks[pick].keyID)
         }
 
         // Pass 2 - hidden recipients. Trial each wildcard packet against the
@@ -127,10 +137,20 @@ class CardDecryptService private constructor() {
         // on a v6 message opens a stream that fails during the read instead,
         // surfacing as a decryption error rather than a skipped candidate.
         // Correctness is unaffected either way: no wrong key yields plaintext.
+        //
+        // 4.7.2 RC6: the candidate whose key ID matches the card's decryption
+        // slot goes first. Only that key can open a packet on this card, so on
+        // a ring with several encryption subkeys this is normally the one
+        // attempt. A wrong ECDH candidate now fails cleanly in
+        // CardPublicKeyDataDecryptorFactory and the trial moves on; before,
+        // its unwrap error ended the trial (#108 follow-up, found on device).
         if (pked == null && sawWildcard) {
+            val hiddenSlotKeyId = slotKeyId ?: decryptionSlotKeyId(session)
+            val candidates = encryptionCandidates(pubRing)
+                .sortedByDescending { hiddenSlotKeyId != null && it.keyID == hiddenSlotKeyId }
             outer@ for (obj in pkesks) {
                 if (obj.keyID != WILDCARD_KEY_ID) continue
-                for (candidate in encryptionCandidates(pubRing)) {
+                for (candidate in candidates) {
                     val stream = try {
                         obj.getDataStream(CardPublicKeyDataDecryptorFactory(session, candidate))
                     } catch (e: PGPException) {
@@ -230,6 +250,20 @@ class CardDecryptService private constructor() {
             out.write(buf, 0, n)
         }
         return out.toByteArray()
+    }
+
+    /**
+     * Key ID of the key in the card's decryption slot, or null when the
+     * slot is empty, holds a non-v4 fingerprint, or the card's data could
+     * not be read. Null only means "no preference", so pass 1 falls back to
+     * the first match. A card that left the field is still reported.
+     */
+    private fun decryptionSlotKeyId(session: OpenPgpCardSession): Long? = try {
+        CardPkeskSelection.v4KeyId(session.getApplicationRelatedData().decFingerprint)
+    } catch (e: OpenPgpCardException.TagLost) {
+        throw e
+    } catch (e: OpenPgpCardException) {
+        null
     }
 
     /**

@@ -139,6 +139,10 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
   50 MB): one opt-in switch in Settings, off by default, that lifts the 16 MB limit so every file is compressed
   with ZLIB. The Encrypt progress already covers the longer run. Other methods (ZIP, BZip2) and padding are not
   planned unless someone asks for them.
+  - Oct 27, another user: asked for zstd or xz, and to avoid bzip2 on mobile. OpenPGP defines only ZIP, ZLIB and
+    BZip2, so zstd and xz would not open elsewhere. Also asked about multiple cores: compression is single-threaded
+    today. Possible follow-up: compress large files in parallel blocks joined into one standard ZLIB stream (the
+    pigz approach), so the output is unchanged for other apps. Measure on a phone before committing to it.
 - #105: the Enter key runs the default action on passphrase prompts. The provider prompt (SSH, and mail apps
   decrypting or signing) sets no IME action, so the keyboard's checkmark only closes the keyboard and Unlock has
   to be tapped. ImeAction.Done with keyboardActions running Unlock there, and the same on the Encrypt and Decrypt
@@ -164,6 +168,15 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
     ADSKs, so if PGPony's linked token holds one of the two older encryption subkeys, nothing in the message is
     for it. Waiting on the PKESK key IDs and which token holds which subkey. Either way, decrypt should try every
     PKESK against every held secret, and the picker should say which subkey a card holds.
+  - Oct 27: card status in. The message's PKESKs, in order: 2AE019246C5C0CB6 and B9E473DF106CBD8A (the two
+    ADSK-flagged authentication subkeys, set that way on purpose), then 03C78DF0C62F7C14 (newest encryption
+    subkey). Card 10240001 (OpenPGP 3.4) holds 03C78DF0... in its decryption slot and 2AE0... in authentication.
+    Card 0006 18160546 holds BDC5DA4245EFAC3D in decryption and B9E4... in authentication. 2B77125258187770 is a
+    stub only. Card 10240001 failed because pass 1 took the first PKESK in the ring (2AE0...) and sent it to the
+    decryption slot; fixed in 4.7.2 RC6 (PLANNING_4.7.2 item 9). Card 0006 has no PKESK for its decryption slot,
+    so it needs the 4.8.0 work: MSE so PSO:DECIPHER uses the authentication slot (OpenPGP card 3.3 and later)
+    when the only matching PKESK names the key in that slot, plus encrypting to ADSKs. Check whether the iOS card
+    path has the same first-match selection.
 
 
 - In-app viewer for decrypted files (user email, Oct 23): a decrypted PDF or image always goes to the Android

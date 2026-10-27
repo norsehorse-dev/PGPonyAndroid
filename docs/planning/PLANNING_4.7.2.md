@@ -179,7 +179,50 @@ band, the focused field stays visible, the screen still scrolls to its last elem
 leaves no leftover space.
 
 
+## 9. Card decrypt picks the wrong recipient packet
+
+Report: #108, Oct 27. A message encrypted with gpg to a key whose authentication subkeys carry the ADSK flag has
+three PKESKs: the two authentication subkeys first, then the newest encryption subkey. Decrypting it with a card
+whose decryption slot holds that encryption subkey failed with "This message was encrypted to a different key
+than the one in this card's decryption slot."
+
+Cause: CardDecryptService pass 1 opened the first PKESK whose key ID is anywhere in the paired ring. All three are
+in the ring, so it chose the authentication subkey's packet and sent it to PSO:DECIPHER, which always uses the
+decryption slot. The card could open the message; PGPony chose the wrong packet. Any message that lists another
+subkey of the same certificate ahead of the card's own key hits this, ADSK or not.
+
+Work: when more than one addressed PKESK names a key in the ring, read the decryption slot's fingerprint from
+Application Related Data (GET DATA, no PIN) and open the packet addressed to that key ID (last 8 bytes of the v4
+fingerprint). No slot fingerprint, an unreadable card or no matching packet falls back to the old first-match
+order. One recipient costs nothing extra. The selection lives in CardPkeskSelection with unit tests built from
+the #108 key IDs. Hidden-recipient (wildcard) handling is unchanged. No new strings.
+
+Found while testing RC6 on a cv25519 card, same function: on an ECDH card a packet for another key does not fail
+on the card (the ECDH step succeeds for any packet); it fails at the host-side AES key unwrap with Bouncy Castle's
+InvalidCipherTextException ("checksum failed"), which is not a PGPException. In pass 1 that reached the user as a
+bare "checksum failed" (RSA cards gave the "different key" message). In pass 2, the hidden-recipient trial, it
+escaped the per-candidate catch, so the first wrong candidate ended the trial and a ring with two encryption
+subkeys never tried the card's own. Work: CardPublicKeyDataDecryptorFactory catches the unwrap and pad failures;
+when the key it was given is not the decryption slot's key it throws the same "different key" error as the RSA
+path, otherwise a PGPException. Pass 2 also tries the decryption slot's key first. No new strings.
+
+Also found in that test: a hidden-recipient message opened as a FILE never offered the card. Since 4.1.0 the text
+detector arms the fallback (software keys first, then PIN and tap when none opens it), but the two file detectors
+did not set it up, so a file ended at "none of your keys opened it". Both file detectors now arm the same fallback,
+and the streaming one matches on addressed key IDs like the others. No new strings.
+
+Not fixed here: a card whose decryption slot has no PKESK in the message (the other card in #108, where only its
+authentication slot key was encrypted to). That needs MSE, in PLANNING_4.8.0 under #108.
+
+On device, with a linked card: a message encrypted to the card's key alone still decrypts; a message encrypted to
+the card's key plus another subkey of the same certificate listed first decrypts (gpg -r <subkey>! -r
+<card subkey>! puts them in that order); a message for none of the card's keys still shows the mismatch error, on
+cv25519 as well as RSA; a hidden-recipient message (gpg -R) on a ring with two encryption subkeys decrypts with
+the card key picked, and opened as a file with a software key picked it switches to PIN and tap after the
+software keys fail.
+
+
 ## Release
 
-versionCode 472, versionName 4.7.2. Changelog 472.txt and RELEASE_NOTES_4.7.2.md after RC5 is checked. Same
+versionCode 472, versionName 4.7.2. Changelog 472.txt and RELEASE_NOTES_4.7.2.md after RC6 is checked. Same
 release path as 4.7.1.
