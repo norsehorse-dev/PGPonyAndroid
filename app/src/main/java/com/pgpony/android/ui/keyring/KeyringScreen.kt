@@ -843,10 +843,10 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
         // generation impossible with no workaround.
         //
         // Same modifier order as RevokeKeySheet: scroll first, then insets,
-        // padding last. imePadding matters because MainActivity calls
-        // enableEdgeToEdge(), so the window never resizes for the keyboard and
-        // Material3 1.3.1 does not apply IME insets to ModalBottomSheet
-        // content itself.
+        // padding last. imePadding matters because MainActivity runs edge to
+        // edge (enableEdgeToEdge plus adjustResize), so no window is resized
+        // for the keyboard, and Material3 1.3.1 does not apply IME insets to
+        // ModalBottomSheet content itself.
         Column(
             modifier = Modifier
                 .fillMaxWidth()

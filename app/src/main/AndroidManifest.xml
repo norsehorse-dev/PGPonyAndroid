@@ -76,7 +76,15 @@
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="locale|layoutDirection"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.PGPony">
+            <!-- 4.7.2 RC5: adjustResize. MainActivity runs edge to edge (enableEdgeToEdge), so the
+                 window is not resized for the keyboard: the system only delivers the IME inset, and
+                 the screens reserve it with imePadding. With no mode set the system used adjustPan
+                 for this Compose window, panned it up by the keyboard and imePadding added the
+                 keyboard height again, which left a black band over the keyboard (since RC2).
+                 ShareTargetActivity keeps the default: it is not edge to edge, has no imePadding,
+                 and relies on the pan to keep its fields visible. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

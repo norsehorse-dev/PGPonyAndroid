@@ -3,7 +3,7 @@
 Status: open (Oct 24 2026). A point release on main after 4.7.1 (versionCode 472): the keyboard staying up on
 Encrypt and Decrypt (user email, Oct 24), and the Play crash moved out of 4.7.1. RC1 built and checked on device
 Oct 24; RC2 adds item 3, found while testing RC1. RC3 adds items 4 and 5 from the tester's RC2 report (Oct 24). RC4 adds items 6 and 7 from the tester's RC3
-report (Oct 25). If 4.7.2
+report (Oct 25). RC5 adds item 8 from a tester's RC4 report (Oct 26). If 4.7.2
 follows 4.7.1 within days, Play gets 4.7.2 directly instead of 4.7.1.
 
 
@@ -146,8 +146,40 @@ no new strings. Card PIN fields keep no button.
 Left out (4.8.0): the other passphrase fields in the app (Key Details sheets, Import, Settings, Pair, the
 provider prompt).
 
+## 8. A black band over the keyboard on Encrypt and Decrypt
+
+**Status:** code in (Oct 26), RC5.
+
+Origin: tester report on RC4 (Oct 26). With the keyboard open on Encrypt or Decrypt there is an empty black band
+between the content and the top of the keyboard, roughly a keyboard height too much. The screen scrolls, but half
+of it is wasted. It started with RC2.
+
+Cause: RC2 (item 3) added imePadding to the Encrypt and Decrypt content, on the assumption that the window is never
+resized for the keyboard. The manifest set no windowSoftInputMode on MainActivity, and with no mode the system picks
+adjustPan for a Compose window: it panned the window up to keep the focused field visible, and imePadding then took
+the keyboard height off the content again. Checked before changing anything: no windowSoftInputMode in the manifest
+or the theme, and no setSoftInputMode in code.
+
+Work: MainActivity gets android:windowSoftInputMode="adjustResize". It already runs edge to edge
+(enableEdgeToEdge), so adjustResize does not resize the window; the system only delivers the IME inset, and the
+existing imePadding calls are what reserve the keyboard space. The pan stops. The imePadding calls stay, and the
+comments that said the window never resizes now describe this setup. The same double count applied to the other
+MainActivity screens that use imePadding (Exchange, the PIN lock screen) and is fixed by the same line. The
+ModalBottomSheets (Import, Revoke, Notes, Contact link, QR, Move to card, the Keyring sheets) open in their own
+window, so the activity mode should not change them; check them on device.
+
+ShareTargetActivity keeps the default mode. It is not edge to edge and has no imePadding, so it has no double
+count, and on Android 15 and later (targetSdk 36) adjustResize would stop resizing it and leave its fields under
+the keyboard. No new strings.
+
+On device, keyboard open, gesture and 3-button navigation, and a Samsung One UI device if one is at hand:
+Encrypt and Decrypt message fields, the share target (share text into PGPony), the PIN lock screen, Exchange, and
+two sheets with a text field (Import key, Revoke). For each: the content sits directly above the keyboard with no
+band, the focused field stays visible, the screen still scrolls to its last element, and closing the keyboard
+leaves no leftover space.
+
 
 ## Release
 
-versionCode 472, versionName 4.7.2. Changelog 472.txt and RELEASE_NOTES_4.7.2.md after RC4 is checked. Same
+versionCode 472, versionName 4.7.2. Changelog 472.txt and RELEASE_NOTES_4.7.2.md after RC5 is checked. Same
 release path as 4.7.1.

@@ -165,10 +165,11 @@ fun EncryptScreen(viewModel: EncryptDecryptViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                // MainActivity calls enableEdgeToEdge(), so the window never resizes for the
-                // keyboard. Without imePadding the scroll area stays full height under the keyboard
-                // and nothing it covers can be scrolled to. consumeWindowInsets(padding) keeps the
-                // insets the Scaffolds already reserved from being added twice.
+                // MainActivity runs edge to edge with adjustResize (manifest), so the window is not
+                // resized for the keyboard: the IME inset arrives as WindowInsets.ime and imePadding
+                // is the only thing reserving it. Without it the scroll area stays full height under
+                // the keyboard and nothing it covers can be scrolled to. consumeWindowInsets(padding)
+                // keeps the insets the Scaffolds already reserved from being added twice.
                 .consumeWindowInsets(padding)
                 .imePadding()
                 .padding(horizontal = 16.dp)
@@ -3982,10 +3983,11 @@ fun DecryptScreen(viewModel: EncryptDecryptViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                // MainActivity calls enableEdgeToEdge(), so the window never resizes for the
-                // keyboard. Without imePadding the scroll area stays full height under the keyboard
-                // and nothing it covers can be scrolled to. consumeWindowInsets(padding) keeps the
-                // insets the Scaffolds already reserved from being added twice.
+                // MainActivity runs edge to edge with adjustResize (manifest), so the window is not
+                // resized for the keyboard: the IME inset arrives as WindowInsets.ime and imePadding
+                // is the only thing reserving it. Without it the scroll area stays full height under
+                // the keyboard and nothing it covers can be scrolled to. consumeWindowInsets(padding)
+                // keeps the insets the Scaffolds already reserved from being added twice.
                 .consumeWindowInsets(padding)
                 .imePadding()
                 .padding(horizontal = 16.dp)
