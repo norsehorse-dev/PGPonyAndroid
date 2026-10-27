@@ -1,6 +1,6 @@
 # PGPony Android 4.8.0: Planning
 
-Status: open (Oct 20 2026). Seed: what the 4.7.0 feature freeze deferred, what 4.7.0 left open, and requests
+Status: open (Oct 20 2026; issues #105, #106 and #108 added Oct 26). Seed: what the 4.7.0 feature freeze deferred, what 4.7.0 left open, and requests
 that came in during the 4.7.0 cycle. Android leads, then iOS and desktop mirror each item once verified (iOS is
 on 8.4.0, Android 4.6.1 to 4.7.0 parity; see HANDOFF-8.4.0.md in the iOS repo). Priorities and the RC breakdown
 are set once the list settles.
@@ -139,6 +139,31 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
   50 MB): one opt-in switch in Settings, off by default, that lifts the 16 MB limit so every file is compressed
   with ZLIB. The Encrypt progress already covers the longer run. Other methods (ZIP, BZip2) and padding are not
   planned unless someone asks for them.
+- #105: the Enter key runs the default action on passphrase prompts. The provider prompt (SSH, and mail apps
+  decrypting or signing) sets no IME action, so the keyboard's checkmark only closes the keyboard and Unlock has
+  to be tapped. ImeAction.Done with keyboardActions running Unlock there, and the same on the Encrypt and Decrypt
+  passphrase prompts. No new strings.
+- #106: verify a detached signature with one trip to the picker. Asked: pick the signature and find the signed
+  file by dropping .asc or .sig. The system picker grants access to the picked document only, never its folder,
+  so the sibling cannot be checked directly. Planned instead: the Verify picker takes several files
+  (OpenMultipleDocuments) and pairs each signature with its file by name; a lone signature still asks for the
+  file. Same pairing serves the 4.7.0 item 38 left-out (several signatures with their files, section 6).
+- #108: ADSK (additional decryption subkeys, GnuPG 2.4.1 and later).
+  - Encrypt: findEncryptionKey picks one encryption subkey per recipient (the newest valid one, or the one chosen
+    in the picker), so a recipient's ADSK is dropped. Encrypt to every valid encryption subkey of each recipient
+    key, ADSKs included, as GnuPG does; the per-recipient subkey choice stays as an override.
+  - Decrypt: a message from GnuPG to the reporter's key and its ADSK fails with the key-not-on-this-device error,
+    though one of the subkeys should be held. Cause not known; asked the reporter (Oct 26) for the PGPony version,
+    how the key is held (card link or imported secret, which token holds which subkey), the key listing and the
+    message's PKESK key IDs. Suspects: card-recipient detection matching only the card's stored subkey, or the
+    ADSK key flag making a subkey unusable in SignerEvaluator.
+  - Oct 26: reporter is on 4.7.0 from Play and pointed to the public key on their GitHub profile (6C525E39...
+    819140A, RSA 3072). Three ordinary encryption subkeys (2B771252..., BDC5DA42..., 03C78DF0..., the last the
+    newest), two signing, two authentication; no standalone ADSK, but both authentication subkeys carry key flags
+    20 04 (authentication plus the 0x0400 ADSK flag). GnuPG encrypts to the newest valid encryption subkey plus
+    ADSKs, so if PGPony's linked token holds one of the two older encryption subkeys, nothing in the message is
+    for it. Waiting on the PKESK key IDs and which token holds which subkey. Either way, decrypt should try every
+    PKESK against every held secret, and the picker should say which subkey a card holds.
 
 
 - In-app viewer for decrypted files (user email, Oct 23): a decrypted PDF or image always goes to the Android
@@ -151,6 +176,17 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
 4.7.2 guards the recipient and Sign as lists against a repeated fingerprint (the Play crash). Find how two
 pgp_keys rows came to share a fingerprint (no unique index on the column), merge any that exist on upgrade, and
 add the index.
+
+
+## 4d. Left out of 4.7.2
+
+- Show or hide on the other passphrase fields (4.7.2 item 7 covers the Encrypt and Decrypt prompts and the two
+  Decrypt screen fields): Key Details sheets, Import, Settings, Pair, the provider prompt (pairs with #105).
+  Card PIN fields keep none.
+- Text around the armor (4.7.2 item 5 covers decrypt): check clear-signed verify and file decrypt for the same
+  failure when text with a dash line surrounds the block.
+- The passphrase field rule (4.7.2 item 6: a typed passphrase is used once, the cache is the only memory): check
+  the other places a passphrase is typed for a field that outlives its attempt.
 
 
 ## 5. Contributor PRs waiting on a decision
