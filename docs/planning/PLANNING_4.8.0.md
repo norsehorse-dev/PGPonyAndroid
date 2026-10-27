@@ -173,7 +173,7 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
     subkey). Card 10240001 (OpenPGP 3.4) holds 03C78DF0... in its decryption slot and 2AE0... in authentication.
     Card 0006 18160546 holds BDC5DA4245EFAC3D in decryption and B9E4... in authentication. 2B77125258187770 is a
     stub only. Card 10240001 failed because pass 1 took the first PKESK in the ring (2AE0...) and sent it to the
-    decryption slot; fixed in 4.7.2 RC6 (PLANNING_4.7.2 item 9). Card 0006 has no PKESK for its decryption slot,
+    decryption slot; fixed in 4.7.2 RC7 (PLANNING_4.7.2 item 9; the RC6 tag did not compile). Card 0006 has no PKESK for its decryption slot,
     so it needs the 4.8.0 work: MSE so PSO:DECIPHER uses the authentication slot (OpenPGP card 3.3 and later)
     when the only matching PKESK names the key in that slot, plus encrypting to ADSKs. Check whether the iOS card
     path has the same first-match selection.

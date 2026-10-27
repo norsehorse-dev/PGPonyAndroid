@@ -83,6 +83,7 @@ build for one fix, not a release candidate, and is listed because it is on the s
 | 4.7.2-RC3 | 2026-10-25 02:38 | `6fc2acc` (tag v4.7.2-rc3) | `c4514e1dc2e18f919dcf1ef7897348e175757f93a9fa2dcb40b2da72a3976b6f` | `79d3eec38e1031a0a26dbf2defac7277c7c8ffc7faee9069803512975be58a39` | Verified: two clean-clone builds of the branch are identical, and the signed RC matches them |
 | 4.7.2-RC4 | 2026-10-26 02:22 | `218c91b` (tag v4.7.2-rc4) | `75210dfe08d2452752e05af176962d900d73a71a06e7356f35b97feb38eb46cd` | `b3b4608d4490b652692d70217c6fb5a33aed09721092fdb81e8f7bc14e92b5ff` | Verified: two clean-clone builds of the branch are identical, and the signed RC matches them |
 | 4.7.2-RC5 | 2026-10-27 04:07 | `5b4e965` (tag v4.7.2-rc5) | `ab11c3c8b5fc126ef7af2ba91b1590ae826d262bb96678ebfb0f7f7676c4cd67` | `ccd06662a19d108384001db5fe8c9886dad59102bd45ca6c3ea87b969dbd4197` | Verified: two clean-clone builds of the tag are identical, and the signed RC matches them |
+| 4.7.2-RC6 | Not published | `a0d263e` (tag v4.7.2-rc6) | None | None | Tag only: the tagged commit does not compile (a suspend call outside a coroutine in EncryptDecryptViewModel), so the gate stopped and no APK was built, signed or published. Its changes ship in RC7 |
 
 Results, checked on Oct 24 2026 with tools/rc_history_check.sh: 14 of the 58 RCs reproduce from a commit in
 the history, and 4.7.2 RC1 and RC2 were built through the gate. The other 44 do not reproduce from either

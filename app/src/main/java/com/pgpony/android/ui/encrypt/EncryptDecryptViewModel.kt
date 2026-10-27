@@ -3568,7 +3568,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      * with an encryption-capable key. Blocking ring loads; call off the main
      * thread.
      */
-    private fun hiddenRecipientFallbackCard(): PGPKeyEntity? =
+    private suspend fun hiddenRecipientFallbackCard(): PGPKeyEntity? =
         repo.getAllKeys()
             .filter { it.isCardBacked && it.armoredPublicKey != null }
             .firstOrNull { entity ->

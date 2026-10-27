@@ -197,7 +197,7 @@ fingerprint). No slot fingerprint, an unreadable card or no matching packet fall
 order. One recipient costs nothing extra. The selection lives in CardPkeskSelection with unit tests built from
 the #108 key IDs. Hidden-recipient (wildcard) handling is unchanged. No new strings.
 
-Found while testing RC6 on a cv25519 card, same function: on an ECDH card a packet for another key does not fail
+Found while testing the RC6 changes on a cv25519 card, same function: on an ECDH card a packet for another key does not fail
 on the card (the ECDH step succeeds for any packet); it fails at the host-side AES key unwrap with Bouncy Castle's
 InvalidCipherTextException ("checksum failed"), which is not a PGPException. In pass 1 that reached the user as a
 bare "checksum failed" (RSA cards gave the "different key" message). In pass 2, the hidden-recipient trial, it
@@ -222,7 +222,14 @@ the card key picked, and opened as a file with a software key picked it switches
 software keys fail.
 
 
+Tagged as v4.7.2-rc6, but that commit does not compile: the file detectors' new helper calls the suspend
+getAllKeys from a plain function. The local build that was tested on device came from before that last edit, so
+the error only showed in the gate's clean clone. The tag stays as it is (RC tags are never moved or reused), no
+RC6 APK exists, and RC_HISTORY says so. The fix and everything above ship in RC7. Lesson for the RC steps: the
+local build and device test come after the last edit, right before the commit.
+
+
 ## Release
 
-versionCode 472, versionName 4.7.2. Changelog 472.txt and RELEASE_NOTES_4.7.2.md after RC6 is checked. Same
+versionCode 472, versionName 4.7.2. Changelog 472.txt and RELEASE_NOTES_4.7.2.md after RC7 is checked. Same
 release path as 4.7.1.
