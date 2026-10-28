@@ -3,7 +3,7 @@
 Fixes for typing on Encrypt and Decrypt, passphrase entry, pasted messages and hardware key decryption. 4.7.2
 carries versionCode 472 and installs in place over 4.7.1. It went through release candidates published as GitHub
 pre-releases, each with its own signed tag; docs/RC_HISTORY.md lists them. RC6 was tagged but did not build, so it
-has no download.
+has no download. The release APK is the RC7 file itself, with the same whole-file SHA-256.
 
 ## The keyboard on Encrypt and Decrypt
 
@@ -52,13 +52,13 @@ list scrolled, reported through Google Play.
 Whole-file SHA-256 (is this download the published file):
 
 ```
-WHOLE_FILE_SHA256
+872ae77e479cab5ae33e6b4dd2f2676ba03e2a3cec266f8d84a0bd4ee3319508
 ```
 
 Content hash (for rebuilders; excludes signature, see docs/REPRODUCIBLE_BUILDS_PLAYBOOK.md):
 
 ```
-CONTENT_HASH
+6ae822feb4e7730104b701c924e16f515e0825bd992dba468ea1543460d9fb94
 ```
 
 The APK is signed with the NorseHorse release key

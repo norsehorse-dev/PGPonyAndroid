@@ -84,11 +84,12 @@ build for one fix, not a release candidate, and is listed because it is on the s
 | 4.7.2-RC4 | 2026-10-26 02:22 | `218c91b` (tag v4.7.2-rc4) | `75210dfe08d2452752e05af176962d900d73a71a06e7356f35b97feb38eb46cd` | `b3b4608d4490b652692d70217c6fb5a33aed09721092fdb81e8f7bc14e92b5ff` | Verified: two clean-clone builds of the branch are identical, and the signed RC matches them |
 | 4.7.2-RC5 | 2026-10-27 04:07 | `5b4e965` (tag v4.7.2-rc5) | `ab11c3c8b5fc126ef7af2ba91b1590ae826d262bb96678ebfb0f7f7676c4cd67` | `ccd06662a19d108384001db5fe8c9886dad59102bd45ca6c3ea87b969dbd4197` | Verified: two clean-clone builds of the tag are identical, and the signed RC matches them |
 | 4.7.2-RC6 | Not published | `a0d263e` (tag v4.7.2-rc6) | None | None | Tag only: the tagged commit does not compile (a suspend call outside a coroutine in EncryptDecryptViewModel), so the gate stopped and no APK was built, signed or published. Its changes ship in RC7 |
+| 4.7.2-RC7 | 2026-10-27 18:52 | `497518b` (tag v4.7.2-rc7) | `6ae822feb4e7730104b701c924e16f515e0825bd992dba468ea1543460d9fb94` | `872ae77e479cab5ae33e6b4dd2f2676ba03e2a3cec266f8d84a0bd4ee3319508` | Verified: two clean-clone builds of the tag are identical, and the signed RC matches them. Published unchanged as 4.7.2 (the release APK has the same whole-file SHA-256) |
 
 Results, checked on Oct 24 2026 with tools/rc_history_check.sh: 14 of the 58 RCs reproduce from a commit in
 the history, and 4.7.2 RC1 and RC2 were built through the gate. The other 44 do not reproduce from either
 candidate commit. Four of the verified RCs (4.2.0 RC4, 4.2.1 RC1, 4.6.4 RC1 and 4.7.1 RC1) were published
-unchanged as the release that followed them.
+unchanged as the release that followed them, and so was 4.7.2 RC7 later.
 
 For the last RCs before several releases, the candidate commit builds to the content hash of the release itself:
 4.2.0 RC5 and RC6, 4.4.0 RC14, 4.5.1 RC1 and RC2, 4.5.3 RC1 to RC3, and 4.7.0 RC7. The release reproduces from
