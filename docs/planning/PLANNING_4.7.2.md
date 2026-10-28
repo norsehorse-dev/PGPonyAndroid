@@ -231,5 +231,7 @@ local build and device test come after the last edit, right before the commit.
 
 ## Release
 
-versionCode 472, versionName 4.7.2. Changelog 472.txt and RELEASE_NOTES_4.7.2.md after RC7 is checked. Same
-release path as 4.7.1.
+versionCode 472, versionName 4.7.2, from RC7's code (checked on device Oct 28). Changelog 472.txt and
+RELEASE_NOTES_4.7.2.md. Same release path as 4.7.1: signed commit and tag, reproducibility gate, GitHub release with
+four assets, pgpony.app, Play (notes in all 11 listing languages), F-Droid from the tag. The release commit only
+adds docs and the changelog, so the release APK should have RC7's content hash.
