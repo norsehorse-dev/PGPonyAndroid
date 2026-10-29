@@ -46,7 +46,6 @@ import org.bouncycastle.openpgp.PGPPublicKey
 import org.bouncycastle.openpgp.PGPPublicKeyRing
 import org.bouncycastle.openpgp.PGPSecretKeyRing
 import org.bouncycastle.openpgp.PGPSignature
-import org.bouncycastle.openpgp.PGPSignatureGenerator
 import org.bouncycastle.openpgp.PGPSignatureList
 import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator
 import org.bouncycastle.openpgp.jcajce.JcaPGPObjectFactory
@@ -157,7 +156,7 @@ class RevocationService private constructor() {
         //    whatever the primary key uses; SHA-256 hash is RFC 4880
         //    recommended and works for both Ed25519 and RSA.
         val sigGen = try {
-            PGPSignatureGenerator(
+            PonySigGen(
                 BcPGPContentSignerBuilder(
                     secretKey.publicKey.algorithm,
                     HashAlgorithmTags.SHA256
@@ -298,7 +297,7 @@ class RevocationService private constructor() {
         }
 
         val sigGen = try {
-            PGPSignatureGenerator(
+            PonySigGen(
                 BcPGPContentSignerBuilder(primary.publicKey.algorithm, HashAlgorithmTags.SHA256),
                 primary.publicKey
             )

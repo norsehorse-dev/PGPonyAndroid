@@ -34,7 +34,6 @@ import org.bouncycastle.openpgp.PGPPublicKey
 import org.bouncycastle.openpgp.PGPPublicKeyRing
 import org.bouncycastle.openpgp.PGPSecretKeyRing
 import org.bouncycastle.openpgp.PGPSignature
-import org.bouncycastle.openpgp.PGPSignatureGenerator
 import org.bouncycastle.openpgp.PGPSignatureList
 import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator
 import org.bouncycastle.openpgp.bc.BcPGPObjectFactory
@@ -124,7 +123,7 @@ object CertificationService {
         val privateKey = unlockPrimary(certifier, passphrase)
         val signerPub = certifier.publicKey
         return makeCertifications(signerPub, target, userIds, level, expirySeconds, exportable, now) { type ->
-            PGPSignatureGenerator(BcPGPContentSignerBuilder(signerPub.algorithm, HashAlgorithmTags.SHA512), signerPub)
+            PonySigGen(BcPGPContentSignerBuilder(signerPub.algorithm, HashAlgorithmTags.SHA512), signerPub)
                 .apply { init(type, privateKey) }
         }
     }
@@ -138,7 +137,7 @@ object CertificationService {
         expirySeconds: Long?,
         exportable: Boolean,
         now: Date,
-        newGenerator: (Int) -> PGPSignatureGenerator
+        newGenerator: (Int) -> PonySigGen
     ): List<Made> {
         val targetPrimary = target.publicKey
         return userIds.map { uid ->
@@ -193,8 +192,8 @@ object CertificationService {
         session: com.pgpony.android.crypto.card.OpenPgpCardSession,
         pin: ByteArray,
         signerPub: PGPPublicKey
-    ): (Int) -> PGPSignatureGenerator = { type ->
-        PGPSignatureGenerator(com.pgpony.android.crypto.card.CardPGPContentSignerBuilder(session, pin, signerPub), signerPub)
+    ): (Int) -> PonySigGen = { type ->
+        PonySigGen(com.pgpony.android.crypto.card.CardPGPContentSignerBuilder(session, pin, signerPub), signerPub)
             .apply { init(type, org.bouncycastle.openpgp.PGPPrivateKey(signerPub.keyID, signerPub.publicKeyPacket, null)) }
     }
 
@@ -268,7 +267,7 @@ object CertificationService {
         val privateKey = unlockPrimary(certifier, passphrase)
         val signerPub = certifier.publicKey
         return revocation(signerPub, target, userId, now) { type ->
-            PGPSignatureGenerator(BcPGPContentSignerBuilder(signerPub.algorithm, HashAlgorithmTags.SHA512), signerPub)
+            PonySigGen(BcPGPContentSignerBuilder(signerPub.algorithm, HashAlgorithmTags.SHA512), signerPub)
                 .apply { init(type, privateKey) }
         }
     }
@@ -278,7 +277,7 @@ object CertificationService {
         target: PGPPublicKeyRing,
         userId: String,
         now: Date,
-        newGenerator: (Int) -> PGPSignatureGenerator
+        newGenerator: (Int) -> PonySigGen
     ): Made {
         val gen = newGenerator(PGPSignature.CERTIFICATION_REVOCATION)
         val hashed = PGPSignatureSubpacketGenerator()

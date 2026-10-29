@@ -35,7 +35,6 @@ import org.bouncycastle.openpgp.PGPPublicKeyRing
 import org.bouncycastle.openpgp.PGPSignature
 import org.bouncycastle.openpgp.PGPSignatureList
 import org.bouncycastle.openpgp.jcajce.JcaPGPObjectFactory
-import org.bouncycastle.openpgp.operator.bc.BcPGPContentVerifierBuilderProvider
 import java.io.ByteArrayInputStream
 
 // ── Input type ─────────────────────────────────────────────────────────
@@ -232,9 +231,8 @@ class VerifyService private constructor() {
         // verifies is the signer.
         val signerKey = candidates.firstOrNull { key ->
             try {
-                sig.init(BcPGPContentVerifierBuilderProvider(), key)
-                sig.update(canonical, 0, canonical.size)
-                sig.verify()
+                // 4.7.3: v5 document signatures hash an extra block BC leaves out.
+                LibrePgpV5Sig.verify(sig, key, canonical, LibrePgpV5Sig.CLEARTEXT_EXTRA)
             } catch (e: Exception) {
                 failure = e
                 false
@@ -384,8 +382,7 @@ class VerifyService private constructor() {
         val checks = candidates.mapIndexedNotNull { i, key ->
             try {
                 val s = if (i == 0) sig else parseFirstSignatureBytes(signatureBytes)
-                s.init(BcPGPContentVerifierBuilderProvider(), key)
-                key to s
+                key to LibrePgpV5Sig.StreamCheck(s, key)
             } catch (e: Exception) {
                 initFailure = e
                 null
@@ -400,8 +397,8 @@ class VerifyService private constructor() {
             )
         }
         val match = try {
-            drainStream(signedStream, tee, checks.map { it.second })
-            checks.firstOrNull { (_, s) -> runCatching { s.verify() }.getOrDefault(false) }
+            drainChecks(signedStream, tee, checks.map { it.second })
+            checks.firstOrNull { (_, c) -> runCatching { c.verify() }.getOrDefault(false) }
         } catch (e: Exception) {
             return VerificationResult.Invalid(
                 reason = "Verification error: ${e.message}",
@@ -416,7 +413,21 @@ class VerifyService private constructor() {
                 signedContent = null
             )
         }
-        return gradedResult(match.second, match.first, publicKeyRings, null)
+        return gradedResult(match.second.sig, match.first, publicKeyRings, null)
+    }
+
+    private fun drainChecks(
+        input: java.io.InputStream,
+        tee: java.io.OutputStream?,
+        checks: List<LibrePgpV5Sig.StreamCheck>
+    ) {
+        val buf = ByteArray(1 shl 16)
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            for (c in checks) c.update(buf, 0, n)
+            tee?.write(buf, 0, n)
+        }
     }
 
     private fun drainStream(
@@ -455,9 +466,7 @@ class VerifyService private constructor() {
         var failure: Exception? = null
         val (signerKey, claimed) = findVerifyingKey(sig, publicKeyRings) { key ->
             try {
-                sig.init(BcPGPContentVerifierBuilderProvider(), key)
-                sig.update(signedBytes)
-                sig.verify()
+                LibrePgpV5Sig.verify(sig, key, signedBytes)
             } catch (e: Exception) {
                 failure = e
                 false

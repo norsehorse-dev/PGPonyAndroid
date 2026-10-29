@@ -33,8 +33,7 @@ import org.bouncycastle.openpgp.PGPPrivateKey
 import org.bouncycastle.openpgp.PGPPublicKey
 import org.bouncycastle.openpgp.PGPPublicKeyRing
 import org.bouncycastle.openpgp.PGPSignature
-import org.bouncycastle.openpgp.PGPSignatureGenerator
-import org.bouncycastle.openpgp.operator.bc.BcPGPContentVerifierBuilderProvider
+import com.pgpony.android.crypto.PonySigGen
 import org.bouncycastle.openpgp.operator.bc.BcPGPDataEncryptorBuilder
 import org.bouncycastle.openpgp.operator.bc.BcPublicKeyKeyEncryptionMethodGenerator
 import java.io.ByteArrayOutputStream
@@ -197,13 +196,12 @@ object KeyToCardService {
     /** A signature made in the signature slot verifies under [pub]. */
     private fun testSign(session: OpenPgpCardSession, pub: PGPPublicKey, userPin: ByteArray): Boolean {
         val data = challenge()
-        val gen = PGPSignatureGenerator(CardPGPContentSignerBuilder(session, userPin, pub), pub)
+        val gen = PonySigGen(CardPGPContentSignerBuilder(session, userPin, pub), pub)
         gen.init(PGPSignature.BINARY_DOCUMENT, PGPPrivateKey(pub.keyID, pub.publicKeyPacket, null))
         gen.update(data)
         val sig = gen.generate()
-        sig.init(BcPGPContentVerifierBuilderProvider(), pub)
-        sig.update(data)
-        return sig.verify()
+        // 4.7.3: a v5 key's signature needs the v5 document hashing to verify.
+        return com.pgpony.android.crypto.LibrePgpV5Sig.verify(sig, pub, data)
     }
 
     /** A message encrypted to [pub] decrypts in the decryption slot. */

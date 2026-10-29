@@ -24,7 +24,7 @@ import org.bouncycastle.openpgp.PGPException
 import org.bouncycastle.openpgp.PGPPrivateKey
 import org.bouncycastle.openpgp.PGPPublicKey
 import org.bouncycastle.openpgp.PGPSignature
-import org.bouncycastle.openpgp.PGPSignatureGenerator
+import com.pgpony.android.crypto.PonySigGen
 import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
@@ -86,6 +86,7 @@ class CardSigningService private constructor() {
         text: String
     ): String {
         val sigGen = buildGenerator(session, publicKey, pin, PGPSignature.CANONICAL_TEXT_DOCUMENT)
+        sigGen.setCleartext() // 4.7.3: a v5 signer hashes the cleartext marker
 
         val out = ByteArrayOutputStream()
         val armored = ArmoredOutputStream(out).stripVersion()
@@ -155,8 +156,8 @@ class CardSigningService private constructor() {
         publicKey: PGPPublicKey,
         pin: ByteArray,
         signatureType: Int
-    ): PGPSignatureGenerator {
-        val sigGen = PGPSignatureGenerator(CardPGPContentSignerBuilder(session, pin, publicKey), publicKey)
+    ): PonySigGen {
+        val sigGen = PonySigGen(CardPGPContentSignerBuilder(session, pin, publicKey), publicKey)
 
         // BC's init() only reads keyID off this key and hands it to our
         // builder (which ignores it). The public key packet gives the

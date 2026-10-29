@@ -143,6 +143,11 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
     BZip2, so zstd and xz would not open elsewhere. Also asked about multiple cores: compression is single-threaded
     today. Possible follow-up: compress large files in parallel blocks joined into one standard ZLIB stream (the
     pigz approach), so the output is unchanged for other apps. Measure on a phone before committing to it.
+  - Oct 28, same user: for files, pre-compress (zstd or xz) and then encrypt with OpenPGP compression off, with
+    the user choosing whether decrypt saves the compressed or the unpacked file. Interoperable on the OpenPGP side
+    (gpg or sq decrypt it to file.xz); the receiver needs xz or zstd to unpack, the caveat the reporter raised.
+    Needs a compressor in both directions and a new dependency in the reproducible build. Not in 4.8.0; after
+    the ZLIB switch.
 - #105: the Enter key runs the default action on passphrase prompts. The provider prompt (SSH, and mail apps
   decrypting or signing) sets no IME action, so the keyboard's checkmark only closes the keyboard and Unlock has
   to be tapped. ImeAction.Done with keyboardActions running Unlock there, and the same on the Encrypt and Decrypt

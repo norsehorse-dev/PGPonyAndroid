@@ -5,7 +5,7 @@
 // pair. Same load -> sign -> reassemble shape as RevocationService and
 // KeyExpirationService, reusing their exact BC idioms:
 //
-//   • Self-certifications: PGPSignatureGenerator.generateCertification
+//   • Self-certifications: PonySigGen.generateCertification
 //     (String, PGPPublicKey) -> PGPPublicKey.addCertification, the
 //     same POSITIVE_CERTIFICATION path KeyExpirationService already
 //     uses to re-sign every UID when expiry changes.
@@ -47,7 +47,6 @@ import org.bouncycastle.openpgp.PGPPublicKey
 import org.bouncycastle.openpgp.PGPPublicKeyRing
 import org.bouncycastle.openpgp.PGPSecretKeyRing
 import org.bouncycastle.openpgp.PGPSignature
-import org.bouncycastle.openpgp.PGPSignatureGenerator
 import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator
 import org.bouncycastle.openpgp.PGPSignatureSubpacketVector
 import org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder
@@ -102,7 +101,7 @@ class UserIdService private constructor() {
         val primarySecret = secretRing.secretKey
         val privateKey = extractPrivate(primarySecret, passphrase)
         val signerBuilder = BcPGPContentSignerBuilder(primarySecret.publicKey.algorithm, HashAlgorithmTags.SHA256)
-        fun signer() = PGPSignatureGenerator(signerBuilder, primary).apply { init(PGPSignature.POSITIVE_CERTIFICATION, privateKey) }
+        fun signer() = PonySigGen(signerBuilder, primary).apply { init(PGPSignature.POSITIVE_CERTIFICATION, privateKey) }
 
         val representative = representativeSelfCert(primary)
 
@@ -179,7 +178,7 @@ class UserIdService private constructor() {
         for (n in notations) {
             sub.setNotationData(false, true, n.name, n.value)
         }
-        val gen = PGPSignatureGenerator(signerBuilder, primary).apply {
+        val gen = PonySigGen(signerBuilder, primary).apply {
             init(PGPSignature.POSITIVE_CERTIFICATION, privateKey)
         }
         gen.setHashedSubpackets(sub.generate())
@@ -219,7 +218,7 @@ class UserIdService private constructor() {
         val primarySecret = secretRing.secretKey
         val privateKey = extractPrivate(primarySecret, passphrase)
         val signerBuilder = BcPGPContentSignerBuilder(primarySecret.publicKey.algorithm, HashAlgorithmTags.SHA256)
-        val gen = PGPSignatureGenerator(signerBuilder, primary).apply { init(PGPSignature.CERTIFICATION_REVOCATION, privateKey) }
+        val gen = PonySigGen(signerBuilder, primary).apply { init(PGPSignature.CERTIFICATION_REVOCATION, privateKey) }
 
         val sub = PGPSignatureSubpacketGenerator()
         sub.setIssuerFingerprint(false, primary)
@@ -281,7 +280,7 @@ class UserIdService private constructor() {
         val primarySecret = secretRing.secretKey
         val privateKey = extractPrivate(primarySecret, passphrase)
         val signerBuilder = BcPGPContentSignerBuilder(primarySecret.publicKey.algorithm, HashAlgorithmTags.SHA256)
-        fun signer() = PGPSignatureGenerator(signerBuilder, primary).apply { init(PGPSignature.POSITIVE_CERTIFICATION, privateKey) }
+        fun signer() = PonySigGen(signerBuilder, primary).apply { init(PGPSignature.POSITIVE_CERTIFICATION, privateKey) }
 
         val currentPrimaryUid = currentPrimaryUserId(primary)
         if (currentPrimaryUid != null && currentPrimaryUid != userId) {
@@ -310,7 +309,7 @@ class UserIdService private constructor() {
         primary: PGPPublicKey,
         userId: String,
         isPrimary: Boolean,
-        signer: () -> PGPSignatureGenerator
+        signer: () -> PonySigGen
     ): PGPPublicKey {
         val existing = latestSelfCert(primary, userId)
         val sub = PGPSignatureSubpacketGenerator()

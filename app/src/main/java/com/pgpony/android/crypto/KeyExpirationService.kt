@@ -48,7 +48,6 @@ import org.bouncycastle.openpgp.PGPPublicKey
 import org.bouncycastle.openpgp.PGPPublicKeyRing
 import org.bouncycastle.openpgp.PGPSecretKeyRing
 import org.bouncycastle.openpgp.PGPSignature
-import org.bouncycastle.openpgp.PGPSignatureGenerator
 import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator
 import org.bouncycastle.openpgp.PGPSignatureSubpacketVector
 import org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder
@@ -153,7 +152,7 @@ class KeyExpirationService private constructor() {
         )
         val newPublic = try {
             rebuildExpiration(publicRing, expiresAtEpochSeconds, secretRing, passphrase, target) { type ->
-                PGPSignatureGenerator(signerBuilder, primarySecret.publicKey).apply { init(type, privateKey) }
+                PonySigGen(signerBuilder, primarySecret.publicKey).apply { init(type, privateKey) }
             }
         } catch (e: ExpirationError) {
             throw e
@@ -191,7 +190,7 @@ class KeyExpirationService private constructor() {
         }
         val newPublic = try {
             rebuildExpiration(publicRing, expiresAtEpochSeconds, null, null, target) { type ->
-                PGPSignatureGenerator(CardPGPContentSignerBuilder(session, pin, primaryPublic), primaryPublic).apply {
+                PonySigGen(CardPGPContentSignerBuilder(session, pin, primaryPublic), primaryPublic).apply {
                     init(type, PGPPrivateKey(primaryPublic.keyID, primaryPublic.publicKeyPacket, null))
                 }
             }
@@ -213,7 +212,7 @@ class KeyExpirationService private constructor() {
         secretRing: PGPSecretKeyRing?,
         passphrase: String?,
         target: Target,
-        makeGenerator: (Int) -> PGPSignatureGenerator
+        makeGenerator: (Int) -> PonySigGen
     ): PGPPublicKeyRing {
         var primary = publicRing.publicKey
 
@@ -404,12 +403,12 @@ class KeyExpirationService private constructor() {
         expirySeconds: Long?,
         secretRing: PGPSecretKeyRing,
         passphrase: String?,
-        makeBindingGenerator: (Int) -> PGPSignatureGenerator
+        makeBindingGenerator: (Int) -> PonySigGen
     ): PGPSignature {
         val subSecret = secretRing.getSecretKey(subkey.keyID)
             ?: throw ExpirationError.UnsupportedKey("Missing secret material for the signing subkey")
         val subPrivate = extractPrivate(subSecret, passphrase)
-        val backGen = PGPSignatureGenerator(
+        val backGen = PonySigGen(
             BcPGPContentSignerBuilder(subkey.algorithm, HashAlgorithmTags.SHA256), subkey
         )
         backGen.init(PGPSignature.PRIMARYKEY_BINDING, subPrivate)

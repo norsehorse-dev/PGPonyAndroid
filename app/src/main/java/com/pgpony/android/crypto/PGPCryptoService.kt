@@ -1300,9 +1300,9 @@ class PGPCryptoService private constructor() {
                         com.pgpony.android.crypto.pqc.CompositeLibrePGPEncryptionMethodGenerator(encKey)
                     )
                 } else {
-                    encryptedGen.addMethod(
-                        org.bouncycastle.openpgp.operator.bc.BcPublicKeyKeyEncryptionMethodGenerator(encKey)
-                    )
+                    // 4.7.3: GnuPG's X448 (bare 56-octet value) gets PGPony's own
+                    // ECDH; Bouncy Castle cannot read that encoding. See GnuPgX448.
+                    encryptedGen.addMethod(GnuPgX448.encryptionMethod(encKey))
                 }
             }
 
@@ -1338,7 +1338,7 @@ class PGPCryptoService private constructor() {
                 )
             } else {
             // Optional signature
-            var sigGen: PGPSignatureGenerator? = null
+            var sigGen: PonySigGen? = null
             // Phase A3 fix: the prior guard was `signingSecretKey != null
             // && passphrase != null`, which silently skipped signing whenever
             // the signing key was unprotected (no passphrase). Result: the
@@ -1379,7 +1379,7 @@ class PGPCryptoService private constructor() {
                 // output stream first, so CardPGPContentSigner (which hashes
                 // everything written) signs the correct salted v6 digest. No-op
                 // for v4 card keys.
-                sigGen = PGPSignatureGenerator(
+                sigGen = PonySigGen(
                     CardPGPContentSignerBuilder(cardSession, cardPin, cardSigningPublicKey),
                     cardSigningPublicKey
                 )
@@ -1409,7 +1409,7 @@ class PGPCryptoService private constructor() {
                     throw SigningError.SigningFailed(e.message ?: "Failed to unlock signing key")
                 }
 
-                sigGen = PGPSignatureGenerator(
+                sigGen = PonySigGen(
                     org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder(
                         // 3.0.0 (5d-3): the strongest hash every recipient lists.
                         signingKey.publicKey.algorithm, RecipientPreferences.hashFor(recipientPublicKeys)
@@ -1426,14 +1426,17 @@ class PGPCryptoService private constructor() {
                 sigGen.generateOnePassVersion(false).encode(compOut)
             }
 
-            // Literal data
+            // Literal data. 4.7.3: a v5 signer hashes these same literal fields.
+            val litFormat = if (filename != null) PGPLiteralData.BINARY else PGPLiteralData.UTF8
+            val litDate = Date()
+            sigGen?.setLiteralData(litFormat, filename ?: "", litDate)
             val litGen = PGPLiteralDataGenerator()
             val litOut = litGen.open(
                 compOut,
-                if (filename != null) PGPLiteralData.BINARY else PGPLiteralData.UTF8,
+                litFormat,
                 filename ?: "",
                 data.size.toLong(),
-                Date()
+                litDate
             )
 
             litOut.write(data)
@@ -1548,12 +1551,12 @@ class PGPCryptoService private constructor() {
         // 1) Build the signer FIRST. Software: unlock up front (clean
         //    output guarantee). Card: the content-signer defers the tap
         //    to getSignature() at the very end.
-        var sigGen: PGPSignatureGenerator? = null
+        var sigGen: PonySigGen? = null
         if (compositeRequested) {
             // Composite signing goes through compositeInline below; no
             // classical signer stands in for it.
         } else if (cardSession != null && cardSigningPublicKey != null && cardPin != null) {
-            sigGen = PGPSignatureGenerator(
+            sigGen = PonySigGen(
                 CardPGPContentSignerBuilder(cardSession, cardPin, cardSigningPublicKey),
                 cardSigningPublicKey
             )
@@ -1581,7 +1584,7 @@ class PGPCryptoService private constructor() {
                 }
                 throw SigningError.SigningFailed(e.message ?: "Failed to unlock signing key")
             }
-            sigGen = PGPSignatureGenerator(
+            sigGen = PonySigGen(
                 org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder(
                     // 3.0.0 (5d-3): the strongest hash every recipient lists.
                     signingKey.publicKey.algorithm, RecipientPreferences.hashFor(recipientPublicKeys)
@@ -1642,9 +1645,9 @@ class PGPCryptoService private constructor() {
                         com.pgpony.android.crypto.pqc.CompositeLibrePGPEncryptionMethodGenerator(encKey)
                     )
                 } else {
-                    encryptedGen.addMethod(
-                        org.bouncycastle.openpgp.operator.bc.BcPublicKeyKeyEncryptionMethodGenerator(encKey)
-                    )
+                    // 4.7.3: GnuPG's X448 (bare 56-octet value) gets PGPony's own
+                    // ECDH; Bouncy Castle cannot read that encoding. See GnuPgX448.
+                    encryptedGen.addMethod(GnuPgX448.encryptionMethod(encKey))
                 }
             }
 
@@ -1706,12 +1709,15 @@ class PGPCryptoService private constructor() {
 
             // Partial-length literal: the buffer overload streams without
             // a declared total size.
+            val litFormat = if (filename != null) PGPLiteralData.BINARY else PGPLiteralData.UTF8
+            val litDate = Date()
+            sigGen?.setLiteralData(litFormat, filename ?: "", litDate) // 4.7.3: v5 signers hash these
             val litGen = PGPLiteralDataGenerator()
             val litOut = litGen.open(
                 signAndLitOut,
-                if (filename != null) PGPLiteralData.BINARY else PGPLiteralData.UTF8,
+                litFormat,
                 filename ?: "",
-                Date(),
+                litDate,
                 ByteArray(1 shl 16)
             )
             val buf = ByteArray(1 shl 16)
@@ -2927,7 +2933,7 @@ class PGPCryptoService private constructor() {
                 ).build(passphrase.toCharArray())
             )
 
-            val sigGen = PGPSignatureGenerator(
+            val sigGen = PonySigGen(
                 org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder(
                     signingKey.publicKey.algorithm, HashAlgorithmTags.SHA256
                 ),
@@ -2954,8 +2960,10 @@ class PGPCryptoService private constructor() {
 
                 sigGen.generateOnePassVersion(false).encode(compOut)
 
+                val litDate = Date()
+                sigGen.setLiteralData(PGPLiteralData.UTF8, "", litDate) // 4.7.3: v5 signers hash these
                 val litGen = PGPLiteralDataGenerator()
-                val litOut = litGen.open(compOut, PGPLiteralData.UTF8, "", data.size.toLong(), Date())
+                val litOut = litGen.open(compOut, PGPLiteralData.UTF8, "", data.size.toLong(), litDate)
                 litOut.write(data)
                 litOut.close()
 
@@ -3477,7 +3485,8 @@ class PGPCryptoService private constructor() {
             return try {
                 PkeskMatch(
                     obj.getDataStream(
-                        org.bouncycastle.openpgp.operator.bc.BcPublicKeyDataDecryptorFactory(privateKey)
+                        // 4.7.3: X448 ECDH in GnuPG's encoding opens here too.
+                        GnuPgX448.DecryptorFactory(privateKey)
                     ),
                     obj,
                     secretKey.keyID
@@ -3899,6 +3908,10 @@ internal object ContentWalker {
         /** One-pass signatures read and not yet closed, outermost first. */
         val open = ArrayList<PGPOnePassSignature>()
         var verifier: PGPOnePassSignature? = null
+        // 4.7.3: a v5 signer's document signature hashes the literal data
+        // fields too (LibrePgpV5Sig); this verifier is fed alongside [verifier].
+        var v5Verifier: LibrePgpV5Sig.Verifier? = null
+        var literalExtra: ByteArray? = null
         var verifierKey: PGPPublicKey? = null
         var verifierStatus: SignerStatus? = null
         var signingKeyFingerprint: String? = null
@@ -3969,6 +3982,7 @@ internal object ContentWalker {
                     st.literalSeen = true
                     st.filename = LiteralFilename.sanitize(obj.fileName) // 4.6.0 (item 17.3)
                     st.sink.begin(st.filename)
+                    st.literalExtra = LibrePgpV5Sig.literalExtra(obj.format, obj.rawFileName, obj.modificationTime)
                     val litStream = obj.inputStream
                     val buf = ByteArray(1 shl 16)
                     while (true) {
@@ -3977,6 +3991,7 @@ internal object ContentWalker {
                         if (len == 0) continue
                         st.sink.write(buf, 0, len)
                         st.verifier?.update(buf, 0, len)
+                        st.v5Verifier?.update(buf, 0, len)
                         st.bytes += len
                     }
                 }
@@ -4023,6 +4038,12 @@ internal object ContentWalker {
             } ?: return
             ops.init(org.bouncycastle.openpgp.operator.bc.BcPGPContentVerifierBuilderProvider(), signerPubKey)
             st.verifier = ops
+            if (signerPubKey.version == 5) {
+                st.v5Verifier = LibrePgpV5Sig.Verifier(
+                    signerPubKey, ops.keyAlgorithm, ops.hashAlgorithm,
+                    ops.signatureType == PGPSignature.CANONICAL_TEXT_DOCUMENT
+                )
+            }
             st.verifierKey = signerPubKey
             st.signerKeyID = String.format("%016X", ops.keyID)
         }
@@ -4043,7 +4064,14 @@ internal object ContentWalker {
             sig.keyAlgorithm == ops.keyAlgorithm &&
             v6 == (sig.version == 6) &&
             (!v6 || sig.hasKeyIdentifier(ops.keyIdentifier))
-        val valid = bound && try { ops.verify(sig) } catch (e: PGPException) { false }
+        val v5 = st.v5Verifier
+        val valid = bound && try {
+            if (v5 != null && LibrePgpV5Sig.isV5Document(sig)) {
+                v5.verify(sig, st.literalExtra ?: LibrePgpV5Sig.DETACHED_EXTRA)
+            } else {
+                ops.verify(sig)
+            }
+        } catch (e: PGPException) { false }
         if (!valid) return SignerStatus.INVALID
         // Graded and identified by the exact key that verified, by fingerprint.
         val key = st.verifierKey ?: return SignerStatus.INVALID

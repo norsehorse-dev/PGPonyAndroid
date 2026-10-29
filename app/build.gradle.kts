@@ -260,8 +260,10 @@ android {
         // card signing with the card key labels (#102). versionCode 471.
         // 4.7.2: the keyboard closes on a tap away from a text field (Encrypt, Decrypt), and the
         // recipient and signer lists drop a repeated fingerprint (Play crash). versionCode 472.
-        versionCode = 472
-        versionName = "4.7.2"
+        // 4.7.3: encrypting to and decrypting with GnuPG's X448 encryption subkeys
+        // (the Curve448 ECDH of LibrePGP v5 Ed448 keys). versionCode 473.
+        versionCode = 473
+        versionName = "4.7.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

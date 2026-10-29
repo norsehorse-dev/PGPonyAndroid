@@ -42,8 +42,6 @@ import org.bouncycastle.openpgp.bc.BcPGPObjectFactory
 import org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder
 import org.bouncycastle.openpgp.operator.bc.BcPGPContentVerifierBuilderProvider
 import org.bouncycastle.openpgp.operator.bc.BcPGPDataEncryptorBuilder
-import org.bouncycastle.openpgp.operator.bc.BcPublicKeyDataDecryptorFactory
-import org.bouncycastle.openpgp.operator.bc.BcPublicKeyKeyEncryptionMethodGenerator
 import org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -254,6 +252,19 @@ object SecretKeyCheck {
     private fun prove(pub: PGPPublicKey, priv: PGPPrivateKey): Boolean? {
         val data = challenge()
         if (pub.algorithm in SIGNING) {
+            if (pub.version == 5) {
+                // 4.7.3: Bouncy Castle writes a v5 signature with a 4-octet trailer
+                // length but verifies with 8, so it never accepts its own v5
+                // signature. For a v5 key, sign and verify the challenge directly.
+                return runCatching {
+                    val signer = BcPGPContentSignerBuilder(pub.algorithm, HashAlgorithmTags.SHA512)
+                        .build(PGPSignature.BINARY_DOCUMENT, priv)
+                    signer.outputStream.write(data)
+                    val verifier = BcPGPContentVerifierBuilderProvider().get(pub.algorithm, HashAlgorithmTags.SHA512).build(pub)
+                    verifier.outputStream.write(data)
+                    verifier.verify(signer.signature)
+                }.getOrDefault(false)
+            }
             val sig = try {
                 val gen = PGPSignatureGenerator(BcPGPContentSignerBuilder(pub.algorithm, HashAlgorithmTags.SHA256), pub)
                 gen.init(PGPSignature.BINARY_DOCUMENT, priv)
@@ -275,7 +286,7 @@ object SecretKeyCheck {
                     BcPGPDataEncryptorBuilder(SymmetricKeyAlgorithmTags.AES_256)
                         .setWithIntegrityPacket(true).setSecureRandom(SecureRandom())
                 )
-                gen.addMethod(BcPublicKeyKeyEncryptionMethodGenerator(pub))
+                gen.addMethod(GnuPgX448.encryptionMethod(pub))
                 val out = ByteArrayOutputStream()
                 gen.open(out, data.size.toLong()).use { it.write(data) }
                 out.toByteArray()
@@ -285,7 +296,7 @@ object SecretKeyCheck {
             return runCatching {
                 val list = BcPGPObjectFactory(encrypted).nextObject() as PGPEncryptedDataList
                 val pked = list[0] as PGPPublicKeyEncryptedData
-                val back = pked.getDataStream(BcPublicKeyDataDecryptorFactory(priv)).use { it.readBytes() }
+                val back = pked.getDataStream(GnuPgX448.DecryptorFactory(priv)).use { it.readBytes() }
                 back.contentEquals(data) && pked.verify()
             }.getOrDefault(false)
         }
