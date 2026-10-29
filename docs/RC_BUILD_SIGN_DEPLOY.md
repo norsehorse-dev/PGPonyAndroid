@@ -37,8 +37,12 @@ git commit -S -m "<X.Y.Z> RC<N>: <summary>"
 git push origin main
 git tag -s v<X.Y.Z>-rc<N> -m "PGPony <X.Y.Z> RC<N>"
 git verify-tag v<X.Y.Z>-rc<N>
+git rev-parse HEAD v<X.Y.Z>-rc<N>^{commit}
 git push origin v<X.Y.Z>-rc<N>
 ```
+
+The two hashes `git rev-parse` prints must be the same. 4.7.3 RC1's tag went onto the commit before the RC
+commit; the gate caught it only because the content hash matched the previous release.
 
 ## 2. Build through the gate
 

@@ -207,6 +207,24 @@ add the index.
   the other places a passphrase is typed for a field that outlives its attempt.
 
 
+## 4e. Inline text signatures that GnuPG reports as BAD (found in the Desktop 3.0.3 interop run, Oct 29)
+
+An inline signed message with a text signature (type 0x01) is reported as BAD by gpg 2.4.4 and 2.5.21, for v4
+keys as well as v5 ones. That covers PGPCryptoService.sign(textMode = true) and, on desktop, the SOP wrapper's
+`inline-sign --as=text` and `encrypt --as=text --sign-with`. Binary inline, detached text and cleartext signatures
+are good in gpg. Desktop 3.0.2 already did this with a v4 key, so it predates 4.7.3.
+
+Cause: PGPony writes the text into a 'u' literal data packet with the line endings it was given (LF) and hashes
+it with CR LF, as a text signature should. GnuPG hashes text literal data as stored and expects it to be in
+canonical CR LF form already (gpg --textmode writes CR LF into its 't' packets). PGPony verifies its own messages
+because Bouncy Castle converts LF to CR LF on the reading side as well.
+
+Work: write the literal data in canonical CR LF form whenever the signature is a text signature, in sign() and
+wherever else an inline text signature is made; then check gpg reports Good, and that gpg's own text-mode messages
+still verify here (they do today). Desktop's SOP wrapper builds its own literal packet (SopInline), so desktop
+changes that file itself when it takes this from the sync.
+
+
 ## 5. Contributor PRs waiting on a decision
 
 - #96: Korean err_ strings. Korean has had no err_ strings so far; decide whether that stands.

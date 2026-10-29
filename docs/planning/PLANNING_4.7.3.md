@@ -87,6 +87,10 @@ gpg as a good self-signature.
 
 ## Release
 
+RC1 was tagged on the wrong commit (the 4.7.2 release commit 454bf8e, not the RC1 commit aff8306); the gate built
+4.7.2's content hash and nothing was published. The tag stays as it is, RC_HISTORY records it, and the RC1
+changes ship as RC2 on aff8306. RC_BUILD_SIGN_DEPLOY step 1 now checks the tag's commit against HEAD.
+
 Same path as 4.7.2: RCs as signed tags and GitHub pre-releases through the gate, one RC at a time, device test
 before tagging. Changelog 473.txt and RELEASE_NOTES_4.7.3.md after the last RC is checked. Desktop 3.0.3 follows
 with the same GnuPgX448 code.
