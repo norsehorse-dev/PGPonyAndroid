@@ -225,6 +225,26 @@ still verify here (they do today). Desktop's SOP wrapper builds its own literal 
 changes that file itself when it takes this from the sync.
 
 
+## 4f. Polish (pl)
+
+Origin: a Google Play review, Oct 30 2026 (five stars, waiting for Polish).
+
+- Resource folder values-pl, the whole of values/strings.xml (about 2,400 strings and 26 plurals). Machine
+  translation, multi-agent: split the file between translators, then a separate reviewer per part who did not
+  translate it, then one pass for terminology across the whole file (encrypt, decrypt, sign, verify, key pair,
+  subkey, fingerprint, keyring, trust levels, passphrase, security key) so each term has one Polish word.
+- Plurals need all four forms Polish uses: one, few, many, other. Check every <plurals> entry by hand against the
+  CLDR rules (few is 2 to 4, 22 to 24 and so on, never 12 to 14; many is 0, 5 to 21, 25 to 31 and so on); this is
+  where machine translation most often goes wrong.
+- Register it: res/xml/locales_config.xml (pl), i18n/LanguageManager (PL, picker name Polski).
+- The format-argument check from 4.6.2 (every %1$s, %1$d, escape and entity matches values/) runs on values-pl.
+- Store text: fastlane/metadata/android/pl-PL/ (title, short description, full description) and the same in the
+  Play listing. The Play release notes for 4.8.0 and later add Polish as a twelfth language.
+- From the release that ships it, "all 10 locales" in the rules above means all 11.
+- Release notes and the reply on the review say plainly that the translation is mostly machine-made and ask for
+  corrections. iOS and desktop add Polish when they mirror this item.
+
+
 ## 5. Contributor PRs waiting on a decision
 
 - #96: Korean err_ strings. Korean has had no err_ strings so far; decide whether that stands.
