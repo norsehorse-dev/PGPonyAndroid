@@ -91,6 +91,8 @@ RC1 was tagged on the wrong commit (the 4.7.2 release commit 454bf8e, not the RC
 4.7.2's content hash and nothing was published. The tag stays as it is, RC_HISTORY records it, and the RC1
 changes ship as RC2 on aff8306. RC_BUILD_SIGN_DEPLOY step 1 now checks the tag's commit against HEAD.
 
-Same path as 4.7.2: RCs as signed tags and GitHub pre-releases through the gate, one RC at a time, device test
-before tagging. Changelog 473.txt and RELEASE_NOTES_4.7.3.md after the last RC is checked. Desktop 3.0.3 follows
-with the same GnuPgX448 code.
+versionCode 473, versionName 4.7.3, from RC2's code (checked on device, and by the reporter with the real key
+against Kleopatra, Oct 29). Changelog 473.txt and RELEASE_NOTES_4.7.3.md. Same release path as 4.7.2: signed commit
+and tag, reproducibility gate, GitHub release with four assets, pgpony.app, Play (notes in all 11 listing
+languages), F-Droid from the tag. The release commit only adds docs and the changelog, so the release APK should
+have RC2's content hash. Desktop 3.0.3 shipped Oct 29 with the same GnuPgX448 code.

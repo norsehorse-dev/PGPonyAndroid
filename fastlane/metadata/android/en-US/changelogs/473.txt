@@ -1,0 +1,1 @@
+PGPony encrypts to and decrypts with the Ed448 keys GnuPG and Kleopatra make, which are LibrePGP v5 keys with an X448 encryption subkey. Signatures from these keys verify, and signatures PGPony makes with them now verify in GnuPG too.
