@@ -248,9 +248,8 @@ Origin: a Google Play review, Oct 30 2026 (five stars, waiting for Polish).
 ## 4g. Messages whose first partial chunk is under 512 octets (#110)
 
 Origin: #110, Oct 30. A signed message for a v4 RSA key opens in OpenKeychain and GnuPG, and PGPony stops with
-"Malformed message: first partial chunk shorter than 512 octets". The file is named after the key's fingerprint and
-the key is published on Keybase, so it is most likely Keybase's signature for the key, written by Go's OpenPGP code,
-which sends a small first chunk. To confirm on the attached file.
+"Malformed message: first partial chunk shorter than 512 octets". The file is the reverse signature from the key's
+Keybase sigchain (confirmed by the reporter), written by Go's OpenPGP code, which sends a small first chunk.
 
 Cause: MessageGrammar.packets() (added Sep 29 for the SOP interop run) enforces RFC 9580 4.2.1.4, which says the
 first partial length MUST be at least 512 octets. Bouncy Castle and GnuPG do not enforce it, so PGPony is the only
