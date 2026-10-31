@@ -245,6 +245,24 @@ Origin: a Google Play review, Oct 30 2026 (five stars, waiting for Polish).
   corrections. iOS and desktop add Polish when they mirror this item.
 
 
+## 4g. Messages whose first partial chunk is under 512 octets (#110)
+
+Origin: #110, Oct 30. A signed message for a v4 RSA key opens in OpenKeychain and GnuPG, and PGPony stops with
+"Malformed message: first partial chunk shorter than 512 octets". The file is named after the key's fingerprint and
+the key is published on Keybase, so it is most likely Keybase's signature for the key, written by Go's OpenPGP code,
+which sends a small first chunk. To confirm on the attached file.
+
+Cause: MessageGrammar.packets() (added Sep 29 for the SOP interop run) enforces RFC 9580 4.2.1.4, which says the
+first partial length MUST be at least 512 octets. Bouncy Castle and GnuPG do not enforce it, so PGPony is the only
+one of the three that refuses these messages.
+
+Work: accept a short first partial chunk in MessageGrammar.packets() and in CompositeInlineStreamReader. Keep the
+other checks, including partial lengths only on literal, compressed and encrypted data packets. MessageGrammarTest's
+`a first partial chunk under 512 octets is rejected` becomes a test that it reads, plus a test with the file from
+#110 once it is in test resources. Desktop takes the same change from the sync. Decided Oct 30: not worth a 4.7.4 on
+its own; it ships in 4.8.0 unless another interop fix makes a 4.7.4 worth doing first.
+
+
 ## 5. Contributor PRs waiting on a decision
 
 - #96: Korean err_ strings. Korean has had no err_ strings so far; decide whether that stands.
