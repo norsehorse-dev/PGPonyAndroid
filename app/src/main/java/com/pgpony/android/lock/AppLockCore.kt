@@ -22,6 +22,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.channels.FileChannel
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import java.security.SecureRandom
 import java.util.Base64
@@ -409,6 +411,14 @@ class AppLockCore(
  * Atomic text write: a temp file, synced, renamed over the target, then the
  * directory synced. There is no non-atomic fallback: a failed rename throws
  * and leaves the old file as it was.
+ *
+ * 4.8.0 (desktop 3.1.0): the rename is Files.move with ATOMIC_MOVE, not
+ * File.renameTo. renameTo replaces an existing file on Linux, macOS and
+ * Android, but on Windows it fails when the target exists, so PGPony Desktop
+ * saved the first PIN and then failed every later save (the wrong PIN count,
+ * the duress PIN, a new PIN). An atomic move replaces the target on every
+ * platform. A file another program holds open for a moment on Windows (a
+ * virus scanner, an indexer) can still refuse it, so it is tried a few times.
  */
 internal fun writeFileAtomically(target: File, text: String) {
     val dir = target.parentFile ?: throw IOException("no directory for ${target.name}")
@@ -418,9 +428,23 @@ internal fun writeFileAtomically(target: File, text: String) {
         out.flush()
         out.fd.sync()
     }
-    if (!tmp.renameTo(target)) {
+    var lastError: Exception? = null
+    for (attempt in 1..5) {
+        try {
+            Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            lastError = null
+            break
+        } catch (e: java.nio.file.AtomicMoveNotSupportedException) {
+            lastError = e
+            break
+        } catch (e: IOException) {
+            lastError = e
+            Thread.sleep(20L * attempt)
+        }
+    }
+    if (lastError != null) {
         tmp.delete()
-        throw IOException("could not replace ${target.name}")
+        throw IOException("could not replace ${target.name}", lastError)
     }
     // The rename itself reaches the disk once the directory is synced. Not
     // every filesystem allows opening a directory; the file is in place either way.
