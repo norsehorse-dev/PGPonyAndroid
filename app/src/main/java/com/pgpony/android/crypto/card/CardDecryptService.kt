@@ -341,7 +341,8 @@ class CardDecryptService private constructor() {
             signatureKeyIDRaw = walked.signatureKeyIDRaw,
             signaturePackets = walked.signaturePackets,
             signingKeyFingerprint = walked.signingKeyFingerprint,
-            signerPrimaryFingerprint = walked.signerPrimaryFingerprint
+            signerPrimaryFingerprint = walked.signerPrimaryFingerprint,
+            literalExtra = walked.literalExtra
         )
     }
 }
@@ -373,5 +374,7 @@ data class CardDecryptResult(
     val signingKeyFingerprint: String? = null,
     /** Primary fingerprint (hex uppercase) of the certificate that validly
      *  holds that key; null when unknown. */
-    val signerPrimaryFingerprint: String? = null
+    val signerPrimaryFingerprint: String? = null,
+    /** 4.8.0: see DecryptResult.literalExtra. */
+    val literalExtra: ByteArray? = null
 )

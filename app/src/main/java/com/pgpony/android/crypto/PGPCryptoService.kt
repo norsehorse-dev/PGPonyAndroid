@@ -232,7 +232,13 @@ data class DecryptResult(
     val signingKeyFingerprint: String? = null,
     /** Primary fingerprint (hex uppercase) of the certificate that validly
      *  holds that key; null when unknown. */
-    val signerPrimaryFingerprint: String? = null
+    val signerPrimaryFingerprint: String? = null,
+    /** 4.8.0 (desktop 3.1.0 plan 3d, SOP): the literal data fields a LibrePGP
+     *  v5 signature hashes (LibrePgpV5Sig.literalExtra: format, raw file name,
+     *  date), read from the decrypted literal packet. Lets a caller that checks
+     *  each of [signaturePackets] itself verify a v5 one; null when the message
+     *  had no literal packet the walk read (the composite paths). */
+    val literalExtra: ByteArray? = null
 )
 
 /**
@@ -271,7 +277,9 @@ data class DecryptStreamResult(
     val signerPrimaryFingerprint: String? = null,
     /** 4.7.0 (item 48, #79): see [DecryptResult.decryptingKeyIdRaw]; set on
      *  the classical public-key path. */
-    val decryptingKeyIdRaw: Long? = null
+    val decryptingKeyIdRaw: Long? = null,
+    /** 4.8.0: see [DecryptResult.literalExtra]. */
+    val literalExtra: ByteArray? = null
 )
 
 
@@ -2621,7 +2629,8 @@ class PGPCryptoService private constructor() {
             signaturePackets = walked.signaturePackets,
             signerWeakKey = walked.signerWeakKey,
             signingKeyFingerprint = walked.signingKeyFingerprint,
-            signerPrimaryFingerprint = walked.signerPrimaryFingerprint
+            signerPrimaryFingerprint = walked.signerPrimaryFingerprint,
+            literalExtra = walked.literalExtra
         )
     }
 
@@ -2901,7 +2910,8 @@ class PGPCryptoService private constructor() {
             signaturePackets = walked.signaturePackets,
             signerWeakKey = walked.signerWeakKey,
             signingKeyFingerprint = walked.signingKeyFingerprint,
-            signerPrimaryFingerprint = walked.signerPrimaryFingerprint
+            signerPrimaryFingerprint = walked.signerPrimaryFingerprint,
+            literalExtra = walked.literalExtra
         )
     }
 
@@ -3832,7 +3842,9 @@ internal object ContentWalker {
         /** Fingerprint of the exact key the graded signature verified under. */
         val signingKeyFingerprint: String? = null,
         /** Primary fingerprint of the certificate validly holding that key. */
-        val signerPrimaryFingerprint: String? = null
+        val signerPrimaryFingerprint: String? = null,
+        /** 4.8.0: the literal data fields a v5 signature hashes; null before a literal. */
+        val literalExtra: ByteArray? = null
     ) {
         val signerKnown: Boolean get() = signerKeyID != null
     }
@@ -3954,7 +3966,8 @@ internal object ContentWalker {
             signaturePackets = st.signaturePackets,
             signerWeakKey = if (status == SignerStatus.VERIFIED) st.signerWeakKey else null,
             signingKeyFingerprint = st.signingKeyFingerprint,
-            signerPrimaryFingerprint = st.signerPrimaryFingerprint
+            signerPrimaryFingerprint = st.signerPrimaryFingerprint,
+            literalExtra = st.literalExtra
         )
     }
 

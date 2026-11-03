@@ -698,4 +698,27 @@ h7VBLkq5YtCRkXT8VmIrJ94yR66lNV+SrGxWDkLvz6Cb0xBh9WD8jQ==
 -----END PGP MESSAGE-----
 """
     }
+
+    // 4.8.0 (desktop 3.1.0 plan 3d, SOP): every decrypt path returns the literal data
+    // fields a v5 signature hashes, so a caller checking each signature packet itself
+    // can verify a LibrePGP v5 one.
+    @Test
+    fun everyPathReturnsTheLiteralFieldsAV5SignatureHashes() {
+        val date = Date(1_700_000_000_000L)
+        val bo = ByteArrayOutputStream()
+        PGPLiteralDataGenerator().open(bo, PGPLiteralData.BINARY, "notes.txt", signed.size.toLong(), date).use { it.write(signed) }
+        val packets = cat(opsOf(alice), bo.toByteArray(), sigOf(alice, signed))
+        val want = LibrePgpV5Sig.literalExtra(PGPLiteralData.BINARY.code, "notes.txt".toByteArray(), date)
+        val keys = listOf(alice.pub)
+
+        assertArrayEquals("memory", want, svc.decrypt(encryptRaw(packets, bob), listOf(bob.sec), null, keys).literalExtra)
+        assertArrayEquals(
+            "stream", want,
+            svc.decryptStream(ByteArrayInputStream(encryptRaw(packets, bob)), ByteArrayOutputStream(), listOf(bob.sec), null, keys).literalExtra
+        )
+        assertArrayEquals("signed-only", want, svc.decryptArmored(armor(packets), listOf(bob.sec), null, keys).literalExtra)
+        assertArrayEquals("card", want, card.readContent(packets, keys).literalExtra)
+        assertEquals(0x62, want[0].toInt())
+        assertEquals("notes.txt".length, want[1].toInt())
+    }
 }
