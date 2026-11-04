@@ -1,13 +1,14 @@
 # PGPony Android 4.8.0: Planning
 
-Status: open (Oct 20 2026; issues #105, #106 and #108 added Oct 26). Seed: what the 4.7.0 feature freeze deferred, what 4.7.0 left open, and requests
+Status: open (Oct 20 2026; issues #105, #106 and #108 added Oct 26; items 4e to 4l added Oct 29 to Nov 4). Seed: what the 4.7.0 feature freeze deferred, what 4.7.0 left open, and requests
 that came in during the 4.7.0 cycle. Android leads, then iOS and desktop mirror each item once verified (iOS is
 on 8.4.0, Android 4.6.1 to 4.7.0 parity; see HANDOFF-8.4.0.md in the iOS repo). Priorities and the RC breakdown
 are set once the list settles.
 
 Context: 4.7.0 (versionCode 470) shipped Oct 20 2026 from RC7's code: GitHub release, pgpony.app, Play (with the
-special-use foreground service declaration for PassphraseHoldService), F-Droid from the tag. Anything below is a
-4.8.0 change unless it says otherwise.
+special-use foreground service declaration for PassphraseHoldService), F-Droid from the tag. The 4.7.x patches since:
+4.7.1, 4.7.2 (Oct 28) and 4.7.3 (Oct 30, GnuPG X448 subkeys and LibrePGP v5 signatures). Anything below is a 4.8.0
+change unless it says otherwise.
 
 Rules carried over: one RC at a time; new strings in all 10 locales (de, es, fr, ja, ko, pt-rBR, ru, tr, uk,
 b+zh+Hans), translated multi-agent with a separate reviewer per locale; no names or handles of reporters or
@@ -262,9 +263,106 @@ other checks, including partial lengths only on literal, compressed and encrypte
 its own; it ships in 4.8.0 unless another interop fix makes a 4.7.4 worth doing first.
 
 
+## 4h. Email in exported key file names (a user, promised 28 October)
+
+A user with several keys under one name (one per mail account) asked for the email in exported key file
+names. Android already writes `{name}_{KEYID}_public.asc` (KeyShareIntents.buildExportFilename), so files
+don't collide, but the email is what tells them apart at a glance. iOS 8.4.0 build 13 writes
+`Name_email_KEYID_public.asc` (and `_private.asc`), the "@" as "-", for example
+`Riley_Park_riley-example.com_9D04ADE0_public.asc`. Match it: add the email (lowercased, "@" to "-", other
+unsafe characters to "_", 64 characters at most) between the name and the key ID, in every caller of
+buildExportFilename (public, private, revocation). Unit test the shape.
+
+## 4i. A v4 base for "Advanced: compose subkeys" (a user, Nov 2)
+
+A user asked why a key built with the subkey composer always comes out as a v6 Ed25519 key, and whether it could
+be a standard v4 key with subkeys. Nothing in OpenPGP requires v6 here. The composer is hard-wired to v6:
+PGPCryptoService.assembleGranularV6Ring always starts from buildV6Ed25519X25519KeyRings, KeyRepository
+.generateGranularKey stores the result as V6_ED25519, and KeyringScreen hides the algorithm picker in granular mode.
+The likely reason is that the composer offers ML-KEM-1024 and ML-DSA signing subkeys, which are v6-only. Today the
+workaround is to generate a plain Ed25519 key (v4) and use Add Subkey in Key Details, which already offers the v4
+set.
+
+Work: give granular mode a v4 / v6 choice for the base, v6 by default so the current shape is unchanged.
+- v4 base: start from the v4 Ed25519 + Cv25519 ring the normal keygen builds, keep or strip its default encryption
+  subkey per the existing toggle, and graft each spec with ClassicalSubkeyGen.addSubkey (all classical types,
+  RSA included) or, for ML-KEM-768, the v4 algo-35 interop graft (CompositeKeyGen.addV4Algo35SubkeyRings, with the
+  SEIPDv2 Features flag item 14 of 4.5.0 relies on). Each subkey keeps its own expiry, as on v6.
+- The Add subkey menu in the composer filters with AddSubkeyChoice.classicalFor(isV6) and postQuantumFor(isV6), the
+  same lists Key Details uses. Switching the base from v6 to v4 drops any v6-only subkeys already in the list and
+  says so.
+- generateGranularKey sets the stored algorithm from the base (Ed25519 for v4) instead of always V6_ED25519.
+- Strings for the base choice and the dropped-subkeys note in all locales.
+- Tests: a v4 granular key with RSA, Ed25519 and X25519 subkeys and one with ML-KEM-768 reads back as v4 in
+  BouncyCastle and gpg (gpg --list-packets shows version 4 on every key packet), with per-subkey expiry intact.
+- iOS and desktop mirror once verified.
+
+
+## 4j. Signing with an ML-DSA signing subkey on a classical primary (a user, Nov 4)
+
+Reported on 4.7.2 (Pixel 8, Android 17): a key with an ML-DSA-87 signing subkey cannot sign. With a passphrase the
+sign fails as a wrong passphrase; without one it fails with an unknown public key algorithm. The user also saw an
+Ed25519 primary and an X25519 subkey on a key meant to be post-quantum only, which is the subkey composer's v6
+Ed25519 base with its default encryption subkey switch on (the switch defaults to on).
+
+Cause, from the code (not yet reproduced): a classical v6 primary carrying an ML-DSA signing subkey, from the
+composer or from Add Subkey in Key Details, is stored as a BouncyCastle ring with the algo-30/31 subkey as an
+UnknownBCPGKey and the key labelled V6_ED25519. Every sign path checks `algorithm.isCompositeSign` on the key's
+label, so this key goes through SigningService, and pickSigningSecretKey takes the newest valid signing subkey: the
+ML-DSA one. BouncyCastle cannot extract or sign with it. The sign-only path in EncryptDecryptViewModel maps the
+failure to the passphrase error when a passphrase was given. No test signs a document with a composite signing
+subkey on a classical primary, and no test signs a document with ML-DSA-87+Ed448 at all (CompositeSignerTest and
+CompositeDocumentSignaturesTest use ML-DSA-65+Ed25519 only).
+
+Work:
+- Reproduce first: a unit test that builds a composer key (default encryption subkey on, one ML-DSA-87 signing
+  subkey), with and without a passphrase, and signs cleartext, detached and inline through the paths the app uses.
+- Route a composite signing subkey on a classical primary through CompositeDocumentSigner (unlock the subkey's
+  secret the way CompositeKeyFacade does for a composite primary, sign with the subkey's suite and fingerprint), at
+  every sign site: sign-only, encrypt and sign, files, the provider. Until then, leave a composite subkey out of the
+  BouncyCastle signing pick so the classical primary signs instead of failing.
+- A wrong passphrase and an unsupported key stay two errors: the sign path stops mapping every failure to the
+  passphrase message.
+- Add ML-DSA-87+Ed448 to the document-signature tests (cleartext, detached, inline, verified back), and check the
+  signatures in a second implementation before shipping.
+- The composer's "Include default encryption subkey" switch: say on the switch that it adds a classical X25519
+  subkey, and consider defaulting it to off when only post-quantum subkeys are in the list.
+- Desktop shares this code and takes the same fix from the sync.
+
+
+## 4k. Korean complete and in the picker
+
+values-ko has shipped since 4.6.2 but stays out of locales_config and the in-app picker until the translation is
+complete. Done on main Nov 2 (af491ba): the 389 err_ strings, so every string and plural in values/ now has a Korean
+entry. The translations repository's Korean is at its PR #6 (Oct 8), which 4.7.0 RC3 already applied, so a sync
+from it brings nothing new; check it again before the RC in case more has landed.
+
+Left:
+- Review: a reviewer who did not write them checks the 389 err_ strings against English, the same as the RC3 pass;
+  the format-argument check runs on values-ko.
+- Register it: res/xml/locales_config.xml (ko), i18n/LanguageManager (KO, picker name 한국어), and drop the
+  "unlisted until complete" note in locales_config.xml.
+- Store text: fastlane/metadata/android/ko-KR already exists; check it matches the current English listing.
+- Sync the app's values-ko back to the translations repository so contributors work from the complete file.
+- #96 carries its own translation of the same 389 strings; with af491ba on main it is superseded (see section 5).
+
+
+## 4l. More curves for key generation (#109)
+
+Origin: #109 (Oct 27). A hardware-key provisioning app can now import keys from PGPony and write them to YubiKey,
+Nitrokey and Librem Key cards, and the request is for PGPony to generate ECDSA keys on brainpoolP256r1,
+brainpoolP384r1, brainpoolP512r1 and secp256k1. PGPony already reads and uses these curves (KeyAlgorithm has
+ECDSA_BRAINPOOL_P256/P384/P512 and ECDSA_SECP256K1); they are not in any generate list. Scope is K5.
+
+If yes: add them to the generate picker's Advanced group (v4 only, ECDSA primary with an ECDH subkey on the same
+curve), check what Bouncy Castle 1.85 generates against gpg 2.4 and 2.5 (import, sign, encrypt both ways), and say
+in the captions that cards differ in which curves they hold. iOS and desktop mirror once verified.
+
+
 ## 5. Contributor PRs waiting on a decision
 
-- #96: Korean err_ strings. Korean has had no err_ strings so far; decide whether that stands.
+- #96: Korean err_ strings. Superseded by af491ba (Nov 2), which translated the same 389 strings on main. Close it
+  with thanks, or compare its wording with af491ba first and take any better lines (item 4k's review is the place).
 - #98: manifest content VIEW filters without the inert path patterns.
 
 
@@ -286,10 +384,18 @@ its own; it ships in 4.8.0 unless another interop fix makes a 4.7.4 worth doing 
 
 ## 7. Questions for Kevin
 
-- K3. #96: Korean error strings, yes or no.
+- K3. #96: Korean error strings, yes or no. Answered yes by af491ba (Nov 2); what is left is #96 itself (section 5).
 - K4. #95: take the PGPONY2 format in 4.8.0, or only after iOS and desktop read it?
+- K5. #109: generate brainpool and secp256k1 ECDSA keys in 4.8.0 (item 4l), or leave generation as it is?
 
 
 ## 8. Status of this document
 
-Rev 0 seed. Rev 1 once K3 and K4 are answered and the RC breakdown is set.
+Rev 0 seed, kept current to Nov 4. Rev 1 once K4 and K5 are answered and the RC breakdown is set.
+
+Already on main (no RC yet):
+- af491ba (Nov 2): Korean for the 389 err_ strings (item 4k); DecryptResult, DecryptStreamResult and
+  CardDecryptResult carry the v5 literal fields (literalExtra), so the desktop SOP wrapper can verify a LibrePGP v5
+  signature packet by packet (follow-up to 4.7.3).
+- 3712407 (Nov 3): the app lock store replaces its file with an atomic move (Files.move, ATOMIC_MOVE). File.renameTo
+  fails on Windows when the target exists, so PGPony Desktop saved the first PIN and then failed every later save.
