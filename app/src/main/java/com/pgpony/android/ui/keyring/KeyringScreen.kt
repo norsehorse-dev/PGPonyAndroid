@@ -647,7 +647,8 @@ fun KeyringScreen(
                             suggestedName = KeyShareIntents.buildExportFilename(
                                 ownerLabel = deleteOwnerLabel,
                                 shortFingerprint = key.shortFingerprint,
-                                suffix = "_private"
+                                suffix = "_private",
+                                email = key.userEmail
                             )
                         )
                     }

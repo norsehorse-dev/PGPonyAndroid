@@ -101,6 +101,11 @@ class SigningService private constructor() {
         signingKeyId: Long? = null
     ): String {
         val signingKey = pickSigningKey(secretKeyRing, signingKeyId)
+        // 4.8.0 (item 4j): a composite ML-DSA signing subkey on a classical
+        // primary signs through the composite path.
+        com.pgpony.android.crypto.pqc.CompositeSubkeySigning.forPicked(signingKey, passphrase)?.let { c ->
+            return com.pgpony.android.crypto.pqc.CompositeDocumentSigner.signCleartext(c.suite, c.secret, c.fingerprint, text)
+        }
         val sigGen = buildSignatureGenerator(
             signingKey = signingKey,
             passphrase = passphrase,
@@ -174,6 +179,10 @@ class SigningService private constructor() {
         textMode: Boolean = false
     ): ByteArray {
         val signingKey = pickSigningKey(secretKeyRing, signingKeyId)
+        // 4.8.0 (item 4j): a composite ML-DSA signing subkey on a classical primary.
+        com.pgpony.android.crypto.pqc.CompositeSubkeySigning.forPicked(signingKey, passphrase)?.let { c ->
+            return compositeDetached(c, data, armor, textMode)
+        }
         val sigGen = buildSignatureGenerator(
             signingKey = signingKey,
             passphrase = passphrase,
@@ -214,6 +223,12 @@ class SigningService private constructor() {
         signingKeyId: Long? = null
     ): ByteArray {
         val signingKey = pickSigningKey(secretKeyRing, signingKeyId)
+        // 4.8.0 (item 4j): a composite ML-DSA signing subkey on a classical primary.
+        com.pgpony.android.crypto.pqc.CompositeSubkeySigning.forPicked(signingKey, passphrase)?.let { c ->
+            return com.pgpony.android.crypto.pqc.CompositeDocumentSigner.signDetachedStream(
+                c.suite, c.secret, c.fingerprint, input, armor
+            )
+        }
         val sigGen = buildSignatureGenerator(
             signingKey = signingKey,
             passphrase = passphrase,
@@ -242,6 +257,32 @@ class SigningService private constructor() {
     }
 
     // ── Internals ─────────────────────────────────────────────────────
+
+    /**
+     * 4.8.0 (item 4j): a detached signature from a composite signing subkey,
+     * binary or text (type 0x01, over the canonical CR LF form), armored when
+     * [armor] is set.
+     */
+    private fun compositeDetached(
+        c: com.pgpony.android.crypto.pqc.CompositeSubkeySigning.Signer,
+        data: ByteArray,
+        armor: Boolean,
+        textMode: Boolean
+    ): ByteArray {
+        val packet = if (textMode) {
+            com.pgpony.android.crypto.pqc.CompositeSigPacket.buildDocumentSignature(
+                c.suite, c.secret, com.pgpony.android.crypto.pqc.CompositeSigPacket.TYPE_TEXT,
+                com.pgpony.android.crypto.pqc.CompositeSubkeySigning.canonicalText(data),
+                c.fingerprint, (System.currentTimeMillis() / 1000L).toInt()
+            )
+        } else {
+            com.pgpony.android.crypto.pqc.CompositeDocumentSigner.signDetached(c.suite, c.secret, c.fingerprint, data)
+        }
+        if (!armor) return packet
+        return com.pgpony.android.crypto.pqc.CompositeSigPacket.armor(
+            "-----BEGIN PGP SIGNATURE-----", "-----END PGP SIGNATURE-----", packet
+        ).toByteArray(Charsets.UTF_8)
+    }
 
     /**
      * Build a `PonySigGen` initialized with the unlocked private

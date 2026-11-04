@@ -241,7 +241,7 @@ object CompositeInlineStreamReader {
                     val tag = c and 0x3F
                     val (len, partial) = newLength(input)
                     if (partial && tag != TAG_LITERAL && tag != TAG_COMPRESSED) throw Malformed("partial length on packet $tag")
-                    if (partial && len < 512) throw Malformed("first partial chunk under 512 octets")
+                    // 4.8.0 (item 4g, #110): a first partial chunk under 512 octets reads.
                     return Header(tag, true, len, partial, false)
                 }
                 val tag = (c shr 2) and 0x0F

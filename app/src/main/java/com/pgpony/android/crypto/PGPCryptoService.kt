@@ -1240,6 +1240,29 @@ class PGPCryptoService private constructor() {
         // every signing parameter above are ignored.
         presignedInline: ByteArray? = null
     ): ByteArray {
+        // 4.8.0 (item 4j): when the signing key picked from a classical ring is
+        // a composite ML-DSA signing subkey, sign through the composite inline
+        // path with that subkey, as for a composite primary.
+        if (presignedInline == null && compositeSignSuite == null && cardSession == null && signingSecretKey != null) {
+            val picked = pickSigningSecretKey(signingSecretKey, signingKeyId)
+                ?: throw noSigningKeyError(signingSecretKey)
+            com.pgpony.android.crypto.pqc.CompositeSubkeySigning.forPicked(picked, passphrase)?.let { c ->
+                return encrypt(
+                    data = data,
+                    recipientPublicKeys = recipientPublicKeys,
+                    signingSecretKey = null,
+                    passphrase = passphrase,
+                    filename = filename,
+                    armor = armor,
+                    recipientSubkeyChoices = recipientSubkeyChoices,
+                    v4Algo35Recipients = v4Algo35Recipients,
+                    compositeSignSuite = c.suite,
+                    compositeSignSecret = c.secret,
+                    compositeSignerFingerprint = c.fingerprint,
+                    compositeSignInSeipdV1 = compositeSignInSeipdV1
+                )
+            }
+        }
         val outputStream = ByteArrayOutputStream()
         val armoredOut = if (armor) ArmoredOutputStream(outputStream).stripVersion() else null
         val targetOut = armoredOut ?: outputStream
@@ -1554,6 +1577,32 @@ class PGPCryptoService private constructor() {
         compositeSignerFingerprint: ByteArray? = null,
         compositeSignInSeipdV1: Boolean = true
     ) {
+        // 4.8.0 (item 4j): a composite ML-DSA signing subkey picked from a
+        // classical ring signs through the composite path, as in encrypt().
+        if (compositeSignSuite == null && cardSession == null && signingSecretKey != null) {
+            val picked = pickSigningSecretKey(signingSecretKey, signingKeyId)
+                ?: throw noSigningKeyError(signingSecretKey)
+            com.pgpony.android.crypto.pqc.CompositeSubkeySigning.forPicked(picked, passphrase)?.let { c ->
+                return encryptStream(
+                    input = input,
+                    output = output,
+                    recipientPublicKeys = recipientPublicKeys,
+                    signingSecretKey = null,
+                    passphrase = passphrase,
+                    filename = filename,
+                    armor = armor,
+                    enableCompression = enableCompression,
+                    messagePassword = messagePassword,
+                    useArgon2 = useArgon2,
+                    recipientSubkeyChoices = recipientSubkeyChoices,
+                    v4Algo35Recipients = v4Algo35Recipients,
+                    compositeSignSuite = c.suite,
+                    compositeSignSecret = c.secret,
+                    compositeSignerFingerprint = c.fingerprint,
+                    compositeSignInSeipdV1 = compositeSignInSeipdV1
+                )
+            }
+        }
         val compositeRequested = compositeSignSuite != null && compositeSignSecret != null &&
             compositeSignerFingerprint != null
         // 1) Build the signer FIRST. Software: unlock up front (clean
@@ -2936,6 +2985,10 @@ class PGPCryptoService private constructor() {
         try {
             val signingKey = pickSigningSecretKey(secretKeyRing)
                 ?: throw noSigningKeyError(secretKeyRing)
+            // 4.8.0 (item 4j): a composite ML-DSA signing subkey on a classical primary.
+            com.pgpony.android.crypto.pqc.CompositeSubkeySigning.forPicked(signingKey, passphrase)?.let { c ->
+                return compositeSubkeySign(c, data, detached, armor, textMode)
+            }
             enforceArgon2Policy(signingKey.s2K)
             val privateKey = signingKey.extractPrivateKey(
                 org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyDecryptorBuilder(
@@ -2970,14 +3023,18 @@ class PGPCryptoService private constructor() {
 
                 sigGen.generateOnePassVersion(false).encode(compOut)
 
+                // 4.8.0 (item 4e): a text signature's literal data is stored in
+                // canonical CR LF form. GnuPG hashes it as stored and reported
+                // the LF form as a BAD signature.
+                val content = if (textMode) TextCanonical.crlf(data) else data
                 val litDate = Date()
                 sigGen.setLiteralData(PGPLiteralData.UTF8, "", litDate) // 4.7.3: v5 signers hash these
                 val litGen = PGPLiteralDataGenerator()
-                val litOut = litGen.open(compOut, PGPLiteralData.UTF8, "", data.size.toLong(), litDate)
-                litOut.write(data)
+                val litOut = litGen.open(compOut, PGPLiteralData.UTF8, "", content.size.toLong(), litDate)
+                litOut.write(content)
                 litOut.close()
 
-                sigGen.update(data)
+                sigGen.update(content)
                 sigGen.generate().encode(compOut)
 
                 compOut.close()
@@ -2989,6 +3046,40 @@ class PGPCryptoService private constructor() {
         } catch (e: Exception) {
             throw PGPCryptoError.SigningFailed(e.message ?: "Unknown error")
         }
+    }
+
+    /**
+     * 4.8.0 (item 4j): [sign] for a composite signing subkey. Detached is
+     * binary or text (type 0x01, over the canonical CR LF form); inline is the
+     * composite one-pass message with binary literal data, so an inline text
+     * signature is refused.
+     */
+    private fun compositeSubkeySign(
+        c: com.pgpony.android.crypto.pqc.CompositeSubkeySigning.Signer,
+        data: ByteArray,
+        detached: Boolean,
+        armor: Boolean,
+        textMode: Boolean
+    ): ByteArray {
+        val packet = com.pgpony.android.crypto.pqc.CompositeSigPacket
+        val packets = if (detached) {
+            if (textMode) {
+                packet.buildDocumentSignature(
+                    c.suite, c.secret, packet.TYPE_TEXT,
+                    com.pgpony.android.crypto.pqc.CompositeSubkeySigning.canonicalText(data),
+                    c.fingerprint, (System.currentTimeMillis() / 1000L).toInt()
+                )
+            } else {
+                com.pgpony.android.crypto.pqc.CompositeDocumentSigner.signDetached(c.suite, c.secret, c.fingerprint, data)
+            }
+        } else {
+            if (textMode) throw SigningError.SigningFailed("an ML-DSA key makes binary inline signatures only")
+            com.pgpony.android.crypto.pqc.CompositeDocumentSigner.signInline(c.suite, c.secret, c.fingerprint, data)
+        }
+        if (!armor) return packets
+        val (head, tail) = if (detached) "-----BEGIN PGP SIGNATURE-----" to "-----END PGP SIGNATURE-----"
+            else "-----BEGIN PGP MESSAGE-----" to "-----END PGP MESSAGE-----"
+        return packet.armor(head, tail, packets).toByteArray(Charsets.UTF_8)
     }
 
     // ── Verify ─────────────────────────────────────────────────────────
@@ -3272,6 +3363,16 @@ class PGPCryptoService private constructor() {
         return com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(encKey.algorithm) != null ||
             encKey.algorithm == com.pgpony.android.crypto.pqc.CompositeKemLibrePGP.ALGORITHM_ID
     }
+
+    /**
+     * 4.8.0 (item 4j): true when the key [pickSigningSecretKey] picks from
+     * [ring] is a composite ML-DSA signing subkey, so the signature will be a
+     * v6 composite one. The Encrypt screen asks before putting such a
+     * signature in a SEIPDv1 message, as it does for a composite primary.
+     */
+    internal fun picksCompositeSubkey(ring: PGPSecretKeyRing?, preferredKeyId: Long? = null): Boolean =
+        ring != null &&
+            com.pgpony.android.crypto.pqc.CompositeSubkeySigning.suiteOf(pickSigningSecretKey(ring, preferredKeyId)) != null
 
     /**
      * Pick the secret key in [ring] that should produce a *data* signature.

@@ -36,9 +36,10 @@
 //
 // Both return the input itself when nothing had to change, so ordinary
 // messages reach Bouncy Castle byte for byte as before. The packet reader is
-// strict: a truncated packet, a partial length on a packet type that may not
-// use one, or a first partial chunk under 512 octets (RFC 9580 4.2.1.4) is
-// malformed.
+// strict: a truncated packet or a partial length on a packet type that may not
+// use one is malformed. 4.8.0 (item 4g, #110): a first partial chunk under 512
+// octets reads. RFC 9580 4.2.1.4 asks writers for at least 512, but Go's
+// OpenPGP code writes smaller ones and Bouncy Castle and GnuPG both read them.
 
 package com.pgpony.android.crypto
 
@@ -140,7 +141,6 @@ object MessageGrammar {
             val tag: Int
             if (c and 0x40 != 0) {
                 tag = c and 0x3F
-                var first = true
                 while (true) {
                     val l0 = u8()
                     val len: Int
@@ -151,14 +151,10 @@ object MessageGrammar {
                         l0 == 255 -> len = be(4)
                         else -> { len = 1 shl (l0 and 0x1F); partial = true }
                     }
-                    if (partial) {
-                        if (tag !in PARTIAL_OK) throw Malformed("partial length on packet type $tag")
-                        if (first && len < 512) throw Malformed("first partial chunk shorter than 512 octets")
-                    }
+                    if (partial && tag !in PARTIAL_OK) throw Malformed("partial length on packet type $tag")
                     if (len > data.size - i) throw Truncated()
                     if (len > 0) ranges.add(i until i + len)
                     i += len
-                    first = false
                     if (!partial) break
                 }
             } else {

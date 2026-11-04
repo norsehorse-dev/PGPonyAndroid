@@ -70,12 +70,14 @@ object KeyShareIntents {
         context: Context,
         armored: String,
         keyOwnerLabel: String,
-        shortFingerprint: String
+        shortFingerprint: String,
+        keyEmail: String? = null
     ): Boolean {
         val filename = buildExportFilename(
             ownerLabel = keyOwnerLabel,
             shortFingerprint = shortFingerprint,
-            suffix = "_public"
+            suffix = "_public",
+            email = keyEmail
         )
 
         val uri = try {
@@ -119,7 +121,11 @@ object KeyShareIntents {
     fun buildExportFilename(
         ownerLabel: String,
         shortFingerprint: String,
-        suffix: String
+        suffix: String,
+        // 4.8.0 (item 4h): the key's email, between the name and the key ID, so
+        // keys under one name are told apart at a glance. Left out when blank or
+        // when the label already is the email (a key with no name).
+        email: String? = null
     ): String {
         val safeLabel = ownerLabel
             .replace(Regex("[^A-Za-z0-9._-]"), "_")
@@ -128,7 +134,14 @@ object KeyShareIntents {
         val safeFp = shortFingerprint
             .replace(Regex("[^A-Za-z0-9]"), "")
             .ifEmpty { "unknown" }
-        return "${safeLabel}_${safeFp}${suffix}.asc"
+        val safeEmail = email?.trim()
+            ?.takeIf { it.isNotEmpty() && !it.equals(ownerLabel.trim(), ignoreCase = true) }
+            ?.lowercase()
+            ?.replace("@", "-")
+            ?.replace(Regex("[^a-z0-9._-]"), "_")
+            ?.take(64)
+        val emailPart = if (safeEmail.isNullOrEmpty()) "" else "_$safeEmail"
+        return "${safeLabel}${emailPart}_${safeFp}${suffix}.asc"
     }
 
     /**
@@ -150,12 +163,14 @@ object KeyShareIntents {
         context: Context,
         armoredCert: String,
         keyOwnerLabel: String,
-        shortFingerprint: String
+        shortFingerprint: String,
+        keyEmail: String? = null
     ): Boolean {
         val filename = buildExportFilename(
             ownerLabel = keyOwnerLabel,
             shortFingerprint = shortFingerprint,
-            suffix = "_revocation"
+            suffix = "_revocation",
+            email = keyEmail
         )
 
         val uri = try {
@@ -228,14 +243,17 @@ object KeyShareIntents {
         context: Context,
         armoredPrivate: String,
         keyOwnerLabel: String,
-        shortFingerprint: String
+        shortFingerprint: String,
+        keyEmail: String? = null
     ): Boolean {
         // Filename via the shared A8.6 helper. Consistent shape across
-        // all three share helpers: {safe_owner}_{safe_fp}_private.asc
+        // all three share helpers: {safe_owner}_{email}_{safe_fp}_private.asc
+        // (4.8.0 item 4h adds the email).
         val filename = buildExportFilename(
             ownerLabel = keyOwnerLabel,
             shortFingerprint = shortFingerprint,
-            suffix = "_private"
+            suffix = "_private",
+            email = keyEmail
         )
 
         // Materialize the file in cacheDir/exports/. Try-catch wraps

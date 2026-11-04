@@ -1516,7 +1516,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
 
                 // 4.6.0 (item 14): an ML-DSA signature to a v4 recipient reads
                 // in PGPony but not in GnuPG or Thunderbird; ask first.
-                val pqcInV1 = compositeInfo != null &&
+                // 4.8.0 (item 4j): also a composite signing subkey on a classical primary.
+                val pqcInV1 = (compositeInfo != null || withContext(Dispatchers.Default) { crypto.picksCompositeSubkey(signingRing, s.selectedSigningKeyId) }) &&
                     crypto.compositeSignatureInSeipdV1(recipientRings, s.recipientSubkeyChoices, v4Recipients)
                 val pqcDecision = pqcV4Decision.also { pqcV4Decision = null }
                 if (pqcInV1 && pqcDecision == null) {
@@ -1969,7 +1970,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // the whole file and ran out of memory on large ones.
                 // 4.6.0 (item 14): an ML-DSA signature to a v4 recipient reads
                 // in PGPony but not in GnuPG or Thunderbird; ask first.
-                val pqcInV1 = compositeInfo != null &&
+                // 4.8.0 (item 4j): also a composite signing subkey on a classical primary.
+                val pqcInV1 = (compositeInfo != null || withContext(Dispatchers.Default) { crypto.picksCompositeSubkey(signingRing, s.selectedSigningKeyId) }) &&
                     crypto.compositeSignatureInSeipdV1(recipientRings, s.recipientSubkeyChoices, v4Recipients)
                 val pqcDecision = pqcV4Decision.also { pqcV4Decision = null }
                 if (pqcInV1 && pqcDecision == null) {
@@ -2512,7 +2514,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 }
                 // 4.6.0 (item 14), as in encryptFile: an ML-DSA signature to a
                 // v4 recipient reads in PGPony but not in GnuPG; ask first.
-                val pqcInV1 = compositeInfo != null &&
+                // 4.8.0 (item 4j): also a composite signing subkey on a classical primary.
+                val pqcInV1 = (compositeInfo != null || withContext(Dispatchers.Default) { crypto.picksCompositeSubkey(signingRing, s.selectedSigningKeyId) }) &&
                     crypto.compositeSignatureInSeipdV1(recipientRings, s.recipientSubkeyChoices, v4Recipients)
                 val pqcDecision = pqcV4Decision.also { pqcV4Decision = null }
                 if (pqcInV1 && pqcDecision == null) {
@@ -2839,7 +2842,14 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             // 4.6.0 (item 14) once for the whole batch: an ML-DSA signature to
             // a v4 recipient reads in PGPony but not in GnuPG or Thunderbird.
             val composite = signer?.algorithm?.isCompositeSign == true
-            val pqcInV1 = composite && op == PerFileOp.ENCRYPT_AND_SIGN &&
+            // 4.8.0 (item 4j): a composite signing subkey on a classical primary
+            // makes the same v6 signature, so it gets the same question.
+            val signerForCheck = signer
+            val compositeSubkey = !composite && signerForCheck != null && op == PerFileOp.ENCRYPT_AND_SIGN &&
+                withContext(Dispatchers.IO) {
+                    runCatching { repo.loadSecretKeyRing(signerForCheck.fingerprint) }.getOrNull()
+                }.let { crypto.picksCompositeSubkey(it, s.selectedSigningKeyId) }
+            val pqcInV1 = (composite || compositeSubkey) && op == PerFileOp.ENCRYPT_AND_SIGN &&
                 crypto.compositeSignatureInSeipdV1(recipientRings, s.recipientSubkeyChoices, v4Recipients)
             val pqcDecision = if (resuming != null) batchPqcDecision
                 else pqcV4Decision.also { pqcV4Decision = null }

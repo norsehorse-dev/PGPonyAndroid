@@ -334,6 +334,13 @@ object CompositeSignerGate {
 
     private class Candidate(val certIndex: Int, val fpHex: String, val primaryFpHex: String, val material: ByteArray, val algId: Int)
 
+    /**
+     * 4.8.0 (item 4j): true when [cert] carries a composite signing key, the
+     * primary or a subkey. A classical v6 primary with a composite signing
+     * subkey is a composite signer as well.
+     */
+    fun hasCompositeSigningKey(cert: ByteArray): Boolean = candidates(listOf(cert)).isNotEmpty()
+
     /** Every composite signing key packet (primary or subkey) of [certs]. */
     private fun candidates(certs: List<ByteArray>): List<Candidate> {
         val out = ArrayList<Candidate>()

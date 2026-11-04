@@ -63,7 +63,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.core.content.FileProvider
 import java.io.File
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -2859,6 +2861,20 @@ private fun SignPassphraseDialog(
     val fr = rememberAutoFocusRequester()
     var shown by remember { mutableStateOf(false) }
     val signingKey = state.signingKey
+    // 4.8.0 (#105): the primary action, shared by its button and the keyboard's Done key.
+    val submitSign: () -> Unit = {
+        when (state.mode) {
+            EncryptMode.SIGN -> viewModel.signOnly(passphrase = state.signPassphrase)
+            EncryptMode.TEXT -> viewModel.encrypt(passphrase = state.signPassphrase)
+            EncryptMode.FILE -> viewModel.encryptFile(passphrase = state.signPassphrase)
+            EncryptMode.PASSWORD -> {} // no signing-key unlock in symmetric mode
+            // 3.1.0 Phase 5 (J3)
+            EncryptMode.BUNDLE -> viewModel.encryptBundle(passphrase = state.signPassphrase)
+            // RC3 §J (#16): unreachable, SIGN_FILE has its
+            // own inline passphrase field, not this dialog.
+            EncryptMode.SIGN_FILE -> {}
+        }
+    }
     // Mode-driven copy. The primary button label changes with mode
     // (Sign vs Encrypt vs Encrypt File); the body text adapts the
     // same way the legacy dialog did.
@@ -2972,7 +2988,11 @@ private fun SignPassphraseDialog(
                     value = state.signPassphrase,
                     onValueChange = { viewModel.updateSignPassphrase(it) },
                     label = { Text(stringResource(R.string.encrypt_passphrase_label)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    // 4.8.0 (#105): the keyboard's Done key runs the primary action.
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = {
+                        if (state.signPassphrase.isNotEmpty() && !state.isProcessing) submitSign()
+                    }),
                     // 4.7.2 RC4: show or hide, so a paste can be checked before it is used.
                     visualTransformation = if (shown) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = { PassphraseVisibilityToggle(shown) { shown = !shown } },
@@ -3009,19 +3029,7 @@ private fun SignPassphraseDialog(
                     // dialog: the button appeared to do nothing. Nothing
                     // to submit, nothing to press.
                     enabled = state.signPassphrase.isNotEmpty() && !state.isProcessing,
-                    onClick = {
-                        when (state.mode) {
-                            EncryptMode.SIGN -> viewModel.signOnly(passphrase = state.signPassphrase)
-                            EncryptMode.TEXT -> viewModel.encrypt(passphrase = state.signPassphrase)
-                            EncryptMode.FILE -> viewModel.encryptFile(passphrase = state.signPassphrase)
-                            EncryptMode.PASSWORD -> {} // no signing-key unlock in symmetric mode
-                            // 3.1.0 Phase 5 (J3)
-                            EncryptMode.BUNDLE -> viewModel.encryptBundle(passphrase = state.signPassphrase)
-                            // RC3 §J (#16): unreachable — SIGN_FILE has its
-                            // own inline passphrase field, not this dialog.
-                            EncryptMode.SIGN_FILE -> {}
-                        }
-                    }
+                    onClick = submitSign
                 ) {
                     Text(primaryLabel, fontWeight = FontWeight.SemiBold)
                 }
@@ -3060,6 +3068,14 @@ private fun DecryptPassphraseDialog(
         // RC3 §J (#16): this dialog never opens in Verify mode (verify
         // doesn't decrypt); arm present for exhaustiveness only.
         DecryptMode.VERIFY -> stringResource(R.string.decrypt_action_decrypt)
+    }
+    // 4.8.0 (#105): the primary action, shared by its button and the keyboard's Done key.
+    val submitDecrypt: () -> Unit = {
+        when (state.mode) {
+            DecryptMode.TEXT -> viewModel.decrypt()
+            DecryptMode.FILE -> viewModel.decryptFile(passphrase = state.passphrase)
+            DecryptMode.VERIFY -> {}
+        }
     }
 
     AlertDialog(
@@ -3133,7 +3149,9 @@ private fun DecryptPassphraseDialog(
                     value = state.passphrase,
                     onValueChange = { viewModel.updatePassphrase(it) },
                     label = { Text(stringResource(R.string.encrypt_passphrase_label)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    // 4.8.0 (#105): the keyboard's Done key runs the primary action.
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (state.passphrase.isNotEmpty()) submitDecrypt() }),
                     // 4.7.2 RC4: show or hide, so a paste can be checked before it is used.
                     visualTransformation = if (shown) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = { PassphraseVisibilityToggle(shown) { shown = !shown } },
@@ -3161,13 +3179,7 @@ private fun DecryptPassphraseDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = {
-                    when (state.mode) {
-                        DecryptMode.TEXT -> viewModel.decrypt()
-                        DecryptMode.FILE -> viewModel.decryptFile(passphrase = state.passphrase)
-                        DecryptMode.VERIFY -> {}
-                    }
-                }
+                onClick = submitDecrypt
             ) {
                 Text(primaryLabel, fontWeight = FontWeight.SemiBold)
             }

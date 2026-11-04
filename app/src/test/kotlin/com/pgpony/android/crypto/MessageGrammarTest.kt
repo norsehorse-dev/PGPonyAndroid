@@ -105,7 +105,7 @@ class MessageGrammarTest {
     }
 
     @Test
-    fun `a first partial chunk under 512 octets is rejected`() {
+    fun `a first partial chunk under 512 octets reads (#110)`() {
         fun partial(first: Int, total: Int): ByteArray {
             val body = byteArrayOf('b'.code.toByte(), 0) + ByteArray(4) + ByteArray(total - 6) { 0x41 }
             val exp = Integer.numberOfTrailingZeros(first)
@@ -114,7 +114,8 @@ class MessageGrammarTest {
                 byteArrayOf(rest.toByte()), body.copyOfRange(first, body.size))
         }
         MessageGrammar.normalizePlaintext(partial(512, 600))
-        malformed(partial(256, 300))
+        MessageGrammar.normalizePlaintext(partial(256, 300))
+        MessageGrammar.normalizePlaintext(partial(1, 40))
         assertThrows(MessageGrammar.Malformed::class.java) {
             MessageGrammar.normalizePlaintext(cat(byteArrayOf((0xC0 or 2).toByte(), (224 + 9).toByte()), ByteArray(600)))
         }

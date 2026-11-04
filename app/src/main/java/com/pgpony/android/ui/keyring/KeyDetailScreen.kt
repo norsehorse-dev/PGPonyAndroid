@@ -678,7 +678,8 @@ fun KeyDetailScreen(
                             suggestedName = KeyShareIntents.buildExportFilename(
                                 ownerLabel = deleteOwnerLabel,
                                 shortFingerprint = key.shortFingerprint,
-                                suffix = "_private"
+                                suffix = "_private",
+                                email = key.userEmail
                             )
                         )
                     }
@@ -1332,7 +1333,8 @@ fun KeyDetailScreen(
                     suggestedName = KeyShareIntents.buildExportFilename(
                         ownerLabel = ownerLabel,
                         shortFingerprint = keyForRevoke.shortFingerprint,
-                        suffix = "_revocation"
+                        suffix = "_revocation",
+                        email = keyForRevoke.userEmail
                     )
                 )
             },
@@ -1341,7 +1343,8 @@ fun KeyDetailScreen(
                     context = context,
                     armoredCert = pendingCert,
                     keyOwnerLabel = ownerLabel,
-                    shortFingerprint = keyForRevoke.shortFingerprint
+                    shortFingerprint = keyForRevoke.shortFingerprint,
+                    keyEmail = keyForRevoke.userEmail
                 )
                 if (!launched) {
                     scope.launch {
@@ -1511,7 +1514,8 @@ fun KeyDetailScreen(
                     suggestedName = KeyShareIntents.buildExportFilename(
                         ownerLabel = ownerLabel,
                         shortFingerprint = keyForResultSheet.shortFingerprint,
-                        suffix = "_private"
+                        suffix = "_private",
+                        email = keyForResultSheet.userEmail
                     )
                 )
             },
@@ -1520,7 +1524,8 @@ fun KeyDetailScreen(
                     context = context,
                     armoredPrivate = (if (gpgCompat) viewModel.armoredPrivateKeyGpgCompatForShare(exportPass) else viewModel.armoredPrivateKeyForShare(exportPass)) ?: pendingPrivate,
                     keyOwnerLabel = ownerLabel,
-                    shortFingerprint = keyForResultSheet.shortFingerprint
+                    shortFingerprint = keyForResultSheet.shortFingerprint,
+                    keyEmail = keyForResultSheet.userEmail
                 )
                 if (!launched) {
                     scope.launch {
@@ -1577,7 +1582,8 @@ fun KeyDetailScreen(
                     suggestedName = KeyShareIntents.buildExportFilename(
                         ownerLabel = ownerLabel,
                         shortFingerprint = keyForPublicSheet.shortFingerprint,
-                        suffix = "_public"
+                        suffix = "_public",
+                        email = keyForPublicSheet.userEmail
                     )
                 )
             },
@@ -1586,7 +1592,8 @@ fun KeyDetailScreen(
                     context = context,
                     armored = pendingPublic,
                     keyOwnerLabel = ownerLabel,
-                    shortFingerprint = keyForPublicSheet.shortFingerprint
+                    shortFingerprint = keyForPublicSheet.shortFingerprint,
+                    keyEmail = keyForPublicSheet.userEmail
                 )
                 if (!launched) {
                     scope.launch {
@@ -1740,7 +1747,7 @@ private fun doSharePublicKey(viewModel: KeyDetailViewModel, context: android.con
     val armored = viewModel.armoredPublicKeyForShare() ?: return
     val key = viewModel.state.value.key ?: return
     val label = key.userName.ifBlank { key.userEmail.ifBlank { "Key" } }
-    KeyShareIntents.sharePublicKey(context, armored, label, key.shortFingerprint)
+    KeyShareIntents.sharePublicKey(context, armored, label, key.shortFingerprint, key.userEmail)
 }
 
 /**

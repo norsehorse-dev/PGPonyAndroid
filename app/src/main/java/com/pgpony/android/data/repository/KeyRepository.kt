@@ -1639,11 +1639,21 @@ class KeyRepository(
      * A2 (ENGINE-4): every composite signing certificate in the keyring with
      * its row, as the raw bytes stored, for CompositeSignerGate. The gate's
      * certIndex points into this list.
+     *
+     * 4.8.0 (item 4j): a classical v6 key with a composite signing subkey is
+     * listed too, so a signature from that subkey verifies and is credited to
+     * the key. Its label is the classical primary's, so the stored certificate
+     * is checked for a composite signing key.
      */
     suspend fun loadCompositeSignerCerts(): List<Pair<PGPKeyEntity, ByteArray>> =
         getAllKeys()
-            .filter { it.algorithm.isCompositeSign }
+            .filter { it.algorithm.isCompositeSign || it.isV6Key }
             .mapNotNull { e -> store.loadPublicKey(e.fingerprint)?.let { e to it } }
+            .filter { (e, cert) ->
+                e.algorithm.isCompositeSign ||
+                    runCatching { com.pgpony.android.crypto.pqc.CompositeSignerGate.hasCompositeSigningKey(cert) }
+                        .getOrDefault(false)
+            }
 
     /** Composite key metadata + public material from the stored PUBLIC ring. */
     fun loadCompositePublicInfo(fingerprint: String): CompositeKeyFacade.Info? {

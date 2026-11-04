@@ -262,8 +262,11 @@ android {
         // recipient and signer lists drop a repeated fingerprint (Play crash). versionCode 472.
         // 4.7.3: encrypting to and decrypting with GnuPG's X448 encryption subkeys
         // (the Curve448 ECDH of LibrePGP v5 Ed448 keys). versionCode 473.
-        versionCode = 473
-        versionName = "4.7.3"
+        // 4.8.0: signing with an ML-DSA signing subkey on an Ed25519 primary, messages with a short
+        // first partial chunk (#110), Enter unlocks (#105), the email in export file names,
+        // canonical text in inline text signatures. versionCode 480.
+        versionCode = 480
+        versionName = "4.8.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

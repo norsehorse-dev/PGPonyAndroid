@@ -23,6 +23,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -104,6 +106,21 @@ class ProviderPassphraseActivity : ComponentActivity() {
                 var passphrase by remember { mutableStateOf("") }
                 // 4.7.0 (item 50, #59): the field takes focus and the keyboard opens.
                 val focus = rememberProviderAutoFocus()
+                // 4.8.0 (#105): Unlock, from the button or the keyboard's Done key.
+                val unlock: () -> Unit = {
+                    if (passphrase.isNotEmpty()) {
+                        ProviderPassphraseCache.put(keyId, passphrase)
+                        // 4.7.0 (item 36): keep this process alive while it holds the passphrase.
+                        PassphraseHoldService.startIfWanted(this@ProviderPassphraseActivity)
+                        // 4.0.4: hand the original request back so the
+                        // client can re-execute it immediately, the
+                        // same contract ProviderKeyPickerActivity uses.
+                        // A bare RESULT_OK made FairEmail wait for a
+                        // second Unlock press before showing the mail.
+                        setResult(Activity.RESULT_OK, Intent(apiData ?: Intent()))
+                        finish()
+                    }
+                }
                 AlertDialog(
                     onDismissRequest = { cancel() },
                     title = { Text(stringResource(purpose.titleRes)) },
@@ -129,8 +146,10 @@ class ProviderPassphraseActivity : ComponentActivity() {
                                 singleLine = true,
                                 visualTransformation = PasswordVisualTransformation(),
                                 keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Password
+                                    keyboardType = KeyboardType.Password,
+                                    imeAction = ImeAction.Done
                                 ),
+                                keyboardActions = KeyboardActions(onDone = { unlock() }),
                                 label = {
                                     Text(stringResource(R.string.provider_passphrase_hint))
                                 },
@@ -168,18 +187,7 @@ class ProviderPassphraseActivity : ComponentActivity() {
                     confirmButton = {
                         TextButton(
                             enabled = passphrase.isNotEmpty(),
-                            onClick = {
-                                ProviderPassphraseCache.put(keyId, passphrase)
-                                // 4.7.0 (item 36): keep this process alive while it holds the passphrase.
-                                PassphraseHoldService.startIfWanted(this@ProviderPassphraseActivity)
-                                // 4.0.4: hand the original request back so the
-                                // client can re-execute it immediately, the
-                                // same contract ProviderKeyPickerActivity uses.
-                                // A bare RESULT_OK made FairEmail wait for a
-                                // second Unlock press before showing the mail.
-                                setResult(Activity.RESULT_OK, Intent(apiData ?: Intent()))
-                                finish()
-                            }
+                            onClick = unlock
                         ) { Text(stringResource(R.string.provider_passphrase_unlock)) }
                     },
                     dismissButton = {
