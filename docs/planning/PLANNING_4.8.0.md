@@ -1,9 +1,9 @@
 # PGPony Android 4.8.0: Planning
 
-Status: open (Oct 20 2026; issues #105, #106 and #108 added Oct 26; items 4e to 4l added Oct 29 to Nov 4). Seed: what the 4.7.0 feature freeze deferred, what 4.7.0 left open, and requests
+Status: open (Oct 20 2026; issues #105, #106 and #108 added Oct 26; items 4e to 4l added Oct 29 to Nov 4; Rev 1 with the RC breakdown, Nov 4). Seed: what the 4.7.0 feature freeze deferred, what 4.7.0 left open, and requests
 that came in during the 4.7.0 cycle. Android leads, then iOS and desktop mirror each item once verified (iOS is
-on 8.4.0, Android 4.6.1 to 4.7.0 parity; see HANDOFF-8.4.0.md in the iOS repo). Priorities and the RC breakdown
-are set once the list settles.
+on 8.4.0, Android 4.6.1 to 4.7.0 parity; see HANDOFF-8.4.0.md in the iOS repo). The RC breakdown is in section
+9.
 
 Context: 4.7.0 (versionCode 470) shipped Oct 20 2026 from RC7's code: GitHub release, pgpony.app, Play (with the
 special-use foreground service declaration for PassphraseHoldService), F-Droid from the tag. The 4.7.x patches since:
@@ -385,13 +385,16 @@ in the captions that cards differ in which curves they hold. iOS and desktop mir
 ## 7. Questions for Kevin
 
 - K3. #96: Korean error strings, yes or no. Answered yes by af491ba (Nov 2); what is left is #96 itself (section 5).
-- K4. #95: take the PGPONY2 format in 4.8.0, or only after iOS and desktop read it?
-- K5. #109: generate brainpool and secp256k1 ECDSA keys in 4.8.0 (item 4l), or leave generation as it is?
+- K4. #95: take the PGPONY2 format in 4.8.0, or only after iOS and desktop read it? Answered Nov 4: the whole PR in
+  4.8.0, in RC6, rebased on 4.7.0's Exchange changes with its planning-doc edit taken out. #100's slower playback by
+  default ships with it.
+- K5. #109: generate brainpool and secp256k1 ECDSA keys in 4.8.0 (item 4l), or leave generation as it is? Answered
+  Nov 4: yes, brainpoolP256r1, brainpoolP384r1, brainpoolP512r1 and secp256k1, v4 only, in RC4.
 
 
 ## 8. Status of this document
 
-Rev 0 seed, kept current to Nov 4. Rev 1 once K4 and K5 are answered and the RC breakdown is set.
+Rev 1, Nov 4: K4 and K5 answered, RC breakdown in section 9. Rev 0 was the seed, kept current to Nov 4.
 
 Already on main (no RC yet):
 - af491ba (Nov 2): Korean for the 389 err_ strings (item 4k); DecryptResult, DecryptStreamResult and
@@ -399,3 +402,56 @@ Already on main (no RC yet):
   signature packet by packet (follow-up to 4.7.3).
 - 3712407 (Nov 3): the app lock store replaces its file with an atomic move (Files.move, ATOMIC_MOVE). File.renameTo
   fails on Windows when the target exists, so PGPony Desktop saved the first PIN and then failed every later save.
+
+
+## 9. RC breakdown (Rev 1, Nov 4)
+
+Smallest and safest first. Each RC's work starts only once the one before it is built, tested on the device and
+published.
+
+RC1, interop fixes with no new strings:
+- 4g (#110): a short first partial chunk reads. Desktop takes it from the sync.
+- 4j, the signing path: the reproducing test first (ClassicalPrimaryCompositeSignTest), then a composite signing
+  subkey on a classical primary signs through CompositeDocumentSigner, and a wrong passphrase and an unsupported key
+  stay two errors. If the fix reaches past the signing path (keygen, bindings or the picker), 4j leads RC2 and RC1
+  ships without it. Desktop takes it from the sync. The composer switch is RC2's, since it needs strings.
+- 4e: the literal data is written in CR LF form for a text signature, on Android's SOP path. Desktop changes
+  SopInline itself.
+- #105: Enter runs Unlock on the passphrase prompts. Android UI only; desktop checks its own prompts when it mirrors
+  the item.
+- 4h: the email in exported key file names, matching iOS build 13. Desktop names its exports in KeyDetailDialog
+  (short fingerprint) and changes that itself.
+
+RC2, the subkey composer and small UX:
+- 4i: a v4 base for the composer.
+- 4j, the composer switch: its caption says it adds a classical X25519 subkey, and it defaults to off when the list
+  holds only post-quantum subkeys (decided Nov 4).
+- 4k: Korean reviewed, registered and synced back to the translations repository. The review compares #96's wording
+  with af491ba and takes any better lines; #96 is closed after that.
+- #101, the #93 long press, keyboard dismissal on the other screens (4b), the 4d items, #98.
+
+RC3, data and security:
+- 4c: duplicate fingerprint rows merged on upgrade and the unique index added. The migration gets its own device pass.
+- 3a: the passphrase before a private key export, and BiometricGate before Backup.
+
+RC4, card and key crypto:
+- #108: encrypt to every valid encryption subkey including ADSKs, and decrypt through the authentication slot with MSE.
+- 3 (#71): primary-signed edits on a key whose primary is on the card.
+- #86: the hash choice when re-signing self-signatures.
+- 4l (#109): brainpool and secp256k1 generation, v4 only.
+
+RC5, new ways in:
+- #103 (text selection menu), #72 (sign one shared file), #67 (restore a shared backup), #106 (the Verify picker pairs
+  signatures with their files, which also covers the 4.7.0 item 38 left-out), #104 (the ZLIB switch).
+
+RC6: #95 whole, with #100's slower playback.
+
+RC7: item 1, SSH with ML-DSA-44 + Ed25519, after the OkcAgent, okc-agents and OpenSSH 10.4 checks in the item.
+
+RC8: 4f, Polish. Last, so the translation covers the final values/ in one pass, item 1's strings included.
+
+Not in an RC: the section 6 carry-overs unless one comes up on its own, and the in-app viewer for decrypted files
+(4b), which is not planned yet.
+
+What desktop takes from the sync and what it changes itself is noted per item above for RC1. Later RCs note it in
+each item when their work starts.
