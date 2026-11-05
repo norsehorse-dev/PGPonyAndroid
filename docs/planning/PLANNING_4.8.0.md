@@ -1,6 +1,6 @@
 # PGPony Android 4.8.0: Planning
 
-Status: open (Oct 20 2026; issues #105, #106 and #108 added Oct 26; items 4e to 4l added Oct 29 to Nov 4; Rev 1 with the RC breakdown, Nov 4). Seed: what the 4.7.0 feature freeze deferred, what 4.7.0 left open, and requests
+Status: open (Oct 20 2026; issues #105, #106 and #108 added Oct 26; items 4e to 4n added Oct 29 to Nov 4; Rev 1 with the RC breakdown, Nov 4; Rev 2 adds RC8 for 4n, Nov 4). Seed: what the 4.7.0 feature freeze deferred, what 4.7.0 left open, and requests
 that came in during the 4.7.0 cycle. Android leads, then iOS and desktop mirror each item once verified (iOS is
 on 8.4.0, Android 4.6.1 to 4.7.0 parity; see HANDOFF-8.4.0.md in the iOS repo). The RC breakdown is in section
 9.
@@ -371,6 +371,27 @@ working like select mode, with Cancel and Done for the order changes. Plan:
 - Strings for the menu item and the mode's title; Cancel and Done reuse the existing ones where they read right.
 Desktop has no drag reorder, so nothing to mirror there; iOS checks its own Keyring when it takes 4.8.0.
 
+## 4n. Recipient groups, and the picker's order (Nov 4)
+
+PGPony Desktop 4.0.0 replaces its inline recipient list with this app's picker and waits for the 4.8.0 tag to take
+groups from the sync (PLANNING_DESKTOP_4_0_0.md section 6), so groups are built here first. Decided Nov 4:
+- Order: the picker lists your own keys first, then everyone else A to Z by name (email when there is no name).
+  Today it follows the keyring query, newest first. The share target's picker takes the same order.
+- Groups: a named set of keys, stored by primary fingerprint in a new table, with its Room migration. Groups show at
+  the top of the picker sheet and search matches their names. Picking a group adds its usable keys as chips and
+  names the ones it left out (revoked, expired, or a card row without its public certificate).
+- Managing groups: "Save as group" in the picker sheet turns the current selection into one; a Groups section on
+  the Keyring creates, renames, edits members and deletes; Key Details lists the groups the key is in, with add and
+  remove.
+- Deleted keys: a key in Recently Deleted stays a member but cannot be picked, and restoring it puts it back; a key
+  deleted for good leaves every group.
+- Moving: the full backup and the full-backup pairing transfer carry groups; public-key-only transfers do not. The
+  backup format leaves room for iOS to read groups later. Check that 4.7.x still restores a backup that carries
+  groups and skips them.
+- Strings: new ones in all locales, before 4f so the Polish pass covers them.
+Desktop takes the data layer and the backup and pairing format from the sync and builds its own screens and the
+`pgpony encrypt -r @name` form. iOS mirrors it when it takes 4.8.0.
+
 
 ## 5. Contributor PRs waiting on a decision
 
@@ -409,6 +430,7 @@ Desktop has no drag reorder, so nothing to mirror there; iOS checks its own Keyr
 
 ## 8. Status of this document
 
+Rev 2, Nov 4: item 4n (recipient groups and the picker's order) added as RC8; Polish moves to RC9.
 Rev 1, Nov 4: K4 and K5 answered, RC breakdown in section 9. Rev 0 was the seed, kept current to Nov 4.
 
 Already on main (no RC yet):
@@ -419,7 +441,7 @@ Already on main (no RC yet):
   fails on Windows when the target exists, so PGPony Desktop saved the first PIN and then failed every later save.
 
 
-## 9. RC breakdown (Rev 1, Nov 4)
+## 9. RC breakdown (Rev 2, Nov 4)
 
 Smallest and safest first. Each RC's work starts only once the one before it is built, tested on the device and
 published.
@@ -464,7 +486,9 @@ RC6: #95 whole, with #100's slower playback.
 
 RC7: item 1, SSH with ML-DSA-44 + Ed25519, after the OkcAgent, okc-agents and OpenSSH 10.4 checks in the item.
 
-RC8: 4f, Polish. Last, so the translation covers the final values/ in one pass, item 1's strings included.
+RC8: 4n, recipient groups and the picker's order (added Nov 4).
+
+RC9: 4f, Polish. Last, so the translation covers the final values/ in one pass, item 1's and 4n's strings included.
 
 Not in an RC: the section 6 carry-overs unless one comes up on its own, and the in-app viewer for decrypted files
 (4b), which is not planned yet.
