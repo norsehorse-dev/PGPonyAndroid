@@ -728,6 +728,7 @@
     <string name="import_duplicate_view_key">查看密钥</string>
     <string name="import_result_merged">此密钥已在你的密钥环中。它已用较新的密钥材料更新。</string>
     <string name="import_result_already_in_keyring">此密钥已在你的密钥环中。</string>
+    <string name="import_result_restored_key_pair">此密钥原在「最近删除」中，现已连同私钥恢复到你的密钥环。如只想保留公钥，请删除此密钥，在「最近删除」中对它使用「永久删除」，然后重新导入公钥。</string>
     <string name="import_result_own_key_updated">你的密钥对已用此副本中较新的自签名（首选项、过期时间或绑定）更新。</string>
     <string name="import_duplicate_own_key_note">这是你的密钥对。导入只会添加比你现有的更新的自签名，而此副本中没有。</string>
 
@@ -1009,6 +1010,7 @@
     <!-- ── Export biometric prompt ─────────────────────────────────── -->
     <string name="key_detail_export_biometric_title">验证身份</string>
     <string name="key_detail_export_biometric_subtitle">验证身份以导出你的私钥</string>
+    <string name="key_detail_export_private_passphrase_body">输入此密钥的口令以将其导出。</string>
 
     <!-- ── Status / snackbar messages ──────────────────────────────── -->
     <string name="key_detail_status_pub_copied">公钥已复制到剪贴板</string>
@@ -2065,6 +2067,7 @@
     <string name="settings_section_backup">备份</string>
     <string name="settings_backup_title">备份与恢复</string>
     <string name="settings_backup_subtitle">将整个密钥环存储为加密文件，或从中恢复</string>
+    <string name="settings_backup_biometric_subtitle">验证身份以备份你的密钥</string>
     <string name="backup_screen_title">备份与恢复</string>
     <string name="backup_menu_backup_title">备份我的密钥环</string>
     <string name="backup_menu_backup_subtitle">将你的所有密钥存储为一个加密文件</string>

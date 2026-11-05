@@ -673,6 +673,7 @@
     <string name="import_duplicate_view_key">Показать ключ</string>
     <string name="import_result_merged">Этот ключ уже был в вашей связке ключей. Он обновлён более новым материалом ключа.</string>
     <string name="import_result_already_in_keyring">Этот ключ уже в вашей связке ключей.</string>
+    <string name="import_result_restored_key_pair">Этот ключ был в разделе «Недавно удалённые» и вернулся в вашу связку ключей вместе со своим закрытым ключом. Чтобы оставить только открытый ключ, удалите этот ключ, примените к нему «Удалить навсегда» в разделе «Недавно удалённые», затем снова импортируйте открытый ключ.</string>
     <string name="import_result_own_key_updated">Ваша пара ключей обновлена более новыми самоподписями из этой копии (предпочтения, срок действия или привязки).</string>
     <string name="import_duplicate_own_key_note">Это ваша пара ключей. При импорте добавляются только самоподписи новее тех, что у вас есть, а в этой копии таких нет.</string>
 
@@ -921,6 +922,7 @@
     <!-- ── Export biometric prompt ─────────────────────────────────── -->
     <string name="key_detail_export_biometric_title">Подтвердите личность</string>
     <string name="key_detail_export_biometric_subtitle">Пройдите аутентификацию, чтобы экспортировать закрытый ключ</string>
+    <string name="key_detail_export_private_passphrase_body">Введите парольную фразу этого ключа, чтобы экспортировать его.</string>
 
     <!-- ── Status / snackbar messages ──────────────────────────────── -->
     <string name="key_detail_status_pub_copied">Открытый ключ скопирован в буфер обмена</string>
@@ -1959,6 +1961,7 @@
     <string name="settings_section_backup">Резервная копия</string>
     <string name="settings_backup_title">Резервная копия &amp; восстановление</string>
     <string name="settings_backup_subtitle">Сохраните всю связку ключей в зашифрованный файл или восстановите её</string>
+    <string name="settings_backup_biometric_subtitle">Пройдите аутентификацию, чтобы создать резервную копию ключей</string>
     <string name="backup_screen_title">Резервная копия &amp; восстановление</string>
     <string name="backup_menu_backup_title">Создать резервную копию связки ключей</string>
     <string name="backup_menu_backup_subtitle">Сохранить все ключи в один зашифрованный файл</string>

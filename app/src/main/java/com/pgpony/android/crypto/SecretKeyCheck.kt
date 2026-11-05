@@ -135,6 +135,78 @@ object SecretKeyCheck {
         return true
     }
 
+    /** 4.8.0 (item 3a): what [unlockTarget] checks a passphrase against. */
+    private sealed interface UnlockTarget {
+        class Composite(val bytes: ByteArray) : UnlockTarget
+        class Classical(val key: org.bouncycastle.openpgp.PGPSecretKey) : UnlockTarget
+    }
+
+    /**
+     * 4.8.0 (item 3a): the secret key a typed passphrase is checked against
+     * before a private key export, or null when [raw] holds no passphrase
+     * protected secret that can be checked here. A composite primary is
+     * checked through CompositeKeyFacade; otherwise the first protected,
+     * non-stub key Bouncy Castle can unlock, the primary first. A composite
+     * signing subkey (algorithms 30 and 31) is skipped, since its classical
+     * primary shares the passphrase, and a v4 ML-KEM subkey is left off the
+     * same way.
+     */
+    private fun unlockTarget(raw: ByteArray): UnlockTarget? {
+        val bytes = binary(raw) ?: return null
+        val parsed = CertificateBindings.parse(bytes) ?: return null
+        if (CompositeSignSuite.forAlgId(parsed.primary.algorithm) != null) {
+            return if (CompositeKeyFacade.isProtected(bytes)) UnlockTarget.Composite(bytes) else null
+        }
+        var base = CertificateBindings.stubStrippedPrimary(bytes)
+        if (CompositeKeyFacade.hasV4Algo35Subkey(base)) {
+            base = CompositeKeyFacade.v4Algo35BaseBytes(base) ?: return null
+        }
+        val ring = runCatching {
+            PGPSecretKeyRing(ByteArrayInputStream(LibrePGPV5Interop.toBcFormat(base)), JcaKeyFingerprintCalculator())
+        }.getOrNull() ?: return null
+        for (key in ring.secretKeys) {
+            if (key.isPrivateKeyEmpty) continue
+            val s2k = key.s2K
+            if (s2k != null && s2k.type == S2K_GNU) continue
+            if (key.s2KUsage.toInt() == 0) continue
+            if (CompositeSignSuite.forAlgId(key.publicKey.algorithm) != null) continue
+            return UnlockTarget.Classical(key)
+        }
+        return null
+    }
+
+    /**
+     * 4.8.0 (item 3a): whether exporting [raw] has to ask for its passphrase:
+     * it holds a protected secret that [passphraseUnlocks] can check. An
+     * unprotected key, or one whose only secrets are stubs, does not.
+     */
+    fun exportNeedsPassphrase(raw: ByteArray): Boolean = unlockTarget(raw) != null
+
+    /**
+     * 4.8.0 (item 3a): does [passphrase] unlock [raw]? The secret is
+     * unlocked, not just parsed, so a wrong passphrase is false. Throws
+     * PGPCryptoError.ResourceLimitExceeded for an Argon2 S2K outside the
+     * policy, which is not a wrong passphrase.
+     */
+    fun passphraseUnlocks(raw: ByteArray, passphrase: CharArray): Boolean =
+        when (val target = unlockTarget(raw)) {
+            null -> false
+            is UnlockTarget.Composite -> try {
+                CompositeKeyFacade.parse(target.bytes, passphrase).compositeSecret != null
+            } catch (e: PGPCryptoError.ResourceLimitExceeded) {
+                throw e
+            } catch (e: Exception) {
+                false
+            }
+            is UnlockTarget.Classical -> try {
+                SecretKeyUnlock.extract(target.key, passphrase) != null
+            } catch (e: PGPCryptoError.ResourceLimitExceeded) {
+                throw e
+            } catch (e: PGPException) {
+                false
+            }
+        }
+
     /** [isFullyPassphraseProtected] for a Bouncy Castle ring. */
     fun isFullyPassphraseProtected(ring: PGPSecretKeyRing): Boolean = isFullyPassphraseProtected(ring.encoded)
 

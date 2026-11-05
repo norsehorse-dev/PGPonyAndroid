@@ -640,6 +640,7 @@ pgpony.app</string>
     <!-- ── Export biometric prompt ─────────────────────────────────── -->
     <string name="key_detail_export_biometric_title">Verificar identidad</string>
     <string name="key_detail_export_biometric_subtitle">Autentícate para exportar tu clave privada</string>
+    <string name="key_detail_export_private_passphrase_body">Introduce la frase de contraseña de esta clave para exportarla.</string>
 
     <!-- ── Status / snackbar messages ──────────────────────────────── -->
     <string name="key_detail_status_pub_copied">Clave pública copiada al portapapeles</string>
@@ -1470,6 +1471,7 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="import_paste_from_clipboard">Pegar del portapapeles</string>
     <string name="import_preview_source_keyserver">Encontrada en tus servidores de claves</string>
     <string name="import_result_already_in_keyring">Esta clave ya está en tu llavero.</string>
+    <string name="import_result_restored_key_pair">Esta clave estaba en Eliminados recientemente y ha vuelto a tu llavero con su clave privada. Para conservar solo la clave pública, elimina esta clave, usa \"Eliminar permanentemente\" sobre ella en Eliminados recientemente y luego vuelve a importar la clave pública.</string>
     <string name="import_result_own_key_updated">Tu par de claves se actualizó con las autofirmas más recientes de esta copia (preferencias, caducidad o vinculaciones).</string>
     <string name="import_duplicate_own_key_note">Este es tu par de claves. Una importación solo añade autofirmas más recientes que las que ya tienes, y esta copia no tiene ninguna.</string>
     <string name="import_result_merged">Esta clave ya estaba en tu llavero. Se ha actualizado con el material de clave más reciente.</string>
@@ -1687,6 +1689,7 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="settings_armor_comment_toggle_subtitle">Añadir un encabezado Comment a los mensajes cifrados y firmados</string>
     <string name="settings_armor_comment_toggle_title">Incluir comentario en la salida PGP</string>
     <string name="settings_backup_subtitle">Guarda todo tu llavero en un archivo cifrado, o restaura uno</string>
+    <string name="settings_backup_biometric_subtitle">Autentícate para hacer una copia de seguridad de tus claves</string>
     <string name="settings_backup_title">Copia de seguridad y restauración</string>
     <string name="settings_biometric_sign_subtitle">Confirma con tu huella antes de firmar con una clave de software. Las llaves de hardware siguen usando PIN + toque.</string>
     <string name="settings_biometric_sign_title">Requerir huella para firmar</string>

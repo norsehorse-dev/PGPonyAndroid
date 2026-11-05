@@ -640,6 +640,7 @@ pgpony.app</string>
     <!-- ── Export biometric prompt ─────────────────────────────────── -->
     <string name="key_detail_export_biometric_title">Identität bestätigen</string>
     <string name="key_detail_export_biometric_subtitle">Authentifiziere dich, um deinen privaten Schlüssel zu exportieren</string>
+    <string name="key_detail_export_private_passphrase_body">Gib die Passphrase dieses Schlüssels ein, um ihn zu exportieren.</string>
 
     <!-- ── Status / snackbar messages ──────────────────────────────── -->
     <string name="key_detail_status_pub_copied">Öffentlicher Schlüssel in Zwischenablage kopiert</string>
@@ -1470,6 +1471,7 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="import_paste_from_clipboard">Aus Zwischenablage einfügen</string>
     <string name="import_preview_source_keyserver">Über deine Schlüsselserver gefunden</string>
     <string name="import_result_already_in_keyring">Dieser Schlüssel ist bereits in deinem Schlüsselbund.</string>
+    <string name="import_result_restored_key_pair">Dieser Schlüssel war in „Zuletzt gelöscht“ und ist jetzt mit seinem privaten Schlüssel wieder in deinem Schlüsselbund. Wenn du nur den öffentlichen Schlüssel behalten willst, lösche diesen Schlüssel, wähle in „Zuletzt gelöscht“ für ihn „Endgültig löschen“ und importiere danach den öffentlichen Schlüssel erneut.</string>
     <string name="import_result_own_key_updated">Dein Schlüsselpaar wurde mit den neueren Selbstsignaturen aus dieser Kopie aktualisiert (Präferenzen, Ablaufdatum oder Bindungen).</string>
     <string name="import_duplicate_own_key_note">Das ist dein Schlüsselpaar. Ein Import fügt nur Selbstsignaturen hinzu, die neuer sind als deine vorhandenen, und diese Kopie enthält keine.</string>
     <string name="import_result_merged">Dieser Schlüssel war bereits in deinem Schlüsselbund. Er wurde mit dem neueren Schlüsselmaterial aktualisiert.</string>
@@ -1687,6 +1689,7 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="settings_armor_comment_toggle_subtitle">Comment-Header zu verschlüsselten und signierten Nachrichten hinzufügen</string>
     <string name="settings_armor_comment_toggle_title">Kommentar in PGP-Ausgabe aufnehmen</string>
     <string name="settings_backup_subtitle">Deinen ganzen Schlüsselbund in eine verschlüsselte Datei sichern oder eine wiederherstellen</string>
+    <string name="settings_backup_biometric_subtitle">Authentifiziere dich, um deine Schlüssel zu sichern</string>
     <string name="settings_backup_title">Sichern &amp; Wiederherstellen</string>
     <string name="settings_biometric_sign_subtitle">Vor dem Signieren mit einem Software-Schlüssel per Fingerabdruck bestätigen. Hardware-Schlüssel nutzen weiter PIN + Antippen.</string>
     <string name="settings_biometric_sign_title">Fingerabdruck zum Signieren verlangen</string>

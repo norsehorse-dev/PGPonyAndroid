@@ -737,6 +737,7 @@
     <string name="import_duplicate_view_key">View Key</string>
     <string name="import_result_merged">This key was already in your keyring. It has been updated with the newer key material.</string>
     <string name="import_result_already_in_keyring">This key is already in your keyring.</string>
+    <string name="import_result_restored_key_pair">This key was in Recently Deleted and is back in your keyring with its private key. To keep only the public key, delete this key, use Delete permanently on it in Recently Deleted, then import the public key again.</string>
     <!-- 4.7.0 (item 24, #78): re-importing your own key pair edited elsewhere. -->
     <string name="import_result_own_key_updated">Your key pair was updated with the newer self-signatures in this copy (preferences, expiry or bindings).</string>
     <string name="import_duplicate_own_key_note">This is your key pair. An import only adds self-signatures newer than the ones you have, and this copy has none.</string>
@@ -1021,6 +1022,7 @@
     <!-- ── Export biometric prompt ─────────────────────────────────── -->
     <string name="key_detail_export_biometric_title">Verify identity</string>
     <string name="key_detail_export_biometric_subtitle">Authenticate to export your private key</string>
+    <string name="key_detail_export_private_passphrase_body">Enter this key\'s passphrase to export it.</string>
 
     <!-- ── Status / snackbar messages ──────────────────────────────── -->
     <string name="key_detail_status_pub_copied">Public key copied to clipboard</string>
@@ -2080,6 +2082,7 @@
     <string name="settings_section_backup">Backup</string>
     <string name="settings_backup_title">Back up &amp; restore</string>
     <string name="settings_backup_subtitle">Save your whole keyring to an encrypted file, or restore one</string>
+    <string name="settings_backup_biometric_subtitle">Authenticate to back up your keys</string>
     <string name="backup_screen_title">Backup &amp; Restore</string>
     <string name="backup_menu_backup_title">Back up my keyring</string>
     <string name="backup_menu_backup_subtitle">Save all your keys to one encrypted file</string>

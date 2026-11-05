@@ -157,7 +157,9 @@ class ExchangeViewModel(
                 // 4.0.0 Phase 1 (iOS v7.1.1 F3) — outcome-aware commit:
                 // scanning a key you already hold no longer errors.
                 val outcome = repo.importArmoredKeyDetailed(text)
-                val message = when (outcome.resolution) {
+                val message = if (outcome.restoredFromBin && outcome.entity.isKeyPair) {
+                    PGPonyApp.instance.getString(R.string.import_result_restored_key_pair)
+                } else when (outcome.resolution) {
                     ImportResolution.ALREADY_IN_KEYRING ->
                         PGPonyApp.instance.getString(R.string.import_result_already_in_keyring)
                     ImportResolution.MERGED_NEW_MATERIAL ->
@@ -221,7 +223,9 @@ class ExchangeViewModel(
                 // importing a search hit you already hold no longer
                 // errors.
                 val outcome = repo.importArmoredKeyDetailed(armored)
-                val message = when (outcome.resolution) {
+                val message = if (outcome.restoredFromBin && outcome.entity.isKeyPair) {
+                    PGPonyApp.instance.getString(R.string.import_result_restored_key_pair)
+                } else when (outcome.resolution) {
                     ImportResolution.ALREADY_IN_KEYRING ->
                         PGPonyApp.instance.getString(R.string.import_result_already_in_keyring)
                     ImportResolution.MERGED_NEW_MATERIAL ->

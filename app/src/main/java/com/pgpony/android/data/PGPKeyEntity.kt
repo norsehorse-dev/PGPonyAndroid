@@ -108,7 +108,9 @@ class RevocationReasonConverter {
 
 // ── Entity ─────────────────────────────────────────────────────────────
 
-@Entity(tableName = "pgp_keys")
+// 4.8.0 (item 4c): one row per fingerprint, binned rows included. Added by
+// MIGRATION_12_13 after it collapses existing duplicates (DuplicateKeyRows).
+@Entity(tableName = "pgp_keys", indices = [Index(value = ["fingerprint"], unique = true)])
 @TypeConverters(
     TrustLevelConverter::class,
     KeyAlgorithmConverter::class,
@@ -445,12 +447,14 @@ interface PGPKeyDao {
 // MIGRATION_5_6 declared in data/RoomMigrations.kt with the others.
 // RC3 §N (#34) — schema v8 adds fallback_keys + signing_defaults
 // (FallbackKeyEntity.kt), MIGRATION_7_8 in data/RoomMigrations.kt.
+// 4.8.0 (item 4c): schema v13 adds the unique fingerprint index on pgp_keys,
+// MIGRATION_12_13.
 @Database(
     entities = [
         PGPKeyEntity::class, ApiClientEntity::class, AutocryptPeerEntity::class,
         FallbackKeyEntity::class, SigningDefaultsEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 @TypeConverters(

@@ -10,6 +10,9 @@
 
 package com.pgpony.android.data
 
+import android.content.ContentValues
+import android.database.Cursor
+import android.database.sqlite.SQLiteDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
@@ -205,4 +208,62 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
             """.trimIndent()
         )
     }
+}
+
+/**
+ * 4.8.0 (item 4c): one row per fingerprint. Collapses every group of
+ * pgp_keys rows that share a fingerprint (see DuplicateKeyRows for which row
+ * stays and what it takes from the others), then adds the unique index
+ * PGPKeyEntity declares. The rows of a group share their SecureKeyStore
+ * entry (the store lowercases the fingerprint), so only rows are deleted
+ * here and no key material moves. The index has to come after the collapse:
+ * CREATE UNIQUE INDEX fails on a table that still holds a duplicate.
+ */
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        collapseDuplicateKeyRows(db)
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_pgp_keys_fingerprint` ON `pgp_keys` (`fingerprint`)")
+    }
+}
+
+internal fun collapseDuplicateKeyRows(db: SupportSQLiteDatabase): Int {
+    val rows = ArrayList<Map<String, Any?>>()
+    db.query("SELECT * FROM `pgp_keys`").use { c ->
+        while (c.moveToNext()) {
+            val row = HashMap<String, Any?>(c.columnCount)
+            for (i in 0 until c.columnCount) {
+                row[c.getColumnName(i)] = when (c.getType(i)) {
+                    Cursor.FIELD_TYPE_NULL -> null
+                    Cursor.FIELD_TYPE_INTEGER -> c.getLong(i)
+                    Cursor.FIELD_TYPE_FLOAT -> c.getDouble(i)
+                    Cursor.FIELD_TYPE_BLOB -> c.getBlob(i)
+                    else -> c.getString(i)
+                }
+            }
+            rows.add(row)
+        }
+    }
+    var removed = 0
+    for (group in DuplicateKeyRows.groups(rows)) {
+        val plan = DuplicateKeyRows.plan(group)
+        for (id in plan.deleteIds) {
+            db.delete("pgp_keys", "id = ?", arrayOf(id))
+            removed++
+        }
+        if (plan.changes.isNotEmpty()) {
+            val values = ContentValues()
+            for ((col, v) in plan.changes) {
+                when (v) {
+                    null -> values.putNull(col)
+                    is Long -> values.put(col, v)
+                    is Int -> values.put(col, v)
+                    is Double -> values.put(col, v)
+                    is ByteArray -> values.put(col, v)
+                    else -> values.put(col, v.toString())
+                }
+            }
+            db.update("pgp_keys", SQLiteDatabase.CONFLICT_ABORT, values, "id = ?", arrayOf(plan.keeperId))
+        }
+    }
+    return removed
 }

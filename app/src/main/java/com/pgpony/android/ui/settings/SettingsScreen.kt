@@ -135,6 +135,15 @@ fun SettingsScreen(
             action()
         }
     }
+    // 4.8.0 (item 3a): a backup carries every private key, so it asks for the
+    // same device check as Export Private Key first, with the same fall-through
+    // when no biometric or screen lock is set up. Cancelling starts no backup.
+    val openBackupGated: () -> Unit = {
+        guardSecurityChange(
+            context.getString(R.string.key_detail_export_biometric_title),
+            context.getString(R.string.settings_backup_biometric_subtitle)
+        ) { showBackup = true }
+    }
     val tooltipState = rememberTooltipState()
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -949,7 +958,7 @@ fun SettingsScreen(
                 subtitle = stringResource(R.string.settings_backup_subtitle),
                 icon = Icons.Filled.Backup,
                 iconTint = Color(0xFF8B5CF6),
-                onClick = { showBackup = true }
+                onClick = openBackupGated
             )
             Spacer(modifier = Modifier.height(16.dp))
             // ── Data Section ───────────────────────────────────────────
@@ -1290,7 +1299,7 @@ fun SettingsScreen(
                         OutlinedButton(
                             onClick = {
                                 viewModel.dismissClear()
-                                showBackup = true
+                                openBackupGated()
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) { Text(stringResource(R.string.settings_data_clear_backup_button)) }

@@ -1484,6 +1484,68 @@ fun KeyDetailScreen(
         )
     }
 
+    // 4.8.0 (item 3a): a protected key's passphrase before its export. Typed
+    // every time (the passphrase cache does not count), checked by unlocking
+    // the key, and cleared from the field after each attempt.
+    if (state.showExportPassphraseDialog && keyForExport != null) {
+        val exportPass = remember { mutableStateOf("") }
+        var exportPassShown by remember { mutableStateOf(false) }
+        val submitExportPass: () -> Unit = {
+            val entered = exportPass.value
+            exportPass.value = ""
+            viewModel.submitExportPassphrase(entered) {
+                scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.key_detail_status_priv_missing)) }
+            }
+        }
+        AlertDialog(
+            onDismissRequest = { if (!state.exportPassphraseChecking) viewModel.dismissExportPassphraseDialog() },
+            title = { Text(stringResource(R.string.encrypt_passphrase_dialog_title)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.key_detail_export_private_passphrase_body))
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = exportPass.value,
+                        onValueChange = { exportPass.value = it },
+                        singleLine = true,
+                        enabled = !state.exportPassphraseChecking,
+                        visualTransformation = if (exportPassShown) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = { PassphraseVisibilityToggle(exportPassShown) { exportPassShown = !exportPassShown } },
+                        label = { Text(stringResource(R.string.encrypt_passphrase_label)) },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                        ),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                            onDone = { if (exportPass.value.isNotEmpty()) submitExportPass() }
+                        ),
+                        isError = state.exportPassphraseWrong,
+                        modifier = Modifier.keepsKeyboard()
+                    )
+                    if (state.exportPassphraseWrong) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            stringResource(R.string.encdec_error_incorrect_passphrase_retry),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = exportPass.value.isNotEmpty() && !state.exportPassphraseChecking,
+                    onClick = submitExportPass
+                ) { Text(stringResource(R.string.common_button_continue)) }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !state.exportPassphraseChecking,
+                    onClick = { viewModel.dismissExportPassphraseDialog() }
+                ) { Text(stringResource(R.string.common_button_cancel)) }
+            }
+        )
+    }
+
     // ── Phase A7 Fix4: Export Private Key result sheet ────────────────
     //
     // Renders after biometric success. Hosts two delivery options
@@ -1805,6 +1867,12 @@ private fun doExportPrivateWithBiometric(
     // (no biometric available) or from the BiometricGate onSuccess
     // callback.
     val openResultSheet: () -> Unit = open@{
+        // 4.8.0 (item 3a): a protected key asks for its passphrase first. The
+        // dialog checks it by unlocking the key and only then opens the sheet.
+        if (viewModel.state.value.exportNeedsPassphrase) {
+            viewModel.showExportPassphraseDialog()
+            return@open
+        }
         val armored = viewModel.armoredPrivateKeyForShare()
         if (armored == null) {
             onError(context.getString(R.string.key_detail_status_priv_missing))

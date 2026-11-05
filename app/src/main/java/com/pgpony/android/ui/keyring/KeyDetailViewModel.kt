@@ -383,6 +383,15 @@ data class KeyDetailUiState(
      *  confirm, the screen-level code invokes BiometricGate (if
      *  available) and only then surfaces the share Intent. */
     val showExportPrivateConfirm: Boolean = false,
+    /** 4.8.0 (item 3a): the key holds a protected secret, so Export Private
+     *  Key asks for its passphrase after the biometric check. */
+    val exportNeedsPassphrase: Boolean = false,
+    /** 4.8.0 (item 3a): the export passphrase dialog is open. */
+    val showExportPassphraseDialog: Boolean = false,
+    /** 4.8.0 (item 3a): the typed passphrase is being checked (Argon2 can take a moment). */
+    val exportPassphraseChecking: Boolean = false,
+    /** 4.8.0 (item 3a): the last passphrase typed did not unlock the key. */
+    val exportPassphraseWrong: Boolean = false,
 
     // 4.5.3 (#57): key-storage recovery. needsRecovery is set at load time when
     // this key's material can't be read via the hardware keystore (the OS wiped
@@ -497,6 +506,9 @@ class KeyDetailViewModel(
                 } ?: false,
                 privateKeyIsProtected = loaded?.takeIf { it.isKeyPair }?.let {
                     withContext(Dispatchers.IO) { repo.isPrivateKeyPassphraseProtected(it.fingerprint) }
+                } ?: false,
+                exportNeedsPassphrase = loaded?.takeIf { it.isKeyPair }?.let {
+                    withContext(Dispatchers.IO) { runCatching { repo.privateExportNeedsPassphrase(it.fingerprint) }.getOrDefault(false) }
                 } ?: false,
                 primaryStub = loaded?.takeIf { it.isKeyPair }?.let {
                     withContext(Dispatchers.IO) { runCatching { repo.primaryStubKind(it.fingerprint) }.getOrNull() }
@@ -2025,10 +2037,14 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                     wasProtected -> R.string.change_passphrase_changed
                     else -> R.string.change_passphrase_set
                 }
+                val needsForExport = withContext(Dispatchers.IO) {
+                    runCatching { repo.privateExportNeedsPassphrase(key.fingerprint) }.getOrDefault(newPassphrase.isNotEmpty())
+                }
                 _state.value = _state.value.copy(
                     changePassphraseInFlight = false,
                     showChangePassphraseSheet = false,
                     privateKeyIsProtected = newPassphrase.isNotEmpty(),
+                    exportNeedsPassphrase = needsForExport,
                     successMessage = PGPonyApp.instance.getString(confirmation)
                 )
             } catch (e: org.bouncycastle.openpgp.PGPException) {
@@ -2530,6 +2546,55 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
 
     fun dismissExportPrivateConfirm() {
         _state.value = _state.value.copy(showExportPrivateConfirm = false)
+    }
+
+    /** 4.8.0 (item 3a): open the passphrase dialog for a protected key's export. */
+    fun showExportPassphraseDialog() {
+        _state.value = _state.value.copy(
+            showExportPassphraseDialog = true,
+            exportPassphraseChecking = false,
+            exportPassphraseWrong = false
+        )
+    }
+
+    fun dismissExportPassphraseDialog() {
+        _state.value = _state.value.copy(
+            showExportPassphraseDialog = false,
+            exportPassphraseChecking = false,
+            exportPassphraseWrong = false
+        )
+    }
+
+    /**
+     * 4.8.0 (item 3a): check the typed [passphrase] by unlocking the stored
+     * secret, and only then produce the armor and open the result sheet. A
+     * wrong passphrase leaves the dialog open with an error and produces no
+     * armor. The passphrase is used for this check alone: it is not cached,
+     * not handed to the export (the copy is exported as stored, still
+     * protected), and the caller clears its field after the attempt.
+     * [onMissing] runs when the key unlocked but no armor came out.
+     */
+    fun submitExportPassphrase(passphrase: String, onMissing: () -> Unit) {
+        val key = _state.value.key ?: return
+        if (passphrase.isEmpty() || _state.value.exportPassphraseChecking) return
+        _state.value = _state.value.copy(exportPassphraseChecking = true, exportPassphraseWrong = false)
+        val chars = passphrase.toCharArray()
+        viewModelScope.launch {
+            val ok = try {
+                repo.privateKeyPassphraseUnlocks(key.fingerprint, chars)
+            } catch (e: Exception) {
+                false
+            } finally {
+                chars.fill('\u0000')
+            }
+            if (!ok) {
+                _state.value = _state.value.copy(exportPassphraseChecking = false, exportPassphraseWrong = true)
+                return@launch
+            }
+            dismissExportPassphraseDialog()
+            val armored = withContext(Dispatchers.IO) { armoredPrivateKeyForShare() }
+            if (armored == null) onMissing() else showExportPrivateResult(armored)
+        }
     }
 
     /**

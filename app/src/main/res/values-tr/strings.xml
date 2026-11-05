@@ -730,6 +730,7 @@
     <string name="import_duplicate_view_key">Anahtarı Görüntüle</string>
     <string name="import_result_merged">Bu anahtar zaten anahtarlığınızdaydı. Daha yeni anahtar malzemesiyle güncellendi.</string>
     <string name="import_result_already_in_keyring">Bu anahtar zaten anahtarlığınızda.</string>
+    <string name="import_result_restored_key_pair">Bu anahtar Son Silinenler\'deydi ve gizli anahtarıyla birlikte anahtarlığınıza geri döndü. Yalnızca açık anahtarı tutmak için bu anahtarı silin, ardından Son Silinenler\'de ona \"Kalıcı olarak sil\" seçeneğini uygulayın ve açık anahtarı yeniden içe aktarın.</string>
     <string name="import_result_own_key_updated">Anahtar çiftiniz bu kopyadaki daha yeni öz imzalarla güncellendi (tercihler, son kullanma tarihi veya bağlamalar).</string>
     <string name="import_duplicate_own_key_note">Bu sizin anahtar çiftiniz. İçe aktarma yalnızca sizdekilerden daha yeni öz imzaları ekler ve bu kopyada böyle bir imza yok.</string>
 
@@ -1012,6 +1013,7 @@
     <!-- ── Export biometric prompt ─────────────────────────────────── -->
     <string name="key_detail_export_biometric_title">Kimliği doğrulayın</string>
     <string name="key_detail_export_biometric_subtitle">Gizli anahtarınızı dışa aktarmak için kimliğinizi doğrulayın</string>
+    <string name="key_detail_export_private_passphrase_body">Dışa aktarmak için bu anahtarın parola ifadesini girin.</string>
 
     <!-- ── Status / snackbar messages ──────────────────────────────── -->
     <string name="key_detail_status_pub_copied">Açık anahtar panoya kopyalandı</string>
@@ -2071,6 +2073,7 @@
     <string name="settings_section_backup">Yedekleme</string>
     <string name="settings_backup_title">Yedekle ve geri yükle</string>
     <string name="settings_backup_subtitle">Tüm anahtarlığınızı şifreli bir dosyaya kaydedin veya bir yedeği geri yükleyin</string>
+    <string name="settings_backup_biometric_subtitle">Anahtarlarınızı yedeklemek için kimliğinizi doğrulayın</string>
     <string name="backup_screen_title">Yedekleme ve Geri Yükleme</string>
     <string name="backup_menu_backup_title">Anahtarlığımı yedekle</string>
     <string name="backup_menu_backup_subtitle">Tüm anahtarlarınızı tek bir şifreli dosyaya kaydedin</string>

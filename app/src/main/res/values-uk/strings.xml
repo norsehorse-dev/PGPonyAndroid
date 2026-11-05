@@ -734,6 +734,7 @@
     <string name="import_duplicate_view_key">Переглянути ключ</string>
     <string name="import_result_merged">Цей ключ уже був у вашій зв’язці ключів. Його оновлено новішим ключовим матеріалом.</string>
     <string name="import_result_already_in_keyring">Цей ключ уже є у вашій зв’язці ключів.</string>
+    <string name="import_result_restored_key_pair">Цей ключ був у розділі «Нещодавно видалені» і повернувся до вашої зв’язки ключів разом зі своїм закритим ключем. Щоб залишити лише відкритий ключ, видаліть цей ключ, застосуйте до нього «Видалити назавжди» в розділі «Нещодавно видалені», а потім знову імпортуйте відкритий ключ.</string>
     <string name="import_result_own_key_updated">Вашу пару ключів оновлено новішими самопідписами з цієї копії (налаштування, термін дії або прив’язки).</string>
     <string name="import_duplicate_own_key_note">Це ваша пара ключів. Імпорт додає лише самопідписи, новіші за наявні у вас, а в цій копії таких немає.</string>
 
@@ -1018,6 +1019,7 @@
     <!-- ── Export biometric prompt ─────────────────────────────────── -->
     <string name="key_detail_export_biometric_title">Підтвердьте свою особу</string>
     <string name="key_detail_export_biometric_subtitle">Пройдіть автентифікацію, щоб експортувати закритий ключ</string>
+    <string name="key_detail_export_private_passphrase_body">Введіть парольну фразу цього ключа, щоб експортувати його.</string>
 
     <!-- ── Status / snackbar messages ──────────────────────────────── -->
     <string name="key_detail_status_pub_copied">Відкритий ключ скопійовано в буфер обміну</string>
@@ -2083,6 +2085,7 @@
     <string name="settings_section_backup">Резервна копія</string>
     <string name="settings_backup_title">Резервна копія й відновлення</string>
     <string name="settings_backup_subtitle">Збережіть усю зв’язку ключів у зашифрований файл або відновіть її з такого файлу</string>
+    <string name="settings_backup_biometric_subtitle">Пройдіть автентифікацію, щоб створити резервну копію ключів</string>
     <string name="backup_screen_title">Резервна копія й відновлення</string>
     <string name="backup_menu_backup_title">Створити резервну копію зв’язки ключів</string>
     <string name="backup_menu_backup_subtitle">Зберегти всі ваші ключі в одному зашифрованому файлі</string>

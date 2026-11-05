@@ -678,6 +678,7 @@
     <string name="import_duplicate_view_key">키 보기</string>
     <string name="import_result_merged">이 키는 이미 키링에 있었습니다. 더 새로운 키 자료로 갱신되었습니다.</string>
     <string name="import_result_already_in_keyring">이 키는 이미 키링에 있습니다.</string>
+    <string name="import_result_restored_key_pair">이 키는 최근 삭제됨에 있었으며, 개인 키와 함께 키링으로 돌아왔습니다. 공개 키만 남기려면 이 키를 삭제하고, 최근 삭제됨에서 이 키에 ‘영구히 삭제’를 실행한 다음, 공개 키를 다시 가져오세요.</string>
     <string name="import_result_own_key_updated">이 사본에 있는 더 새로운 자체 서명(환경설정, 만료일 또는 바인딩)으로 키 쌍을 업데이트했습니다.</string>
     <string name="import_duplicate_own_key_note">내 키 쌍입니다. 가져오기는 이미 있는 것보다 새로운 자체 서명만 추가하며, 이 사본에는 그런 서명이 없습니다.</string>
 
@@ -925,6 +926,7 @@
     <!-- ── Export biometric prompt ─────────────────────────────────── -->
     <string name="key_detail_export_biometric_title">신원 확인</string>
     <string name="key_detail_export_biometric_subtitle">개인 키를 내보내려면 인증하세요</string>
+    <string name="key_detail_export_private_passphrase_body">내보내려면 이 키의 비밀구절을 입력하세요.</string>
 
     <!-- ── Status / snackbar messages ──────────────────────────────── -->
     <string name="key_detail_status_pub_copied">공개 키가 클립보드에 복사되었습니다</string>
@@ -1945,10 +1947,11 @@
     <string name="settings_section_backup">백업</string>
     <string name="settings_backup_title">백업 및 복구</string>
     <string name="settings_backup_subtitle">전체 키링을 암호화된 파일로 저장하거나 복원합니다</string>
+    <string name="settings_backup_biometric_subtitle">키를 백업하려면 인증하세요</string>
     <string name="backup_screen_title">백업 및 복구</string>
-    <string name="backup_menu_backup_title">내 키링 복구하기</string>
+    <string name="backup_menu_backup_title">내 키링 백업하기</string>
     <string name="backup_menu_backup_subtitle">모든 키를 하나의 암호화된 파일로 저장합니다</string>
-    <string name="backup_menu_restore_title">벡업 복구하기</string>
+    <string name="backup_menu_restore_title">백업에서 복구하기</string>
     <string name="backup_menu_restore_subtitle">.pgpony 백업 파일에서 키를 가져옵니다</string>
     <string name="backup_code_heading">당신의 복구 코드</string>
     <string name="backup_code_explain">이 코드가 백업을 여는 유일한 방법입니다. 적어서 안전한 곳에 보관하세요. PGPony가 복구해 드릴 수 없습니다.</string>
@@ -1984,7 +1987,7 @@
     <!-- 4.0.0 Phase 3 — OpenKeychain migration card -->
     <string name="okc_migration_title">OpenKeychain에서 오셨나요?</string>
     <string name="okc_migration_body">OpenKeychain에서 키를 내보낸 뒤 아래에서 그 파일을 고르세요. 모두 한 번에 가져와집니다. 암호화된 OpenKeychain 백업(.sec.pgp 파일)은 설정 → 백업 → 복원을 대신 쓰세요.</string>
-    <string name="okc_migration_onboarding_body">암호화된 OpenKeychain 백업은 \"백업에서 복원\"을, 내보낸 키 파일은 \"이미 키가 있습니다\"를 고르세요.</string>
+    <string name="okc_migration_onboarding_body">암호화된 OpenKeychain 백업은 \"백업 복구하기\"를, 내보낸 키 파일은 \"이미 키가 있습니다\"를 고르세요.</string>
     <!-- 4.3.0 (#26): change key passphrase -->
     <string name="key_detail_action_change_passphrase">비밀구절 바꾸기</string>
     <string name="change_passphrase_sheet_title">비밀구절 바꾸기</string>

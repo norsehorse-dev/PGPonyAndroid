@@ -196,6 +196,15 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
 pgp_keys rows came to share a fingerprint (no unique index on the column), merge any that exist on upgrade, and
 add the index.
 
+Found (Nov 4): every import path looked only for a live row. Delete a key (it moves to Recently Deleted), import
+it again, and a second row is added next to the binned one; restore the binned row and the keyring holds the key
+twice. Purging the binned row later (Empty bin, or the retention window) also wiped the store entry both rows
+share, so the live copy lost its key material. Fix in RC3: an import of a binned key brings that row back and
+lands on it; purge leaves the store alone while another row holds the fingerprint; MIGRATION_12_13 merges every
+group of rows that share a fingerprint (DuplicateKeyRows: secret material first, then a card link, then a live
+row, notes from both kept) and adds the unique index. Desktop has its own keyring store and checks its import
+and bin paths for the same gap when it mirrors the item.
+
 
 ## 4d. Left out of 4.7.2
 

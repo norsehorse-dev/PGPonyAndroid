@@ -640,6 +640,7 @@ pgpony.app</string>
     <!-- ── Export biometric prompt ─────────────────────────────────── -->
     <string name="key_detail_export_biometric_title">Verificar identidade</string>
     <string name="key_detail_export_biometric_subtitle">Autentique-se para exportar sua chave privada</string>
+    <string name="key_detail_export_private_passphrase_body">Digite a frase-senha desta chave para exportá-la.</string>
 
     <!-- ── Status / snackbar messages ──────────────────────────────── -->
     <string name="key_detail_status_pub_copied">Chave pública copiada para a área de transferência</string>
@@ -1470,6 +1471,7 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="import_paste_from_clipboard">Colar da área de transferência</string>
     <string name="import_preview_source_keyserver">Encontrada nos seus servidores de chaves</string>
     <string name="import_result_already_in_keyring">Esta chave já está no seu chaveiro.</string>
+    <string name="import_result_restored_key_pair">Esta chave estava em Excluídos recentemente e voltou para o seu chaveiro junto com a chave privada. Para manter só a chave pública, exclua esta chave, use \"Excluir permanentemente\" nela em Excluídos recentemente e depois importe a chave pública de novo.</string>
     <string name="import_result_own_key_updated">Seu par de chaves foi atualizado com as autoassinaturas mais recentes desta cópia (preferências, validade ou vínculos).</string>
     <string name="import_duplicate_own_key_note">Este é o seu par de chaves. Uma importação só adiciona autoassinaturas mais recentes que as que você já tem, e esta cópia não tem nenhuma.</string>
     <string name="import_result_merged">Esta chave já estava no seu chaveiro. Ela foi atualizada com o material de chave mais recente.</string>
@@ -1687,6 +1689,7 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="settings_armor_comment_toggle_subtitle">Adicionar um cabeçalho Comment às mensagens criptografadas e assinadas</string>
     <string name="settings_armor_comment_toggle_title">Incluir comentário na saída PGP</string>
     <string name="settings_backup_subtitle">Salve todo o seu chaveiro em um arquivo criptografado, ou restaure um</string>
+    <string name="settings_backup_biometric_subtitle">Autentique-se para fazer backup das suas chaves</string>
     <string name="settings_backup_title">Backup e restauração</string>
     <string name="settings_biometric_sign_subtitle">Confirme com sua digital antes de assinar com uma chave de software. Chaves de hardware continuam usando PIN + toque.</string>
     <string name="settings_biometric_sign_title">Exigir digital para assinar</string>

@@ -640,6 +640,7 @@ pgpony.app</string>
     <!-- ── Export biometric prompt ─────────────────────────────────── -->
     <string name="key_detail_export_biometric_title">Vérifier l\'identité</string>
     <string name="key_detail_export_biometric_subtitle">Authentifiez-vous pour exporter votre clé privée</string>
+    <string name="key_detail_export_private_passphrase_body">Saisissez la phrase secrète de cette clé pour l\'exporter.</string>
 
     <!-- ── Status / snackbar messages ──────────────────────────────── -->
     <string name="key_detail_status_pub_copied">Clé publique copiée dans le presse-papiers</string>
@@ -1470,6 +1471,7 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="import_paste_from_clipboard">Coller depuis le presse-papiers</string>
     <string name="import_preview_source_keyserver">Trouvée via vos serveurs de clés</string>
     <string name="import_result_already_in_keyring">Cette clé est déjà dans votre trousseau.</string>
+    <string name="import_result_restored_key_pair">Cette clé était dans Récemment supprimés et est revenue dans votre trousseau avec sa clé privée. Pour ne garder que la clé publique, supprimez cette clé, appliquez-lui « Supprimer définitivement » dans Récemment supprimés, puis importez à nouveau la clé publique.</string>
     <string name="import_result_own_key_updated">Votre paire de clés a été mise à jour avec les autosignatures plus récentes de cette copie (préférences, expiration ou liaisons).</string>
     <string name="import_duplicate_own_key_note">Il s\'agit de votre paire de clés. Une importation n\'ajoute que des autosignatures plus récentes que celles que vous avez, et cette copie n\'en contient aucune.</string>
     <string name="import_result_merged">Cette clé était déjà dans votre trousseau. Elle a été mise à jour avec le matériel de clé plus récent.</string>
@@ -1687,6 +1689,7 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="settings_armor_comment_toggle_subtitle">Ajouter un en-tête Comment aux messages chiffrés et signés</string>
     <string name="settings_armor_comment_toggle_title">Inclure le commentaire dans la sortie PGP</string>
     <string name="settings_backup_subtitle">Enregistrez tout votre trousseau dans un fichier chiffré, ou restaurez-en un</string>
+    <string name="settings_backup_biometric_subtitle">Authentifiez-vous pour sauvegarder vos clés</string>
     <string name="settings_backup_title">Sauvegarde et restauration</string>
     <string name="settings_biometric_sign_subtitle">Confirmez avec votre empreinte avant de signer avec une clé logicielle. Les clés matérielles restent en PIN + présentation.</string>
     <string name="settings_biometric_sign_title">Exiger l\'empreinte pour signer</string>

@@ -640,6 +640,7 @@ pgpony.app</string>
     <!-- ── Export biometric prompt ─────────────────────────────────── -->
     <string name="key_detail_export_biometric_title">本人確認</string>
     <string name="key_detail_export_biometric_subtitle">認証して秘密鍵をエクスポート</string>
+    <string name="key_detail_export_private_passphrase_body">エクスポートするには、この鍵のパスフレーズを入力してください。</string>
 
     <!-- ── Status / snackbar messages ──────────────────────────────── -->
     <string name="key_detail_status_pub_copied">公開鍵をクリップボードにコピーしました</string>
@@ -1470,6 +1471,7 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="import_paste_from_clipboard">クリップボードから貼り付け</string>
     <string name="import_preview_source_keyserver">鍵サーバーで見つかりました</string>
     <string name="import_result_already_in_keyring">この鍵はすでに鍵束にあります。</string>
+    <string name="import_result_restored_key_pair">この鍵は「最近削除した項目」にあったため、秘密鍵とともに鍵束に戻りました。公開鍵だけを残すには、この鍵を削除し、「最近削除した項目」でこの鍵に対して「完全に削除」を実行してから、公開鍵をもう一度インポートしてください。</string>
     <string name="import_result_own_key_updated">このコピーに含まれる新しい自己署名（設定、有効期限、バインディング）で鍵ペアを更新しました。</string>
     <string name="import_duplicate_own_key_note">これはあなたの鍵ペアです。インポートでは手元の自己署名より新しいものだけが追加されますが、このコピーには新しいものがありません。</string>
     <string name="import_result_merged">この鍵はすでに鍵束にありました。新しい鍵データで更新しました。</string>
@@ -1685,6 +1687,7 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="settings_armor_comment_toggle_subtitle">暗号化・署名済みメッセージに Comment ヘッダーを追加します</string>
     <string name="settings_armor_comment_toggle_title">PGP 出力にコメントを含める</string>
     <string name="settings_backup_subtitle">鍵束全体を暗号化ファイルに保存、または復元します</string>
+    <string name="settings_backup_biometric_subtitle">認証して鍵をバックアップ</string>
     <string name="settings_backup_title">バックアップと復元</string>
     <string name="settings_biometric_sign_subtitle">ソフトウェア鍵で署名する前に指紋で確認します。ハードウェアキーは従来どおり PIN + タップです。</string>
     <string name="settings_biometric_sign_title">署名に指紋を要求</string>

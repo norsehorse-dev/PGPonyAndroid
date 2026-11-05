@@ -1209,6 +1209,18 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                 } else {
                     repo.importArmoredKeyDetailed(preview.armoredText)
                 }
+                // 4.8.0 (item 4c): a key pair brought back from Recently Deleted
+                // says so, since a public key import returned its private key.
+                if (outcome.restoredFromBin && outcome.entity.isKeyPair) {
+                    _state.value = _state.value.copy(
+                        isImporting = false,
+                        showImportSheet = false,
+                        importPreview = null,
+                        successMessage = PGPonyApp.instance.getString(R.string.import_result_restored_key_pair)
+                    )
+                    loadKeys()
+                    return@launch
+                }
                 if (outcome.resolution == ImportResolution.ALREADY_IN_KEYRING) {
                     val name = outcome.entity.userName.ifBlank { outcome.entity.shortFingerprint }
                     _state.value = _state.value.copy(

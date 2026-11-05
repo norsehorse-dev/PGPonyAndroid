@@ -197,7 +197,10 @@ data class ImportOutcome(
     val subkeysAdded: Int = 0,
     /** 4.7.0 (item 47, #78): held secret keys replaced by the file's, when
      *  Use the secret keys from this file was chosen. */
-    val secretsReplaced: Int = 0
+    val secretsReplaced: Int = 0,
+    /** 4.8.0 (item 4c): the key was in Recently Deleted and this import
+     *  brought that row back, with its private key when it had one. */
+    val restoredFromBin: Boolean = false
 )
 
 class KeyRepository(
@@ -692,6 +695,7 @@ class KeyRepository(
             "-----END PGP PUBLIC KEY BLOCK-----",
             publicRing
         )
+        reviveBinned(fpHex)
         val existing = dedup.findExisting(fpHex)
         if (existing != null) {
             if (hasPrivate && !existing.isKeyPair) {
@@ -806,6 +810,7 @@ class KeyRepository(
             "-----END PGP PUBLIC KEY BLOCK-----",
             publicRing
         )
+        reviveBinned(fpHex)
         val existing = dedup.findExisting(fpHex)
         if (existing != null) {
             if (hasPrivate && !existing.isKeyPair) {
@@ -979,7 +984,10 @@ class KeyRepository(
         fromAutocrypt: Boolean,
         upgrade: SecretUpgrade
     ): ImportOutcome {
-        val outcome = importArmoredKeyDetailedInner(armoredText, upgrade)
+        val binnedIds = dao.getDeletedKeys().mapTo(HashSet()) { it.id }
+        val outcome = importArmoredKeyDetailedInner(armoredText, upgrade).let {
+            if (it.entity.id in binnedIds && it.entity.deletedAt == null) it.copy(restoredFromBin = true) else it
+        }
         val e = outcome.entity
         val marked = when {
             fromAutocrypt && outcome.resolution == ImportResolution.INSERTED ->
@@ -1005,6 +1013,7 @@ class KeyRepository(
         // placeholder keyed by the Signature slot's fingerprint, which is a
         // subkey's when the primary stayed off the card. Pair onto it by any of
         // its slots, taking the key's real primary fingerprint.
+        reviveBinned(importResult.fingerprint)
         val existing = dedup.findExisting(importResult.fingerprint)
             ?: importResult.publicKeyRing?.let { cardPlaceholderFor(it) }
                 ?.let { placeholder -> placeholder.copy(fingerprint = importResult.fingerprint) }
@@ -1468,6 +1477,7 @@ class KeyRepository(
         // matches ANY card slot fingerprint against each stored ring's
         // full key set (primary + subkeys) and links onto the owning
         // entity, keeping ITS primary fingerprint.
+        reviveBinned(primaryFp)
         val existing = dao.getByFingerprint(primaryFp)
             ?: findEntityBySubkeyFingerprint(listOfNotNull(sigFp, decFp, authFp))
         if (existing != null) {
@@ -2286,6 +2296,28 @@ class KeyRepository(
         return crypto.isPassphraseProtected(ring)
     }
 
+    /**
+     * 4.8.0 (item 3a): whether Export Private Key asks for this key's
+     * passphrase first. Read from the stored packets, so composite keys and
+     * keys with a v4 ML-KEM subkey are covered as well as Bouncy Castle rings.
+     */
+    fun privateExportNeedsPassphrase(fingerprint: String): Boolean {
+        val raw = store.loadPrivateKey(fingerprint) ?: return false
+        return SecretKeyCheck.exportNeedsPassphrase(raw)
+    }
+
+    /**
+     * 4.8.0 (item 3a): does [passphrase] unlock this key's stored secret? The
+     * passphrase is typed for this check every time: the passphrase cache and
+     * the hold service are not consulted, and nothing is cached here. The S2K
+     * work (Argon2 on v6 keys) runs off the main thread.
+     */
+    suspend fun privateKeyPassphraseUnlocks(fingerprint: String, passphrase: CharArray): Boolean =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            val raw = store.loadPrivateKey(fingerprint) ?: return@withContext false
+            SecretKeyCheck.passphraseUnlocks(raw, passphrase)
+        }
+
     fun exportArmoredPrivateKey(fingerprint: String): String? {
         v4Algo35ArmoredPrivateKey(fingerprint, null)?.let { return it }
         compositeArmoredPrivateKey(fingerprint, null)?.let { return it }
@@ -2352,9 +2384,36 @@ class KeyRepository(
     /** Restore a binned key to live. Its material was never removed. */
     suspend fun restoreKey(id: String) = dao.restoreFromBin(id)
 
+    /**
+     * 4.8.0 (item 4c): an import of a key that sits in Recently Deleted brings
+     * that row back first, so the import lands on it (a duplicate, a secret
+     * upgrade or a card link) instead of adding a second row with the same
+     * fingerprint. The binned row keeps its notes, trust and card link, and
+     * its key material never left the store. No-op when a live row exists.
+     */
+    private suspend fun reviveBinned(fingerprint: String) {
+        val target = KeyDeduplicationService.normalize(fingerprint)
+        if (target.isEmpty() || dedup.findExisting(fingerprint) != null) return
+        dao.getDeletedKeys()
+            .firstOrNull { KeyDeduplicationService.normalize(it.fingerprint) == target }
+            ?.let { dao.restoreFromBin(it.id) }
+    }
+
     /** Permanently destroy a binned key: secret material, related rows, and
      *  the DB row. Mirrors the old hard-delete cleanup. */
     suspend fun purgeKey(entity: PGPKeyEntity) {
+        // 4.8.0 (item 4c): rows that share a fingerprint share their store
+        // entry. Before the unique index (MIGRATION_12_13) a binned row could
+        // sit next to a live copy of the same key, and purging it wiped the
+        // live copy's material. If another row still holds this fingerprint,
+        // only this row goes.
+        val target = KeyDeduplicationService.normalize(entity.fingerprint)
+        val shared = (dao.getAllKeys() + dao.getDeletedKeys())
+            .any { it.id != entity.id && KeyDeduplicationService.normalize(it.fingerprint) == target }
+        if (shared) {
+            dao.purgeById(entity.id)
+            return
+        }
         com.pgpony.android.data.RemovedUserIdStore.clear(entity.fingerprint)
         com.pgpony.android.data.KeyPublicationStore.clear(entity.fingerprint)
         com.pgpony.android.data.KeyServerCheckStore.clear(entity.fingerprint) // 4.7.0 (item 60)
