@@ -117,7 +117,7 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
 
 ## 4. Keyring and Exchange follow-ups
 
-- #101: a setting to turn off drag to reorder on the Keyring.
+- #101: a setting to turn off drag to reorder on the Keyring. Done in RC2; the reorder mode follow-up is item 4m.
 - #93 follow-up: a long press on a key starts select mode (4.7.0 item 63).
 - #86 follow-up: choose the hash (SHA-512 for large RSA keys) when re-signing self-signatures (4.7.0 item 51).
 - #100 follow-up: slower or paused QR playback by default.
@@ -359,6 +359,19 @@ curve), check what Bouncy Castle 1.85 generates against gpg 2.4 and 2.5 (import,
 in the captions that cards differ in which curves they hold. iOS and desktop mirror once verified.
 
 
+## 4m. Reorder mode on the Keyring (#101 follow-up, Nov 4)
+
+After trying RC2's setting, the #101 reporter asked for a way to turn dragging back on from the menu for a while,
+working like select mode, with Cancel and Done for the order changes. Plan:
+- A Reorder keys item in the Keyring menu enters reorder mode: the drag handles show, the top bar carries Cancel and
+  Done the way select mode does, and nothing is saved until Done. Cancel and Back put the order back as it was.
+- With the RC2 setting on, the handles stay always on and a drag saves at once, as now. With it off, the menu item
+  is the way to reorder. K6 asks whether the setting stays once the mode exists.
+- Select mode and reorder mode don't mix: entering one leaves the other.
+- Strings for the menu item and the mode's title; Cancel and Done reuse the existing ones where they read right.
+Desktop has no drag reorder, so nothing to mirror there; iOS checks its own Keyring when it takes 4.8.0.
+
+
 ## 5. Contributor PRs waiting on a decision
 
 - #96: Korean err_ strings. Superseded by af491ba (Nov 2), which translated the same 389 strings on main. Close it
@@ -390,6 +403,8 @@ in the captions that cards differ in which curves they hold. iOS and desktop mir
   default ships with it.
 - K5. #109: generate brainpool and secp256k1 ECDSA keys in 4.8.0 (item 4l), or leave generation as it is? Answered
   Nov 4: yes, brainpoolP256r1, brainpoolP384r1, brainpoolP512r1 and secp256k1, v4 only, in RC4.
+- K6. Item 4m: keep the drag setting next to reorder mode, or drop it so the handles only show in reorder mode?
+  Recommendation: keep it, since it shipped in RC2 and some people want the handles always there. Open.
 
 
 ## 8. Status of this document
@@ -442,7 +457,8 @@ RC4, card and key crypto:
 
 RC5, new ways in:
 - #103 (text selection menu), #72 (sign one shared file), #67 (restore a shared backup), #106 (the Verify picker pairs
-  signatures with their files, which also covers the 4.7.0 item 38 left-out), #104 (the ZLIB switch).
+  signatures with their files, which also covers the 4.7.0 item 38 left-out), #104 (the ZLIB switch), and 4m
+  (reorder mode on the Keyring, added Nov 4).
 
 RC6: #95 whole, with #100's slower playback.
 
