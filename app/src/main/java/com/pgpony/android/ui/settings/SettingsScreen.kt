@@ -57,6 +57,11 @@ import com.pgpony.android.data.ArmorCommentDefaults
 import com.pgpony.android.BuildConfig
 import com.pgpony.android.data.ArmorCommentValidator
 import com.pgpony.android.ui.components.rememberTooltipState
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import com.pgpony.android.ui.help.HelpScreen
 import com.pgpony.android.ui.theme.AppTheme
 import androidx.compose.foundation.selection.toggleable
@@ -216,6 +221,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .dismissKeyboardOnTap()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
         ) {
@@ -525,6 +531,7 @@ fun SettingsScreen(
                     placeholder = { Text(ArmorCommentDefaults.DEFAULT_COMMENT) },
                     singleLine = true,
                     modifier = Modifier
+                        .keepsKeyboard()
                         .fillMaxWidth()
                         .padding(start = 40.dp)
                 )
@@ -788,6 +795,15 @@ fun SettingsScreen(
                 iconTint = Color(0xFF8B5CF6),
                 checked = state.offerPublishAfterKeygen,
                 onCheckedChange = { viewModel.setOfferPublishAfterKeygen(it) }
+            )
+            // 4.8.0 (#101): turn off drag to reorder on the Keyring.
+            SettingsToggle(
+                title = stringResource(R.string.settings_keyring_drag_title),
+                subtitle = stringResource(R.string.settings_keyring_drag_subtitle),
+                icon = Icons.Filled.DragHandle,
+                iconTint = Color(0xFF0EA5E9),
+                checked = state.keyringDragReorder,
+                onCheckedChange = { viewModel.setKeyringDragReorder(it) }
             )
             Spacer(modifier = Modifier.height(16.dp))
             // ── OpenPGP Provider Section (4.0.0 Succession Phase 1) ────
@@ -1357,7 +1373,7 @@ fun SettingsScreen(
                                 )
                             },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.keepsKeyboard().fillMaxWidth()
                         )
                     }
                 },
@@ -1750,7 +1766,7 @@ private fun ProxySection() {
                 },
                 singleLine = true,
                 label = { Text(stringResource(R.string.settings_proxy_custom_host)) },
-                modifier = Modifier.weight(2f)
+                modifier = Modifier.keepsKeyboard().weight(2f)
             )
             OutlinedTextField(
                 value = customPort,
@@ -1766,7 +1782,7 @@ private fun ProxySection() {
                 },
                 singleLine = true,
                 label = { Text(stringResource(R.string.settings_proxy_custom_port)) },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.keepsKeyboard().weight(1f)
             )
         }
     }
@@ -1785,8 +1801,10 @@ private fun ProxySection() {
                 },
                 singleLine = true,
                 label = { Text(stringResource(R.string.settings_proxy_socks_user)) },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.keepsKeyboard().weight(1f)
             )
+            // 4.8.0 (item 4d): show or hide the SOCKS password.
+            var proxyPassShown by remember { mutableStateOf(false) }
             OutlinedTextField(
                 value = proxyPass,
                 onValueChange = {
@@ -1795,9 +1813,10 @@ private fun ProxySection() {
                     com.pgpony.android.network.HttpClientFactory.invalidate()
                 },
                 singleLine = true,
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                visualTransformation = if (proxyPassShown) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = { PassphraseVisibilityToggle(proxyPassShown) { proxyPassShown = !proxyPassShown } },
                 label = { Text(stringResource(R.string.settings_proxy_socks_pass)) },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.keepsKeyboard().weight(1f)
             )
         }
         Text(

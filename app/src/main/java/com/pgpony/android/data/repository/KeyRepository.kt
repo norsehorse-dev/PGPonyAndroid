@@ -471,9 +471,12 @@ class KeyRepository(
         includeDefaultEncryptionSubkey: Boolean,
         subkeys: List<GranularSubkeySpec>,
         passphrase: String?,
-        expirationSeconds: Long? = null
+        expirationSeconds: Long? = null,
+        // 4.8.0 (item 4i): false builds the key on a v4 Ed25519 base.
+        v6: Boolean = true
     ): PGPKeyEntity = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val uid = PGPKeyEntity.composeUserID(name, email)
+        if (!v6) return@withContext storeGranularV4Key(uid, includeDefaultEncryptionSubkey, subkeys, passphrase, expirationSeconds)
         val ring = crypto.assembleGranularV6Ring(
             userID = uid,
             includeDefaultEncryptionSubkey = includeDefaultEncryptionSubkey,
@@ -487,6 +490,8 @@ class KeyRepository(
 
         store.storePublicKey(fpHex, publicRing.encoded)
         store.storePrivateKey(fpHex, ring.encoded)
+        // 4.8.0: the recovery wrap every other keygen path attaches.
+        attachRecovery(fpHex, passphrase)
 
         val validSec = primary.validSeconds
         val expiresAtMs = if (validSec > 0) primary.creationTime.time + validSec * 1000 else null
@@ -507,6 +512,55 @@ class KeyRepository(
         )
         dao.insert(entity)
         return@withContext entity
+    }
+
+    /**
+     * 4.8.0 (item 4i): a granular key on a v4 base, stored like the key types
+     * it matches. With an ML-KEM-768 subkey it is the raw-octet v4 interop key
+     * (MLKEM768_X25519_V4, as generateV4Algo35Key stores it); without one it is
+     * an ordinary v4 Ed25519 key.
+     */
+    private suspend fun storeGranularV4Key(
+        uid: String,
+        includeDefaultEncryptionSubkey: Boolean,
+        subkeys: List<GranularSubkeySpec>,
+        passphrase: String?,
+        expirationSeconds: Long?
+    ): PGPKeyEntity {
+        val key = crypto.assembleGranularV4(
+            userID = uid,
+            includeDefaultEncryptionSubkey = includeDefaultEncryptionSubkey,
+            subkeys = subkeys,
+            passphrase = passphrase,
+            expirationSeconds = expirationSeconds
+        )
+        store.storePublicKey(key.fingerprintHex, key.public)
+        store.storePrivateKey(key.fingerprintHex, key.secret)
+        attachRecovery(key.fingerprintHex, passphrase)
+
+        val armoredPublic = key.publicRing?.let { crypto.exportArmoredPublicKey(it) }
+            ?: CompositeSigPacket.armor(
+                "-----BEGIN PGP PUBLIC KEY BLOCK-----",
+                "-----END PGP PUBLIC KEY BLOCK-----",
+                key.public
+            )
+        val parsed = PGPKeyEntity.parseUserID(uid)
+        val entity = PGPKeyEntity(
+            id = UUID.randomUUID().toString(),
+            fingerprint = key.fingerprintHex,
+            userID = uid,
+            userName = parsed.first,
+            userEmail = parsed.second,
+            algorithm = if (key.hasV4Algo35) KeyAlgorithm.MLKEM768_X25519_V4 else KeyAlgorithm.ED25519_CV25519,
+            isKeyPair = true,
+            trustLevel = TrustLevel.ULTIMATE,
+            createdAt = System.currentTimeMillis(),
+            expiresAt = expirationSeconds?.let { System.currentTimeMillis() + it * 1000 },
+            armoredPublicKey = armoredPublic,
+            revocationCertificate = null
+        )
+        dao.insert(entity)
+        return entity
     }
 
     // ── Import ─────────────────────────────────────────────────────────

@@ -21,8 +21,12 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 import java.text.DateFormat
 import java.util.Date
 
@@ -50,6 +54,7 @@ fun EditExpirationSheet(
     var customMillis by remember { mutableStateOf<Long?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var passphrase by remember { mutableStateOf("") }
+    var passphraseShown by remember { mutableStateOf(false) }
     var pin by remember { mutableStateOf("") }
     var alsoCurrentSubkeys by remember { mutableStateOf(false) }
 
@@ -78,7 +83,8 @@ fun EditExpirationSheet(
                 .imePadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
+                .padding(bottom = 32.dp)
+                .dismissKeyboardOnTap(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
@@ -149,7 +155,7 @@ fun EditExpirationSheet(
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
                     singleLine = true,
                     enabled = !isProcessing,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth()
                 )
                 Text(
                     text = stringResource(R.string.key_detail_expiry_card_hint),
@@ -161,11 +167,12 @@ fun EditExpirationSheet(
                     value = passphrase,
                     onValueChange = { passphrase = it },
                     label = { Text(stringResource(R.string.key_detail_expiry_passphrase_label)) },
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
                     singleLine = true,
                     enabled = !isProcessing,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth()
                 )
             }
 
@@ -191,7 +198,12 @@ fun EditExpirationSheet(
                         val expiry = computeExpiresAtEpochSeconds()
                         val also = subkeyLabel == null && offerCurrentSubkeys && alsoCurrentSubkeys
                         if (isCardBacked) onApplyCard(expiry, pin, also)
-                        else onApplySoftware(expiry, passphrase.ifBlank { null }, also)
+                        else {
+                            // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
+                            val entered = passphrase
+                            passphrase = ""
+                            onApplySoftware(expiry, entered.ifBlank { null }, also)
+                        }
                     },
                     enabled = canApply,
                     modifier = Modifier.weight(1f)

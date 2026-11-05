@@ -95,6 +95,9 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.keepsKeyboard
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -843,6 +846,7 @@ fun KeyDetailScreen(
     // ── 4.7.0 (item 51, #86): refresh self-signatures ──────────────────
     if (state.showRefreshSigs) {
         var refreshPass by remember { mutableStateOf("") }
+        var refreshPassShown by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { viewModel.dismissRefreshSigs() },
             title = { Text(stringResource(R.string.key_detail_refresh_sigs_title)) },
@@ -854,10 +858,11 @@ fun KeyDetailScreen(
                             value = refreshPass,
                             onValueChange = { refreshPass = it },
                             label = { Text(stringResource(R.string.key_detail_expiry_passphrase_label)) },
-                            visualTransformation = PasswordVisualTransformation(),
+                            visualTransformation = if (refreshPassShown) VisualTransformation.None else PasswordVisualTransformation(),
+                            trailingIcon = { PassphraseVisibilityToggle(refreshPassShown) { refreshPassShown = !refreshPassShown } },
                             singleLine = true,
                             enabled = !state.refreshSigsInFlight,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.keepsKeyboard().fillMaxWidth()
                         )
                     }
                     state.refreshSigsError?.let {
@@ -871,6 +876,8 @@ fun KeyDetailScreen(
                     // the device-auth gate comes before the re-signing.
                     onClick = {
                         val pass = refreshPass.ifBlank { null }
+                        // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
+                        refreshPass = ""
                         deleteWithOptionalBiometricGate(
                             context = context,
                             title = context.getString(R.string.key_detail_resign_biometric_title),
@@ -1131,6 +1138,7 @@ fun KeyDetailScreen(
     }
     state.certRevokeRequest?.let { row ->
         var certRevokePass by remember(row) { mutableStateOf("") }
+        var certRevokeShown by remember(row) { mutableStateOf(false) }
         val local = !row.certification.exportable
         // 4.7.0 RC4 (item 31): a certification made on a card is withdrawn on it.
         val onCard = !local && row.issuer?.let { it.isCardBacked && !it.isKeyPair } == true
@@ -1159,9 +1167,12 @@ fun KeyDetailScreen(
                                     )
                                 )
                             },
-                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            // 4.8.0 (item 4d): show or hide for a passphrase only, never a card PIN.
+                            visualTransformation = if (certRevokeShown && !onCard) VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                            trailingIcon = if (onCard) null else ({ PassphraseVisibilityToggle(certRevokeShown) { certRevokeShown = !certRevokeShown } }),
                             singleLine = true,
-                            enabled = !state.certRevokeInFlight
+                            enabled = !state.certRevokeInFlight,
+                            modifier = Modifier.keepsKeyboard()
                         )
                         if (onCard) {
                             Text(
@@ -1207,7 +1218,10 @@ fun KeyDetailScreen(
                                 viewModel.onCardRevokeFailure(IllegalStateException(revokeNoLink))
                             }
                         } else {
-                            viewModel.confirmRevokeCertification(certRevokePass.ifBlank { null })
+                            // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
+                            val entered = certRevokePass
+                            certRevokePass = ""
+                            viewModel.confirmRevokeCertification(entered.ifBlank { null })
                         }
                     },
                     enabled = !state.certRevokeInFlight && (!onCard || certRevokePass.isNotEmpty())
@@ -1376,6 +1390,7 @@ fun KeyDetailScreen(
     val keyForExport = state.key
     if (state.showRecoveryDialog) {
         val recoveryPass = remember { mutableStateOf("") }
+        var recoveryShown by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { if (!state.isRecovering) viewModel.dismissRecoveryDialog() },
             title = { Text(stringResource(R.string.key_detail_recovery_title)) },
@@ -1387,8 +1402,10 @@ fun KeyDetailScreen(
                         value = recoveryPass.value,
                         onValueChange = { recoveryPass.value = it },
                         singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        label = { Text(stringResource(R.string.encrypt_passphrase_label)) }
+                        visualTransformation = if (recoveryShown) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = { PassphraseVisibilityToggle(recoveryShown) { recoveryShown = !recoveryShown } },
+                        label = { Text(stringResource(R.string.encrypt_passphrase_label)) },
+                        modifier = Modifier.keepsKeyboard()
                     )
                     state.recoveryError?.let {
                         Spacer(Modifier.height(8.dp))
@@ -1399,7 +1416,12 @@ fun KeyDetailScreen(
             confirmButton = {
                 TextButton(
                     enabled = recoveryPass.value.isNotEmpty() && !state.isRecovering,
-                    onClick = { viewModel.submitRecovery(recoveryPass.value) }
+                    onClick = {
+                        // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
+                        val entered = recoveryPass.value
+                        recoveryPass.value = ""
+                        viewModel.submitRecovery(entered)
+                    }
                 ) {
                     Text(
                         if (state.isRecovering) stringResource(R.string.key_detail_recovery_restoring)

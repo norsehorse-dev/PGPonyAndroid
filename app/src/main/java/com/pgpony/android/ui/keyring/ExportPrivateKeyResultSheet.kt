@@ -77,8 +77,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -104,6 +108,8 @@ fun ExportPrivateKeyResultSheet(
     // deleted original would make the backup unreadable forever.
     var exportPassphrase by remember { mutableStateOf("") }
     var exportPassphraseConfirm by remember { mutableStateOf("") }
+    var exportShown by remember { mutableStateOf(false) }
+    var exportConfirmShown by remember { mutableStateOf(false) }
     val passphraseMismatch =
         exportPassphrase.isNotEmpty() && exportPassphrase != exportPassphraseConfirm
     val effectivePassphrase: String? =
@@ -123,7 +129,8 @@ fun ExportPrivateKeyResultSheet(
                 .verticalScroll(rememberScrollState())
                 .imePadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 24.dp, vertical = 8.dp),
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+                .dismissKeyboardOnTap(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // ── Header: key icon + title ──────────────────────────────
@@ -243,19 +250,21 @@ fun ExportPrivateKeyResultSheet(
                     value = exportPassphrase,
                     onValueChange = { exportPassphrase = it },
                     label = { Text(stringResource(R.string.export_passphrase_label)) },
-                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    visualTransformation = if (exportShown) VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    trailingIcon = { PassphraseVisibilityToggle(exportShown) { exportShown = !exportShown } },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth()
                 )
                 if (exportPassphrase.isNotEmpty()) {
                     OutlinedTextField(
                         value = exportPassphraseConfirm,
                         onValueChange = { exportPassphraseConfirm = it },
                         label = { Text(stringResource(R.string.export_passphrase_confirm_label)) },
-                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        visualTransformation = if (exportConfirmShown) VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        trailingIcon = { PassphraseVisibilityToggle(exportConfirmShown) { exportConfirmShown = !exportConfirmShown } },
                         singleLine = true,
                         isError = passphraseMismatch,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.keepsKeyboard().fillMaxWidth()
                     )
                     if (passphraseMismatch) {
                         Text(

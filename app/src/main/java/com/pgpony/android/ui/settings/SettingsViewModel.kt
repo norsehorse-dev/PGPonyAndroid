@@ -117,6 +117,8 @@ data class SettingsUiState(
     val allowExpiredKeys: Boolean = false,
     // item 8 (#request): offer the post-keygen publish prompt (default on).
     val offerPublishAfterKeygen: Boolean = true,
+    // 4.8.0 (#101): drag to reorder on the Keyring (default on).
+    val keyringDragReorder: Boolean = true,
     // ── Phase A4: default / remembered recipient ────────────────────────
     val defaultRecipientMode: DefaultRecipientMode = DefaultRecipientMode.NONE,
     /** Fingerprint of the pinned recipient (PINNED mode). */
@@ -218,6 +220,13 @@ class SettingsViewModel(
         _state.value = _state.value.copy(offerPublishAfterKeygen = enabled)
     }
 
+    /** 4.8.0 (#101): turn drag to reorder on the Keyring on or off.
+     *  KeyringViewModel reads "keyring_drag_reorder". Persisted. */
+    fun setKeyringDragReorder(enabled: Boolean) {
+        prefs.edit().putBoolean("keyring_drag_reorder", enabled).apply()
+        _state.value = _state.value.copy(keyringDragReorder = enabled)
+    }
+
     /** RC5 P3 (#23): public so SettingsScreen can re-read persisted
      *  preferences on entry. The onboarding biometric toggle (slide 5)
      *  writes `biometric_lock` directly to prefs, and this ViewModel is
@@ -246,6 +255,7 @@ class SettingsViewModel(
             useArgon2 = prefs.getBoolean("use_argon2", false),
             allowExpiredKeys = prefs.getBoolean("allow_expired_keys", false),
             offerPublishAfterKeygen = prefs.getBoolean("offer_publish_after_keygen", true),
+            keyringDragReorder = prefs.getBoolean("keyring_drag_reorder", true),
             // ── Phase A12: theme + reminders persisted prefs ────
             selectedTheme = AppTheme.fromStorage(prefs.getString("selected_theme", null)),
             keyExpirationRemindersEnabled = prefs.getBoolean("key_expiration_reminders", false),

@@ -75,7 +75,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:configChanges="locale|layoutDirection"
+            android:configChanges="locale|layoutDirection|screenLayout"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.PGPony">
             <!-- 4.7.2 RC5: adjustResize. MainActivity runs edge to edge (enableEdgeToEdge), so the

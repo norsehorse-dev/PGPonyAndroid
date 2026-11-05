@@ -1329,6 +1329,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // straight back with an error, which is the only case
                 // where it should reappear.
                 showSignPassphraseDialog = false,
+                // 4.8.0 (item 4d): a typed passphrase is good for this one attempt (the
+                // parameter holds it); the in-app cache is the only memory.
+                signPassphrase = "",
             )
             // RC3 §N (#34): sign-without-encrypting default.
             val effectiveSigner = resolveEffectiveSigner(
@@ -1476,6 +1479,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // straight back with an error, which is the only case
                 // where it should reappear.
                 showSignPassphraseDialog = false,
+                // 4.8.0 (item 4d): the typed passphrase is used once (see signOnly).
+                signPassphrase = "",
             )
             try {
                 // 4.0.4 — off the main thread. Only the symmetric and
@@ -1925,6 +1930,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // straight back with an error, which is the only case
                 // where it should reappear.
                 showSignPassphraseDialog = false,
+                // 4.8.0 (item 4d): the typed passphrase is used once (see signOnly).
+                signPassphrase = "",
             )
             try {
                 // 4.0.4 — off the main thread; see encryptText above. File
@@ -2474,6 +2481,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // straight back with an error, which is the only case
                 // where it should reappear.
                 showSignPassphraseDialog = false,
+                // 4.8.0 (item 4d): the typed passphrase is used once (see signOnly).
+                signPassphrase = "",
             )
             try {
                 // 4.0.4 — the crypto below was already on Dispatchers.Default,
@@ -3032,6 +3041,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             // §3 (#15): a cached in-app passphrase counts as already asked.
             val pass = batchPassphrase ?: s.passphrase.ifBlank { null }
                 ?: cacheFp?.let { com.pgpony.android.session.InAppPassphraseCache.get(it) }
+            // 4.8.0 (item 4d): the typed passphrase is used once, as on the other decrypt paths.
+            if (s.passphrase.isNotEmpty()) clearTypedPassphrase()
             _decryptState.value = _decryptState.value.copy(
                 isProcessing = true, errorMessage = null, processedBytes = 0L, totalBytes = 0L,
                 fileBatch = start.copy(running = true, needsPassphrase = false, passphraseError = null)
@@ -5024,8 +5035,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      */
     private fun signedFileTextOrNull(bytes: ByteArray): String? {
         if (bytes.isEmpty()) return null
-        val head = String(bytes, 0, minOf(64, bytes.size), Charsets.US_ASCII)
-        if (!head.contains("-----BEGIN PGP")) return null
+        // 4.8.0 (item 4d): anywhere in the buffered file, not only the first 64 bytes, so text
+        // before the armor still routes a clear-signed file to verify.
+        if (com.pgpony.android.crypto.ArmorExtractor.indexOfAscii(bytes, "-----BEGIN PGP") < 0) return null
         return try { String(bytes, Charsets.UTF_8) } catch (e: Exception) { null }
     }
 
@@ -5614,7 +5626,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      * rather than given a larger number.
      */
     private fun effectiveDecryptFileBytes(bytes: ByteArray): ByteArray =
-        MimeEnvelope.unwrapBytes(bytes)
+        // 4.8.0 (item 4d): then only the PGP MESSAGE block, as effectiveDecryptInput does.
+        com.pgpony.android.crypto.ArmorExtractor.messageOnlyBytes(MimeEnvelope.unwrapBytes(bytes))
 
     // ── 3.1.0 Phase 4 (J1): content-based routing after decrypt ────────
 
@@ -6032,7 +6045,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             _encryptState.value = s.copy(errorMessage = it, signFileProcessing = false)
             return
         }
-        _encryptState.value = s.copy(signFileProcessing = true, errorMessage = null)
+        // 4.8.0 (item 4d): the typed passphrase is good for this one attempt; `s` keeps it
+        // for the launch below, and the field is empty whether it succeeds or fails.
+        _encryptState.value = s.copy(signFileProcessing = true, errorMessage = null, signFilePassphrase = "")
         viewModelScope.launch {
             try {
                 // #65: a composite ML-DSA signing key is not a BouncyCastle

@@ -1977,6 +1977,8 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="key_card_default_badge">PREDETERMINADA</string>
     <string name="settings_offer_publish_title">Ofrecer publicar las claves nuevas</string>
     <string name="settings_offer_publish_subtitle">Tras generar una clave, sugiere publicarla en servidores de claves. Desactívalo para mantener la generación de claves totalmente local.</string>
+    <string name="settings_keyring_drag_title">Arrastrar para reordenar claves</string>
+    <string name="settings_keyring_drag_subtitle">Muestra el control para arrastrar las claves a un orden personalizado. Desactívalo para que el orden no cambie por accidente.</string>
     <string name="keyring_generate_algorithm_group_classical">Clásico</string>
     <string name="keyring_generate_algorithm_group_pqc">Poscuántico</string>
     <string name="keyring_generate_algorithm_group_interop">Interop / compatibilidad</string>
@@ -1986,6 +1988,11 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="keyring_generate_granular_toggle">Avanzado: componer subclaves</string>
     <string name="keyring_generate_granular_include_default">Incluir la subclave de cifrado predeterminada</string>
     <string name="keyring_generate_granular_add_subkey">Añadir subclave</string>
+    <string name="keyring_generate_granular_base_label">Clave base</string>
+    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
+    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
+    <string name="keyring_generate_granular_dropped_for_v4">Una clave v4 no puede contener algunas de las subclaves que elegiste, así que se quitaron.</string>
+    <string name="keyring_generate_granular_include_default_caption">Añade una subclave de cifrado X25519 clásica junto a las que elijas.</string>
     <string name="keyring_error_email_invalid">Esa dirección de correo no parece correcta</string>
     <string name="import_button_encrypt_to_key">Cifrar a esta clave</string>
     <string name="key_detail_copy_email_cd">Copiar la dirección de correo</string>

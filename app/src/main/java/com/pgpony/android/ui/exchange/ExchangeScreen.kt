@@ -33,6 +33,7 @@ import com.pgpony.android.R
 import com.pgpony.android.ui.components.ScreenTooltip
 import com.pgpony.android.ui.keyring.ImportMethod
 import com.pgpony.android.ui.keyring.ImportMethodBody
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
 import com.pgpony.android.ui.keyring.KeyringUiState
 import com.pgpony.android.ui.keyring.KeyringViewModel
 import androidx.compose.ui.platform.LocalContext
@@ -318,6 +319,8 @@ private fun ImportPane(content: @Composable () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            // 4.8.0 (item 4b): the import fields here close the keyboard on a tap away too.
+            .dismissKeyboardOnTap()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .imePadding(),

@@ -871,7 +871,10 @@ fun PGPonyMainScreen(
     // state survives Activity recreation. As of RC4 MainActivity declares
     // configChanges="locale|layoutDirection", so on API 33+ a language
     // switch lands as an in-place onConfigurationChanged (no recreate, no
-    // flash, and the current route is preserved). API 26-32 still gets a
+    // flash, and the current route is preserved). 4.8.0 adds screenLayout:
+    // the first switch away from the system language after a cold start
+    // also reports a screenLayout change (diff 0x2104), and without it that
+    // one switch recreated with a black flash. API 26-32 still gets a
     // real recreate via AppCompat's compat shim, and any config change
     // (rotation, dark mode) recreates on every API level — so this
     // saveable is still required. With plain `remember`, the recreated

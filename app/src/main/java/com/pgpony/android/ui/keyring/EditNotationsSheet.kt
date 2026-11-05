@@ -20,8 +20,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 import com.pgpony.android.crypto.UserIdService
 
 /** A single editable notation row. Both fields are observable so the
@@ -50,6 +54,7 @@ fun EditNotationsSheet(
         }
     }
     var passphrase by remember { mutableStateOf("") }
+    var passphraseShown by remember { mutableStateOf(false) }
 
     // Rows the user actually meant: drop any left entirely blank.
     fun keptRows(): List<NotationDraft> =
@@ -71,7 +76,8 @@ fun EditNotationsSheet(
                 .imePadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
+                .padding(bottom = 32.dp)
+                .dismissKeyboardOnTap(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
@@ -105,7 +111,7 @@ fun EditNotationsSheet(
                             isError = row.name.isNotBlank() && !row.name.contains('@'),
                             singleLine = true,
                             enabled = !isProcessing,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.keepsKeyboard().weight(1f)
                         )
                         TextButton(
                             onClick = { rows.removeAt(index) },
@@ -123,7 +129,7 @@ fun EditNotationsSheet(
                         label = { Text(stringResource(R.string.key_detail_notations_value_label)) },
                         singleLine = true,
                         enabled = !isProcessing,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.keepsKeyboard().fillMaxWidth()
                     )
                 }
             }
@@ -148,11 +154,12 @@ fun EditNotationsSheet(
                     value = passphrase,
                     onValueChange = { passphrase = it },
                     label = { Text(stringResource(R.string.key_detail_add_userid_passphrase_label)) },
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
                     singleLine = true,
                     enabled = !isProcessing,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth()
                 )
             }
 
@@ -178,7 +185,10 @@ fun EditNotationsSheet(
                         val notations = keptRows().map {
                             UserIdService.Notation(it.name.trim(), it.value)
                         }
-                        onApply(notations, passphrase.ifBlank { null })
+                        // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
+                        val entered = passphrase
+                        passphrase = ""
+                        onApply(notations, entered.ifBlank { null })
                     },
                     enabled = canApply,
                     modifier = Modifier.weight(1f)

@@ -1973,6 +1973,8 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="key_card_default_badge">デフォルト</string>
     <string name="settings_offer_publish_title">新しい鍵の公開を提案</string>
     <string name="settings_offer_publish_subtitle">鍵の生成後、鍵サーバーへの公開を提案します。オフにすると、鍵の生成を完全にローカルに保ちます。</string>
+    <string name="settings_keyring_drag_title">ドラッグして鍵を並べ替え</string>
+    <string name="settings_keyring_drag_subtitle">鍵をカスタム順にドラッグして並べ替えるためのハンドルを表示します。オフにすると、誤って順番が変わるのを防げます。</string>
     <string name="keyring_generate_algorithm_group_classical">従来型</string>
     <string name="keyring_generate_algorithm_group_pqc">耐量子</string>
     <string name="keyring_generate_algorithm_group_interop">相互運用 / 互換性</string>
@@ -1982,6 +1984,11 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="keyring_generate_granular_toggle">詳細: サブキーを構成</string>
     <string name="keyring_generate_granular_include_default">デフォルトの暗号化サブキーを含める</string>
     <string name="keyring_generate_granular_add_subkey">サブキーを追加</string>
+    <string name="keyring_generate_granular_base_label">主鍵</string>
+    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
+    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
+    <string name="keyring_generate_granular_dropped_for_v4">v4 鍵には選択したサブキーの一部を含められないため、それらを削除しました。</string>
+    <string name="keyring_generate_granular_include_default_caption">選択したサブキーに加えて、従来型の X25519 暗号化サブキーを追加します。</string>
     <string name="keyring_error_email_invalid">そのメールアドレスは正しくないようです</string>
     <string name="import_button_encrypt_to_key">この鍵に暗号化</string>
     <string name="key_detail_copy_email_cd">メールアドレスをコピー</string>

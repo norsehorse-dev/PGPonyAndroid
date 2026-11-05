@@ -485,7 +485,8 @@ class ShareTargetViewModel(
      */
     private fun performDecryptStreaming(uri: android.net.Uri, sourceFilename: String?) {
         val current = _state.value
-        _state.update { it.copy(phase = ShareTargetPhase.Processing, errorMessage = null) }
+        // 4.8.0 (item 4d): the typed passphrase is good for this one attempt (`current` holds it).
+        _state.update { it.copy(phase = ShareTargetPhase.Processing, errorMessage = null, passphrase = "") }
         viewModelScope.launch {
             try {
                 val (tryRings, compositeRings) = withContext(Dispatchers.IO) { decryptRings(current) }
@@ -767,7 +768,8 @@ class ShareTargetViewModel(
             }
         }
 
-        _state.update { it.copy(phase = ShareTargetPhase.Processing, errorMessage = null) }
+        // 4.8.0 (item 4d): the typed passphrase is good for this one attempt (`current` holds it).
+        _state.update { it.copy(phase = ShareTargetPhase.Processing, errorMessage = null, passphrase = "") }
 
         viewModelScope.launch {
             try {
@@ -970,7 +972,8 @@ class ShareTargetViewModel(
 
     private fun performDecryptBinary(data: ByteArray, sourceFilename: String?) {
         val current = _state.value
-        _state.update { it.copy(phase = ShareTargetPhase.Processing, errorMessage = null) }
+        // 4.8.0 (item 4d): the typed passphrase is good for this one attempt (`current` holds it).
+        _state.update { it.copy(phase = ShareTargetPhase.Processing, errorMessage = null, passphrase = "") }
         viewModelScope.launch {
             try {
                 val (tryRings, compositeRings) = withContext(Dispatchers.IO) { decryptRings(current) }
@@ -1116,7 +1119,10 @@ class ShareTargetViewModel(
      * effectiveDecryptFileBytes.
      */
     private fun unwrapEnvelopeBytes(bytes: ByteArray): ByteArray =
-        com.pgpony.android.crypto.mime.MimeEnvelope.unwrapBytes(bytes)
+        // 4.8.0 (item 4d): then only the PGP MESSAGE block, so text around it is ignored.
+        com.pgpony.android.crypto.ArmorExtractor.messageOnlyBytes(
+            com.pgpony.android.crypto.mime.MimeEnvelope.unwrapBytes(bytes)
+        )
 
     private fun stripPgpExtension(name: String): String =
         name.removeSuffix(".pgp").removeSuffix(".gpg").removeSuffix(".asc")

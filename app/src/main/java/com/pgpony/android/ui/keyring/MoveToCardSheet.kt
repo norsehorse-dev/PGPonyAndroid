@@ -21,6 +21,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -30,6 +31,9 @@ import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
 import com.pgpony.android.crypto.card.CardSlot
 import com.pgpony.android.crypto.card.KeyToCard
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 
 /**
  * The key a slot gets by default: the newest key that fits it, a subkey before
@@ -116,7 +120,8 @@ fun MoveToCardSheet(
                 .imePadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
+                .padding(bottom = 32.dp)
+                .dismissKeyboardOnTap(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(stringResource(R.string.move_to_card_title), style = MaterialTheme.typography.headlineSmall)
@@ -175,7 +180,7 @@ fun MoveToCardSheet(
             CheckRow(stringResource(R.string.move_to_card_replace_confirm), replaceSlots, !isProcessing) { replaceSlots = it }
 
             if (passphraseProtected) {
-                SecretField(stringResource(R.string.key_detail_add_userid_passphrase_label), passphrase, !isProcessing) { passphrase = it }
+                SecretField(stringResource(R.string.key_detail_add_userid_passphrase_label), passphrase, !isProcessing, showToggle = true) { passphrase = it }
             }
             SecretField(stringResource(R.string.move_to_card_admin_pin), adminPin, !isProcessing) { adminPin = it }
             SecretField(stringResource(R.string.move_to_card_user_pin), userPin, !isProcessing) { userPin = it }
@@ -194,7 +199,12 @@ fun MoveToCardSheet(
                     Text(stringResource(R.string.common_button_cancel))
                 }
                 Button(
-                    onClick = { onMove(picked, passphrase.ifEmpty { null }, adminPin, userPin, removeFromPhone && removeAllowed, replaceSlots) },
+                    onClick = {
+                        // 4.8.0 (item 4d): the key passphrase is used once; a retry starts empty. The PINs stay.
+                        val entered = passphrase
+                        passphrase = ""
+                        onMove(picked, entered.ifEmpty { null }, adminPin, userPin, removeFromPhone && removeAllowed, replaceSlots)
+                    },
                     enabled = canMove,
                     modifier = Modifier.weight(1f)
                 ) {
@@ -321,15 +331,24 @@ private fun SwitchRow(label: String, hint: String, checked: Boolean, enabled: Bo
 }
 
 @Composable
-private fun SecretField(label: String, value: String, enabled: Boolean, onChange: (String) -> Unit) {
+private fun SecretField(
+    label: String,
+    value: String,
+    enabled: Boolean,
+    // 4.8.0 (item 4d): show or hide for the passphrase only; card PINs never get it.
+    showToggle: Boolean = false,
+    onChange: (String) -> Unit
+) {
+    var shown by remember { mutableStateOf(false) }
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
         label = { Text(label) },
-        visualTransformation = PasswordVisualTransformation(),
+        visualTransformation = if (showToggle && shown) VisualTransformation.None else PasswordVisualTransformation(),
+        trailingIcon = if (showToggle) ({ PassphraseVisibilityToggle(shown) { shown = !shown } }) else null,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         singleLine = true,
         enabled = enabled,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.keepsKeyboard().fillMaxWidth()
     )
 }

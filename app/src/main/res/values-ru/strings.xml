@@ -2054,6 +2054,8 @@
     <string name="key_card_default_badge">ПО УМОЛЧАНИЮ</string>
     <string name="settings_offer_publish_title">Предлагать публикацию новых ключей</string>
     <string name="settings_offer_publish_subtitle">После создания ключа предлагает опубликовать его на серверах ключей. Отключите, чтобы создание ключей оставалось полностью локальным.</string>
+    <string name="settings_keyring_drag_title">Менять порядок ключей перетаскиванием</string>
+    <string name="settings_keyring_drag_subtitle">Показывает маркер, которым можно перетаскивать ключи и задавать пользовательский порядок. Отключите, чтобы порядок не менялся случайно.</string>
     <string name="keyring_generate_algorithm_group_classical">Классические</string>
     <string name="keyring_generate_algorithm_group_pqc">Постквантовые</string>
     <string name="keyring_generate_algorithm_group_interop">Совместимость / interop</string>
@@ -2063,6 +2065,11 @@
     <string name="keyring_generate_granular_toggle">Расширенно: составить подключи</string>
     <string name="keyring_generate_granular_include_default">Включить подключ шифрования по умолчанию</string>
     <string name="keyring_generate_granular_add_subkey">Добавить подключ</string>
+    <string name="keyring_generate_granular_base_label">Основной ключ</string>
+    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
+    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
+    <string name="keyring_generate_granular_dropped_for_v4">Ключ v4 не может содержать некоторые из выбранных подключей, поэтому они удалены.</string>
+    <string name="keyring_generate_granular_include_default_caption">Добавляет классический подключ шифрования X25519 в дополнение к выбранным.</string>
     <string name="keyring_error_email_invalid">Этот адрес эл. почты выглядит неправильно</string>
     <string name="import_button_encrypt_to_key">Зашифровать для этого ключа</string>
     <string name="key_detail_copy_email_cd">Скопировать адрес эл. почты</string>

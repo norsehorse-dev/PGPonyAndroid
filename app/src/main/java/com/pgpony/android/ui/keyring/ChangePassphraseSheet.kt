@@ -19,8 +19,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 
@@ -39,6 +43,9 @@ fun ChangePassphraseSheet(
     var newPass by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var ackRemove by remember { mutableStateOf(false) }
+    var currentShown by remember { mutableStateOf(false) }
+    var newShown by remember { mutableStateOf(false) }
+    var confirmShown by remember { mutableStateOf(false) }
 
     val removing = newPass.isEmpty()
     val matches = newPass == confirm
@@ -59,7 +66,8 @@ fun ChangePassphraseSheet(
                 .imePadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
+                .padding(bottom = 32.dp)
+                .dismissKeyboardOnTap(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
@@ -77,11 +85,12 @@ fun ChangePassphraseSheet(
                     value = current,
                     onValueChange = { current = it },
                     label = { Text(stringResource(R.string.change_passphrase_current_label)) },
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (currentShown) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = { PassphraseVisibilityToggle(currentShown) { currentShown = !currentShown } },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
                     singleLine = true,
                     enabled = !isProcessing,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth()
                 )
             }
 
@@ -89,22 +98,24 @@ fun ChangePassphraseSheet(
                 value = newPass,
                 onValueChange = { newPass = it },
                 label = { Text(stringResource(R.string.change_passphrase_new_label)) },
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (newShown) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = { PassphraseVisibilityToggle(newShown) { newShown = !newShown } },
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
                 enabled = !isProcessing,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.keepsKeyboard().fillMaxWidth()
             )
             OutlinedTextField(
                 value = confirm,
                 onValueChange = { confirm = it },
                 label = { Text(stringResource(R.string.keyring_generate_passphrase_confirm_label)) },
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (confirmShown) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = { PassphraseVisibilityToggle(confirmShown) { confirmShown = !confirmShown } },
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
                 isError = !matches,
                 enabled = !isProcessing,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.keepsKeyboard().fillMaxWidth()
             )
             if (!matches) {
                 Text(
@@ -166,7 +177,12 @@ fun ChangePassphraseSheet(
                     modifier = Modifier.weight(1f)
                 ) { Text(stringResource(R.string.common_button_cancel)) }
                 Button(
-                    onClick = { onApply(if (isProtected) current else "", newPass) },
+                    onClick = {
+                        // 4.8.0 (item 4d): the current passphrase is used once; a retry starts empty.
+                        val entered = if (isProtected) current else ""
+                        current = ""
+                        onApply(entered, newPass)
+                    },
                     enabled = canApply,
                     modifier = Modifier.weight(1f)
                 ) {

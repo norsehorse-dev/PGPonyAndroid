@@ -24,8 +24,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 import com.pgpony.android.crypto.ClassicalSubkeyGen
 import com.pgpony.android.crypto.AddSubkeyChoice
 import com.pgpony.android.crypto.pqc.CompositeSignSuite
@@ -54,6 +58,7 @@ fun AddSubkeySheet(
     var customMillis by remember { mutableStateOf<Long?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var passphrase by remember { mutableStateOf("") }
+    var passphraseShown by remember { mutableStateOf(false) }
 
     fun computeExpiresAtEpochSeconds(): Long? {
         val preset = selectedPreset
@@ -78,7 +83,8 @@ fun AddSubkeySheet(
                 .imePadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
+                .padding(bottom = 32.dp)
+                .dismissKeyboardOnTap(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
@@ -129,11 +135,12 @@ fun AddSubkeySheet(
                 value = passphrase,
                 onValueChange = { passphrase = it },
                 label = { Text(stringResource(R.string.key_detail_add_subkey_passphrase_label)) },
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
                 enabled = !isProcessing,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.keepsKeyboard().fillMaxWidth()
             )
 
             if (errorMessage != null) {
@@ -155,7 +162,10 @@ fun AddSubkeySheet(
                 ) { Text(stringResource(R.string.common_button_cancel)) }
                 Button(
                     onClick = {
-                        onApply(selectedChoice, computeExpiresAtEpochSeconds(), passphrase.ifBlank { null })
+                        // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
+                        val entered = passphrase
+                        passphrase = ""
+                        onApply(selectedChoice, computeExpiresAtEpochSeconds(), entered.ifBlank { null })
                     },
                     enabled = canApply,
                     modifier = Modifier.weight(1f)

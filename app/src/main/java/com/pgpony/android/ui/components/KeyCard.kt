@@ -13,6 +13,7 @@ package com.pgpony.android.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,10 +37,13 @@ import com.pgpony.android.R
 import com.pgpony.android.data.PGPKeyEntity
 import com.pgpony.android.data.TrustLevel
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun KeyCard(
     key: PGPKeyEntity,
     onClick: () -> Unit = {},
+    // 4.8.0 (#93): a long press, when the caller handles one.
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     trailing: (@Composable () -> Unit)? = null,
     /** 4.6.0 (item 20): how many stored keys share this key's identity. */
@@ -49,7 +53,10 @@ fun KeyCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .then(
+                if (onLongClick != null) Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+                else Modifier.clickable(onClick = onClick)
+            ),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)

@@ -608,6 +608,8 @@
     <string name="keyring_generate_email_label">邮箱（可选）</string>
     <string name="settings_offer_publish_title">提示发布新密钥</string>
     <string name="settings_offer_publish_subtitle">生成密钥后，建议将其发布到密钥服务器。关闭此项可让密钥生成全程保持在本地。</string>
+    <string name="settings_keyring_drag_title">拖动以重新排序密钥</string>
+    <string name="settings_keyring_drag_subtitle">显示拖动手柄，用于将密钥调整为自定义排序。关闭此项可避免排序被意外改动。</string>
     <string name="keyring_generate_algorithm_label">算法</string>
     <string name="keyring_generate_algorithm_caption_v6">OpenPGP v6（RFC 9580）。现代格式，带有专用的签名子钥并支持硬件密钥。如果你的收件人使用较旧的软件，请选择 v4 类型。</string>
     <string name="keyring_generate_algorithm_caption_ed25519">快速、紧凑的椭圆曲线密钥（OpenPGP v4）。支持广泛。是不错的默认选择。</string>
@@ -623,6 +625,11 @@
     <string name="keyring_generate_granular_toggle">高级：自行组合子钥</string>
     <string name="keyring_generate_granular_include_default">包含默认加密子钥</string>
     <string name="keyring_generate_granular_add_subkey">添加子钥</string>
+    <string name="keyring_generate_granular_base_label">基础密钥</string>
+    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
+    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
+    <string name="keyring_generate_granular_dropped_for_v4">v4 密钥无法容纳你选择的部分子钥，因此已将它们移除。</string>
+    <string name="keyring_generate_granular_include_default_caption">在你选择的子钥之外，再添加一个传统 X25519 加密子钥。</string>
     <string name="keyring_generate_expiration_label">有效期</string>
     <string name="keyring_generate_passphrase_label">口令（可选）</string>
     <string name="keyring_generate_passphrase_confirm_label">确认口令</string>

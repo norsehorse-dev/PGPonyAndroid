@@ -1111,7 +1111,7 @@
     <string name="security_info_block_at_rest_body">개인 키는 androidx.security.crypto로 저장되며, Android Keystore가 생성하고 보호하는 마스터 키로 지켜집니다. 현대 기기에서 Keystore는 하드웨어 보안(Titan M, Secure Enclave 또는 동등물)으로 뒷받침됩니다.</string>
 
     <string name="security_info_block_biometric_title">선택적 생체 인증 잠금</string>
-    <string name="security_info_block_biometric_body">설정 및 보안에서 생체 인증 잠금을 켜면 PGPony를 열 때마다 지문이나 얼굴 잠금 해제를 요구합니다. 모든 복호화 작업마다 재인증을 요구하게 할 수도 있습니다.</string>
+    <string name="security_info_block_biometric_body">설정 &gt; 보안에서 생체 인증 잠금을 켜면 PGPony를 열 때마다 지문이나 얼굴 잠금 해제를 요구합니다. 모든 복호화 작업마다 재인증을 요구하게 할 수도 있습니다.</string>
 
     <string name="security_info_block_clipboard_title">클립보드 자동 비우기</string>
     <string name="security_info_block_clipboard_body">클립보드에 복사된 민감한 내용은 설정 가능한 시간 제한(기본 60초) 후 자동으로 지워져, 다른 앱이 읽을 수 있는 곳에 남지 않습니다.</string>
@@ -2043,6 +2043,8 @@
     <string name="key_card_default_badge">기본</string>
     <string name="settings_offer_publish_title">새 키 게시 제안</string>
     <string name="settings_offer_publish_subtitle">키를 생성한 후 키 서버에 게시하도록 제안합니다. 키 생성을 완전히 로컬로 유지하려면 끄세요.</string>
+    <string name="settings_keyring_drag_title">키를 끌어 순서 바꾸기</string>
+    <string name="settings_keyring_drag_subtitle">키를 끌어 사용자 지정 순서로 바꾸는 핸들을 표시합니다. 실수로 순서가 바뀌지 않게 하려면 끄세요.</string>
     <string name="keyring_generate_algorithm_group_classical">기존</string>
     <string name="keyring_generate_algorithm_group_pqc">포스트 양자</string>
     <string name="keyring_generate_algorithm_group_interop">상호 운용 / 호환성</string>
@@ -2052,6 +2054,11 @@
     <string name="keyring_generate_granular_toggle">고급: 보조 키 구성</string>
     <string name="keyring_generate_granular_include_default">기본 암호화 보조 키 포함</string>
     <string name="keyring_generate_granular_add_subkey">보조 키 추가</string>
+    <string name="keyring_generate_granular_base_label">기반 키</string>
+    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
+    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
+    <string name="keyring_generate_granular_dropped_for_v4">v4 키에는 선택한 보조 키 중 일부를 담을 수 없어 제거했습니다.</string>
+    <string name="keyring_generate_granular_include_default_caption">선택한 보조 키와 함께 기존 방식의 X25519 암호화 보조 키를 추가합니다.</string>
     <string name="keyring_error_email_invalid">전자 우편 주소가 올바르지 않은 것 같습니다</string>
     <string name="import_button_encrypt_to_key">이 키로 암호화</string>
     <string name="key_detail_copy_email_cd">전자 우편 주소 복사</string>
@@ -2125,7 +2132,7 @@
     <string name="revocation_result_publish_button">키 서버에 폐기 게시</string>
     <string name="keyring_generate_algorithm_experimental">지원 앱 제한적</string>
     <string name="keyring_generate_algorithm_experimental_note">이 키는 PGPony에서 완전히 작동합니다. 많은 다른 앱은 아직 포스트 양자 키를 읽지 못하며, 서로 호환되지 않는 두 가지 포스트 양자 형식이 쓰이고 있습니다.</string>
-    <string name="keyring_generate_algorithm_caption_pqc_sign_87">최고 보안 등급: v6 키(RFC 9980)의 ML-DSA-87 서명 ID와 ML-KEM-1024 암호화 하위 키입니다. 권장 선택인 ML-DSA-65 + ML-KEM-768보다 키가 크고 느립니다. 최신 OpenPGP 소프트웨어에서만 사용할 수 있습니다.</string>
+    <string name="keyring_generate_algorithm_caption_pqc_sign_87">최고 보안 등급: v6 키(RFC 9980)의 ML-DSA-87 서명 ID와 ML-KEM-1024 암호화 보조 키입니다. 권장 선택인 ML-DSA-65 + ML-KEM-768보다 키가 크고 느립니다. 최신 OpenPGP 소프트웨어에서만 사용할 수 있습니다.</string>
     <string name="key_detail_label_add">라벨 추가</string>
     <string name="keyring_same_identity_body">이 중 하나로 암호화하거나 신뢰하기 전에 지문을 비교하세요.</string>
     <string name="keyring_same_identity_created_format">생성 %1$s</string>
@@ -2149,7 +2156,7 @@
     <string name="import_url_error_http_format">서버 응답: HTTP %1$d</string>
     <string name="import_url_error_failed_format">링크를 가져오지 못했습니다: %1$s</string>
     <string name="import_preview_source_url_format">링크: %1$s</string>
-    <string name="key_detail_add_subkey_v6_note">Thunderbird와 GnuPG는 아직 v6 키를 읽지 못하므로 여기서 추가한 하위 키는 거기서 작동하지 않습니다.</string>
+    <string name="key_detail_add_subkey_v6_note">Thunderbird와 GnuPG는 아직 v6 키를 읽지 못하므로 여기서 추가한 보조 키는 거기서 작동하지 않습니다.</string>
     <string name="share_target_action_import">키 가져오기</string>
     <string name="share_target_action_import_subtitle">지문을 확인한 뒤 키링에 추가</string>
     <string name="share_target_action_import_encrypt">가져와서 이 키로 암호화</string>
@@ -2168,18 +2175,18 @@
     <string name="ssh_error_storage_recoverable">이 기기에서 PGPony의 보안 키 저장소가 시스템에 의해 초기화되었습니다. PGPony를 열고 이 키를 암호문으로 한 번 잠금 해제한 뒤 다시 시도하세요.</string>
     <string name="ssh_error_storage_unreadable">이 기기에서 PGPony의 보안 키 저장소가 시스템에 의해 초기화되었고, 이 키에는 복구할 암호문이 없습니다. PGPony에서 키를 다시 가져오세요.</string>
     <string name="ssh_keypicker_title">SSH에 사용할 키 선택</string>
-    <string name="ssh_keypicker_empty">SSH 인증 하위 키가 있는 키가 없습니다. PGPony에서 키 쌍을 열고 인증 하위 키를 추가한 뒤 다시 시도하세요.</string>
+    <string name="ssh_keypicker_empty">SSH 인증 보조 키가 있는 키가 없습니다. PGPony에서 키 쌍을 열고 인증 보조 키를 추가한 뒤 다시 시도하세요.</string>
     <string name="key_detail_action_copy_ssh_key">SSH 공개 키 복사</string>
     <string name="key_detail_ssh_key_copied">SSH 공개 키를 복사했습니다</string>
-    <string name="keyring_generate_ssh_auth_toggle">SSH 인증 하위 키 추가</string>
-    <string name="keyring_generate_ssh_auth_caption">ssh-agent 브리지를 통해 SSH로 서버에 로그인하기 위한 하위 키입니다. RSA 키에는 RSA, 그 밖의 키에는 Ed25519를 사용합니다.</string>
-    <string name="keyring_generate_ssh_auth_failed">키가 생성되었지만 SSH 하위 키를 추가하지 못했습니다: %1$s. 키 세부 정보에서 추가할 수 있습니다.</string>
+    <string name="keyring_generate_ssh_auth_toggle">SSH 인증 보조 키 추가</string>
+    <string name="keyring_generate_ssh_auth_caption">ssh-agent 브리지를 통해 SSH로 서버에 로그인하기 위한 보조 키입니다. RSA 키에는 RSA, 그 밖의 키에는 Ed25519를 사용합니다.</string>
+    <string name="keyring_generate_ssh_auth_failed">키가 생성되었지만 SSH 보조 키를 추가하지 못했습니다: %1$s. 키 세부 정보에서 추가할 수 있습니다.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">Termux에서 SSH</string>
     <string name="ssh_help_row_subtitle">Termux의 ssh와 git에서 PGPony 키 사용</string>
     <string name="ssh_help_body">PGPony는 Termux의 SSH 로그인에 서명할 수 있습니다. OkcAgent가 ssh의 요청을 PGPony에 전달하며, 개인 키는 PGPony 밖으로 나가지 않습니다.</string>
     <string name="ssh_help_get">PGPony용 OkcAgent 받기</string>
-    <string name="ssh_help_steps">1. 키에 인증 하위 키를 추가하세요 (키 세부 정보, 하위 키 추가). 키 세부 정보의 SSH 공개 키 복사로 서버 authorized_keys에 넣을 줄을 얻을 수 있습니다.
+    <string name="ssh_help_steps">1. 키에 인증 보조 키를 추가하세요 (키 세부 정보, 보조 키 추가). 키 세부 정보의 SSH 공개 키 복사로 서버 authorized_keys에 넣을 줄을 얻을 수 있습니다.
 2. 위 링크에서 OkcAgent를 설치하세요. 다른 OkcAgent가 있으면 먼저 제거하세요.
 3. OkcAgent에서 Settings, Crypto provider를 열어 PGPony를 선택하고 OkcAgent 알림을 허용하세요.
 4. OkcAgent에서 Add SSH key를 탭하고 키를 선택하세요.
@@ -2187,7 +2194,7 @@
     <string name="ssh_help_note">암호문과 보안 키 확인은 OkcAgent 알림으로 옵니다. ssh가 멈춘 것 같으면 알림을 확인하세요. GrapheneOS에서는 OkcAgent의 네트워크 권한도 켜세요. Termux가 로컬 연결로 OkcAgent에 접속하므로 권한이 없으면 ssh가 멈춥니다.</string>
     <string name="key_detail_action_ssh_setup">Termux에서 SSH 설정</string>
     <!-- 4.6.0: API consent and SSH scope -->
-    <string name="ssh_error_dual_use_auth">이 키의 인증 하위 키는 서명도 할 수 있습니다. 키 세부 정보에서 인증 전용 하위 키를 추가하세요.</string>
+    <string name="ssh_error_dual_use_auth">이 키의 인증 보조 키는 서명도 할 수 있습니다. 키 세부 정보에서 인증 전용 보조 키를 추가하세요.</string>
     <string name="provider_consent_ssh_title">%1$s에 SSH를 허용할까요?</string>
     <string name="provider_consent_ssh_body">%1$s(%2$s)이(가) PGPony 인증 키로 SSH 서버에 로그인하려고 합니다. 메시지를 암호화, 복호화하거나 서명할 수는 없습니다.\n\n다음에 키를 선택하며, 이 앱은 그 키만 사용할 수 있습니다. 설정 → 연결된 앱에서 언제든지 제거할 수 있습니다.</string>
     <string name="ssh_keypicker_confirm">%1$s이(가) 이 키로 로그인하려고 합니다. 허용하려면 탭하세요.</string>
@@ -2330,7 +2337,7 @@
     <string name="err_card_has_kdf_configured_but_no">카드에 KDF가 설정되어 있지만 %1$s PIN의 솔트가 없습니다</string>
     <string name="err_card_i_o_failed">카드 입출력에 실패했습니다: %1$s</string>
     <string name="err_card_kept_announcing_more_response_data">카드가 응답 데이터가 더 있다고 계속 알렸습니다</string>
-    <string name="err_card_moved_away_hold_still_try">카드가 멀어졌습니다. 카드를 움직이지 않게 잡고 다시 시도하세요</string>
+    <string name="err_card_moved_away_hold_still_try">카드가 인식 범위를 벗어났습니다. 카드를 움직이지 말고 다시 시도하세요</string>
     <string name="err_card_mute_did_not_answer">카드가 응답하지 않습니다</string>
     <string name="err_card_protocol_not_supported">지원되지 않는 카드 프로토콜입니다</string>
     <string name="err_card_rejected_corrected_le">카드가 수정된 Le를 거부했습니다</string>
@@ -2443,7 +2450,7 @@
     <string name="err_key_import_failed">키 가져오기 실패: %1$s</string>
     <string name="err_key_lives_hardware_key_so_user">이 키는 하드웨어 키에 있으므로, 카드 기반 키의 사용자 ID는 여기서 편집할 수 없습니다</string>
     <string name="err_key_lives_hardware_key_subkeys_can">이 키는 하드웨어 키에 있습니다. 카드 기반 키에는 여기서 보조 키를 추가할 수 없습니다</string>
-    <string name="err_key_lives_hardware_key_use_card">이 키는 하드웨어 키에 있습니다. 만료일을 편집하려면 카드 절차를 이용하세요.</string>
+    <string name="err_key_lives_hardware_key_use_card">이 키는 하드웨어 키에 저장되어 있습니다. 만료일을 변경하려면 카드 관리 기능을 사용하세요.</string>
     <string name="err_key_lives_hardware_key_user_ids">이 키는 하드웨어 키에 있습니다. 카드 기반 키의 사용자 ID는 여기서 편집할 수 없습니다</string>
     <string name="err_key_needs_its_passphrase_recover_before">이 키를 변경하려면 먼저 비밀구절로 키를 복구해야 합니다</string>
     <string name="err_key_not_found">키 %1$s을(를) 찾을 수 없습니다</string>
@@ -2477,7 +2484,7 @@
     <string name="err_no_encrypted_data_found_message">메시지에서 암호화된 데이터를 찾을 수 없습니다</string>
     <string name="err_no_encrypted_data_found_message_2">메시지에서 암호화된 데이터를 찾을 수 없습니다.</string>
     <string name="err_no_encryption_subkey_found">%1$s의 암호화 보조 키를 찾을 수 없습니다</string>
-    <string name="err_no_held_composite_secret_key_any">이 메시지의 복합 받는 사람 %1$s명 중 누구의 복합 개인 키도 보유하고 있지 않습니다</string>
+    <string name="err_no_held_composite_secret_key_any">이 메시지의 복합 키 받는 사람 %1$s명에 해당하는 복합 개인 키가 하나도 없습니다</string>
     <string name="err_no_held_librepgp_composite_secret_key">이 메시지의 복합 받는 사람 %1$s명 중 누구의 LibrePGP 복합 개인 키도 보유하고 있지 않습니다</string>
     <string name="err_no_input_data_provided">입력 데이터가 제공되지 않았습니다</string>
     <string name="err_no_key_id_request">요청에 키 ID가 없습니다</string>
@@ -2524,8 +2531,8 @@
     <string name="err_pgpony_does_not_have_permission_use">PGPony에 아직 이 USB 기기를 사용할 권한이 없습니다</string>
     <string name="err_pgpony_does_not_implement_yet_crypto">PGPony는 아직 %1$s 기능을 구현하지 않았습니다. 암호 작업은 다음 릴리스 단계에서 제공됩니다.</string>
     <string name="err_pgpony_offline_mode_no_network_request">PGPony 오프라인 모드가 켜져 있어 네트워크 요청을 보내지 않았습니다</string>
-    <string name="err_pgpony_s_secure_key_storage_device">이 기기에서 PGPony의 보안 키 저장소가 운영체제에 의해 무효화되었습니다. 접근을 복원하려면 PGPony를 열고 이 키를 비밀구절로 한 번 잠금 해제한 뒤 다시 시도하세요.</string>
-    <string name="err_pgpony_s_secure_key_storage_device_2">이 기기에서 PGPony의 보안 키 저장소가 운영체제에 의해 무효화되었고, 이 키에는 복구에 쓸 비밀구절이 없어 저장된 키 자료가 사라졌습니다. PGPony를 열고 키를 다시 가져오세요.</string>
+    <string name="err_pgpony_s_secure_key_storage_device">운영체제가 이 기기의 PGPony 보안 키 저장소를 무효화했습니다. PGPony를 열고 이 키의 비밀구절로 한 번 잠금을 해제하여 접근을 복구한 뒤 다시 시도하세요.</string>
+    <string name="err_pgpony_s_secure_key_storage_device_2">운영체제가 이 기기의 PGPony 보안 키 저장소를 무효화했습니다. 이 키에는 복구에 사용할 비밀구절이 없어 저장된 키 자료가 손실되었습니다. PGPony를 열고 키를 다시 가져오세요.</string>
     <string name="err_pgpony_supports_openpgp_api_versions_client">PGPony가 지원하는 OpenPGP API 버전은 %1$s-%2$s인데 클라이언트가 %3$s 버전을 보냈습니다</string>
     <string name="err_pgpony_supports_ssh_authentication_api_versi">PGPony가 지원하는 SSH 인증 API 버전은 %1$s인데 클라이언트가 %2$s 버전을 보냈습니다</string>
     <string name="err_pin_blocked_too_many_wrong_attempts">PIN이 잠겼습니다. 잘못 입력한 횟수가 너무 많습니다(0x6983)</string>
@@ -2548,7 +2555,7 @@
     <string name="err_reader_busy_automatic_sequence">리더가 자동 시퀀스를 실행하는 중입니다</string>
     <string name="err_reader_error_0x">리더 오류 0x%1$s</string>
     <string name="err_reader_hardware_error">리더 하드웨어 오류</string>
-    <string name="err_reader_kept_answering_sequence_while_was">시퀀스 %2$s 요청이 아직 처리되지 않았는데 리더가 계속 시퀀스 %1$s 응답을 보냈습니다</string>
+    <string name="err_reader_kept_answering_sequence_while_was">시퀀스 %2$s의 응답을 기다리는 동안 리더가 계속 시퀀스 %1$s로 응답했습니다</string>
     <string name="err_reader_missing_bulk_endpoints_ccid_requires">이 리더에는 CCID에 필요한 벌크 엔드포인트가 없습니다</string>
     <string name="err_reader_rejected_command">리더가 명령을 거부했습니다: %1$s</string>
     <string name="err_reader_returned_empty_response">리더가 빈 응답을 반환했습니다</string>
@@ -2667,7 +2674,7 @@
     <string name="err_v4_fingerprint_must_20_bytes">v4 지문은 20바이트여야 합니다</string>
     <string name="err_v4_fingerprint_must_exactly_20_bytes">v4 지문은 정확히 20바이트여야 하지만 %1$s바이트입니다</string>
     <string name="err_v4_key_supports_ml_kem_768">v4 키는 ML-KEM-768(알고리즘 35) 포스트 양자 보조 키만 지원합니다</string>
-    <string name="err_v6_granular_key_takes_ed25519_x25519">v6 개별 구성 키는 Ed25519/X25519 기존 방식 보조 키만 받습니다</string>
+    <string name="err_v6_granular_key_takes_ed25519_x25519">보조 키 구성을 지정하는 v6 키에는 기존 방식의 Ed25519/X25519 보조 키만 사용할 수 있습니다</string>
     <string name="err_verification_error">검증 오류: %1$s</string>
     <string name="err_wrapped_session_key_length_out_range">래핑된 세션 키 길이가 범위를 벗어났습니다</string>
     <string name="err_wrong_pin_no_tries_remaining_pin">PIN이 틀렸습니다. 남은 횟수가 없어 PIN이 잠겼습니다</string>

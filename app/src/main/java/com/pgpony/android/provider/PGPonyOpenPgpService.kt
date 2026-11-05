@@ -1319,6 +1319,19 @@ class PGPonyOpenPgpService : Service() {
 
         // ── Shape 1: detached-signature verify (multipart/signed) ──────
         val detachedSignature = data.getByteArrayExtra(OpenPgpApi.EXTRA_DETACHED_SIGNATURE)
+        // 4.8.0: an ML-DSA composite detached signature is graded by
+        // CompositeSignerGate, as the in-app Verify does. Bouncy Castle can't
+        // parse it and reported it as an invalid signature.
+        if (detachedSignature != null && isCompositeDetached(detachedSignature)) {
+            if (!metadataOnly) writeAll(output, inputBytes)
+            return successResult().apply {
+                putExtra(OpenPgpApi.RESULT_SIGNATURE, compositeDetachedSignatureResult(detachedSignature, inputBytes, senderAddress))
+                putExtra(
+                    OpenPgpApi.RESULT_DECRYPTION,
+                    OpenPgpDecryptionResult(OpenPgpDecryptionResult.RESULT_NOT_ENCRYPTED)
+                )
+            }
+        }
         if (detachedSignature != null) {
             val verification = verifier.verifyDetached(
                 signatureBytes = detachedSignature,
@@ -1344,6 +1357,28 @@ class PGPonyOpenPgpService : Service() {
         val asText = inputBytes.toString(Charsets.UTF_8)
         // A1 (ENGINE-1): routed by the first armor line, not by a substring
         // anywhere in the input (an armor header value could carry it).
+        // 4.8.0: an ML-DSA composite clear-signed message goes to the gate too.
+        if (com.pgpony.android.intent.ClearSignedInput.isClearSigned(asText) &&
+            runCatching { com.pgpony.android.crypto.pqc.CompositeDocumentVerifier.isCompositeCleartext(asText) }.getOrDefault(false)
+        ) {
+            val certs = runBlocking { repo.loadCompositeSignerCerts() }
+            val graded = runCatching { CompositeSignerGate.verifyCleartext(certs.map { it.second }, asText) }.getOrNull()
+            val content = graded?.content?.let { String(it, Charsets.UTF_8) }
+                ?: com.pgpony.android.crypto.pqc.CompositeDocumentVerifier.cleartextContent(asText)
+                ?: ""
+            if (!metadataOnly) writeAll(output, content.toByteArray(Charsets.UTF_8))
+            return successResult().apply {
+                putExtra(
+                    OpenPgpApi.RESULT_SIGNATURE,
+                    if (graded == null) OpenPgpSignatureResult.createWithInvalidSignature()
+                    else compositeGradedResult(graded, certs, senderAddress)
+                )
+                putExtra(
+                    OpenPgpApi.RESULT_DECRYPTION,
+                    OpenPgpDecryptionResult(OpenPgpDecryptionResult.RESULT_NOT_ENCRYPTED)
+                )
+            }
+        }
         if (com.pgpony.android.intent.ClearSignedInput.isClearSigned(asText)) {
             val verification = verifier.verifyClearSigned(asText, publicRings)
             val content = when (verification) {
@@ -1688,6 +1723,35 @@ class PGPonyOpenPgpService : Service() {
             if (streamed != null) CompositeSignerGate.verifyStreamed(certs.map { it.second }, streamed)
             else CompositeSignerGate.verifyInline(certs.map { it.second }, inline!!)
         }.getOrNull() ?: return OpenPgpSignatureResult.createWithInvalidSignature()
+        return compositeGradedResult(graded, certs, senderAddress, claimedFp)
+    }
+
+    /** 4.8.0: true when [signature] (armored or binary) is an ML-DSA composite signature. */
+    private fun isCompositeDetached(signature: ByteArray): Boolean = runCatching {
+        com.pgpony.android.crypto.pqc.CompositeDocumentVerifier.isCompositeSignature(
+            com.pgpony.android.crypto.pqc.CompositeDocumentVerifier.rawSignaturePacket(signature)
+        )
+    }.getOrDefault(false)
+
+    /** 4.8.0: a composite detached signature over [signed], graded like [compositeInlineSignatureResult]. */
+    private fun compositeDetachedSignatureResult(
+        signature: ByteArray,
+        signed: ByteArray,
+        senderAddress: String?
+    ): OpenPgpSignatureResult {
+        val certs = runBlocking { repo.loadCompositeSignerCerts() }
+        val graded = runCatching { CompositeSignerGate.verifyDetached(certs.map { it.second }, signature, signed) }
+            .getOrNull() ?: return OpenPgpSignatureResult.createWithInvalidSignature()
+        return compositeGradedResult(graded, certs, senderAddress)
+    }
+
+    /** A graded composite signature as the API's result; the owner is the certificate the gate names. */
+    private fun compositeGradedResult(
+        graded: CompositeSignerGate.Graded,
+        certs: List<Pair<com.pgpony.android.data.PGPKeyEntity, ByteArray>>,
+        senderAddress: String?,
+        claimedFp: String? = null
+    ): OpenPgpSignatureResult {
         val keyId = parseKeyId(graded.signingKeyFingerprint?.take(16))
             ?: parseKeyId((graded.claimedFingerprint ?: claimedFp)?.take(16))
         return gradedSignatureResult(

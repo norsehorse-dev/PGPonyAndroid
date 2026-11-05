@@ -706,6 +706,73 @@ class PGPCryptoService private constructor() {
         return ring
     }
 
+    /**
+     * 4.8.0 (item 4i): a granular key on a v4 Ed25519 base. [secret] and
+     * [public] are the stored octets; [publicRing] is set when the key has no
+     * ML-KEM-768 subkey and stays an ordinary Bouncy Castle ring.
+     */
+    class GranularV4Key(
+        val secret: ByteArray,
+        val public: ByteArray,
+        val fingerprintHex: String,
+        val hasV4Algo35: Boolean,
+        val publicRing: PGPPublicKeyRing?
+    )
+
+    /**
+     * 4.8.0 (item 4i): assemble an advanced granular key on a v4 Ed25519 base
+     * (sign + certify), the same primary the normal Ed25519 keygen makes. Its
+     * default Cv25519 encryption subkey is kept or stripped per
+     * [includeDefaultEncryptionSubkey], each classical spec (RSA included) is
+     * added with its own expiry, and an ML-KEM-768 spec is grafted last as the
+     * v4 algorithm 35 interop subkey, because Bouncy Castle can't carry that
+     * subkey through a later edit. A key with that subkey advertises SEIPDv2,
+     * as the v4 interop keygen does; a classical one doesn't. ML-DSA and
+     * ML-KEM-1024 are v6 only, and a v4 key takes one ML-KEM-768 subkey here.
+     */
+    fun assembleGranularV4(
+        userID: String,
+        includeDefaultEncryptionSubkey: Boolean,
+        subkeys: List<GranularSubkeySpec>,
+        passphrase: String?,
+        creationDate: Date = Date(),
+        expirationSeconds: Long? = null
+    ): GranularV4Key {
+        val pq = subkeys.filter { it.choice is AddSubkeyChoice.PqEncryption }
+        require(subkeys.none { it.choice is AddSubkeyChoice.PqSigning }) { "ML-DSA signing subkeys need a v6 key" }
+        require(pq.all { (it.choice as AddSubkeyChoice.PqEncryption).suite == com.pgpony.android.crypto.pqc.CompositeSuite.IETF_768 }) {
+            "A v4 key takes ML-KEM-768 only"
+        }
+        require(pq.size <= 1) { "A v4 key takes one ML-KEM-768 subkey" }
+
+        var ring = buildEd25519KeyRingGenerator(
+            userID, passphrase, creationDate, expirationSeconds,
+            features = if (pq.isEmpty()) null else (0x01 or 0x08).toByte()
+        ).generateSecretKeyRing()
+
+        if (!includeDefaultEncryptionSubkey) {
+            val defaultEnc = ring.secretKeys.asSequence().firstOrNull {
+                !it.publicKey.isMasterKey && it.publicKey.isEncryptionKey
+            }
+            if (defaultEnc != null) ring = ClassicalSubkeyGen.removeSubkey(ring, defaultEnc.keyID)
+        }
+        for (spec in subkeys) {
+            val choice = spec.choice as? AddSubkeyChoice.Classical ?: continue
+            ring = ClassicalSubkeyGen.addSubkey(ring, choice.type, passphrase, spec.expirationSeconds)
+        }
+
+        val pqSpec = pq.firstOrNull()
+        if (pqSpec != null) {
+            val rings = com.pgpony.android.crypto.pqc.CompositeKeyGen.addV4Algo35SubkeyRings(
+                ring, passphrase, expirationSeconds = pqSpec.expirationSeconds
+            )
+            return GranularV4Key(rings.secretRaw, rings.publicRaw, rings.primaryFingerprintHex.uppercase(), true, null)
+        }
+        val publicRing = PGPPublicKeyRing(ring.publicKeys.asSequence().toList())
+        val fp = ring.publicKey.fingerprint.joinToString("") { "%02X".format(it) }
+        return GranularV4Key(ring.encoded, publicRing.encoded, fp, false, publicRing)
+    }
+
     private fun buildV6Ed25519X25519KeyRings(
         userID: String,
         passphrase: String?,

@@ -41,9 +41,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.PGPonyTheme
 import com.pgpony.android.R
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
 import com.pgpony.android.ui.util.autofillPassword
 import org.openintents.openpgp.util.OpenPgpApi
 
@@ -104,6 +106,8 @@ class ProviderPassphraseActivity : ComponentActivity() {
                     }
                 }
                 var passphrase by remember { mutableStateOf("") }
+                // 4.8.0 (item 4d): show or hide, so a paste can be checked.
+                var shown by remember { mutableStateOf(false) }
                 // 4.7.0 (item 50, #59): the field takes focus and the keyboard opens.
                 val focus = rememberProviderAutoFocus()
                 // 4.8.0 (#105): Unlock, from the button or the keyboard's Done key.
@@ -144,7 +148,8 @@ class ProviderPassphraseActivity : ComponentActivity() {
                                 value = passphrase,
                                 onValueChange = { passphrase = it },
                                 singleLine = true,
-                                visualTransformation = PasswordVisualTransformation(),
+                                visualTransformation = if (shown) VisualTransformation.None else PasswordVisualTransformation(),
+                                trailingIcon = { PassphraseVisibilityToggle(shown) { shown = !shown } },
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Password,
                                     imeAction = ImeAction.Done

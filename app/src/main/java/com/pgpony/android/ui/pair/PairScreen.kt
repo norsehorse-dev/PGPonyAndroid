@@ -75,6 +75,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pgpony.android.BuildConfig
@@ -97,6 +98,9 @@ import com.pgpony.android.ui.keyring.BiometricAvailability
 import com.pgpony.android.ui.keyring.BiometricGate
 import com.pgpony.android.ui.scanner.QRScannerScreen
 import com.pgpony.android.ui.util.ClipboardService
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 import com.pgpony.android.ui.util.rememberHaptics
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -315,6 +319,7 @@ fun PairScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .dismissKeyboardOnTap()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -443,7 +448,7 @@ private fun JoiningPane(
         isError = bad,
         enabled = !working && !busy,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.keepsKeyboard().fillMaxWidth()
     )
     if (bad) {
         Text(
@@ -531,7 +536,7 @@ private fun HostComparePane(
         isError = wrong,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         textStyle = MaterialTheme.typography.headlineSmall.copy(fontFamily = FontFamily.Monospace),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.keepsKeyboard().fillMaxWidth()
     )
     if (wrong) {
         Text(stringResource(R.string.pair_typed_code_wrong), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
@@ -959,17 +964,26 @@ private fun SendPane(controller: PairController, peer: PairInfo?, onPrepared: (P
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        // 4.8.0 (item 4d): show or hide each passphrase field.
+        var passShown by remember { mutableStateOf(false) }
+        var pass2Shown by remember { mutableStateOf(false) }
         OutlinedTextField(
             value = pass, onValueChange = { pass = it }, label = { Text(stringResource(R.string.pair_transfer_pass)) },
-            singleLine = true, visualTransformation = PasswordVisualTransformation(), enabled = !working,
+            singleLine = true,
+            visualTransformation = if (passShown) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = { PassphraseVisibilityToggle(passShown) { passShown = !passShown } },
+            enabled = !working,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.keepsKeyboard().fillMaxWidth()
         )
         OutlinedTextField(
             value = pass2, onValueChange = { pass2 = it }, label = { Text(stringResource(R.string.pair_transfer_pass_repeat)) },
-            singleLine = true, visualTransformation = PasswordVisualTransformation(), enabled = !working,
+            singleLine = true,
+            visualTransformation = if (pass2Shown) VisualTransformation.None else PasswordVisualTransformation(),
+            trailingIcon = { PassphraseVisibilityToggle(pass2Shown) { pass2Shown = !pass2Shown } },
+            enabled = !working,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            isError = pass2.isNotEmpty() && pass != pass2, modifier = Modifier.fillMaxWidth()
+            isError = pass2.isNotEmpty() && pass != pass2, modifier = Modifier.keepsKeyboard().fillMaxWidth()
         )
     }
     error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
@@ -1082,7 +1096,7 @@ private fun IncomingPane(
             onValueChange = onBackupCode,
             label = { Text(stringResource(R.string.pair_backup_code_label)) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.keepsKeyboard().fillMaxWidth()
         )
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1117,7 +1131,7 @@ private fun ReceivedPane(
             label = { Text(stringResource(R.string.pair_backup_code_label)) },
             singleLine = true,
             isError = backupError != null,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.keepsKeyboard().fillMaxWidth()
         )
         backupError?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)

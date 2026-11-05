@@ -75,6 +75,11 @@ import kotlinx.coroutines.launch
 import com.pgpony.android.MainActivity
 import com.pgpony.android.network.KeyLookupSource
 import com.pgpony.android.ui.scanner.QRScannerScreen
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 
 /** 4.7.0 RC6 (item 64, #92): the methods that open their tab on the Exchange page. */
 internal val EXCHANGE_IMPORT_METHODS = setOf(ImportMethod.QR_CODE, ImportMethod.KEY_SERVER, ImportMethod.GITHUB)
@@ -107,6 +112,7 @@ fun ImportKeyScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .dismissKeyboardOnTap()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 8.dp)
                 .imePadding()
@@ -227,9 +233,12 @@ internal fun ImportMethodBody(state: KeyringUiState, viewModel: KeyringViewModel
                 onClick = {
                     val replace = useFileSecrets && preview.replaceableSecrets > 0 &&
                         preview.additionalKeys.isEmpty()
+                    // 4.8.0 (4.7.2 rule): a typed passphrase is used once.
+                    val entered = fileSecretsPassphrase
+                    fileSecretsPassphrase = ""
                     viewModel.confirmImportPreview(
                         replaceSecrets = replace,
-                        secretPassphrase = fileSecretsPassphrase.takeIf { replace && it.isNotEmpty() }?.toCharArray()
+                        secretPassphrase = entered.takeIf { replace && it.isNotEmpty() }?.toCharArray()
                     )
                 },
                 modifier = Modifier.weight(1f),
@@ -365,7 +374,7 @@ private fun PasteSection(state: KeyringUiState, viewModel: KeyringViewModel) {
             onValueChange = { viewModel.updateImportText(it) },
             label = { Text(stringResource(R.string.import_paste_label)) },
             placeholder = { Text(stringResource(R.string.import_paste_placeholder)) },
-            modifier = Modifier.fillMaxWidth().heightIn(min = 140.dp),
+            modifier = Modifier.keepsKeyboard().fillMaxWidth().heightIn(min = 140.dp),
             maxLines = 12,
             textStyle = MaterialTheme.typography.bodySmall
                 .copy(fontFamily = FontFamily.Monospace)
@@ -583,7 +592,7 @@ private fun KeyServerSection(state: KeyringUiState, viewModel: KeyringViewModel)
             onValueChange = { viewModel.updateImportSearchQuery(it) },
             label = { Text(stringResource(R.string.import_keyserver_query_label)) },
             placeholder = { Text(stringResource(R.string.import_keyserver_query_placeholder)) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.keepsKeyboard().fillMaxWidth(),
             singleLine = true,
             leadingIcon = {
                 Icon(Icons.Filled.Search, null, modifier = Modifier.size(18.dp))
@@ -626,7 +635,7 @@ private fun UrlSection(state: KeyringUiState, viewModel: KeyringViewModel) {
             onValueChange = { viewModel.updateImportUrl(it) },
             label = { Text(stringResource(R.string.import_url_label)) },
             placeholder = { Text("https://") },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.keepsKeyboard().fillMaxWidth(),
             singleLine = true,
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri
@@ -671,7 +680,7 @@ private fun GitHubSection(state: KeyringUiState, viewModel: KeyringViewModel) {
             onValueChange = { viewModel.updateImportGitHubUser(it) },
             label = { Text(stringResource(R.string.import_github_label)) },
             placeholder = { Text(stringResource(R.string.import_github_placeholder)) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.keepsKeyboard().fillMaxWidth(),
             singleLine = true,
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                 keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri
@@ -752,6 +761,8 @@ private fun ReplaceSecretsOption(
             }
         }
         if (checked) {
+            // 4.8.0 (item 4d): show or hide the passphrase.
+            var shown by remember { mutableStateOf(false) }
             OutlinedTextField(
                 value = passphrase,
                 onValueChange = onPassphraseChange,
@@ -759,11 +770,12 @@ private fun ReplaceSecretsOption(
                 label = { Text(stringResource(R.string.import_replace_secrets_passphrase_label)) },
                 supportingText = { Text(stringResource(R.string.import_replace_secrets_passphrase_help)) },
                 singleLine = true,
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                visualTransformation = if (shown) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = { PassphraseVisibilityToggle(shown) { shown = !shown } },
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                     keyboardType = androidx.compose.ui.text.input.KeyboardType.Password
                 ),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.keepsKeyboard().fillMaxWidth()
             )
         }
     }

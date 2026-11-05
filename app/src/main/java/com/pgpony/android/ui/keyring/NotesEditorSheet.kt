@@ -47,6 +47,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 
 private const val NOTES_LIMIT = 500
 
@@ -76,7 +78,8 @@ fun NotesEditorSheet(
                 .verticalScroll(rememberScrollState())
                 .imePadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 24.dp, vertical = 8.dp),
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+                .dismissKeyboardOnTap(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
@@ -99,6 +102,7 @@ stringResource(R.string.notes_editor_explainer),
                 },
                 placeholder = { Text(stringResource(R.string.notes_editor_placeholder)) },
                 modifier = Modifier
+                    .keepsKeyboard()
                     .fillMaxWidth()
                     .heightIn(min = 120.dp),
                 maxLines = 8

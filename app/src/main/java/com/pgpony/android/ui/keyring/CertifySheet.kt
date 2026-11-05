@@ -19,9 +19,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 import com.pgpony.android.crypto.CertificationService
 import com.pgpony.android.data.PGPKeyEntity
 import androidx.compose.foundation.selection.toggleable
@@ -63,6 +67,7 @@ fun CertifySheet(
     var localOnly by remember { mutableStateOf(false) }
     var compared by remember { mutableStateOf(false) }
     var passphrase by remember { mutableStateOf("") }
+    var passphraseShown by remember { mutableStateOf(false) }
 
     // 4.7.0 RC4 (item 31): a certifier on a card asks for its PIN, not a passphrase.
     val onCard = certifier?.let { it.isCardBacked && !it.isKeyPair } == true // 4.7.0 (item 55)
@@ -81,7 +86,8 @@ fun CertifySheet(
                 .imePadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
+                .padding(bottom = 32.dp)
+                .dismissKeyboardOnTap(),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(stringResource(R.string.certify_sheet_title), style = MaterialTheme.typography.headlineSmall)
@@ -239,11 +245,13 @@ fun CertifySheet(
                         )
                     )
                 },
-                visualTransformation = PasswordVisualTransformation(),
+                // 4.8.0 (item 4d): show or hide for a passphrase only, never a card PIN.
+                visualTransformation = if (passphraseShown && !onCard) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = if (onCard) null else ({ PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } }),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
                 enabled = !isProcessing,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.keepsKeyboard().fillMaxWidth()
             )
             if (onCard) {
                 Text(
@@ -264,9 +272,12 @@ fun CertifySheet(
                 Button(
                     onClick = {
                         val c = certifier ?: return@Button
+                        // 4.8.0 (item 4d): a passphrase is used once; a retry starts empty. A card PIN stays.
+                        val entered = passphrase
+                        if (!onCard) passphrase = ""
                         onApply(
                             c.fingerprint,
-                            passphrase.ifBlank { null },
+                            entered.ifBlank { null },
                             certifiable.map { it.raw }.filter { it in picked },
                             level,
                             expiry.seconds,

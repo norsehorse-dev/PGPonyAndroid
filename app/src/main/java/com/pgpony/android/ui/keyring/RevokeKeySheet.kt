@@ -63,8 +63,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 import com.pgpony.android.data.RevocationReason
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,6 +87,7 @@ fun RevokeKeySheet(
     var selectedReason by remember { mutableStateOf(RevocationReason.NO_REASON) }
     var comment by remember { mutableStateOf("") }
     var passphrase by remember { mutableStateOf("") }
+    var passphraseShown by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = { if (!isProcessing) onDismiss() },
@@ -103,7 +108,8 @@ fun RevokeKeySheet(
                 .verticalScroll(rememberScrollState())
                 .imePadding()
                 .navigationBarsPadding()
-                .padding(horizontal = 24.dp, vertical = 8.dp),
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+                .dismissKeyboardOnTap(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
@@ -149,7 +155,7 @@ fun RevokeKeySheet(
                         style = MaterialTheme.typography.bodySmall
                     )
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.keepsKeyboard().fillMaxWidth(),
                 maxLines = 3
             )
 
@@ -169,9 +175,10 @@ fun RevokeKeySheet(
                     )
                 },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.keepsKeyboard().fillMaxWidth()
             )
 
             if (!errorMessage.isNullOrBlank()) {
@@ -195,10 +202,13 @@ fun RevokeKeySheet(
                 }
                 Button(
                     onClick = {
+                        // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
+                        val entered = passphrase
+                        passphrase = ""
                         onRevoke(
                             selectedReason,
                             comment.trim().ifBlank { null },
-                            passphrase.ifBlank { null }
+                            entered.ifBlank { null }
                         )
                     },
                     enabled = !isProcessing,

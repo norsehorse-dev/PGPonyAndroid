@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
@@ -44,10 +45,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
 import com.pgpony.android.crypto.KeyAlgorithm
-import com.pgpony.android.crypto.AddSubkeyChoice
 import com.pgpony.android.data.PGPKeyEntity
 import androidx.compose.ui.unit.Dp
 import com.pgpony.android.ui.components.KeyCard
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 import com.pgpony.android.ui.components.ScreenTooltip
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
@@ -88,6 +91,14 @@ fun KeyringScreen(
     val toggleSelect: (String) -> Unit = { fp ->
         val cur = selection.orEmpty()
         selection = if (fp in cur) cur - fp else cur + fp
+    }
+    // 4.8.0 (#93): a long press on a key starts select mode with that key ticked.
+    val selectHaptics = com.pgpony.android.ui.util.rememberHaptics()
+    val longPressSelect: (String) -> Unit = { fp ->
+        if (selection == null) {
+            selectHaptics.tap()
+            selection = listOf(fp)
+        } else toggleSelect(fp)
     }
 
     // CertainBot (RC4): a delete or trust change made on the Key Detail
@@ -413,6 +424,8 @@ fun KeyringScreen(
                         onToggleCollapse = { viewModel.toggleSection("MINE") },
                         reorderableState = reorderableState,
                         manualMode = manualMode,
+                        dragEnabled = state.dragReorderEnabled,
+                        onLongPress = longPressSelect,
                         onKeyClick = onKeyClick,
                         identityCounts = identityCounts,
                         onIdentityClick = { identityDialogFor = it },
@@ -428,6 +441,8 @@ fun KeyringScreen(
                         onToggleCollapse = { viewModel.toggleSection("CONTACT") },
                         reorderableState = reorderableState,
                         manualMode = manualMode,
+                        dragEnabled = state.dragReorderEnabled,
+                        onLongPress = longPressSelect,
                         onKeyClick = onKeyClick,
                         identityCounts = identityCounts,
                         onIdentityClick = { identityDialogFor = it },
@@ -443,6 +458,8 @@ fun KeyringScreen(
                         onToggleCollapse = { viewModel.toggleSection("PUBLIC") },
                         reorderableState = reorderableState,
                         manualMode = manualMode,
+                        dragEnabled = state.dragReorderEnabled,
+                        onLongPress = longPressSelect,
                         onKeyClick = onKeyClick,
                         identityCounts = identityCounts,
                         onIdentityClick = { identityDialogFor = it },
@@ -770,6 +787,10 @@ private fun LazyListScope.keySection(
     // 4.7.0 (item 63, #93): when selecting, a tap ticks the key.
     selection: Set<String>? = null,
     onToggleSelect: (String) -> Unit = {},
+    // 4.8.0 (#101): false hides the drag handle (Settings).
+    dragEnabled: Boolean = true,
+    // 4.8.0 (#93): a long press on a key.
+    onLongPress: (String) -> Unit = {},
 ) {
     if (keys.isEmpty()) return
     // #45: header shows the count and toggles the section. A collapsed
@@ -803,11 +824,12 @@ private fun LazyListScope.keySection(
             KeyCard(
                 key = key,
                 onClick = { if (selection != null) onToggleSelect(key.fingerprint) else onKeyClick(key.fingerprint) },
+                onLongClick = { onLongPress(key.fingerprint) },
                 sameIdentityCount = identityCounts[key.identityKey] ?: 1,
                 onSameIdentityClick = { onIdentityClick(key) },
                 trailing = if (selection != null) {
                     { Checkbox(checked = key.fingerprint in selection, onCheckedChange = { onToggleSelect(key.fingerprint) }) }
-                } else if (manualMode) {
+                } else if (manualMode && dragEnabled) {
                     {
                         Icon(
                             Icons.Filled.DragHandle,
@@ -855,6 +877,8 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
                 .imePadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
+                // 4.8.0 (item 4b): a tap away from a field closes the keyboard.
+                .dismissKeyboardOnTap()
         ) {
             Text(stringResource(R.string.keyring_generate_title), style = MaterialTheme.typography.headlineSmall)
             Spacer(modifier = Modifier.height(16.dp))
@@ -863,7 +887,7 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
                 value = state.generateName,
                 onValueChange = { viewModel.updateGenerateName(it) },
                 label = { Text(stringResource(R.string.keyring_generate_name_label)) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.keepsKeyboard().fillMaxWidth(),
                 singleLine = true
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -872,13 +896,14 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
                 value = state.generateEmail,
                 onValueChange = { viewModel.updateGenerateEmail(it) },
                 label = { Text(stringResource(R.string.keyring_generate_email_label)) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.keepsKeyboard().fillMaxWidth(),
                 singleLine = true
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Algorithm picker (hidden in granular mode: the primary is fixed to
-            // a v6 Ed25519 base whose subkey set the user composes below).
+            // Algorithm picker (hidden in granular mode: the primary is an
+            // Ed25519 base, v6 or v4 (4.8.0 item 4i), whose subkey set the user
+            // composes below).
             if (!state.generateGranular) {
                 KeygenAlgorithmPicker(
                     selected = state.generateAlgorithm,
@@ -930,6 +955,38 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
             }
             if (state.generateGranular) {
                 Spacer(modifier = Modifier.height(8.dp))
+                // 4.8.0 (item 4i): the base key, v6 by default.
+                Text(stringResource(R.string.keyring_generate_granular_base_label), style = MaterialTheme.typography.labelMedium)
+                Spacer(modifier = Modifier.height(4.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = state.granularBaseV6,
+                        onClick = { viewModel.setGranularBase(true) },
+                        label = { Text(stringResource(R.string.keyring_generate_granular_base_v6)) }
+                    )
+                    FilterChip(
+                        selected = !state.granularBaseV6,
+                        onClick = { viewModel.setGranularBase(false) },
+                        label = { Text(stringResource(R.string.keyring_generate_granular_base_v4)) }
+                    )
+                }
+                Text(
+                    stringResource(
+                        if (state.granularBaseV6) R.string.keyring_generate_algorithm_caption_v6
+                        else R.string.keyring_generate_algorithm_caption_ed25519
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (state.granularDroppedForV4) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.keyring_generate_granular_dropped_for_v4),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -942,7 +999,15 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
                         modifier = Modifier.minimumInteractiveComponentSize()
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.keyring_generate_granular_include_default))
+                    // 4.8.0 (item 4j): the caption says what the switch adds.
+                    Column {
+                        Text(stringResource(R.string.keyring_generate_granular_include_default))
+                        Text(
+                            stringResource(R.string.keyring_generate_granular_include_default_caption),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 if (state.granularSubkeys.isNotEmpty()) {
@@ -975,8 +1040,8 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
                         expanded = granularMenuOpen,
                         onDismissRequest = { granularMenuOpen = false }
                     ) {
-                        (AddSubkeyChoice.classicalFor(isV6 = true) +
-                            AddSubkeyChoice.postQuantumFor(isV6 = true)).forEach { choice ->
+                        // 4.8.0 (item 4i): the subkeys the chosen base can hold.
+                        GranularComposer.menu(state.granularBaseV6, state.granularSubkeys).forEach { choice ->
                             DropdownMenuItem(
                                 text = { Text(addSubkeyChoiceLabel(choice)) },
                                 onClick = {
@@ -1020,24 +1085,29 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
             }
             Spacer(modifier = Modifier.height(12.dp))
 
+            // 4.8.0 (item 4d): show or hide, so a paste can be checked.
+            var passShown by remember { mutableStateOf(false) }
             OutlinedTextField(
                 value = state.generatePassphrase,
                 onValueChange = { viewModel.updateGeneratePassphrase(it) },
                 label = { Text(stringResource(R.string.keyring_generate_passphrase_label)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(),
+                visualTransformation = if (passShown) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = { PassphraseVisibilityToggle(passShown) { passShown = !passShown } },
+                modifier = Modifier.keepsKeyboard().fillMaxWidth(),
                 singleLine = true
             )
             Spacer(modifier = Modifier.height(8.dp))
 
+            var confirmShown by remember { mutableStateOf(false) }
             OutlinedTextField(
                 value = state.generateConfirmPassphrase,
                 onValueChange = { viewModel.updateGenerateConfirmPassphrase(it) },
                 label = { Text(stringResource(R.string.keyring_generate_passphrase_confirm_label)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(),
+                visualTransformation = if (confirmShown) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = { PassphraseVisibilityToggle(confirmShown) { confirmShown = !confirmShown } },
+                modifier = Modifier.keepsKeyboard().fillMaxWidth(),
                 singleLine = true
             )
             Spacer(modifier = Modifier.height(16.dp))

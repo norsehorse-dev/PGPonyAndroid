@@ -609,6 +609,8 @@
     <string name="keyring_generate_email_label">E-posta (isteğe bağlı)</string>
     <string name="settings_offer_publish_title">Yeni anahtarları yayımlamayı öner</string>
     <string name="settings_offer_publish_subtitle">Bir anahtar oluşturduktan sonra onu anahtar sunucularında yayımlamayı önerir. Anahtar oluşturmayı tamamen yerel tutmak için kapatın.</string>
+    <string name="settings_keyring_drag_title">Anahtarları sürükleyerek yeniden sırala</string>
+    <string name="settings_keyring_drag_subtitle">Anahtarları özel bir sıralamaya sürüklemek için tutamacı gösterir. Sıralamanın yanlışlıkla değişmemesi için kapatın.</string>
     <string name="keyring_generate_algorithm_label">Algoritma</string>
     <string name="keyring_generate_algorithm_caption_v6">OpenPGP v6 (RFC 9580). Ayrı bir imzalama alt anahtarı ve donanım anahtarı desteği sunan modern biçim. Alıcılarınız eski yazılımlar kullanıyorsa bir v4 türü seçin.</string>
     <string name="keyring_generate_algorithm_caption_ed25519">Hızlı, kompakt eliptik eğri anahtarları (OpenPGP v4). Geniş çapta desteklenir. İyi bir varsayılan seçim.</string>
@@ -624,6 +626,11 @@
     <string name="keyring_generate_granular_toggle">Gelişmiş: alt anahtarları yapılandır</string>
     <string name="keyring_generate_granular_include_default">Varsayılan şifreleme alt anahtarını ekle</string>
     <string name="keyring_generate_granular_add_subkey">Alt anahtar ekle</string>
+    <string name="keyring_generate_granular_base_label">Temel anahtar</string>
+    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
+    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
+    <string name="keyring_generate_granular_dropped_for_v4">Bir v4 anahtarı seçtiğiniz alt anahtarların bazılarını içeremez, bu yüzden bunlar kaldırıldı.</string>
+    <string name="keyring_generate_granular_include_default_caption">Seçtiğiniz alt anahtarların yanına klasik bir X25519 şifreleme alt anahtarı ekler.</string>
     <string name="keyring_generate_expiration_label">Son kullanma tarihi</string>
     <string name="keyring_generate_passphrase_label">Parola ifadesi (isteğe bağlı)</string>
     <string name="keyring_generate_passphrase_confirm_label">Parola İfadesini Onayla</string>

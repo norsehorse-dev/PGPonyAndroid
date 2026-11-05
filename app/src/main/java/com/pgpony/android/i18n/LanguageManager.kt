@@ -43,7 +43,7 @@ import java.util.Locale
 
 // ── Supported languages ────────────────────────────────────────────────
 //
-// Six entries, same set as iOS PGPony.xcstrings supports. The `tag` field
+// One entry per language PGPony ships (Korean from 4.8.0). The `tag` field
 // is the IETF BCP-47 language tag — what AppCompat and Android's resource
 // loader use to look up values-XX/strings.xml at runtime.
 //
@@ -63,11 +63,12 @@ enum class SupportedLanguage(val tag: String, val nativeName: String) {
     RU("ru", "Русский"),
     TR("tr", "Türkçe"),
     UK("uk", "Українська"),
-    ZH_HANS("zh-Hans", "简体中文");
+    ZH_HANS("zh-Hans", "简体中文"),
+    KO("ko", "한국어");
 
     companion object {
         /**
-         * Resolve a language tag (or BCP-47 locale) to one of our seven
+         * Resolve a language tag (or BCP-47 locale) to one of our
          * supported languages, snapping region variants to the closest
          * canonical entry. Returns null if nothing matches at all.
          *
@@ -101,6 +102,7 @@ enum class SupportedLanguage(val tag: String, val nativeName: String) {
                 "tr" -> TR
                 "uk" -> UK
                 "zh" -> if (isTraditionalChinese(normalized)) null else ZH_HANS
+                "ko" -> KO
                 else -> null
             }
         }

@@ -64,6 +64,7 @@ import androidx.core.content.FileProvider
 import java.io.File
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardActions
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -4746,18 +4747,3 @@ private fun loadCardRecipients(
     return loaded.rings to loaded.v4Algo35
 }
 
-/**
- * 4.7.2 RC4: the eye button on a passphrase field. Masked by default; the tester who asked for it could not tell
- * that a paste had gone wrong because only dots showed. Card PIN fields deliberately do not get one.
- */
-@Composable
-private fun PassphraseVisibilityToggle(shown: Boolean, onToggle: () -> Unit) {
-    IconButton(onClick = onToggle) {
-        Icon(
-            if (shown) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-            contentDescription = stringResource(
-                if (shown) R.string.encrypt_password_hide else R.string.encrypt_password_show
-            )
-        )
-    }
-}

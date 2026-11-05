@@ -54,4 +54,32 @@ object ArmorExtractor {
         val block = blocks(input).firstOrNull { it.type == "MESSAGE" } ?: return input
         return if (input.trim() == block.text) input else block.text + "\n"
     }
+
+    /**
+     * 4.8.0 (item 4d): [messageOnly] for a buffered file. Bytes with text around a complete
+     * PGP MESSAGE block come back as just the block. Binary ciphertext, a block with nothing
+     * around it, and input with no complete block come back unchanged (the same array).
+     */
+    fun messageOnlyBytes(bytes: ByteArray): ByteArray {
+        if (indexOfAscii(bytes, "-----BEGIN PGP MESSAGE-----") < 0) return bytes
+        // ISO-8859-1 maps each byte to one char and back, so the text around the block need
+        // not be valid UTF-8; the block itself is ASCII.
+        val text = String(bytes, Charsets.ISO_8859_1)
+        val out = messageOnly(text)
+        return if (out === text) bytes else out.toByteArray(Charsets.ISO_8859_1)
+    }
+
+    /** 4.8.0 (item 4d): offset of the ASCII [marker] in [bytes], or -1. */
+    fun indexOfAscii(bytes: ByteArray, marker: String): Int {
+        val m = marker.toByteArray(Charsets.US_ASCII)
+        val last = bytes.size - m.size
+        var i = 0
+        while (i <= last) {
+            var j = 0
+            while (j < m.size && bytes[i + j] == m[j]) j++
+            if (j == m.size) return i
+            i++
+        }
+        return -1
+    }
 }

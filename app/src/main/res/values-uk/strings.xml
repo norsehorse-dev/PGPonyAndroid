@@ -611,6 +611,8 @@
     <string name="keyring_generate_email_label">Ел. пошта (необов’язково)</string>
     <string name="settings_offer_publish_title">Пропонувати публікацію нових ключів</string>
     <string name="settings_offer_publish_subtitle">Після створення ключа пропонувати опублікувати його на серверах ключів. Вимкніть, щоб створення ключів залишалося повністю локальним.</string>
+    <string name="settings_keyring_drag_title">Змінювати порядок ключів перетягуванням</string>
+    <string name="settings_keyring_drag_subtitle">Показувати маркер, яким можна перетягувати ключі й задавати власний порядок. Вимкніть, щоб порядок не змінювався випадково.</string>
     <string name="keyring_generate_algorithm_label">Алгоритм</string>
     <string name="keyring_generate_algorithm_caption_v6">OpenPGP v6 (RFC 9580). Сучасний формат з окремим підключем для підпису та підтримкою апаратних ключів. Виберіть тип v4, якщо ваші отримувачі користуються старішими програмами.</string>
     <string name="keyring_generate_algorithm_caption_ed25519">Швидкі компактні ключі на еліптичних кривих (OpenPGP v4). Широко підтримуються. Добрий вибір за замовчуванням.</string>
@@ -626,6 +628,11 @@
     <string name="keyring_generate_granular_toggle">Додатково: налаштувати склад підключів</string>
     <string name="keyring_generate_granular_include_default">Додати підключ шифрування за замовчуванням</string>
     <string name="keyring_generate_granular_add_subkey">Додати підключ</string>
+    <string name="keyring_generate_granular_base_label">Основний ключ</string>
+    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
+    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
+    <string name="keyring_generate_granular_dropped_for_v4">Ключ v4 не може містити деякі з вибраних підключів, тому їх вилучено.</string>
+    <string name="keyring_generate_granular_include_default_caption">Додає класичний підключ шифрування X25519 на додачу до вибраних.</string>
     <string name="keyring_generate_expiration_label">Термін дії</string>
     <string name="keyring_generate_passphrase_label">Парольна фраза (необов’язково)</string>
     <string name="keyring_generate_passphrase_confirm_label">Підтвердьте парольну фразу</string>

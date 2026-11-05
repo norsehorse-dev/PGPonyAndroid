@@ -31,8 +31,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 
@@ -60,6 +64,8 @@ fun DeleteKeySheet(
     // such rings as-is; the field subtitle says so).
     var backupPassphrase by remember { mutableStateOf("") }
     var backupPassphraseConfirm by remember { mutableStateOf("") }
+    var backupShown by remember { mutableStateOf(false) }
+    var backupConfirmShown by remember { mutableStateOf(false) }
     val backupMismatch =
         backupPassphrase.isNotEmpty() && backupPassphrase != backupPassphraseConfirm
 
@@ -73,7 +79,8 @@ fun DeleteKeySheet(
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
+                .padding(bottom = 32.dp)
+                .dismissKeyboardOnTap(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -140,19 +147,21 @@ fun DeleteKeySheet(
                 value = backupPassphrase,
                 onValueChange = { backupPassphrase = it },
                 label = { Text(stringResource(R.string.export_passphrase_backup_label)) },
-                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                visualTransformation = if (backupShown) VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                trailingIcon = { PassphraseVisibilityToggle(backupShown) { backupShown = !backupShown } },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.keepsKeyboard().fillMaxWidth()
             )
             if (backupPassphrase.isNotEmpty()) {
                 OutlinedTextField(
                     value = backupPassphraseConfirm,
                     onValueChange = { backupPassphraseConfirm = it },
                     label = { Text(stringResource(R.string.export_passphrase_confirm_label)) },
-                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    visualTransformation = if (backupConfirmShown) VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    trailingIcon = { PassphraseVisibilityToggle(backupConfirmShown) { backupConfirmShown = !backupConfirmShown } },
                     singleLine = true,
                     isError = backupMismatch,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth()
                 )
                 if (backupMismatch) {
                     Text(

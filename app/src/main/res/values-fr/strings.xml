@@ -1977,6 +1977,8 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="key_card_default_badge">PAR DÉFAUT</string>
     <string name="settings_offer_publish_title">Proposer de publier les nouvelles clés</string>
     <string name="settings_offer_publish_subtitle">Après la génération d\'une clé, propose de la publier sur des serveurs de clés. Désactivez pour garder la génération de clés entièrement locale.</string>
+    <string name="settings_keyring_drag_title">Faire glisser pour réorganiser les clés</string>
+    <string name="settings_keyring_drag_subtitle">Affiche la poignée permettant de faire glisser les clés dans un ordre personnalisé. Désactivez pour éviter que l\'ordre ne change par mégarde.</string>
     <string name="keyring_generate_algorithm_group_classical">Classique</string>
     <string name="keyring_generate_algorithm_group_pqc">Post-quantique</string>
     <string name="keyring_generate_algorithm_group_interop">Interop / compatibilité</string>
@@ -1986,6 +1988,11 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="keyring_generate_granular_toggle">Avancé : composer les sous-clés</string>
     <string name="keyring_generate_granular_include_default">Inclure la sous-clé de chiffrement par défaut</string>
     <string name="keyring_generate_granular_add_subkey">Ajouter une sous-clé</string>
+    <string name="keyring_generate_granular_base_label">Clé de base</string>
+    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
+    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
+    <string name="keyring_generate_granular_dropped_for_v4">Une clé v4 ne peut pas porter certaines des sous-clés que vous avez choisies, elles ont donc été retirées.</string>
+    <string name="keyring_generate_granular_include_default_caption">Ajoute une sous-clé de chiffrement X25519 classique aux côtés de celles que vous choisissez.</string>
     <string name="keyring_error_email_invalid">Cette adresse e-mail ne semble pas correcte</string>
     <string name="import_button_encrypt_to_key">Chiffrer vers cette clé</string>
     <string name="key_detail_copy_email_cd">Copier l\'adresse e-mail</string>

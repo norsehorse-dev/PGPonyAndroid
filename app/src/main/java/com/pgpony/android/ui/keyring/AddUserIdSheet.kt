@@ -20,8 +20,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 
@@ -40,6 +44,7 @@ fun AddUserIdSheet(
     var email by remember { mutableStateOf("") }
     var makePrimary by remember { mutableStateOf(false) }
     var passphrase by remember { mutableStateOf("") }
+    var passphraseShown by remember { mutableStateOf(false) }
 
     fun composedUserId(): String {
         val trimmedName = name.trim()
@@ -64,7 +69,8 @@ fun AddUserIdSheet(
                 .imePadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
+                .padding(bottom = 32.dp)
+                .dismissKeyboardOnTap(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
@@ -83,7 +89,7 @@ fun AddUserIdSheet(
                 label = { Text(stringResource(R.string.key_detail_add_userid_name_label)) },
                 singleLine = true,
                 enabled = !isProcessing,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.keepsKeyboard().fillMaxWidth()
             )
             OutlinedTextField(
                 value = email,
@@ -92,7 +98,7 @@ fun AddUserIdSheet(
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Email),
                 singleLine = true,
                 enabled = !isProcessing,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.keepsKeyboard().fillMaxWidth()
             )
 
             Row(
@@ -120,11 +126,12 @@ fun AddUserIdSheet(
                 value = passphrase,
                 onValueChange = { passphrase = it },
                 label = { Text(stringResource(R.string.key_detail_add_userid_passphrase_label)) },
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
                 enabled = !isProcessing,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.keepsKeyboard().fillMaxWidth()
             )
 
             if (errorMessage != null) {
@@ -146,7 +153,10 @@ fun AddUserIdSheet(
                 ) { Text(stringResource(R.string.common_button_cancel)) }
                 Button(
                     onClick = {
-                        onApply(composedUserId(), makePrimary, passphrase.ifBlank { null })
+                        // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
+                        val entered = passphrase
+                        passphrase = ""
+                        onApply(composedUserId(), makePrimary, entered.ifBlank { null })
                     },
                     enabled = canApply,
                     modifier = Modifier.weight(1f)

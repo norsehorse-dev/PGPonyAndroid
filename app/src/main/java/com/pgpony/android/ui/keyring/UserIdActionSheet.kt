@@ -18,8 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
+import com.pgpony.android.ui.components.PassphraseVisibilityToggle
+import com.pgpony.android.ui.util.dismissKeyboardOnTap
+import com.pgpony.android.ui.util.keepsKeyboard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +37,7 @@ fun UserIdActionSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var passphrase by remember { mutableStateOf("") }
+    var passphraseShown by remember { mutableStateOf(false) }
 
     val title = when (request.kind) {
         UserIdActionRequest.Kind.REVOKE -> stringResource(R.string.key_detail_userid_action_sheet_title_revoke)
@@ -61,7 +66,8 @@ fun UserIdActionSheet(
                 .imePadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
+                .padding(bottom = 32.dp)
+                .dismissKeyboardOnTap(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(text = title, style = MaterialTheme.typography.headlineSmall)
@@ -77,11 +83,12 @@ fun UserIdActionSheet(
                     value = passphrase,
                     onValueChange = { passphrase = it },
                     label = { Text(stringResource(R.string.key_detail_userid_action_passphrase_label)) },
-                    visualTransformation = PasswordVisualTransformation(),
+                    visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
                     singleLine = true,
                     enabled = !isProcessing,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth()
                 )
             }
 
@@ -103,7 +110,12 @@ fun UserIdActionSheet(
                     modifier = Modifier.weight(1f)
                 ) { Text(stringResource(R.string.common_button_cancel)) }
                 Button(
-                    onClick = { onApply(passphrase.ifBlank { null }) },
+                    onClick = {
+                        // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
+                        val entered = passphrase
+                        passphrase = ""
+                        onApply(entered.ifBlank { null })
+                    },
                     enabled = !isProcessing,
                     modifier = Modifier.weight(1f)
                 ) {

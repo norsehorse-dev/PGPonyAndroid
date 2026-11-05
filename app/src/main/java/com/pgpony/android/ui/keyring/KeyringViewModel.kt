@@ -115,6 +115,13 @@ data class KeyringUiState(
     val generateSshAuth: Boolean = false,
     val granularIncludeDefaultEncryption: Boolean = true,
     val granularSubkeys: List<AddSubkeyChoice> = emptyList(),
+    // 4.8.0 (item 4i): the composer's base key, v6 (the shape it always made) or v4.
+    val granularBaseV6: Boolean = true,
+    // 4.8.0 (item 4i): switching to v4 removed subkeys a v4 key can't hold.
+    val granularDroppedForV4: Boolean = false,
+    // 4.8.0 (item 4j): the user set the default encryption subkey switch, so
+    // the composer stops choosing its value from the subkey list.
+    val granularIncludeDefaultTouched: Boolean = false,
     val isGenerating: Boolean = false,
     // 4.0.0 Phase 5a (§6 Q6) — set to the new key's fingerprint right
     // after a successful generate so the UI can offer the publish
@@ -182,6 +189,8 @@ data class KeyringUiState(
     // preserves the existing createdAt-DESC order on upgrade until the
     // user picks alphabetical or drags something.
     val sortMode: SortMode = SortMode.MANUAL,
+    // 4.8.0 (#101): Settings can turn off the drag handle on the Keyring.
+    val dragReorderEnabled: Boolean = true,
     val manualOrder: List<String> = emptyList(),
     // 4.2.0 RC2 workstream F — LibrePGP composite keys (768/1024)
     // generated before the RC2 wire fixes use an ECC point encoding gpg
@@ -340,6 +349,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             ?: emptySet()
         _state.value = _state.value.copy(
             sortMode = savedMode,
+            dragReorderEnabled = prefs.getBoolean("keyring_drag_reorder", true),
             manualOrder = savedOrder,
             dismissedRegenHintFingerprints = dismissedRegenHints,
             collapsedSections = collapsed
@@ -487,7 +497,9 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                 _state.value = _state.value.copy(
                     allKeys = keys,
                     legacyCompositeFingerprints = computeLegacyCompositeFingerprints(keys),
-                    hasLoaded = true
+                    hasLoaded = true,
+                    // 4.8.0 (#101): Settings may have changed it since init.
+                    dragReorderEnabled = prefs.getBoolean("keyring_drag_reorder", true)
                 )
             } catch (_: Exception) {
             }
@@ -574,6 +586,13 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             generateConfirmPassphrase = "",
             generateExpiration = ExpirationOption.TWO_YEARS,
             generateSshAuth = false,
+            // 4.8.0: the composer starts fresh each time the sheet opens.
+            generateGranular = false,
+            granularIncludeDefaultEncryption = true,
+            granularSubkeys = emptyList(),
+            granularBaseV6 = true,
+            granularDroppedForV4 = false,
+            granularIncludeDefaultTouched = false,
             errorMessage = null
         )
     }
@@ -616,16 +635,41 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
     }
 
     fun setGranularIncludeDefaultEncryption(on: Boolean) {
-        _state.value = _state.value.copy(granularIncludeDefaultEncryption = on)
+        _state.value = _state.value.copy(granularIncludeDefaultEncryption = on, granularIncludeDefaultTouched = true)
     }
 
     fun addGranularSubkey(choice: AddSubkeyChoice) {
-        _state.value = _state.value.copy(granularSubkeys = _state.value.granularSubkeys + choice)
+        setGranularSubkeys(_state.value.granularSubkeys + choice)
     }
 
     fun removeGranularSubkey(index: Int) {
-        _state.value = _state.value.copy(
-            granularSubkeys = _state.value.granularSubkeys.filterIndexed { i, _ -> i != index }
+        setGranularSubkeys(_state.value.granularSubkeys.filterIndexed { i, _ -> i != index })
+    }
+
+    /**
+     * 4.8.0 (item 4i): the base key for the composer. Switching to v4 keeps
+     * only the subkeys a v4 key can hold (no ML-DSA, no ML-KEM-1024, one
+     * ML-KEM-768) and says so when it removed any.
+     */
+    fun setGranularBase(v6: Boolean) {
+        val s = _state.value
+        if (v6 == s.granularBaseV6) return
+        if (v6) {
+            _state.value = s.copy(granularBaseV6 = true, granularDroppedForV4 = false)
+            return
+        }
+        val kept = GranularComposer.keptForV4(s.granularSubkeys)
+        _state.value = s.copy(granularBaseV6 = false, granularDroppedForV4 = kept.size != s.granularSubkeys.size)
+        setGranularSubkeys(kept, keepDroppedNote = true)
+    }
+
+    private fun setGranularSubkeys(list: List<AddSubkeyChoice>, keepDroppedNote: Boolean = false) {
+        val s = _state.value
+        _state.value = s.copy(
+            granularSubkeys = list,
+            granularDroppedForV4 = keepDroppedNote && s.granularDroppedForV4,
+            granularIncludeDefaultEncryption = if (s.granularIncludeDefaultTouched) s.granularIncludeDefaultEncryption
+                else GranularComposer.defaultEncryptionSubkey(list)
         )
     }
 
@@ -664,7 +708,8 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                             GranularSubkeySpec(it, s.generateExpiration.seconds)
                         },
                         passphrase = passphrase,
-                        expirationSeconds = s.generateExpiration.seconds
+                        expirationSeconds = s.generateExpiration.seconds,
+                        v6 = s.granularBaseV6
                     )
                 } else {
                     repo.generateKey(
@@ -694,6 +739,9 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                     errorMessage = sshAuthError,
                     isGenerating = false,
                     showGenerateSheet = false,
+                    // 4.8.0 (item 4d): the new key's passphrase leaves memory with the sheet.
+                    generatePassphrase = "",
+                    generateConfirmPassphrase = "",
                     // 4.0.0 Phase 5a (§6 Q6) — offer to publish the new key.
                     // item 8 (#request): suppressed while offline and when the
                     // "offer to publish new keys" suggestion is turned off.
@@ -1384,4 +1432,40 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             loadKeys()
         }
     }
+}
+
+/**
+ * 4.8.0 (items 4i and 4j): the subkey composer's rules, kept apart from the
+ * ViewModel so they can be tested on their own.
+ */
+object GranularComposer {
+
+    /** The Add subkey menu for [baseV6], given the subkeys already [chosen]. */
+    fun menu(baseV6: Boolean, chosen: List<AddSubkeyChoice>): List<AddSubkeyChoice> {
+        val all = AddSubkeyChoice.classicalFor(isV6 = baseV6) + AddSubkeyChoice.postQuantumFor(isV6 = baseV6)
+        if (baseV6 || chosen.none { it is AddSubkeyChoice.PqEncryption }) return all
+        return all.filterNot { it is AddSubkeyChoice.PqEncryption }
+    }
+
+    /** [chosen] with what a v4 base can't hold removed: ML-DSA, ML-KEM-1024, a second ML-KEM-768. */
+    fun keptForV4(chosen: List<AddSubkeyChoice>): List<AddSubkeyChoice> {
+        val allowed = (AddSubkeyChoice.classicalFor(isV6 = false) + AddSubkeyChoice.postQuantumFor(isV6 = false)).toSet()
+        var pqKept = false
+        return chosen.filter { c ->
+            when {
+                c !in allowed -> false
+                c is AddSubkeyChoice.PqEncryption -> if (pqKept) false else { pqKept = true; true }
+                else -> true
+            }
+        }
+    }
+
+    /**
+     * Whether the default classical encryption subkey is on when the user has
+     * not set the switch: off once the list has a post-quantum encryption
+     * subkey and nothing classical, so a key composed as post-quantum only
+     * gets no classical encryption subkey it wasn't asked for.
+     */
+    fun defaultEncryptionSubkey(chosen: List<AddSubkeyChoice>): Boolean =
+        !(chosen.any { it is AddSubkeyChoice.PqEncryption } && chosen.none { it is AddSubkeyChoice.Classical })
 }

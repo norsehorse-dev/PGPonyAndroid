@@ -1977,6 +1977,8 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="key_card_default_badge">STANDARD</string>
     <string name="settings_offer_publish_title">Veröffentlichung neuer Schlüssel anbieten</string>
     <string name="settings_offer_publish_subtitle">Schlägt nach dem Erzeugen eines Schlüssels vor, ihn auf Schlüsselservern zu veröffentlichen. Ausschalten, um die Schlüsselerzeugung vollständig lokal zu halten.</string>
+    <string name="settings_keyring_drag_title">Schlüssel per Ziehen umsortieren</string>
+    <string name="settings_keyring_drag_subtitle">Zeigt den Griff, mit dem du Schlüssel in eine eigene Reihenfolge ziehen kannst. Ausschalten, damit sich die Reihenfolge nicht versehentlich ändert.</string>
     <string name="keyring_generate_algorithm_group_classical">Klassisch</string>
     <string name="keyring_generate_algorithm_group_pqc">Post-Quanten</string>
     <string name="keyring_generate_algorithm_group_interop">Interop / Kompatibilität</string>
@@ -1986,6 +1988,11 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="keyring_generate_granular_toggle">Erweitert: Unterschlüssel zusammenstellen</string>
     <string name="keyring_generate_granular_include_default">Standard-Verschlüsselungs-Unterschlüssel einschließen</string>
     <string name="keyring_generate_granular_add_subkey">Unterschlüssel hinzufügen</string>
+    <string name="keyring_generate_granular_base_label">Basisschlüssel</string>
+    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
+    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
+    <string name="keyring_generate_granular_dropped_for_v4">Ein v4-Schlüssel kann einige der gewählten Unterschlüssel nicht aufnehmen, daher wurden sie entfernt.</string>
+    <string name="keyring_generate_granular_include_default_caption">Fügt neben den gewählten einen klassischen X25519-Verschlüsselungs-Unterschlüssel hinzu.</string>
     <string name="keyring_error_email_invalid">Diese E-Mail-Adresse sieht nicht richtig aus</string>
     <string name="import_button_encrypt_to_key">An diesen Schlüssel verschlüsseln</string>
     <string name="key_detail_copy_email_cd">E-Mail-Adresse kopieren</string>

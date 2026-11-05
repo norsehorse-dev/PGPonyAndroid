@@ -616,6 +616,8 @@
     <string name="keyring_generate_email_label">Email (optional)</string>
     <string name="settings_offer_publish_title">Offer to publish new keys</string>
     <string name="settings_offer_publish_subtitle">After generating a key, suggest publishing it to key servers. Turn off to keep key generation fully local.</string>
+    <string name="settings_keyring_drag_title">Drag to reorder keys</string>
+    <string name="settings_keyring_drag_subtitle">Show the handle for dragging keys into a custom order. Turn off to keep the order from changing by accident.</string>
     <string name="keyring_generate_algorithm_label">Algorithm</string>
     <string name="keyring_generate_algorithm_caption_v6">OpenPGP v6 (RFC 9580). Modern format with a dedicated signing subkey and hardware-key support. Pick a v4 type if your recipients use older software.</string>
     <string name="keyring_generate_algorithm_caption_ed25519">Fast, compact elliptic-curve keys (OpenPGP v4). Widely supported. A good default.</string>
@@ -631,6 +633,11 @@
     <string name="keyring_generate_granular_toggle">Advanced: compose subkeys</string>
     <string name="keyring_generate_granular_include_default">Include default encryption subkey</string>
     <string name="keyring_generate_granular_add_subkey">Add subkey</string>
+    <string name="keyring_generate_granular_base_label">Base key</string>
+    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
+    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
+    <string name="keyring_generate_granular_dropped_for_v4">A v4 key can\'t hold some of the subkeys you picked, so they were removed.</string>
+    <string name="keyring_generate_granular_include_default_caption">Adds a classical X25519 encryption subkey next to the ones you pick.</string>
     <string name="keyring_generate_expiration_label">Expiration</string>
     <string name="keyring_generate_passphrase_label">Passphrase (optional)</string>
     <string name="keyring_generate_passphrase_confirm_label">Confirm Passphrase</string>
