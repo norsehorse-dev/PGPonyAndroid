@@ -64,6 +64,13 @@ PGPony release key; its certificate SHA-256 fingerprint is:
 446bf9e621222a40c66cd2476e1a97105ccb2a9b16a01a91c1c7eb90765b50dc
 ```
 
+To check the signer with [`AppVerifier`](https://github.com/soupslurpr/AppVerifier), paste this text as the verification info:
+
+```
+com.pgpony.android
+44:6B:F9:E6:21:22:2A:40:C6:6C:D2:47:6E:1A:97:10:5C:CB:2A:9B:16:A0:1A:91:C1:C7:EB:90:76:5B:50:DC
+```
+
 Check a downloaded APK against it with the Android build tools:
 
 ```
