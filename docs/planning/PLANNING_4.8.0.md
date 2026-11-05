@@ -402,6 +402,27 @@ Desktop takes the data layer and the backup and pairing format from the sync and
 `pgpony encrypt -r @name` form. iOS mirrors it when it takes 4.8.0.
 
 
+## 4o. Three follow-ups from #78, #88 and #90 (Nov 5)
+
+A tester confirmed the 4.7.0 fixes for #82, #87, #89, #91 and #92 and asked three follow-ups. All in RC4.
+- #78: a re-import from gpg after the primary's usage flags changed, on a key whose primary is offline (a GNU stub).
+  Read from the code it works: CertificateMerge takes the newer self-signature (a User ID certification or a
+  direct-key signature), updateSecretRingPublicParts replaces only public parts so the stub stays a stub, and the
+  Usage row reads the newest flagged self-signature. No test covers it. Add one to CertificateMergeTest: a key flags
+  change at a later time, as a User ID certification and as a direct-key signature, merged with isKeyPair = true;
+  then the stub leg (primary turned into a GNU stub, the public parts replaced, the stub still a stub, the subkey
+  secret still unlocks, the primary's flags C and S).
+- #88: the certifier and signer lookup cards show the key's algorithm on the last line, and a key KeyAlgorithm does
+  not model (DSA, ElGamal) reads Unknown. Show the algorithm and size from the public key instead (DSA 1024,
+  ElGamal 4096), with Unknown only when even that cannot be read. KeyAlgorithm.UNKNOWN stays the truthful fallback
+  elsewhere.
+- #90: Check on Key Details asks keys.openpgp.org only (KeyServerRepository.CHECK_SERVER_NAME). Ask the servers
+  marked for lookup, in the user's order, stop at the first that has the key, and record that server's name in
+  KeyServerCheckStore so Details shows it. Not found names the servers asked. A network failure on one server moves
+  to the next and is reported only when every server failed.
+Desktop takes #88 and #90 from the sync when it mirrors RC4; #78's test is Android only.
+
+
 ## 5. Contributor PRs waiting on a decision
 
 - #96: Korean err_ strings. Superseded by af491ba (Nov 2), which translated the same 389 strings on main. Close it
@@ -485,6 +506,8 @@ RC4, card and key crypto:
 - 3 (#71): primary-signed edits on a key whose primary is on the card.
 - #86: the hash choice when re-signing self-signatures.
 - 4l (#109): brainpool and secp256k1 generation, v4 only.
+- 4o (#78, #88, #90, added Nov 5): the usage-change re-import test, the algorithm on the lookup cards, Check across
+  the lookup servers in order.
 
 RC5, new ways in:
 - #103 (text selection menu), #72 (sign one shared file), #67 (restore a shared backup), #106 (the Verify picker pairs
