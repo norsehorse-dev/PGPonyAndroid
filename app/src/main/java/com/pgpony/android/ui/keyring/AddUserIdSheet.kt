@@ -37,6 +37,9 @@ fun AddUserIdSheet(
     errorMessage: String? = null,
     onApply: (userId: String, makePrimary: Boolean, passphrase: String?) -> Unit,
     onDismiss: () -> Unit,
+    /** 4.8.0 (#71): the primary is on the security key, so the field takes
+     *  the card PIN and the self-certification is signed there. */
+    cardPin: Boolean = false,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -56,7 +59,7 @@ fun AddUserIdSheet(
         }
     }
 
-    val canApply = !isProcessing && composedUserId().isNotBlank()
+    val canApply = !isProcessing && composedUserId().isNotBlank() && (!cardPin || passphrase.isNotEmpty())
 
     ModalBottomSheet(
         onDismissRequest = { if (!isProcessing) onDismiss() },
@@ -125,14 +128,31 @@ fun AddUserIdSheet(
             OutlinedTextField(
                 value = passphrase,
                 onValueChange = { passphrase = it },
-                label = { Text(stringResource(R.string.key_detail_add_userid_passphrase_label)) },
-                visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
+                label = {
+                    Text(
+                        stringResource(
+                            if (cardPin) R.string.card_decrypt_pin_label
+                            else R.string.key_detail_add_userid_passphrase_label
+                        )
+                    )
+                },
+                // 4.8.0 (item 4d): show or hide for a passphrase only, never a card PIN.
+                visualTransformation = if (passphraseShown && !cardPin) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = if (cardPin) null else ({ PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } }),
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
                 enabled = !isProcessing,
                 modifier = Modifier.keepsKeyboard().fillMaxWidth()
             )
+            if (cardPin) {
+                Text(
+                    text = stringResource(
+                        if (isProcessing) R.string.card_decrypt_hold_card else R.string.key_detail_expiry_card_hint
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isProcessing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             if (errorMessage != null) {
                 Text(

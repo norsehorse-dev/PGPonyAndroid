@@ -81,7 +81,11 @@ fun RevokeKeySheet(
      *  the user changes the form. */
     errorMessage: String? = null,
     onRevoke: (reason: RevocationReason, comment: String?, passphrase: String?) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    /** 4.8.0 (#71): the primary is on the security key, so the field takes
+     *  the card PIN (handed over as the passphrase) and the revocation is
+     *  signed there. */
+    cardPin: Boolean = false
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var selectedReason by remember { mutableStateOf(RevocationReason.NO_REASON) }
@@ -160,7 +164,9 @@ fun RevokeKeySheet(
             )
 
             Text(
-                text = stringResource(R.string.revoke_sheet_passphrase_label),
+                text = stringResource(
+                    if (cardPin) R.string.card_decrypt_pin_label else R.string.revoke_sheet_passphrase_label
+                ),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -168,18 +174,28 @@ fun RevokeKeySheet(
             OutlinedTextField(
                 value = passphrase,
                 onValueChange = { passphrase = it },
-                placeholder = {
+                placeholder = if (cardPin) null else ({
                     Text(
                         stringResource(R.string.revoke_sheet_passphrase_placeholder),
                         style = MaterialTheme.typography.bodySmall
                     )
-                },
+                }),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
+                // 4.8.0 (item 4d): show or hide for a passphrase only, never a card PIN.
+                visualTransformation = if (passphraseShown && !cardPin) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = if (cardPin) null else ({ PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } }),
                 singleLine = true,
                 modifier = Modifier.keepsKeyboard().fillMaxWidth()
             )
+            if (cardPin) {
+                Text(
+                    text = stringResource(
+                        if (isProcessing) R.string.card_decrypt_hold_card else R.string.key_detail_expiry_card_hint
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isProcessing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             if (!errorMessage.isNullOrBlank()) {
                 Text(
@@ -211,7 +227,7 @@ fun RevokeKeySheet(
                             entered.ifBlank { null }
                         )
                     },
-                    enabled = !isProcessing,
+                    enabled = !isProcessing && (!cardPin || passphrase.isNotEmpty()),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError

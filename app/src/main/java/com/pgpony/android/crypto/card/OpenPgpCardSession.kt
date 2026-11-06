@@ -560,6 +560,55 @@ class OpenPgpCardSession(private val transport: CardTransport) {
     }
 
     /**
+     * 4.8.0 (#108): [decipher] with the key in [slot]. DECRYPTION is the
+     * plain call. AUTHENTICATION points PSO:DECIPHER at the authentication
+     * key with MANAGE SECURITY ENVIRONMENT first (see [withDecipherKey]);
+     * the caller has checked that the card supports it.
+     */
+    fun decipher(cipherData: ByteArray, slot: CardSlot): ByteArray =
+        withDecipherKey(slot) { decipher(cipherData) }
+
+    /** 4.8.0 (#108): [decipherRsa] with the key in [slot]; see [decipher]. */
+    fun decipherRsa(cryptogram: ByteArray, modulusBytes: Int, slot: CardSlot): ByteArray =
+        withDecipherKey(slot) { decipherRsa(cryptogram, modulusBytes) }
+
+    /**
+     * 4.8.0 (#108): run [op] (one PSO:DECIPHER) with the key in [slot].
+     *
+     * A message from GnuPG 2.4.1 or later also goes to the recipient's ADSKs
+     * (key flag 0x0400), and a user keeps an ADSK in a card's authentication
+     * slot. PSO:DECIPHER always uses key 2, the decryption key, unless MSE SET
+     * (00 22 41 B8, key reference 83 01 03) selects key 3 first; OpenPGP card
+     * 3.3 added that, and C0's tenth octet says whether a card has it. The
+     * reference is set back to key 2 afterwards whatever happened, so a later
+     * decrypt in the same session uses the decryption key again. A failed
+     * restore is not reported: the operation's own outcome is what the user
+     * needs, and the card drops the setting on the next SELECT or reset.
+     */
+    internal fun <T> withDecipherKey(slot: CardSlot, op: () -> T): T {
+        when (slot) {
+            CardSlot.DECRYPTION -> return op()
+            CardSlot.AUTHENTICATION -> {}
+            CardSlot.SIGNATURE -> throw IllegalArgumentException("PSO:DECIPHER cannot use the signature key")
+        }
+        transmit(CommandApdu.mseSetDecipherKey(OpenPgpCard.MSE_KEY_REF_AUTHENTICATION))
+        return try {
+            op()
+        } finally {
+            restoreDecipherKey()
+        }
+    }
+
+    /** 4.8.0 (#108): MSE back to key 2. Never throws; see [withDecipherKey]. */
+    private fun restoreDecipherKey() {
+        try {
+            transmit(CommandApdu.mseSetDecipherKey(OpenPgpCard.MSE_KEY_REF_DECRYPTION), throwOnError = false)
+        } catch (e: Exception) {
+            // Nothing to do: see withDecipherKey.
+        }
+    }
+
+    /**
      * High-level: SELECT the application and change the user PIN (PW1).
      * Self-contained like readCardInfo — this is what the NFC reader's
      * operation lambda invokes on tap. No admin PIN, no key material:

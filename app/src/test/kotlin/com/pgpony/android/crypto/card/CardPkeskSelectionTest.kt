@@ -75,4 +75,71 @@ class CardPkeskSelectionTest {
     fun nothingInRing() {
         assertEquals(-1, CardPkeskSelection.pickAddressed(listOf(id("1111111111111111")), enc, inRing))
     }
+
+    // ── 4.8.0 RC4 (#108): the authentication slot, through MSE ──────────
+
+    private val olderEnc = id("BDC5DA4245EFAC3D")
+    private val gpgOrder = listOf(auth, otherCardAuth, enc)
+
+    private fun open(index: Int, slot: CardSlot) = CardPkeskSelection.CardPick.Open(index, slot)
+
+    @Test
+    fun cardWithTheMessagesEncryptionKeyUsesItsDecryptionSlot() {
+        // Card A: decryption slot 03C7..., authentication slot 2AE0...
+        // Both have a packet; the decryption slot wins and needs no MSE.
+        assertEquals(
+            open(2, CardSlot.DECRYPTION),
+            CardPkeskSelection.pickForCard(gpgOrder, enc, auth, mseSupported = true, inRing = inRing)
+        )
+    }
+
+    @Test
+    fun cardWithOnlyItsAuthenticationKeyAddressedUsesMse() {
+        // Card B: decryption slot BDC5... (no packet), authentication B9E4...
+        assertEquals(
+            open(1, CardSlot.AUTHENTICATION),
+            CardPkeskSelection.pickForCard(gpgOrder, olderEnc, otherCardAuth, mseSupported = true, inRing = inRing)
+        )
+    }
+
+    @Test
+    fun authenticationSlotWithoutMseIsReported() {
+        assertEquals(
+            CardPkeskSelection.CardPick.AuthSlotWithoutMse(1),
+            CardPkeskSelection.pickForCard(gpgOrder, olderEnc, otherCardAuth, mseSupported = false, inRing = inRing)
+        )
+    }
+
+    @Test
+    fun authenticationKeyNotInRingIsNotChosen() {
+        val ring = setOf(enc)
+        assertEquals(
+            open(1, CardSlot.DECRYPTION),
+            CardPkeskSelection.pickForCard(listOf(otherCardAuth, enc), olderEnc, otherCardAuth, true) { it in ring }
+        )
+    }
+
+    @Test
+    fun unreadableSlotsFallBackToFirstRingMatchThroughDecryption() {
+        assertEquals(
+            open(0, CardSlot.DECRYPTION),
+            CardPkeskSelection.pickForCard(gpgOrder, null, null, mseSupported = true, inRing = inRing)
+        )
+    }
+
+    @Test
+    fun neitherSlotAddressedFallsBackToFirstRingMatch() {
+        assertEquals(
+            open(0, CardSlot.DECRYPTION),
+            CardPkeskSelection.pickForCard(gpgOrder, olderEnc, id("1111111111111111"), mseSupported = true, inRing = inRing)
+        )
+    }
+
+    @Test
+    fun nothingAddressedToTheRing() {
+        assertEquals(
+            CardPkeskSelection.CardPick.None,
+            CardPkeskSelection.pickForCard(listOf(0L, id("1111111111111111")), enc, auth, true, inRing)
+        )
+    }
 }

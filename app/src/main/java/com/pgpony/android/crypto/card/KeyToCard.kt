@@ -10,9 +10,16 @@
 //
 // Supported: v4 keys, RSA 2048 to 4096 (any slot by its usage), Ed25519
 // (EdDSA, signature and authentication slots) and Cv25519 (ECDH, decryption
-// slot). These are the types PGPony can also use on a card afterwards. NIST,
-// brainpool, RFC 9580 Ed25519/X25519 (algorithms 25 to 28), v6 and
-// post-quantum keys are refused with the reason.
+// slot). These are the types PGPony can also use on a card afterwards. RFC
+// 9580 Ed25519/X25519 (algorithms 25 to 28), v6 and post-quantum keys are
+// refused with the reason.
+//
+// 4.8.0 (4l, #109): ECDSA (signature and authentication slots) and ECDH
+// (decryption slot) on NIST P-256/384/521, brainpoolP256r1/384r1/512r1 and
+// secp256k1 move too, now that PGPony generates brainpool and secp256k1 keys.
+// Cards differ in which of these curves they hold; a card that refuses the
+// curve fails the attribute write or the check after it, and nothing on the
+// phone changes.
 //
 // The import data holds private key bytes; every builder here returns arrays
 // the caller wipes ([wipe]) once the APDUs are sent. BigInteger values from
@@ -20,7 +27,11 @@
 
 package com.pgpony.android.crypto.card
 
+import org.bouncycastle.asn1.ASN1ObjectIdentifier
+import org.bouncycastle.asn1.x9.ECNamedCurveTable
 import org.bouncycastle.bcpg.ECDHPublicBCPGKey
+import org.bouncycastle.bcpg.ECDSAPublicBCPGKey
+import org.bouncycastle.bcpg.ECPublicBCPGKey
 import org.bouncycastle.bcpg.ECSecretBCPGKey
 import org.bouncycastle.bcpg.EdDSAPublicBCPGKey
 import org.bouncycastle.bcpg.EdSecretBCPGKey
@@ -37,15 +48,28 @@ object KeyToCard {
     private const val OID_ED25519 = "1.3.6.1.4.1.11591.15.1"
     private const val OID_CV25519 = "1.3.6.1.4.1.3029.1.5.1"
 
-    /** The kinds of key this can move. */
-    enum class Kind { RSA, ED25519, CV25519 }
+    /** 4.8.0 (4l, #109): the Weierstrass curves an OpenPGP card 3.x may hold:
+     *  NIST P-256/384/521, secp256k1 and brainpoolP256r1/384r1/512r1. */
+    private val WEIERSTRASS_OIDS = setOf(
+        "1.2.840.10045.3.1.7", "1.3.132.0.34", "1.3.132.0.35", "1.3.132.0.10",
+        "1.3.36.3.3.2.8.1.1.7", "1.3.36.3.3.2.8.1.1.11", "1.3.36.3.3.2.8.1.1.13"
+    )
+
+    /** The kinds of key this can move. 4.8.0 (4l, #109): EC_SIGN is ECDSA and
+     *  EC_DECRYPT is ECDH on a Weierstrass curve, named by Movable.curveOid. */
+    enum class Kind { RSA, ED25519, CV25519, EC_SIGN, EC_DECRYPT }
 
     /** Why a key cannot go to a card, shown to the user. */
     enum class Refusal { NOT_V4, ALGORITHM, RSA_SIZE, CURVE }
 
     /** What a key is, for the slot choice: its kind, or why it cannot move. */
     sealed class Eligibility {
-        data class Movable(val kind: Kind, val rsaBits: Int = 0) : Eligibility()
+        data class Movable(
+            val kind: Kind,
+            val rsaBits: Int = 0,
+            /** 4.8.0 (4l, #109): the dotted curve OID of an EC_SIGN or EC_DECRYPT key. */
+            val curveOid: String? = null
+        ) : Eligibility()
         data class Refused(val reason: Refusal) : Eligibility()
     }
 
@@ -61,10 +85,19 @@ object KeyToCard {
             PublicKeyAlgorithmTags.EDDSA_LEGACY ->
                 if ((key as? EdDSAPublicBCPGKey)?.curveOID?.id == OID_ED25519) Eligibility.Movable(Kind.ED25519)
                 else Eligibility.Refused(Refusal.CURVE)
-            PublicKeyAlgorithmTags.ECDH ->
-                if ((key as? ECDHPublicBCPGKey)?.curveOID?.id == OID_CV25519) Eligibility.Movable(Kind.CV25519)
+            PublicKeyAlgorithmTags.ECDH -> {
+                val oid = (key as? ECDHPublicBCPGKey)?.curveOID?.id
+                when {
+                    oid == OID_CV25519 -> Eligibility.Movable(Kind.CV25519)
+                    oid != null && oid in WEIERSTRASS_OIDS -> Eligibility.Movable(Kind.EC_DECRYPT, curveOid = oid)
+                    else -> Eligibility.Refused(Refusal.CURVE)
+                }
+            }
+            PublicKeyAlgorithmTags.ECDSA -> {
+                val oid = (key as? ECDSAPublicBCPGKey)?.curveOID?.id
+                if (oid != null && oid in WEIERSTRASS_OIDS) Eligibility.Movable(Kind.EC_SIGN, curveOid = oid)
                 else Eligibility.Refused(Refusal.CURVE)
-            PublicKeyAlgorithmTags.ECDSA -> Eligibility.Refused(Refusal.CURVE)
+            }
             else -> Eligibility.Refused(Refusal.ALGORITHM)
         }
     }
@@ -77,9 +110,10 @@ object KeyToCard {
         when (slot) {
             // A certify-only primary may go to the Signature slot too, as in gpg;
             // the card's signature slot is what certifies on a card.
-            CardSlot.SIGNATURE -> (canSign || primaryCanCertify) && kind != Kind.CV25519
-            CardSlot.DECRYPTION -> canEncrypt && (kind == Kind.RSA || kind == Kind.CV25519)
-            CardSlot.AUTHENTICATION -> canAuthenticate && kind != Kind.CV25519
+            CardSlot.SIGNATURE -> (canSign || primaryCanCertify) && kind != Kind.CV25519 && kind != Kind.EC_DECRYPT
+            CardSlot.DECRYPTION -> canEncrypt &&
+                (kind == Kind.RSA || kind == Kind.CV25519 || kind == Kind.EC_DECRYPT)
+            CardSlot.AUTHENTICATION -> canAuthenticate && kind != Kind.CV25519 && kind != Kind.EC_DECRYPT
         }
 
     // ── Algorithm attributes (C1, C2, C3) ───────────────────────────────
@@ -97,8 +131,9 @@ object KeyToCard {
      * 01 | n bits | e bits | import format, an EC key is its algorithm ID and
      * curve OID. [rsaFormat] keeps the format the slot already uses when it
      * is RSA (with or without the modulus, 01 and 03, maps to the same data).
+     * [curveOid] is the dotted curve OID of an EC_SIGN or EC_DECRYPT key.
      */
-    fun attributes(kind: Kind, rsaBits: Int, eBits: Int, rsaFormat: Int): ByteArray = when (kind) {
+    fun attributes(kind: Kind, rsaBits: Int, eBits: Int, rsaFormat: Int, curveOid: String? = null): ByteArray = when (kind) {
         Kind.RSA -> byteArrayOf(
             0x01,
             ((rsaBits shr 8) and 0xFF).toByte(), (rsaBits and 0xFF).toByte(),
@@ -107,6 +142,17 @@ object KeyToCard {
         )
         Kind.ED25519 -> byteArrayOf(OpenPgpCard.ALGO_EDDSA.toByte()) + ED25519_OID_BYTES
         Kind.CV25519 -> byteArrayOf(OpenPgpCard.ALGO_ECDH.toByte()) + CV25519_OID_BYTES
+        // 4.8.0 (4l, #109): algorithm ID 13 (ECDSA) or 12 (ECDH), then the curve OID.
+        Kind.EC_SIGN -> byteArrayOf(OpenPgpCard.ALGO_ECDSA.toByte()) + oidBody(curveOid)
+        Kind.EC_DECRYPT -> byteArrayOf(OpenPgpCard.ALGO_ECDH.toByte()) + oidBody(curveOid)
+    }
+
+    /** The OID content octets (no 06 tag, no length) of a dotted OID, as a
+     *  card's algorithm attributes carry it. Every curve here is short form. */
+    private fun oidBody(dotted: String?): ByteArray {
+        requireNotNull(dotted) { "an EC key without a curve" }
+        val der = ASN1ObjectIdentifier(dotted).encoded
+        return der.copyOfRange(2, der.size)
     }
 
     /** The RSA public exponent length in bits of raw attributes, or null when they are not RSA. */
@@ -236,6 +282,22 @@ object KeyToCard {
         val stored = fixed(sec.x, 32)
         if (native) stored.reverse()
         return stored
+    }
+
+    /**
+     * 4.8.0 (4l, #109): the private scalar of an ECDSA or ECDH key on a
+     * Weierstrass curve, left-padded to the field length (32 octets for the
+     * 256-bit curves, 48 for 384, 64 for brainpoolP512r1, 66 for P-521), the
+     * fixed size gpg sends.
+     */
+    fun weierstrassSecret(pub: PGPPublicKey, priv: PGPPrivateKey): ByteArray {
+        val sec = priv.privateKeyDataPacket as? ECSecretBCPGKey
+            ?: throw IllegalArgumentException("not an EC private key")
+        val oid = (pub.publicKeyPacket.key as? ECPublicBCPGKey)?.curveOID
+            ?: throw IllegalArgumentException("not an EC key")
+        val x9 = ECNamedCurveTable.getByOID(oid)
+            ?: throw IllegalArgumentException("unknown curve ${oid.id}")
+        return fixed(sec.x, (x9.curve.fieldSize + 7) / 8)
     }
 
     /** The parts for an EC key: 92 with the private scalar or seed. */

@@ -55,6 +55,20 @@ object OpenPgpCard {
     const val INS_TERMINATE_DF: Int = 0xE6          // factory reset (step 1)
     const val INS_ACTIVATE_FILE: Int = 0x44         // factory reset (step 2)
 
+    // ── 4.8.0 (#108): MANAGE SECURITY ENVIRONMENT (spec 3.3 and later) ──
+    // MSE SET (P1 0x41) with the confidentiality template (P2 0xB8) and a
+    // key reference DO 83 01 xx picks which key PSO:DECIPHER uses: 0x02 is
+    // the decryption key (the default), 0x03 the authentication key.
+    const val INS_MANAGE_SECURITY_ENVIRONMENT: Int = 0x22
+    const val P1_MSE_SET_COMPUTE: Int = 0x41
+    const val DO_MSE_KEY_REFERENCE: Int = 0x83
+    const val MSE_KEY_REF_DECRYPTION: Int = 0x02
+    const val MSE_KEY_REF_AUTHENTICATION: Int = 0x03
+
+    /** 4.8.0 (#108): the spec version (AID octets 6 and 7) from which the
+     *  Extended Capabilities DO carries the MSE flag in its tenth octet. */
+    const val SPEC_VERSION_MSE: Int = 0x0303
+
     // ── SELECT parameters ──────────────────────────────────────────────
     const val P1_SELECT_BY_NAME: Int = 0x04
     const val P2_SELECT_FIRST_OR_ONLY: Int = 0x00

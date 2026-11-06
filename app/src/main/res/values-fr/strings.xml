@@ -3007,7 +3007,6 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="certifier_lookup_imported_body">Ses certifications sur cette clé sont revérifiées.</string>
     <string name="key_detail_refresh_sigs_menu">Actualiser les autosignatures</string>
     <string name="key_detail_refresh_sigs_title">Actualiser les autosignatures</string>
-    <string name="key_detail_refresh_sigs_body">Signe de nouveau les ID utilisateur et les liaisons de sous-clés de cette clé avec SHA-256. Toutes les dates d\'expiration restent inchangées. Une sous-clé écartée parce que sa liaison utilisait SHA-1 est rétablie si sa clé privée se trouve sur ce téléphone. Publiez ensuite la clé pour que les autres reçoivent les nouvelles signatures.</string>
     <string name="key_detail_refresh_sigs_action">Actualiser</string>
     <string name="key_detail_refresh_sigs_done">Autosignatures actualisées.</string>
     <plurals name="key_detail_refresh_sigs_done_restored">
@@ -3053,4 +3052,14 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="provider_review_included_format">Déjà incluse pour %1$s</string>
     <!-- 4.7.0 RC7, translated Oct 2026 -->
     <string name="exchange_qr_too_large_inline">Cette clé est trop grande pour un code QR. Utilisez plutôt Copier la clé ou Envoyer ci-dessous.</string>
+    <!-- 4.8.0 RC4 (#86) -->
+    <string name="key_detail_refresh_sigs_body_hash_choice">Signe de nouveau les ID utilisateur et les liaisons de sous-clés de cette clé avec le hachage choisi ci-dessous. Toutes les dates d\'expiration restent inchangées. Une sous-clé écartée parce que sa liaison utilisait SHA-1 est rétablie si son secret se trouve sur ce téléphone. Publiez ensuite la clé pour que les autres reçoivent les nouvelles signatures.</string>
+    <string name="self_sig_hash_label">Hachage des nouvelles signatures</string>
+    <string name="self_sig_hash_hint">Les deux sont sûrs. SHA-512 convient aux clés RSA de 3072 bits ou plus, et aux clés dont les signatures l\'utilisent déjà.</string>
+    <!-- 4.8.0 RC4 (4l) -->
+    <string name="keyring_generate_algorithm_caption_ecdsa">Signature ECDSA avec chiffrement ECDH sur la même courbe (OpenPGP v4). Les clés de sécurité ne prennent pas toutes en charge les mêmes courbes : vérifiez que la vôtre accepte celle-ci avant d\'y déplacer une clé.</string>
+    <!-- 4.8.0 RC4 (#71) -->
+    <string name="err_card_primary_missing">La clé principale n\'est pas dans l\'emplacement de signature de cette clé de sécurité : cette modification ne peut donc pas être effectuée avec celle-ci</string>
+    <string name="key_detail_add_subkey_card_note">La nouvelle sous-clé est créée sur ce téléphone. Cette clé signe et déchiffre avec la clé de sécurité : déplacez donc la nouvelle sous-clé vers celle-ci avec Déplacer vers une clé de sécurité avant de partager la clé. D\'ici là, les messages chiffrés pour une nouvelle sous-clé de chiffrement ne peuvent pas être ouverts.</string>
+    <string name="key_detail_add_subkey_card_new_passphrase_hint">Le secret de la nouvelle sous-clé reste sur ce téléphone, et aucun secret de cette clé n\'a encore de phrase secrète ici. Choisissez-en une pour le protéger.</string>
 </resources>

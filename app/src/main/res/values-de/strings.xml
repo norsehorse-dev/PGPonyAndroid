@@ -3001,7 +3001,6 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="certifier_lookup_imported_body">Seine Beglaubigungen für diesen Schlüssel werden erneut geprüft.</string>
     <string name="key_detail_refresh_sigs_menu">Selbstsignaturen erneuern</string>
     <string name="key_detail_refresh_sigs_title">Selbstsignaturen erneuern</string>
-    <string name="key_detail_refresh_sigs_body">Signiert die Benutzer-IDs und Unterschlüssel-Bindungen dieses Schlüssels erneut mit SHA-256. Alle Ablaufdaten bleiben unverändert. Ein Unterschlüssel, der wegen einer SHA-1-Bindung ausgelassen wurde, ist wieder da, wenn sein geheimer Schlüssel auf diesem Telefon liegt. Veröffentliche den Schlüssel danach, damit andere die neuen Signaturen erhalten.</string>
     <string name="key_detail_refresh_sigs_action">Erneuern</string>
     <string name="key_detail_refresh_sigs_done">Selbstsignaturen erneuert.</string>
     <plurals name="key_detail_refresh_sigs_done_restored">
@@ -3042,4 +3041,14 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="provider_review_included_format">%1$s: bereits enthalten</string>
     <!-- 4.7.0 RC7, translated Oct 2026 -->
     <string name="exchange_qr_too_large_inline">Dieser Schlüssel ist zu groß für einen QR-Code. Nutze stattdessen unten „Schlüssel kopieren“ oder „Hochladen“.</string>
+    <!-- 4.8.0 RC4 (#86) -->
+    <string name="key_detail_refresh_sigs_body_hash_choice">Signiert die Benutzer-IDs und Unterschlüssel-Bindungen dieses Schlüssels erneut mit dem unten gewählten Hash. Alle Ablaufdaten bleiben unverändert. Ein Unterschlüssel, der wegen einer SHA-1-Bindung ausgelassen wurde, ist wieder da, wenn sein geheimer Teil auf diesem Telefon liegt. Veröffentliche den Schlüssel danach, damit andere die neuen Signaturen erhalten.</string>
+    <string name="self_sig_hash_label">Hash für die neuen Signaturen</string>
+    <string name="self_sig_hash_hint">Beide sind sicher. SHA-512 eignet sich für RSA-Schlüssel ab 3072 Bit und für Schlüssel, deren Signaturen schon SHA-512 verwenden.</string>
+    <!-- 4.8.0 RC4 (4l) -->
+    <string name="keyring_generate_algorithm_caption_ecdsa">ECDSA-Signatur mit ECDH-Verschlüsselung auf derselben Kurve (OpenPGP v4). Sicherheitsschlüssel unterstützen unterschiedliche Kurven, prüfe also, ob deiner diese annimmt, bevor du einen Schlüssel darauf verschiebst.</string>
+    <!-- 4.8.0 RC4 (#71) -->
+    <string name="err_card_primary_missing">Der Hauptschlüssel liegt nicht im Signatur-Slot dieses Sicherheitsschlüssels, daher kann diese Änderung damit nicht vorgenommen werden</string>
+    <string name="key_detail_add_subkey_card_note">Der neue Unterschlüssel wird auf diesem Telefon erzeugt. Dieser Schlüssel signiert und entschlüsselt mit dem Sicherheitsschlüssel, verschiebe den neuen Unterschlüssel also mit „Auf Sicherheitsschlüssel verschieben“ dorthin, bevor du den Schlüssel teilst. Bis dahin lassen sich Nachrichten, die an einen neuen Verschlüsselungs-Unterschlüssel verschlüsselt wurden, nicht öffnen.</string>
+    <string name="key_detail_add_subkey_card_new_passphrase_hint">Der geheime Teil des neuen Unterschlüssels bleibt auf diesem Telefon, und noch kein geheimer Teil dieses Schlüssels hat hier eine Passphrase. Wähle eine, um ihn zu schützen.</string>
 </resources>

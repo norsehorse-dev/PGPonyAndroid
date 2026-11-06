@@ -190,6 +190,8 @@ internal object ErrorTextRules {
             ErrorText.Rule("""\QThis security key does not hold the key chosen to certify with\E""", R.string.err_certify_card_mismatch),
             // 4.7.0 RC4 (item 13): Move to Security Key.
             ErrorText.Rule("""\QThe primary key is not in this security key's signature slot, so the expiry cannot be changed with it\E""", R.string.err_card_expiry_primary_missing),
+            // 4.8.0 (#71): an edit the primary signs, on a card whose Signature slot holds another key.
+            ErrorText.Rule("""\QThe primary key is not in this security key's signature slot, so this change cannot be made with it\E""", R.string.err_card_primary_missing),
             ErrorText.Rule("""\QThis security key cannot hold one of the chosen keys. Choose another key or slot.\E""", R.string.err_move_to_card_unsupported),
             ErrorText.Rule("""\QThe security key did not pass the check after the keys were written, so nothing on this phone was changed. Do not rely on the keys on the security key.\E""", R.string.err_move_to_card_check_failed),
             // 4.7.0 (item 10): keys marked Don't use, refused through the provider.

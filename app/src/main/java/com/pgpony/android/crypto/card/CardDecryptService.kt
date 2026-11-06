@@ -105,15 +105,34 @@ class CardDecryptService private constructor() {
         // read from Application Related Data (GET DATA, no PIN) and only when
         // there is a choice to make, so the common one-recipient case costs
         // nothing extra. See CardPkeskSelection.
+        //
+        // 4.8.0 (#108): the authentication slot counts too. GnuPG 2.4.1 and
+        // later also encrypts to the recipient's ADSKs, and a user keeps one
+        // in a card's authentication slot; a card whose decryption key got no
+        // packet can still open the message there, through MSE (see
+        // CardPkeskSelection.pickForCard). So the slots are read whenever any
+        // addressed packet names a key in the ring, not only when there are
+        // several: a message to the ADSK alone has one match, and it is not
+        // the decryption key. One GET DATA, no PIN.
         sawWildcard = pkesks.any { it.keyID == WILDCARD_KEY_ID }
         val addressedIds = pkesks.map { it.keyID }
         val inRing: (Long) -> Boolean = { pubRing.getPublicKey(it) != null }
         val ringMatches = addressedIds.count { it != WILDCARD_KEY_ID && inRing(it) }
-        val slotKeyId = if (ringMatches > 1) decryptionSlotKeyId(session) else null
-        val pick = CardPkeskSelection.pickAddressed(addressedIds, slotKeyId, inRing)
-        if (pick >= 0) {
-            pked = pkesks[pick]
-            encKey = pubRing.getPublicKey(pkesks[pick].keyID)
+        val slots = if (ringMatches > 0) slotData(session) else null
+        val slotKeyId = slots?.let { CardPkeskSelection.v4KeyId(it.decFingerprint) }
+        val authSlotKeyId = slots?.let { CardPkeskSelection.v4KeyId(it.authFingerprint) }
+        var pickedSlot = CardSlot.DECRYPTION
+        var authSlotWithoutMse = false
+        when (val pick = CardPkeskSelection.pickForCard(
+            addressedIds, slotKeyId, authSlotKeyId, slots?.mseSupported == true, inRing
+        )) {
+            is CardPkeskSelection.CardPick.Open -> {
+                pked = pkesks[pick.index]
+                encKey = pubRing.getPublicKey(pkesks[pick.index].keyID)
+                pickedSlot = pick.slot
+            }
+            is CardPkeskSelection.CardPick.AuthSlotWithoutMse -> authSlotWithoutMse = true
+            CardPkeskSelection.CardPick.None -> {}
         }
 
         // Pass 2 - hidden recipients. Trial each wildcard packet against the
@@ -181,6 +200,16 @@ class CardDecryptService private constructor() {
         val chosen = pked
         val chosenKey = encKey
         if (chosen == null || chosenKey == null) {
+            // 4.8.0 (#108): the packet for this card names the key in its
+            // authentication slot, and the card has no MSE (OpenPGP card 3.3
+            // and later) to decipher with it. Same message the card's own
+            // refusal produced before 4.8.0, given without spending a
+            // PSO:DECIPHER on a packet that cannot open.
+            if (authSlotWithoutMse) {
+                throw OpenPgpCardException.Malformed(
+                    "This message was encrypted to a different key than the one in this card's decryption slot."
+                )
+            }
             throw OpenPgpCardException.Malformed(
                 if (sawWildcard)
                     "This message hides its recipient, and this card's key did not open it."
@@ -193,7 +222,7 @@ class CardDecryptService private constructor() {
             // Pass 2 already holds an open stream; pass 1 opens one here, which
             // is where the card operation happens for an addressed message.
             val clear = clearStream
-                ?: chosen.getDataStream(CardPublicKeyDataDecryptorFactory(session, chosenKey))
+                ?: chosen.getDataStream(CardPublicKeyDataDecryptorFactory(session, chosenKey, pickedSlot))
 
             // A legacy packet without integrity protection is refused before
             // its content is read.
@@ -260,6 +289,20 @@ class CardDecryptService private constructor() {
      */
     private fun decryptionSlotKeyId(session: OpenPgpCardSession): Long? = try {
         CardPkeskSelection.v4KeyId(session.getApplicationRelatedData().decFingerprint)
+    } catch (e: OpenPgpCardException.TagLost) {
+        throw e
+    } catch (e: OpenPgpCardException) {
+        null
+    }
+
+    /**
+     * 4.8.0 (#108): the card's Application Related Data (slot fingerprints,
+     * MSE support), or null when it could not be read. Null only means "no
+     * preference", so pass 1 falls back to the first match. A card that left
+     * the field is still reported.
+     */
+    private fun slotData(session: OpenPgpCardSession): ApplicationRelatedData? = try {
+        session.getApplicationRelatedData()
     } catch (e: OpenPgpCardException.TagLost) {
         throw e
     } catch (e: OpenPgpCardException) {

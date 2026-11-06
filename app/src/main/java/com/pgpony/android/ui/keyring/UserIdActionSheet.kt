@@ -34,6 +34,9 @@ fun UserIdActionSheet(
     errorMessage: String? = null,
     onApply: (passphrase: String?) -> Unit,
     onDismiss: () -> Unit,
+    /** 4.8.0 (#71): the primary is on the security key, so the field takes
+     *  the card PIN and the signature is made there (not for Remove). */
+    cardPin: Boolean = false,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var passphrase by remember { mutableStateOf("") }
@@ -78,17 +81,35 @@ fun UserIdActionSheet(
             )
 
             // Remove is structural (no signing), so it needs no passphrase.
+            val onCard = cardPin && request.kind != UserIdActionRequest.Kind.REMOVE
             if (request.kind != UserIdActionRequest.Kind.REMOVE) {
                 OutlinedTextField(
                     value = passphrase,
                     onValueChange = { passphrase = it },
-                    label = { Text(stringResource(R.string.key_detail_userid_action_passphrase_label)) },
-                    visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
+                    label = {
+                        Text(
+                            stringResource(
+                                if (onCard) R.string.card_decrypt_pin_label
+                                else R.string.key_detail_userid_action_passphrase_label
+                            )
+                        )
+                    },
+                    // 4.8.0 (item 4d): show or hide for a passphrase only, never a card PIN.
+                    visualTransformation = if (passphraseShown && !onCard) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = if (onCard) null else ({ PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } }),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
                     singleLine = true,
                     enabled = !isProcessing,
                     modifier = Modifier.keepsKeyboard().fillMaxWidth()
+                )
+            }
+            if (onCard) {
+                Text(
+                    text = stringResource(
+                        if (isProcessing) R.string.card_decrypt_hold_card else R.string.key_detail_expiry_card_hint
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isProcessing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -116,7 +137,7 @@ fun UserIdActionSheet(
                         passphrase = ""
                         onApply(entered.ifBlank { null })
                     },
-                    enabled = !isProcessing,
+                    enabled = !isProcessing && (!onCard || passphrase.isNotEmpty()),
                     modifier = Modifier.weight(1f)
                 ) {
                     if (isProcessing) {

@@ -36,7 +36,13 @@ import org.bouncycastle.openpgp.operator.bc.BcPublicKeyDataDecryptorFactory
 
 class CardPublicKeyDataDecryptorFactory(
     private val session: OpenPgpCardSession,
-    private val encryptionKey: PGPPublicKey
+    private val encryptionKey: PGPPublicKey,
+    // 4.8.0 (#108): the card slot whose key opens the packet. AUTHENTICATION
+    // for an ADSK kept in the authentication slot: the session sets MSE
+    // around the PSO:DECIPHER. The cryptogram format still follows the
+    // packet's algorithm and [encryptionKey], which is the authentication
+    // subkey in that case, so RSA and ECDH work the same in either slot.
+    private val slot: CardSlot = CardSlot.DECRYPTION
 ) : BcPublicKeyDataDecryptorFactory(
     PGPPrivateKey(encryptionKey.keyID, encryptionKey.publicKeyPacket, null)
 ) {
@@ -99,7 +105,17 @@ class CardPublicKeyDataDecryptorFactory(
         }
 
         // ECDH on the card → shared secret.
-        val shared = session.decipher(EcdhCipherData.cipherDoForPoint(cardPoint))
+        // 4.8.0 (4l, #109): RFC 6637 hashes only the x-coordinate of the
+        // shared point. A card that returns the whole uncompressed point
+        // (04 || X || Y, an odd length) is cut down to X; an X-only answer
+        // (32, 48, 64 or 66 octets) and an X25519 answer pass unchanged.
+        val shared = session.decipher(EcdhCipherData.cipherDoForPoint(cardPoint), slot).let { s ->
+            if (s.size > 1 && s.size % 2 == 1 && (s[0].toInt() and 0xFF) == 0x04) {
+                s.copyOfRange(1, 1 + (s.size - 1) / 2)
+            } else {
+                s
+            }
+        }
 
         // KDF parameters come from the recipient (card) encryption key.
         val ecdh = encryptionKey.publicKeyPacket.key as ECDHPublicBCPGKey
@@ -144,6 +160,10 @@ class CardPublicKeyDataDecryptorFactory(
      * slot (GET DATA, no PIN) happens only on this failure path.
      */
     private fun ecdhUnwrapFailure(cause: Exception): Exception {
+        // 4.8.0 (#108): the authentication slot is used only when its
+        // fingerprint named this packet's key, so there is no other-key case
+        // to tell apart; the failure is reported as it is.
+        if (slot != CardSlot.DECRYPTION) return PGPException(cause.message ?: "checksum failed", cause)
         val slotFingerprint = try {
             session.getApplicationRelatedData().decFingerprint
         } catch (e: OpenPgpCardException.TagLost) {
@@ -181,13 +201,16 @@ class CardPublicKeyDataDecryptorFactory(
         val modulusBytes = (rsa.modulus.bitLength() + 7) / 8
 
         return try {
-            session.decipherRsa(cryptogram, modulusBytes)
+            session.decipherRsa(cryptogram, modulusBytes, slot)
         } catch (e: OpenPgpCardException) {
             // The card decrypts with the key in its DECRYPTION slot. If the
             // message was encrypted to a different key (e.g. addressed to the
             // primary/signing key, or to another card), the RSA result fails its
             // PKCS#1 padding check and the card returns 0x6A80. Translate that
             // specific case into a clear message instead of a raw status code.
+            // 4.8.0 (#108): the other-key check reads the decryption slot, so
+            // it only applies there; see ecdhUnwrapFailure.
+            if (slot != CardSlot.DECRYPTION) throw e
             throw keyMismatchOrOriginal(rsa.modulus, e)
         }
     }

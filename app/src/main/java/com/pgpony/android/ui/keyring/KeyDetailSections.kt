@@ -1218,7 +1218,11 @@ fun SubkeysSection(
     // 4.7.0 (item 34, #43): on a key generated on a card the signing key is the
     // primary itself, so the list of subkeys alone showed only the encryption
     // key; this line says where the primary is.
-    primaryOnCard: Boolean = false
+    primaryOnCard: Boolean = false,
+    // 4.8.0 (#71): the primary signs on the security key, so its subkeys get the
+    // manage menu even though their secrets are on the card too. A signing
+    // subkey's expiry stays out: its back-signature needs the subkey's secret.
+    cardPrimary: Boolean = false
 ) {
     SectionGroup(title = stringResource(R.string.key_detail_subkeys_title)) {
         if (primaryOnCard) {
@@ -1254,8 +1258,8 @@ fun SubkeysSection(
                     // by the subkey, so its secret has to be on this phone.
                     val canChangeExpiry = onChangeSubkeyExpiry != null && sub.expiryEditable && !sub.isRevoked &&
                         ((sub.capabilities and 0x02) == 0 ||
-                            sub.secretLocation == com.pgpony.android.crypto.SubkeyAdmission.SecretLocation.ON_DEVICE)
-                    if (canManageSubkeys && !sub.isCardBacked &&
+                            (!cardPrimary && sub.secretLocation == com.pgpony.android.crypto.SubkeyAdmission.SecretLocation.ON_DEVICE))
+                    if (canManageSubkeys && (!sub.isCardBacked || cardPrimary) &&
                         (onRemoveSubkey != null || (onRevokeSubkey != null && !sub.isRevoked) || canChangeExpiry)
                     ) {
                         Spacer(modifier = Modifier.weight(1f))

@@ -171,6 +171,48 @@ fun KeyDetailScreen(
     // shared-launcher-with-state-flag pattern isn't needed.
     val activity = context as? com.pgpony.android.MainActivity
 
+    // 4.8.0 (#71): one edit the primary signs on the security key, over NFC or
+    // USB. During the tap the key's rings are loaded, a CardPrimarySigner is
+    // opened (it checks that the card's Signature slot holds the primary) and
+    // [edit] runs with it; every signature verifies the PIN again right before
+    // it, as card data signing does. The PIN bytes are wiped afterwards.
+    val cardEditPairFirst = stringResource(R.string.card_sign_pair_first)
+    val cardEditNoLink = stringResource(R.string.card_scan_nfc_unavailable)
+    fun <T> runCardPrimaryEdit(
+        pin: String,
+        onStarted: () -> Unit,
+        onFailure: (Throwable) -> Unit,
+        onDone: (T) -> Unit,
+        edit: (
+            com.pgpony.android.crypto.PrimarySigner,
+            org.bouncycastle.openpgp.PGPPublicKeyRing,
+            org.bouncycastle.openpgp.PGPSecretKeyRing?
+        ) -> T
+    ) {
+        val fp = state.key?.fingerprint ?: run {
+            onFailure(IllegalStateException(cardEditPairFirst))
+            return
+        }
+        val pinBytes = pin.toByteArray(Charsets.UTF_8)
+        onStarted()
+        val started = activity?.startCardOperation({ session ->
+            session.select()
+            val repo = PGPonyApp.instance.keyRepository
+            val pub = repo.loadPublicKeyRing(fp) ?: throw OpenPgpCardException.Malformed(cardEditPairFirst)
+            val sec = repo.loadSecretKeyRing(fp)
+            val signer = com.pgpony.android.crypto.card.CardPrimarySigner.open(session, pinBytes, pub.publicKey)
+            com.pgpony.android.crypto.card.CardPrimarySigner.unwrapping { edit(signer, pub, sec) }
+        }) { result ->
+            activity.stopCardScan()
+            java.util.Arrays.fill(pinBytes, 0)
+            result.onSuccess(onDone).onFailure(onFailure)
+        }
+        if (started != true) {
+            java.util.Arrays.fill(pinBytes, 0)
+            onFailure(IllegalStateException(cardEditNoLink))
+        }
+    }
+
     // Fire the initial load whenever the fingerprint arg changes.
     LaunchedEffect(fingerprint) {
         viewModel.load(fingerprint)
@@ -388,7 +430,10 @@ fun KeyDetailScreen(
                                 )
                             }
                             // 4.7.0 (item 51, #86): re-sign with a current hash.
-                            if (menuKey.isKeyPair && state.primaryStub == null && !menuKey.algorithm.isCompositeSign) {
+                            // 4.8.0 (#71): also with the primary on the security key.
+                            if ((menuKey.isKeyPair && state.primaryStub == null && !menuKey.algorithm.isCompositeSign) ||
+                                state.cardPrimaryEdits
+                            ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.key_detail_refresh_sigs_menu)) },
                                     leadingIcon = { Icon(Icons.Filled.Refresh, null) },
@@ -759,15 +804,61 @@ fun KeyDetailScreen(
     // ── item 16 (#54): subkey revoke sheet (reuses RevokeKeySheet) ─────
     val subkeyRevokeTarget = state.subkeyRevokeTarget
     if (state.showSubkeyRevokeSheet && subkeyRevokeTarget != null) {
+        // 4.8.0 (#71): with the primary on the security key, the 0x28 is signed
+        // there. The last encryption subkey is confirmed before the tap.
+        var pendingCardSubkeyRevoke by remember(subkeyRevokeTarget) { mutableStateOf<(() -> Unit)?>(null) }
         RevokeKeySheet(
             keyOwnerLabel = subkeyRevokeTarget.algorithmLabel + " · " + subkeyRevokeTarget.keyId,
             isProcessing = state.subkeyRevokeInFlight,
             errorMessage = state.subkeyRevokeError,
             onRevoke = { reason, comment, passphrase ->
-                viewModel.revokeSubkey(reason, comment, passphrase)
+                if (state.cardPrimaryEdits) {
+                    val subFp = subkeyRevokeTarget.fingerprint
+                    val doRevoke = {
+                        runCardPrimaryEdit<com.pgpony.android.crypto.SignedEdit>(
+                            pin = passphrase.orEmpty(),
+                            onStarted = { viewModel.onCardSubkeyRevokeStarted() },
+                            onFailure = { viewModel.onCardSubkeyRevokeFailure(it) },
+                            onDone = { viewModel.onCardSubkeyRevoked(it) }
+                        ) { signer, pub, sec ->
+                            val target = pub.publicKeys.asSequence().firstOrNull {
+                                !it.isMasterKey && org.bouncycastle.util.encoders.Hex.toHexString(it.fingerprint)
+                                    .equals(subFp, ignoreCase = true)
+                            } ?: throw com.pgpony.android.crypto.RevocationError.UnsupportedKey("Subkey not found in supplied ring")
+                            com.pgpony.android.crypto.RevocationService.shared.revokeSubkeyWith(
+                                signer, pub, sec, target.keyID, reason, comment
+                            )
+                        }
+                    }
+                    if (state.subkeyRevokeLastEncryption) {
+                        pendingCardSubkeyRevoke = doRevoke
+                    } else {
+                        doRevoke()
+                    }
+                } else {
+                    viewModel.revokeSubkey(reason, comment, passphrase)
+                }
             },
-            onDismiss = { viewModel.dismissSubkeyRevokeSheet() }
+            onDismiss = { viewModel.dismissSubkeyRevokeSheet() },
+            cardPin = state.cardPrimaryEdits
         )
+        pendingCardSubkeyRevoke?.let { confirmed ->
+            AlertDialog(
+                onDismissRequest = { pendingCardSubkeyRevoke = null },
+                title = { Text(stringResource(R.string.key_detail_subkey_last_enc_title)) },
+                text = { Text(stringResource(R.string.key_detail_subkey_last_enc_body)) },
+                confirmButton = {
+                    TextButton(onClick = { pendingCardSubkeyRevoke = null; confirmed() }) {
+                        Text(stringResource(R.string.key_detail_subkey_last_enc_action))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingCardSubkeyRevoke = null }) {
+                        Text(stringResource(R.string.common_button_cancel))
+                    }
+                }
+            )
+        }
     }
 
     // ── item 16 (#54): local remove confirmation ──────────────────────
@@ -852,8 +943,35 @@ fun KeyDetailScreen(
             title = { Text(stringResource(R.string.key_detail_refresh_sigs_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.key_detail_refresh_sigs_body))
-                    if (state.privateKeyIsProtected) {
+                    // 4.8.0 (#86): the hash is a choice now, so the body no longer names SHA-256.
+                    Text(stringResource(R.string.key_detail_refresh_sigs_body_hash_choice))
+                    // 4.8.0 (#71): a card signs with its own hash, so it gets no choice.
+                    if (!state.selfSigHashFixed && !state.cardPrimaryEdits) {
+                        SelfSigHashChoice(
+                            selected = state.selfSigHash,
+                            enabled = !state.refreshSigsInFlight,
+                            onSelect = { viewModel.setSelfSigHash(it) }
+                        )
+                    }
+                    // 4.8.0 (#71): the primary signs on the security key; the field takes its PIN.
+                    if (state.cardPrimaryEdits) {
+                        OutlinedTextField(
+                            value = refreshPass,
+                            onValueChange = { refreshPass = it },
+                            label = { Text(stringResource(R.string.card_decrypt_pin_label)) },
+                            visualTransformation = PasswordVisualTransformation(),
+                            singleLine = true,
+                            enabled = !state.refreshSigsInFlight,
+                            modifier = Modifier.keepsKeyboard().fillMaxWidth()
+                        )
+                        Text(
+                            stringResource(
+                                if (state.refreshSigsInFlight) R.string.card_decrypt_hold_card else R.string.key_detail_expiry_card_hint
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else if (state.privateKeyIsProtected) {
                         OutlinedTextField(
                             value = refreshPass,
                             onValueChange = { refreshPass = it },
@@ -878,13 +996,31 @@ fun KeyDetailScreen(
                         val pass = refreshPass.ifBlank { null }
                         // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
                         refreshPass = ""
+                        val onCard = state.cardPrimaryEdits
                         deleteWithOptionalBiometricGate(
                             context = context,
                             title = context.getString(R.string.key_detail_resign_biometric_title),
                             subtitle = context.getString(R.string.key_detail_resign_biometric_subtitle)
-                        ) { viewModel.applyRefreshSigs(pass) }
+                        ) {
+                            if (onCard) {
+                                // 4.8.0 (#71): the same rebuild as the card expiry change, keeping
+                                // every expiry; a signing subkey's binding is passed over.
+                                runCardPrimaryEdit<org.bouncycastle.openpgp.PGPPublicKeyRing>(
+                                    pin = pass.orEmpty(),
+                                    onStarted = { viewModel.onCardRefreshStarted() },
+                                    onFailure = { viewModel.onCardRefreshFailure(it) },
+                                    onDone = { viewModel.onCardRefreshed(it) }
+                                ) { signer, pub, _ ->
+                                    KeyExpirationService.shared.setExpirationWith(
+                                        signer, pub, null, null, KeyExpirationService.Target.Refresh
+                                    ).publicRing
+                                }
+                            } else {
+                                viewModel.applyRefreshSigs(pass)
+                            }
+                        }
                     },
-                    enabled = !state.refreshSigsInFlight
+                    enabled = !state.refreshSigsInFlight && (!state.cardPrimaryEdits || refreshPass.isNotEmpty())
                 ) { Text(stringResource(R.string.key_detail_refresh_sigs_action)) }
             },
             dismissButton = {
@@ -935,7 +1071,7 @@ fun KeyDetailScreen(
                 }
             },
             onApplyCard = { expiresAt, pin, alsoSubkeys ->
-                pendingExpiry = PendingExpiryChange(expiresAt, alsoSubkeys) {
+                pendingExpiry = PendingExpiryChange(expiresAt, alsoSubkeys, card = true) {
                     val fp = keyForExpiry.fingerprint
                     val target = viewModel.expiryTarget(alsoSubkeys)
                     viewModel.onCardExpiryStarted()
@@ -977,7 +1113,11 @@ fun KeyDetailScreen(
                         onConfirmed = pending.run
                     )
                 },
-                onDismiss = { pendingExpiry = null }
+                onDismiss = { pendingExpiry = null },
+                // 4.8.0 (#86): the software path takes the hash picked here; the
+                // card's signer fixes its own, so the card path shows no choice.
+                hashChoice = if (pending.card || keyForExpiry.algorithm.isCompositeSign || state.selfSigHashFixed) null else state.selfSigHash,
+                onHashChoice = { viewModel.setSelfSigHash(it) }
             )
         }
     }
@@ -997,7 +1137,47 @@ fun KeyDetailScreen(
             onApply = { choice, expiresAt, passphrase ->
                 viewModel.addSubkey(choice, expiresAt, passphrase)
             },
-            onDismiss = { viewModel.dismissAddSubkeySheet() }
+            onDismiss = { viewModel.dismissAddSubkeySheet() },
+            // 4.8.0 (#71): a key linked to a security key signs and decrypts there.
+            cardLinked = keyForAddSubkey.isCardBacked,
+            askPassphrase = state.privateKeyIsProtected,
+            onApplyCard = if (!state.cardPrimaryCanAddSubkey) null else ({ choice, expiresAt, pin, passphrase ->
+                val type = (choice as? com.pgpony.android.crypto.AddSubkeyChoice.Classical)?.type
+                if (type != null) {
+                    val lifetime = addSubkeyLifetimeSeconds(expiresAt, System.currentTimeMillis())
+                    viewModel.onCardAddSubkeyStarted()
+                    // The key pair is made before the tap: RSA 4096 can take longer
+                    // than a card should be held to the phone.
+                    scope.launch {
+                        val pair = try {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                com.pgpony.android.crypto.ClassicalSubkeyGen.newSubkeyPair(type)
+                            }
+                        } catch (e: Exception) {
+                            viewModel.onCardAddSubkeyFailure(e)
+                            return@launch
+                        }
+                        runCardPrimaryEdit<com.pgpony.android.crypto.SignedEdit>(
+                            pin = pin,
+                            onStarted = {},
+                            onFailure = { viewModel.onCardAddSubkeyFailure(it) },
+                            onDone = { viewModel.onCardSubkeyAdded(it) }
+                        ) { signer, pub, sec ->
+                            com.pgpony.android.crypto.ClassicalSubkeyGen.addSubkeyWith(
+                                signer = signer,
+                                secretRing = sec ?: throw com.pgpony.android.crypto.ClassicalSubkeyGen.SubkeyAddError(
+                                    "Secret key ring could not be loaded for ${pub.publicKey.keyID}"
+                                ),
+                                publicRing = pub,
+                                type = type,
+                                passphrase = passphrase,
+                                expirationSeconds = lifetime,
+                                pair = pair
+                            )
+                        }
+                    }
+                }
+            })
         )
     }
 
@@ -1010,10 +1190,8 @@ fun KeyDetailScreen(
             passphraseProtected = state.privateKeyIsProtected,
             isProcessing = state.moveToCardInFlight,
             errorMessage = state.moveToCardError,
-            onBackup = {
-                viewModel.dismissMoveToCardSheet()
-                dispatchAction(KeyDetailActionIds.EXPORT_PRIVATE_KEY)
-            },
+            // 4.8.0: the backup comes back to this sheet when the export ends.
+            onBackup = { viewModel.backupFromMoveToCard() },
             onMove = { choices, passphrase, adminPin, userPin, removeFromPhone, replace ->
                 viewModel.prepareMoveToCard(choices, passphrase) { moves, certificate ->
                     val admin = adminPin.toByteArray(Charsets.UTF_8)
@@ -1248,9 +1426,23 @@ fun KeyDetailScreen(
             isProcessing = state.addUserIdInFlight,
             errorMessage = state.addUserIdError,
             onApply = { userId, makePrimary, passphrase ->
-                viewModel.addUserId(userId, makePrimary, passphrase)
+                if (state.cardPrimaryEdits) {
+                    // 4.8.0 (#71): the self-certification (0x13) is signed on the card;
+                    // [passphrase] is the card PIN.
+                    runCardPrimaryEdit<com.pgpony.android.crypto.SignedEdit>(
+                        pin = passphrase.orEmpty(),
+                        onStarted = { viewModel.onCardAddUserIdStarted() },
+                        onFailure = { viewModel.onCardAddUserIdFailure(it) },
+                        onDone = { viewModel.onCardUserIdAdded(it, userId, makePrimary) }
+                    ) { signer, pub, sec ->
+                        com.pgpony.android.crypto.UserIdService.shared.addUserIdWith(signer, sec, pub, userId, makePrimary)
+                    }
+                } else {
+                    viewModel.addUserId(userId, makePrimary, passphrase)
+                }
             },
-            onDismiss = { viewModel.dismissAddUserIdSheet() }
+            onDismiss = { viewModel.dismissAddUserIdSheet() },
+            cardPin = state.cardPrimaryEdits
         )
     }
 
@@ -1295,8 +1487,32 @@ fun KeyDetailScreen(
             displayName = userIdDisplayName,
             isProcessing = state.userIdActionInFlight,
             errorMessage = state.userIdActionError,
-            onApply = { passphrase -> viewModel.confirmUserIdAction(passphrase) },
-            onDismiss = { viewModel.dismissUserIdAction() }
+            onApply = { passphrase ->
+                val request = pendingUserIdAction
+                if (state.cardPrimaryEdits && request.kind != UserIdActionRequest.Kind.REMOVE) {
+                    // 4.8.0 (#71): the revocation (0x30) or the re-issued
+                    // self-certifications are signed on the card; [passphrase] is the PIN.
+                    runCardPrimaryEdit<com.pgpony.android.crypto.SignedEdit>(
+                        pin = passphrase.orEmpty(),
+                        onStarted = { viewModel.onCardUserIdActionStarted() },
+                        onFailure = { viewModel.onCardUserIdActionFailure(it) },
+                        onDone = { viewModel.onCardUserIdActionDone(it, request) }
+                    ) { signer, pub, sec ->
+                        if (request.kind == UserIdActionRequest.Kind.MAKE_PRIMARY) {
+                            com.pgpony.android.crypto.UserIdService.shared.setPrimaryUserIdWith(signer, sec, pub, request.userId)
+                        } else {
+                            com.pgpony.android.crypto.UserIdService.shared.revokeUserIdWith(
+                                signer, sec, pub, request.userId,
+                                com.pgpony.android.data.RevocationReason.USER_ID_INVALID, null
+                            )
+                        }
+                    }
+                } else {
+                    viewModel.confirmUserIdAction(passphrase)
+                }
+            },
+            onDismiss = { viewModel.dismissUserIdAction() },
+            cardPin = state.cardPrimaryEdits
         )
     }
 
@@ -1445,7 +1661,7 @@ fun KeyDetailScreen(
             keyForExport.userEmail.ifBlank { keyForExport.shortFingerprint }
         }
         AlertDialog(
-            onDismissRequest = { viewModel.dismissExportPrivateConfirm() },
+            onDismissRequest = { viewModel.dismissExportPrivateConfirm(); viewModel.exportFlowEnded() },
             title = { Text(stringResource(R.string.key_detail_export_private_dialog_title)) },
             text = {
                 Text(
@@ -1465,6 +1681,7 @@ fun KeyDetailScreen(
                             context = context,
                             viewModel = viewModel,
                             onError = { msg ->
+                                viewModel.exportFlowEnded()
                                 scope.launch { snackbarHostState.showSnackbar(msg) }
                             }
                         )
@@ -1477,7 +1694,7 @@ fun KeyDetailScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.dismissExportPrivateConfirm() }) {
+                TextButton(onClick = { viewModel.dismissExportPrivateConfirm(); viewModel.exportFlowEnded() }) {
                     Text(stringResource(R.string.common_button_cancel))
                 }
             }
@@ -1494,11 +1711,17 @@ fun KeyDetailScreen(
             val entered = exportPass.value
             exportPass.value = ""
             viewModel.submitExportPassphrase(entered) {
+                viewModel.exportFlowEnded()
                 scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.key_detail_status_priv_missing)) }
             }
         }
         AlertDialog(
-            onDismissRequest = { if (!state.exportPassphraseChecking) viewModel.dismissExportPassphraseDialog() },
+            onDismissRequest = {
+                if (!state.exportPassphraseChecking) {
+                    viewModel.dismissExportPassphraseDialog()
+                    viewModel.exportFlowEnded()
+                }
+            },
             title = { Text(stringResource(R.string.encrypt_passphrase_dialog_title)) },
             text = {
                 Column {
@@ -1540,7 +1763,7 @@ fun KeyDetailScreen(
             dismissButton = {
                 TextButton(
                     enabled = !state.exportPassphraseChecking,
-                    onClick = { viewModel.dismissExportPassphraseDialog() }
+                    onClick = { viewModel.dismissExportPassphraseDialog(); viewModel.exportFlowEnded() }
                 ) { Text(stringResource(R.string.common_button_cancel)) }
             }
         )
@@ -2006,7 +2229,9 @@ private fun LoadedBody(
         }
         // 4.7.0 (item 22): the primary's secret is not on this device, so the
         // edits that need it are hidden below; this says why.
-        state.primaryStub?.let { kind ->
+        // 4.8.0 (#71): not when the primary signs on the linked security key, since
+        // those edits are offered and ask for the card.
+        state.primaryStub?.takeIf { !state.cardPrimaryEdits }?.let { kind ->
             item { OfflinePrimaryBanner(onCard = kind == com.pgpony.android.crypto.OfflineStub.Kind.CARD) }
         }
         // 4.6.0 (item 11): a published key edited since its last upload.
@@ -2028,7 +2253,10 @@ private fun LoadedBody(
         // one (RC3 §17.2 I / #29) — software key pairs only, same
         // gating as the Subkeys section's Add button.
         // 4.7.0 (item 55): also a key pair whose subkeys are on a card.
-        val canEditUserIds = key.isKeyPair && state.primaryStub == null
+        // 4.8.0 (#71): and a key whose primary is on the security key, which signs there.
+        val canEditUserIds = (key.isKeyPair && state.primaryStub == null) || state.cardPrimaryEdits
+        // Notations stay with the passphrase path.
+        val canEditNotations = key.isKeyPair && state.primaryStub == null
         // 4.7.0 (item 27): also shown for a single User ID carrying the
         // weak-hash mark, so the mark is never hidden.
         // 4.7.0 (item 31): and whenever someone has certified one of them.
@@ -2041,7 +2269,9 @@ private fun LoadedBody(
                     canEdit = canEditUserIds,
                     onMakePrimary = onMakePrimaryUserId,
                     onRevoke = onRevokeUserId,
-                    onRemove = if (hideDestructiveActions) null else onRemoveUserId,
+                    // 4.8.0 (#71): Remove signs nothing, but it edits the stored
+                    // secret ring, which a key with every secret on the card lacks.
+                    onRemove = if (hideDestructiveActions || !key.isKeyPair) null else onRemoveUserId,
                     onAddUserId = onAddUserId,
                     onCopyEmail = onCopyEmail,
                     certifications = state.certifications,
@@ -2053,11 +2283,11 @@ private fun LoadedBody(
         // §5.6.7 (Play review) — editable primary-UID notations.
         // Same software-key-pair gating as the UID and subkey edit
         // surfaces; the section self-hides when empty and read-only.
-        if (state.notations.isNotEmpty() || canEditUserIds) {
+        if (state.notations.isNotEmpty() || canEditNotations) {
             item {
                 NotationsSection(
                     notations = state.notations,
-                    canEdit = canEditUserIds,
+                    canEdit = canEditNotations,
                     onEdit = onEditNotations
                 )
             }
@@ -2077,22 +2307,28 @@ private fun LoadedBody(
         // Edit Expiry row's own gating (card-backed keys use the NFC
         // flow, public-only keys have no private material to sign
         // the binding with).
-        // Not on a key pair whose subkeys are on a card (item 55): it signs and
-        // decrypts on the card, so a new subkey here would receive mail the
-        // card cannot open. Add the subkey first, then move it.
-        val canAddSubkey = key.isKeyPair && !key.isCardBacked && state.primaryStub == null
+        // 4.8.0 (#71): the 4.7.0 block on a key linked to a security key (item 55)
+        // is lifted. Such a key signs and decrypts on the card, so the sheet says
+        // the new subkey stays on this phone until it is moved there (Move to
+        // security key is offered for it). With the primary on the card, the new
+        // subkey's binding is signed on the card.
+        val canAddSubkey = (key.isKeyPair && state.primaryStub == null) || state.cardPrimaryCanAddSubkey
+        // Per-subkey menus as before (a key pair with its primary here and not
+        // linked to a card), or with the primary on the card (revoke, expiry).
+        val softwareSubkeyEdits = key.isKeyPair && !key.isCardBacked && state.primaryStub == null
         if (state.subkeys.isNotEmpty() || canAddSubkey || key.primaryOnCard) {
             item {
                 SubkeysSection(
                     subkeys = state.subkeys,
                     canAddSubkey = canAddSubkey,
                     onAddSubkey = onAddSubkey,
-                    canManageSubkeys = canAddSubkey,
+                    canManageSubkeys = softwareSubkeyEdits || state.cardPrimaryEdits,
                     onRevokeSubkey = onRevokeSubkey,
-                    onRemoveSubkey = if (hideDestructiveActions) null else onRemoveSubkey,
+                    onRemoveSubkey = if (hideDestructiveActions || !softwareSubkeyEdits) null else onRemoveSubkey,
                     onChangeSubkeyExpiry = onChangeSubkeyExpiry,
                     onCopyKeyId = onCopyKeyId,
-                    primaryOnCard = key.primaryOnCard
+                    primaryOnCard = key.primaryOnCard,
+                    cardPrimary = state.cardPrimaryEdits
                 )
             }
         }
@@ -2184,5 +2420,7 @@ private fun UnpublishedChangesRow(onUpdate: () -> Unit) {
 private class PendingExpiryChange(
     val expiresAtEpochSeconds: Long?,
     val alsoCurrentSubkeys: Boolean,
+    /** 4.8.0 (#86): signed on a security key, which fixes the hash. */
+    val card: Boolean = false,
     val run: () -> Unit
 )

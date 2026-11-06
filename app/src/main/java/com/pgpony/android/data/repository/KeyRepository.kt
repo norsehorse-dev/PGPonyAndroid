@@ -3011,22 +3011,44 @@ class KeyRepository(
      * secret + public rings and stamps entity.expiresAt. Throws
      * ExpirationError on crypto failure (passphrase, etc.).
      */
-    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored. */
+    /** 4.6.0 (item 11): stamps lastLocalEditAt once the edit has been stored.
+     *  4.8.0 (#86): [hashAlgorithm] signs every new signature the edit makes. */
     suspend fun setKeyExpirationSoftware(
         fingerprint: String,
         expiresAtEpochSeconds: Long?,
         passphrase: String?,
-        target: KeyExpirationService.Target = KeyExpirationService.Target.Primary()
+        target: KeyExpirationService.Target = KeyExpirationService.Target.Primary(),
+        hashAlgorithm: Int = org.bouncycastle.bcpg.HashAlgorithmTags.SHA256
     ) =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            setKeyExpirationSoftwareEdit(fingerprint, expiresAtEpochSeconds, passphrase, target).also { stampLocalEdit(fingerprint) }
+            setKeyExpirationSoftwareEdit(fingerprint, expiresAtEpochSeconds, passphrase, target, hashAlgorithm)
+                .also { stampLocalEdit(fingerprint) }
+        }
+
+    /** 4.8.0 (#86): see KeyExpirationService.selfSigHashFixedByKey. */
+    suspend fun selfSigHashFixed(fingerprint: String): Boolean =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            runCatching { loadPublicKeyRing(fingerprint)?.let { KeyExpirationService.selfSigHashFixedByKey(it) } }
+                .getOrNull() ?: false
+        }
+
+    /**
+     * 4.8.0 (#86): the hash a self-signature edit of [fingerprint] starts on
+     * (KeyExpirationService.defaultSelfSigHash), or SHA-256 when the stored
+     * certificate cannot be read.
+     */
+    suspend fun defaultSelfSigHash(fingerprint: String): Int =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            runCatching { loadPublicKeyRing(fingerprint)?.let { KeyExpirationService.defaultSelfSigHash(it) } }
+                .getOrNull() ?: org.bouncycastle.bcpg.HashAlgorithmTags.SHA256
         }
 
     private suspend fun setKeyExpirationSoftwareEdit(
         fingerprint: String,
         expiresAtEpochSeconds: Long?,
         passphrase: String?,
-        target: KeyExpirationService.Target
+        target: KeyExpirationService.Target,
+        hashAlgorithm: Int
     ) {
         val entity = dao.getByFingerprint(fingerprint)
             ?: throw KeyRepoError.NotFound(fingerprint)
@@ -3056,14 +3078,15 @@ class KeyRepository(
             publicRing = pubRing,
             expiresAtEpochSeconds = expiresAtEpochSeconds,
             passphrase = passphrase,
-            target = target
+            target = target,
+            hashAlgorithm = hashAlgorithm
         )
         // 4.6.0 (item 19 follow-up): the ML-KEM bindings Bouncy Castle cannot
         // see are made first, so a failure leaves the stored key untouched.
         // 4.7.0 (item 53, #86): only with Primary(currentSubkeys), and only for
         // the ones valid now, like the other subkeys.
         val v4Bindings = if ((target as? KeyExpirationService.Target.Primary)?.currentSubkeys == true)
-            v4Algo35Bindings(fingerprint, secRing, passphrase, expiresAtEpochSeconds) else emptyList()
+            v4Algo35Bindings(fingerprint, secRing, passphrase, expiresAtEpochSeconds, hashAlgorithm) else emptyList()
         persistExpiration(entity, updated.publicRing, updated.secretRing, expiresAtEpochSeconds, target)
         if (v4Bindings.isNotEmpty()) {
             applyV4Algo35Edits(fingerprint) { raw ->
@@ -3075,12 +3098,17 @@ class KeyRepository(
     }
 
     /**
-     * 4.7.0 (item 51, #86): re-sign a software key pair's self-signatures with
-     * SHA-256, each keeping its expiry, and bring back subkeys left out only
-     * for a weak-hash binding whose secret is stored (KeyExpirationService
+     * 4.7.0 (item 51, #86): re-sign a software key pair's self-signatures,
+     * each keeping its expiry, and bring back subkeys left out only for a
+     * weak-hash binding whose secret is stored (KeyExpirationService
      * .refreshSelfSignatures). Returns how many subkeys came back.
+     * 4.8.0 (#86): with [hashAlgorithm], SHA-256 or SHA-512.
      */
-    suspend fun refreshSelfSignatures(fingerprint: String, passphrase: String?): Int =
+    suspend fun refreshSelfSignatures(
+        fingerprint: String,
+        passphrase: String?,
+        hashAlgorithm: Int = org.bouncycastle.bcpg.HashAlgorithmTags.SHA256
+    ): Int =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             val entity = dao.getByFingerprint(fingerprint) ?: throw KeyRepoError.NotFound(fingerprint)
             if (!entity.isKeyPair) {
@@ -3092,7 +3120,7 @@ class KeyRepository(
                 ?: throw KeyExpirationService.ExpirationError.UnsupportedKey("Secret key ring could not be loaded for $fingerprint")
             val pubRing = loadPublicKeyRing(fingerprint)
                 ?: throw KeyExpirationService.ExpirationError.UnsupportedKey("Public key ring could not be loaded for $fingerprint")
-            val out = keyExpiration.refreshSelfSignatures(secRing, pubRing, passphrase)
+            val out = keyExpiration.refreshSelfSignatures(secRing, pubRing, passphrase, hashAlgorithm)
             persistExpiration(entity, out.rings.publicRing, out.rings.secretRing, null, KeyExpirationService.Target.Refresh)
             stampLocalEdit(fingerprint)
             out.restoredSubkeys.size
@@ -3116,12 +3144,14 @@ class KeyRepository(
     }
 
     /** New 0x18 bindings, carrying [expiresAtEpochSeconds], for every v4 ML-KEM
-     *  subkey stored for [fingerprint], paired with that subkey's public body. */
+     *  subkey stored for [fingerprint], paired with that subkey's public body.
+     *  4.8.0 (#86): signed with [hashAlgorithm], like the other bindings. */
     private fun v4Algo35Bindings(
         fingerprint: String,
         secRing: PGPSecretKeyRing,
         passphrase: String?,
-        expiresAtEpochSeconds: Long?
+        expiresAtEpochSeconds: Long?,
+        hashAlgorithm: Int
     ): List<Pair<ByteArray, ByteArray>> {
         val raw = store.loadPublicKey(fingerprint) ?: return emptyList()
         // 4.7.0 (item 53): never an expired or revoked one.
@@ -3139,7 +3169,7 @@ class KeyRepository(
         }
         return bodies.map { body ->
             val sig = try {
-                com.pgpony.android.crypto.pqc.V4Algo35Edit.binding(secRing, priv, body, expiresAtEpochSeconds)
+                com.pgpony.android.crypto.pqc.V4Algo35Edit.binding(secRing, priv, body, expiresAtEpochSeconds, hashAlgorithm)
             } catch (e: IllegalArgumentException) {
                 throw KeyExpirationService.ExpirationError.UnsupportedKey(e.message ?: "Invalid expiration date")
             }
@@ -3200,7 +3230,12 @@ class KeyRepository(
     ) {
         val entity = dao.getByFingerprint(fingerprint)
             ?: throw KeyRepoError.NotFound(fingerprint)
-        persistExpiration(entity, updatedPublicRing, null, expiresAtEpochSeconds, target)
+        // 4.8.0 (#71): a key whose primary was moved to the card keeps a ring of
+        // divert-to-card stubs; it takes the new signatures too, so a later
+        // private export or edit does not bring the old ones back.
+        val stubs = if (entity.algorithm.isCompositeSign) null
+            else loadSecretKeyRing(fingerprint)?.let { com.pgpony.android.crypto.SignedEdit.of(updatedPublicRing, it).secretRing }
+        persistExpiration(entity, updatedPublicRing, stubs, expiresAtEpochSeconds, target)
     }
 
     private suspend fun persistExpiration(
@@ -3809,24 +3844,116 @@ class KeyRepository(
         entity: PGPKeyEntity,
         updated: UserIdService.UpdatedRings,
         newPrimaryUserId: String?
+    ) = persistUserIdRings(entity, updated.publicRing, updated.secretRing, newPrimaryUserId)
+
+    private suspend fun persistUserIdRings(
+        entity: PGPKeyEntity,
+        publicRing: PGPPublicKeyRing,
+        secretRing: PGPSecretKeyRing?,
+        newPrimaryUserId: String?
     ) {
-        storeEditedPublicKey(entity.fingerprint, updated.publicRing.encoded) // 4.6.0 (item 19)
-        storeEditedPrivateKey(entity.fingerprint, updated.secretRing.encoded)
+        storeEditedPublicKey(entity.fingerprint, publicRing.encoded) // 4.6.0 (item 19)
+        secretRing?.let { storeEditedPrivateKey(entity.fingerprint, it.encoded) }
         // 4.7.0 (item 52): revoking the shown User ID moves the shown identity
         // to the ring's primary instead of keeping a revoked name.
         val shown = newPrimaryUserId
-            ?: entity.userID.takeIf { it in updated.publicRing.publicKey.userIDs.asSequence().toList() &&
-                !UserIdService.shared.isRevoked(updated.publicRing.publicKey, it) }
-            ?: UserIdService.shared.shownUserId(updated.publicRing.publicKey)
+            ?: entity.userID.takeIf { it in publicRing.publicKey.userIDs.asSequence().toList() &&
+                !UserIdService.shared.isRevoked(publicRing.publicKey, it) }
+            ?: UserIdService.shared.shownUserId(publicRing.publicKey)
         val parsed = shown?.takeIf { it != entity.userID }?.let { PGPKeyEntity.parseUserID(it) }
         dao.update(
             entity.copy(
-                armoredPublicKey = armoredAsStored(entity.fingerprint, crypto.exportArmoredPublicKey(updated.publicRing)),
+                armoredPublicKey = armoredAsStored(entity.fingerprint, crypto.exportArmoredPublicKey(publicRing)),
                 userID = shown ?: entity.userID,
                 userName = parsed?.first ?: entity.userName,
                 userEmail = parsed?.second ?: entity.userEmail
             )
         )
+    }
+
+    // ── 4.8.0 (#71): edits signed on the card that holds the primary ────
+    //
+    // The screen runs the card operation (NFC or USB, through
+    // MainActivity.startCardOperation): it loads the rings, opens a
+    // CardPrimarySigner and calls the crypto edit's ...With function. The
+    // result is stored here, the way the passphrase edits store theirs.
+
+    /**
+     * 4.8.0 (#71): true when [entity]'s primary key signs on the card that is
+     * linked to it: the card's Signature slot holds the primary, and the phone
+     * has no secret for the primary (a divert-to-card stub, or no secret ring
+     * at all for a key generated on the card). v4 classical keys only, since
+     * only those move to a card. A key pair whose primary is on the phone keeps
+     * the passphrase path even when a card holds a copy.
+     */
+    fun primarySignsOnCard(entity: PGPKeyEntity): Boolean {
+        if (!entity.primaryOnCard || entity.isV6Key || entity.algorithm.isCompositeSign) return false
+        val ring = loadSecretKeyRing(entity.fingerprint) ?: return !entity.isKeyPair
+        return com.pgpony.android.crypto.OfflineStub.primaryKind(ring) == com.pgpony.android.crypto.OfflineStub.Kind.CARD
+    }
+
+    /** 4.8.0 (#71): store a User ID add, revoke or make-primary signed on the card. */
+    suspend fun persistCardUserIdEdit(
+        fingerprint: String,
+        edit: com.pgpony.android.crypto.SignedEdit,
+        newPrimaryUserId: String?,
+        addedUserId: String? = null
+    ) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        val entity = dao.getByFingerprint(fingerprint) ?: throw KeyRepoError.NotFound(fingerprint)
+        addedUserId?.let { com.pgpony.android.data.RemovedUserIdStore.forget(fingerprint, it) }
+        persistUserIdRings(entity, edit.publicRing, edit.secretRing, newPrimaryUserId)
+        stampLocalEdit(fingerprint)
+    }
+
+    /**
+     * 4.8.0 (#71): store a subkey added with its binding signed on the card.
+     * The new subkey's secret is on the phone, so a key on a card whose every
+     * secret had moved (isKeyPair false) becomes a key pair linked to the card
+     * again, which is what offers Move to Security Key for the new subkey.
+     */
+    suspend fun persistCardSubkeyAdd(
+        fingerprint: String,
+        edit: com.pgpony.android.crypto.SignedEdit
+    ) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        val entity = dao.getByFingerprint(fingerprint) ?: throw KeyRepoError.NotFound(fingerprint)
+        val secret = edit.secretRing ?: throw ClassicalSubkeyGen.SubkeyAddError(
+            "Secret key ring could not be loaded for $fingerprint"
+        )
+        storeEditedPublicKey(fingerprint, edit.publicRing.encoded)
+        storeEditedPrivateKey(fingerprint, secret.encoded)
+        dao.update(
+            entity.copy(
+                isKeyPair = entity.isKeyPair || !com.pgpony.android.crypto.OfflineStub.allStubs(secret),
+                armoredPublicKey = armoredAsStored(fingerprint, crypto.exportArmoredPublicKey(edit.publicRing))
+            )
+        )
+        stampLocalEdit(fingerprint)
+    }
+
+    /** 4.8.0 (#71): store a subkey revocation signed on the card. */
+    suspend fun persistCardSubkeyRevocation(
+        fingerprint: String,
+        edit: com.pgpony.android.crypto.SignedEdit
+    ) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        val entity = dao.getByFingerprint(fingerprint) ?: throw KeyRepoError.NotFound(fingerprint)
+        storeEditedPublicKey(fingerprint, edit.publicRing.encoded)
+        edit.secretRing?.let { storeEditedPrivateKey(fingerprint, it.encoded) }
+        dao.update(entity.copy(armoredPublicKey = armoredAsStored(fingerprint, crypto.exportArmoredPublicKey(edit.publicRing))))
+        stampLocalEdit(fingerprint)
+    }
+
+    /**
+     * 4.8.0 (#71): would revoking [subkeyFingerprint] leave [fingerprint] with no
+     * usable encryption subkey? The card path asks before the tap, as
+     * revokeSubkey does with KeyRepoError.LastEncryptionSubkey.
+     */
+    fun isLastEncryptionSubkeyOf(fingerprint: String, subkeyFingerprint: String): Boolean {
+        val targetHex = subkeyFingerprint.uppercase()
+        isLastEncryptionSubkeyStored(fingerprint, targetHex)?.let { return it }
+        val ring = loadPublicKeyRing(fingerprint) ?: return false
+        val target = ring.publicKeys.asSequence().firstOrNull { !it.isMasterKey && subkeyFpHex(it) == targetHex }
+            ?: return false
+        return isLastEncryptionSubkey(ring, target.keyID)
     }
 
     // ── 4.0.0 Phase 2: keyserver refresh support (iOS v7.1.1 F5) ────────

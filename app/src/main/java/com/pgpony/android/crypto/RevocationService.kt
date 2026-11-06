@@ -159,7 +159,8 @@ class RevocationService private constructor() {
             PonySigGen(
                 BcPGPContentSignerBuilder(
                     secretKey.publicKey.algorithm,
-                    HashAlgorithmTags.SHA256
+                    // 4.8.0 (4l, #109): an ECDSA key signs with a hash as long as its curve.
+                    EcCurveOid.signatureHash(secretKey.publicKey, HashAlgorithmTags.SHA256)
                 ),
                 secretKey.publicKey
             )
@@ -298,7 +299,11 @@ class RevocationService private constructor() {
 
         val sigGen = try {
             PonySigGen(
-                BcPGPContentSignerBuilder(primary.publicKey.algorithm, HashAlgorithmTags.SHA256),
+                // 4.8.0 (4l, #109): an ECDSA primary signs with a hash as long as its curve.
+                BcPGPContentSignerBuilder(
+                    primary.publicKey.algorithm,
+                    EcCurveOid.signatureHash(primary.publicKey, HashAlgorithmTags.SHA256)
+                ),
                 primary.publicKey
             )
         } catch (e: Exception) {
@@ -330,6 +335,36 @@ class RevocationService private constructor() {
             sig.encode(armored)
         }
         return bytes.toString(Charsets.UTF_8.name())
+    }
+
+    /**
+     * 4.8.0 (#71): revoke the subkey [subkeyId] of [publicKeyRing] with a 0x28
+     * made by [signer], such as the primary on an OpenPGP card. Same
+     * subpackets as [generateSubkeyRevocation]. [storedSecretRing] (stubs
+     * included) only takes the new public material.
+     */
+    fun revokeSubkeyWith(
+        signer: PrimarySigner,
+        publicKeyRing: PGPPublicKeyRing,
+        storedSecretRing: PGPSecretKeyRing?,
+        subkeyId: Long,
+        reason: RevocationReason,
+        comment: String?
+    ): SignedEdit {
+        val primary = publicKeyRing.publicKey
+        val target = publicKeyRing.getPublicKey(subkeyId)
+            ?: throw RevocationError.UnsupportedKey("Subkey not found in supplied ring")
+        if (target.keyID == primary.keyID) {
+            throw RevocationError.UnsupportedKey("Key is the primary; use generateRevocationCertificate")
+        }
+        val gen = signer.generator(PGPSignature.SUBKEY_REVOCATION)
+        val subpacketGen = PGPSignatureSubpacketGenerator()
+        subpacketGen.setIssuerFingerprint(false, primary)
+        subpacketGen.setRevocationReason(false, reasonToTag(reason), comment.orEmpty())
+        gen.setHashedSubpackets(subpacketGen.generate())
+        val sig = gen.generateCertification(primary, target)
+        val updated = PGPPublicKey.addCertification(target, sig)
+        return SignedEdit.of(PGPPublicKeyRing.insertPublicKey(publicKeyRing, updated), storedSecretRing)
     }
 
     /**

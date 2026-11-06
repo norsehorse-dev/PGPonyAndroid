@@ -3095,7 +3095,6 @@
     <string name="certifier_lookup_imported_body">Its certifications on this key are checked again.</string>
     <string name="key_detail_refresh_sigs_menu">Refresh self-signatures</string>
     <string name="key_detail_refresh_sigs_title">Refresh self-signatures</string>
-    <string name="key_detail_refresh_sigs_body">Signs this key\'s User IDs and subkey bindings again with SHA-256. Every expiry date stays as it is. A subkey left out because its binding used SHA-1 comes back if its secret key is on this phone. Publish the key afterwards so others get the new signatures.</string>
     <string name="key_detail_refresh_sigs_action">Refresh</string>
     <string name="key_detail_refresh_sigs_done">Self-signatures refreshed.</string>
     <plurals name="key_detail_refresh_sigs_done_restored">
@@ -3137,4 +3136,16 @@
     <string name="provider_review_included_format">Already included for %1$s</string>
     <!-- 4.7.0 RC7: Show Key with a key too large for a QR code (item 69, #100) -->
     <string name="exchange_qr_too_large_inline">This key is too large for a QR code. Use Copy Key or Upload below instead.</string>
+    <!-- 4.8.0 RC4 (#86) -->
+    <string name="key_detail_refresh_sigs_body_hash_choice">Signs this key\'s User IDs and subkey bindings again with the hash chosen below. Every expiry date stays as it is. A subkey left out because its binding used SHA-1 comes back if its secret key is on this phone. Publish the key afterwards so others get the new signatures.</string>
+    <string name="self_sig_hash_label">Hash for the new signatures</string>
+    <string name="self_sig_hash_sha256" translatable="false">SHA-256</string>
+    <string name="self_sig_hash_sha512" translatable="false">SHA-512</string>
+    <string name="self_sig_hash_hint">Both are safe. SHA-512 suits RSA keys of 3072 bits or more, and keys whose signatures already use it.</string>
+    <!-- 4.8.0 RC4 (4l) -->
+    <string name="keyring_generate_algorithm_caption_ecdsa">ECDSA signing with ECDH encryption on the same curve (OpenPGP v4). Security keys differ in which curves they hold, so check that yours takes this one before moving a key to it.</string>
+    <!-- 4.8.0 RC4 (#71) -->
+    <string name="err_card_primary_missing">The primary key is not in this security key\'s signature slot, so this change cannot be made with it</string>
+    <string name="key_detail_add_subkey_card_note">The new subkey is made on this phone. This key signs and decrypts with the security key, so move the new subkey there with Move to security key before you share the key. Until then, messages encrypted to a new encryption subkey cannot be opened.</string>
+    <string name="key_detail_add_subkey_card_new_passphrase_hint">The new subkey\'s secret stays on this phone, and no secret of this key here has a passphrase yet. Choose one to protect it.</string>
 </resources>

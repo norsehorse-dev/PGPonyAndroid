@@ -25,10 +25,11 @@
 //     but takes the target flag as a caller-supplied override so add/
 //     revoke/promote can each say what they want it to become.
 //
-// Card-backed keys are out of scope, matching the same scope line
-// ClassicalSubkeyGen (workstream H) drew: software key pairs only.
-// A card's primary is the signing key for its own self-certs, and NFC
-// signing for UID edits is a separate surgery not needed for #29.
+// 4.8.0 (#71): add, revoke and make-primary also take a PrimarySigner
+// (the ...With functions), so a key whose primary is in an OpenPGP card's
+// Signature slot signs these on the card. The passphrase functions build
+// a software PrimarySigner and run the same code. Notations stay
+// software only.
 //
 // Scope note: this file only edits self-certifications the primary
 // key issues over its own UIDs. Third-party certifications (other
@@ -90,28 +91,59 @@ class UserIdService private constructor() {
         makePrimary: Boolean,
         passphrase: String?
     ): UpdatedRings {
+        requireAddable(publicRing.publicKey, userId)
+        val primarySecret = secretRing.secretKey
+        val privateKey = extractPrivate(primarySecret, passphrase)
+        val signer = PrimarySigner.software(primarySecret.publicKey, privateKey)
+        val primary = addUserIdCore(publicRing.publicKey, userId, makePrimary, signer)
+        return reassemble(secretRing, publicRing, primary)
+    }
+
+    /**
+     * 4.8.0 (#71): [addUserId] with the signatures made by [signer], such as
+     * the primary on an OpenPGP card. [secretRing] (stubs included) gets the
+     * new public material when it is stored; null for a key with none.
+     */
+    fun addUserIdWith(
+        signer: PrimarySigner,
+        secretRing: PGPSecretKeyRing?,
+        publicRing: PGPPublicKeyRing,
+        userId: String,
+        makePrimary: Boolean
+    ): SignedEdit {
+        requireAddable(publicRing.publicKey, userId)
+        val primary = addUserIdCore(publicRing.publicKey, userId, makePrimary, signer)
+        return SignedEdit.of(PGPPublicKeyRing.insertPublicKey(publicRing, primary), secretRing)
+    }
+
+    private fun requireAddable(primary: PGPPublicKey, userId: String) {
         if (userId.isBlank()) {
             throw UserIdError.UnsupportedKey("User ID cannot be blank")
         }
-        var primary = publicRing.publicKey
         if (primary.userIDs.asSequence().any { it == userId }) {
             throw UserIdError.AlreadyExists("This key already has that User ID")
         }
+    }
 
-        val primarySecret = secretRing.secretKey
-        val privateKey = extractPrivate(primarySecret, passphrase)
-        val signerBuilder = BcPGPContentSignerBuilder(primarySecret.publicKey.algorithm, HashAlgorithmTags.SHA256)
-        fun signer() = PonySigGen(signerBuilder, primary).apply { init(PGPSignature.POSITIVE_CERTIFICATION, privateKey) }
+    /** The primary with [userId] added and self-certified by [signer]. */
+    private fun addUserIdCore(
+        primaryIn: PGPPublicKey,
+        userId: String,
+        makePrimary: Boolean,
+        signer: PrimarySigner
+    ): PGPPublicKey {
+        var primary = primaryIn
+        fun certGen() = signer.generator(PGPSignature.POSITIVE_CERTIFICATION)
 
         val representative = representativeSelfCert(primary)
 
         if (makePrimary) {
             val currentPrimaryUid = currentPrimaryUserId(primary)
             if (currentPrimaryUid != null) {
-                primary = reissueSelfCert(primary, currentPrimaryUid, isPrimary = false, signer = ::signer)
+                primary = reissueSelfCert(primary, currentPrimaryUid, isPrimary = false, signer = ::certGen)
             }
         } else {
-            // Bug (limbodiver, Sep 2026): the new UID's self-cert is stamped "now". If
+            // Bug (a user, Sep 2026): the new UID's self-cert is stamped "now". If
             // no existing UID carries an explicit IsPrimaryUserId flag (the usual
             // case, since generation never flags a lone UID), keyservers and gpg
             // fall back to "newest self-sig wins" and show the just-added address
@@ -123,18 +155,16 @@ class UserIdService private constructor() {
             val alreadyExplicit = currentPrimaryUid != null &&
                 latestSelfCert(primary, currentPrimaryUid)?.hashedSubPackets?.isPrimaryUserID == true
             if (currentPrimaryUid != null && !alreadyExplicit) {
-                primary = reissueSelfCert(primary, currentPrimaryUid, isPrimary = true, signer = ::signer)
+                primary = reissueSelfCert(primary, currentPrimaryUid, isPrimary = true, signer = ::certGen)
             }
         }
 
         val sub = PGPSignatureSubpacketGenerator()
         copyUserIdSubpackets(representative?.hashedSubPackets, makePrimary, sub)
-        val gen = signer()
+        val gen = certGen()
         gen.setHashedSubpackets(sub.generate())
         val newCert = gen.generateCertification(userId, primary)
-        primary = PGPPublicKey.addCertification(primary, userId, newCert)
-
-        return reassemble(secretRing, publicRing, primary)
+        return PGPPublicKey.addCertification(primary, userId, newCert)
     }
 
     /**
@@ -170,7 +200,11 @@ class UserIdService private constructor() {
             ?: throw UserIdError.UnsupportedKey("Key has no primary User ID")
         val primarySecret = secretRing.secretKey
         val privateKey = extractPrivate(primarySecret, passphrase)
-        val signerBuilder = BcPGPContentSignerBuilder(primarySecret.publicKey.algorithm, HashAlgorithmTags.SHA256)
+        // 4.8.0 (4l, #109): an ECDSA primary signs with a hash as long as its curve.
+        val signerBuilder = BcPGPContentSignerBuilder(
+            primarySecret.publicKey.algorithm,
+            EcCurveOid.signatureHash(primarySecret.publicKey, HashAlgorithmTags.SHA256)
+        )
         val existing = latestSelfCert(primary, primaryUid)
         val isPrimaryFlag = existing?.hashedSubPackets?.isPrimaryUserID ?: false
         val sub = PGPSignatureSubpacketGenerator()
@@ -206,7 +240,29 @@ class UserIdService private constructor() {
         comment: String?,
         passphrase: String?
     ): UpdatedRings {
-        var primary = publicRing.publicKey
+        requireRevocable(publicRing.publicKey, userId)
+        val primarySecret = secretRing.secretKey
+        val privateKey = extractPrivate(primarySecret, passphrase)
+        val signer = PrimarySigner.software(primarySecret.publicKey, privateKey)
+        val primary = revokeUserIdCore(publicRing.publicKey, userId, reason, comment, signer)
+        return reassemble(secretRing, publicRing, primary)
+    }
+
+    /** 4.8.0 (#71): [revokeUserId] with the revocation made by [signer]. */
+    fun revokeUserIdWith(
+        signer: PrimarySigner,
+        secretRing: PGPSecretKeyRing?,
+        publicRing: PGPPublicKeyRing,
+        userId: String,
+        reason: com.pgpony.android.data.RevocationReason,
+        comment: String?
+    ): SignedEdit {
+        requireRevocable(publicRing.publicKey, userId)
+        val primary = revokeUserIdCore(publicRing.publicKey, userId, reason, comment, signer)
+        return SignedEdit.of(PGPPublicKeyRing.insertPublicKey(publicRing, primary), secretRing)
+    }
+
+    private fun requireRevocable(primary: PGPPublicKey, userId: String) {
         if (primary.userIDs.asSequence().none { it == userId }) {
             throw UserIdError.NotFound("This key has no such User ID")
         }
@@ -214,11 +270,16 @@ class UserIdService private constructor() {
         if (liveUids.size <= 1 && liveUids.contains(userId)) {
             throw UserIdError.UnsupportedKey("Cannot revoke the only remaining User ID on this key")
         }
+    }
 
-        val primarySecret = secretRing.secretKey
-        val privateKey = extractPrivate(primarySecret, passphrase)
-        val signerBuilder = BcPGPContentSignerBuilder(primarySecret.publicKey.algorithm, HashAlgorithmTags.SHA256)
-        val gen = PonySigGen(signerBuilder, primary).apply { init(PGPSignature.CERTIFICATION_REVOCATION, privateKey) }
+    private fun revokeUserIdCore(
+        primary: PGPPublicKey,
+        userId: String,
+        reason: com.pgpony.android.data.RevocationReason,
+        comment: String?,
+        signer: PrimarySigner
+    ): PGPPublicKey {
+        val gen = signer.generator(PGPSignature.CERTIFICATION_REVOCATION)
 
         val sub = PGPSignatureSubpacketGenerator()
         sub.setIssuerFingerprint(false, primary)
@@ -226,9 +287,7 @@ class UserIdService private constructor() {
         gen.setHashedSubpackets(sub.generate())
 
         val revSig = gen.generateCertification(userId, primary)
-        primary = PGPPublicKey.addCertification(primary, userId, revSig)
-
-        return reassemble(secretRing, publicRing, primary)
+        return PGPPublicKey.addCertification(primary, userId, revSig)
     }
 
     /**
@@ -269,32 +328,50 @@ class UserIdService private constructor() {
         userId: String,
         passphrase: String?
     ): UpdatedRings {
-        var primary = publicRing.publicKey
+        requirePromotable(publicRing.publicKey, userId)
+        val primarySecret = secretRing.secretKey
+        val privateKey = extractPrivate(primarySecret, passphrase)
+        val signer = PrimarySigner.software(primarySecret.publicKey, privateKey)
+        val primary = setPrimaryUserIdCore(publicRing.publicKey, userId, signer)
+        return reassemble(secretRing, publicRing, primary)
+    }
+
+    /** 4.8.0 (#71): [setPrimaryUserId] with the self-certifications made by [signer]. */
+    fun setPrimaryUserIdWith(
+        signer: PrimarySigner,
+        secretRing: PGPSecretKeyRing?,
+        publicRing: PGPPublicKeyRing,
+        userId: String
+    ): SignedEdit {
+        requirePromotable(publicRing.publicKey, userId)
+        val primary = setPrimaryUserIdCore(publicRing.publicKey, userId, signer)
+        return SignedEdit.of(PGPPublicKeyRing.insertPublicKey(publicRing, primary), secretRing)
+    }
+
+    private fun requirePromotable(primary: PGPPublicKey, userId: String) {
         if (primary.userIDs.asSequence().none { it == userId }) {
             throw UserIdError.NotFound("This key has no such User ID")
         }
         if (isRevoked(primary, userId)) {
             throw UserIdError.UnsupportedKey("Cannot make a revoked User ID primary")
         }
+    }
 
-        val primarySecret = secretRing.secretKey
-        val privateKey = extractPrivate(primarySecret, passphrase)
-        val signerBuilder = BcPGPContentSignerBuilder(primarySecret.publicKey.algorithm, HashAlgorithmTags.SHA256)
-        fun signer() = PonySigGen(signerBuilder, primary).apply { init(PGPSignature.POSITIVE_CERTIFICATION, privateKey) }
+    private fun setPrimaryUserIdCore(primaryIn: PGPPublicKey, userId: String, signer: PrimarySigner): PGPPublicKey {
+        var primary = primaryIn
+        fun certGen() = signer.generator(PGPSignature.POSITIVE_CERTIFICATION)
 
         val currentPrimaryUid = currentPrimaryUserId(primary)
         if (currentPrimaryUid != null && currentPrimaryUid != userId) {
-            primary = reissueSelfCert(primary, currentPrimaryUid, isPrimary = false, signer = ::signer)
+            primary = reissueSelfCert(primary, currentPrimaryUid, isPrimary = false, signer = ::certGen)
         }
         // 4.6.0 (item 9): clear the flag from every other User ID too, so Make
         // Primary also repairs a key that carries more than one primary flag
         // (the state the publish check refuses).
         for (other in primaryFlaggedLiveUserIds(primary)) {
-            if (other != userId) primary = reissueSelfCert(primary, other, isPrimary = false, signer = ::signer)
+            if (other != userId) primary = reissueSelfCert(primary, other, isPrimary = false, signer = ::certGen)
         }
-        primary = reissueSelfCert(primary, userId, isPrimary = true, signer = ::signer)
-
-        return reassemble(secretRing, publicRing, primary)
+        return reissueSelfCert(primary, userId, isPrimary = true, signer = ::certGen)
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────

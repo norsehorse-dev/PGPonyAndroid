@@ -34,6 +34,8 @@ package com.pgpony.android.crypto
 
 import org.bouncycastle.bcpg.HashAlgorithmTags
 import org.bouncycastle.bcpg.PublicKeyAlgorithmTags
+import org.bouncycastle.bcpg.PublicKeyPacket
+import org.bouncycastle.bcpg.PublicSubkeyPacket
 import org.bouncycastle.bcpg.SymmetricKeyAlgorithmTags
 import org.bouncycastle.bcpg.sig.KeyFlags as PGPKeyFlags
 import org.bouncycastle.crypto.generators.Ed25519KeyPairGenerator
@@ -45,8 +47,14 @@ import org.bouncycastle.crypto.params.X25519KeyGenerationParameters
 import org.bouncycastle.openpgp.PGPException
 import org.bouncycastle.openpgp.PGPKeyPair
 import org.bouncycastle.openpgp.PGPKeyRingGenerator
+import org.bouncycastle.openpgp.PGPPrivateKey
+import org.bouncycastle.openpgp.PGPPublicKey
+import org.bouncycastle.openpgp.PGPPublicKeyRing
+import org.bouncycastle.openpgp.PGPSecretKey
 import org.bouncycastle.openpgp.PGPSecretKeyRing
+import org.bouncycastle.openpgp.PGPSignature
 import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator
+import org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator
 import org.bouncycastle.openpgp.operator.bc.BcPBESecretKeyEncryptorBuilder
 import org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder
 import org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider
@@ -128,7 +136,11 @@ object ClassicalSubkeyGen {
 
         val decryptor = com.pgpony.android.crypto.SecretKeyUnlock.decryptor(passphrase)
         val checksumCalc = BcPGPDigestCalculatorProvider().get(HashAlgorithmTags.SHA1)
-        val certSigGen = BcPGPContentSignerBuilder(primarySec.publicKey.algorithm, HashAlgorithmTags.SHA256)
+        // 4.8.0 (4l, #109): an ECDSA primary signs with a hash as long as its curve.
+        val certSigGen = BcPGPContentSignerBuilder(
+            primarySec.publicKey.algorithm,
+            EcCurveOid.signatureHash(primarySec.publicKey, HashAlgorithmTags.SHA256)
+        )
         val encryptor = passphrase?.takeIf { it.isNotEmpty() }?.let {
             S2kPolicy.v4EncryptorBuilder() // 4.6.0 (item 17.6)
                 .setSecureRandom(random)
@@ -176,6 +188,123 @@ object ClassicalSubkeyGen {
 
         return gen.generateSecretKeyRing()
     }
+
+    /** 4.8.0 (#71): a key other than v4 takes no subkey through [addSubkeyWith]. */
+    const val V4_ONLY_MESSAGE = "Only a v4 key can take a subkey signed on the security key"
+
+    /**
+     * 4.8.0 (#71): add [type] as a new subkey of the v4 [secretRing] when the
+     * primary signs through [signer] instead of from the ring, as when the
+     * stored primary is a divert-to-card stub and the primary sits in the
+     * card's Signature slot. [addSubkey] cannot: Bouncy Castle's
+     * PGPKeyRingGenerator unlocks the primary from the ring.
+     *
+     * The subkey ([pair], made with [newSubkeyPair] before the card is tapped,
+     * or here) stays on the phone, protected with [passphrase], which is
+     * required (see [ringPassphrase]). The binding (0x18) is the one
+     * signature the primary makes. A signing subkey also gets the embedded
+     * 0x19 back-signature, made by the new subkey itself, as in [addSubkey].
+     * Every other key in [secretRing] is kept as it is, so stubs stay stubs.
+     */
+    fun addSubkeyWith(
+        signer: PrimarySigner,
+        secretRing: PGPSecretKeyRing,
+        publicRing: PGPPublicKeyRing,
+        type: ClassicalSubkeyType,
+        passphrase: String?,
+        expirationSeconds: Long? = null,
+        random: SecureRandom = SecureRandom(),
+        pair: PGPKeyPair = buildKeyPair(type, random, Date())
+    ): SignedEdit {
+        val primaryPub = publicRing.publicKey
+        if (primaryPub.version != PublicKeyPacket.VERSION_4) throw SubkeyAddError(V4_ONLY_MESSAGE)
+        if (primaryPub.keyID != signer.publicKey.keyID || secretRing.publicKey.keyID != primaryPub.keyID) {
+            throw SubkeyAddError("The signer is not this key's primary key")
+        }
+        val protectWith = ringPassphrase(secretRing, passphrase)
+
+        // The subkey's public key as a subkey packet (tag 14) from the start, so
+        // Bouncy Castle treats it as a subkey when it is inserted into the ring.
+        val subPacket = PublicSubkeyPacket(
+            PublicKeyPacket.VERSION_4, pair.publicKey.algorithm, pair.publicKey.creationTime,
+            pair.publicKey.publicKeyPacket.key
+        )
+        val subPub = PGPPublicKey(subPacket, BcKeyFingerprintCalculator())
+        val subPriv = PGPPrivateKey(subPub.keyID, subPacket, pair.privateKey.privateKeyDataPacket)
+
+        val hashedGen = PGPSignatureSubpacketGenerator()
+        hashedGen.setKeyFlags(
+            false,
+            when (type.capability) {
+                Capability.SIGN -> PGPKeyFlags.SIGN_DATA
+                Capability.ENCRYPT -> PGPKeyFlags.ENCRYPT_COMMS or PGPKeyFlags.ENCRYPT_STORAGE
+                Capability.AUTHENTICATE -> PGPKeyFlags.AUTHENTICATION
+            }
+        )
+        hashedGen.setIssuerFingerprint(false, primaryPub)
+        if (expirationSeconds != null) {
+            hashedGen.setKeyExpirationTime(false, expirationSeconds)
+        }
+        if (type.capability == Capability.SIGN) {
+            // 4.7.0 (item 39): the back-signature is made by the new subkey.
+            val back = PonySigGen(BcPGPContentSignerBuilder(subPub.algorithm, HashAlgorithmTags.SHA256), subPub)
+            back.init(PGPSignature.PRIMARYKEY_BINDING, subPriv)
+            hashedGen.setEmbeddedSignature(false, back.generateCertification(primaryPub, subPub))
+        }
+
+        val bindGen = signer.generator(PGPSignature.SUBKEY_BINDING)
+        bindGen.setHashedSubpackets(hashedGen.generate())
+        val binding = bindGen.generateCertification(primaryPub, subPub)
+        val boundPub = PGPPublicKey.addCertification(subPub, binding)
+
+        val checksumCalc = BcPGPDigestCalculatorProvider().get(HashAlgorithmTags.SHA1)
+        val encryptor = S2kPolicy.v4EncryptorBuilder() // 4.6.0 (item 17.6)
+            .setSecureRandom(random)
+            .build(protectWith.toCharArray())
+        val secret = PGPSecretKey(subPriv, boundPub, checksumCalc, false, encryptor)
+        // Parsed back from their octets, so the new subkey reads like any other.
+        val ring = PGPSecretKeyRing(
+            PGPSecretKeyRing.insertSecretKey(secretRing, secret).encoded, BcKeyFingerprintCalculator()
+        )
+        val newPublic = ring.getPublicKey(subPub.keyID)
+            ?: throw SubkeyAddError("Could not bind the new subkey")
+        val pubRing = PGPPublicKeyRing(
+            PGPPublicKeyRing.insertPublicKey(publicRing, newPublic).encoded, BcKeyFingerprintCalculator()
+        )
+        return SignedEdit.of(pubRing, ring)
+    }
+
+    /**
+     * 4.8.0 (#71): a new key pair of [type] for [addSubkeyWith], made before the
+     * security key is tapped: an RSA 4096 key can take many seconds, longer
+     * than a card should be held to the phone.
+     */
+    fun newSubkeyPair(type: ClassicalSubkeyType): PGPKeyPair = buildKeyPair(type, SecureRandom(), Date())
+
+    /**
+     * 4.8.0 (#71): the passphrase the new subkey is protected with. When a
+     * secret with material in [secretRing] is protected, [passphrase] has to
+     * unlock it, so the key keeps one passphrase. When the phone holds no
+     * protected secret for the key (every secret on the card, or only
+     * unprotected ones here), [passphrase] is a new one chosen for the new
+     * subkey and is required: its secret is never stored unprotected.
+     */
+    private fun ringPassphrase(secretRing: PGPSecretKeyRing, passphrase: String?): String {
+        if (passphrase.isNullOrEmpty()) throw SubkeyAddError(PASSPHRASE_REQUIRED_MESSAGE)
+        val held = secretRing.secretKeys.asSequence()
+            .firstOrNull { !OfflineStub.isStub(it) && it.s2KUsage.toInt() != 0 }
+            ?: return passphrase
+        val unlocked = try {
+            SecretKeyUnlock.extract(held, passphrase.toCharArray())
+        } catch (e: PGPException) {
+            null
+        }
+        if (unlocked == null) throw SubkeyAddError("Incorrect passphrase for key")
+        return passphrase
+    }
+
+    /** 4.8.0 (#71): [addSubkeyWith] was given no passphrase for the new subkey. */
+    const val PASSPHRASE_REQUIRED_MESSAGE = "Passphrase is required for this key"
 
     private fun buildKeyPair(
         type: ClassicalSubkeyType,

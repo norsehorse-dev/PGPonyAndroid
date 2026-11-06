@@ -167,7 +167,10 @@ object CertificateBindings {
         val backSigExpiresAtMs: Long? = null,
         /** 4.7.0 (item 27): a User ID certification accepted only under the
          *  weak-hash rule (SHA-1 or RIPEMD-160 after the key-signature cutoff). */
-        val weakHash: Boolean = false
+        val weakHash: Boolean = false,
+        /** 4.8.0 (#108): the key flags carry 0x0400, the additional
+         *  decryption subkey (ADSK) flag, which sits in the second octet. */
+        val adsk: Boolean = false
     ) {
         /** Created at or before [t] and not yet expired at [t]. */
         fun aliveAt(t: Long): Boolean = createdMs <= t && (sigExpiresAtMs == null || t < sigExpiresAtMs)
@@ -247,7 +250,11 @@ object CertificateBindings {
         /** 3.0.0 (5d-1): every verified 0x18 binding. */
         val bindings: List<SelfSig> = emptyList(),
         /** 3.0.0 (5d-1): every verified 0x28 revocation. */
-        val revocations: List<Revocation> = emptyList()
+        val revocations: List<Revocation> = emptyList(),
+        /** 4.8.0 (#108): the newest verified 0x18 carries the ADSK key flag
+         *  (0x0400). GnuPG 2.4.1 and later encrypts to such a subkey next to
+         *  the recipient's encryption subkey. */
+        val adsk: Boolean = false
     )
 
     data class Report(
@@ -321,6 +328,25 @@ object CertificateBindings {
         }
 
         /**
+         * 4.8.0 (#108): is [fpHex] an additional decryption subkey (key flag
+         * 0x0400) that a message may be encrypted to at [nowMs]? The same
+         * gates as [isUsableEncryptionKey] (usable primary, a binding alive
+         * now, not revoked, not expired), but the binding in force must carry
+         * the ADSK flag; the encryption flags are not needed. The primary is
+         * never an ADSK. An unsupported report vouches for nothing.
+         */
+        fun isUsableAdsk(fpHex: String, nowMs: Long): Boolean {
+            if (!supported) return false
+            if (!isPrimaryUsable(nowMs)) return false
+            activePrimarySig(nowMs) ?: return false
+            if (isPrimary(fpHex)) return false
+            val s = subkeyByFingerprint(fpHex) ?: return false
+            if (!s.bound || s.revoked) return false
+            val binding = activeAt(s.bindings, nowMs) ?: return false
+            return (binding.keyExpiresAtMs == null || nowMs < binding.keyExpiresAtMs) && binding.adsk
+        }
+
+        /**
          * 3.0.0 (5d-1): may the secret half of [fpHex] decrypt a message
          * addressed to it? Revocation and expiry do not matter here (old mail
          * must stay readable), but the key must be one the certificate marks
@@ -336,7 +362,9 @@ object CertificateBindings {
                 return flagsAllowEncryption(newest?.keyFlags)
             }
             val s = subkeyByFingerprint(fpHex) ?: return true
-            return s.bound && flagsAllowEncryption(s.keyFlags)
+            // 4.8.0 (#108): an ADSK (0x0400) is a decryption key too, even
+            // when its first flags octet names only authentication (0x20 0x04).
+            return s.bound && (flagsAllowEncryption(s.keyFlags) || s.adsk)
         }
 
         /** A key that may speak for the primary as a signer: the primary, or a
@@ -648,6 +676,12 @@ object CertificateBindings {
         val keyFlags: Int? = subpackets(hashed).firstOrNull { it.first == SP_KEY_FLAGS }?.second
             ?.let { if (it.isEmpty()) 0 else it[0].toInt() and 0xFF }
 
+        /** 4.8.0 (#108): the key flags subpacket has the ADSK flag, 0x0400 in
+         *  RFC 9580 terms, which is 0x04 in its second octet. [keyFlags] keeps
+         *  only the first octet, so this is read on its own. */
+        val adskFlag: Boolean = subpackets(hashed).firstOrNull { it.first == SP_KEY_FLAGS }?.second
+            ?.let { it.size >= 2 && (it[1].toInt() and 0x04) != 0 } ?: false
+
         /** Signature expiration (hashed subpacket 3), seconds after creation; null for none or 0. */
         val sigExpirySeconds: Long? = subpackets(hashed).firstOrNull { it.first == SP_SIG_EXPIRATION }?.second
             ?.takeIf { it.size == 4 }?.let { be32(it, 0).toLong() and 0xFFFFFFFFL }?.takeIf { it > 0 }
@@ -958,7 +992,8 @@ object CertificateBindings {
                         version = sub.version,
                         publicBody = pub,
                         bindings = bindings,
-                        revocations = revocations
+                        revocations = revocations,
+                        adsk = newestBinding?.adskFlag == true
                     )
                 )
             } else {
@@ -1020,7 +1055,8 @@ object CertificateBindings {
         createdMs = s.createdMs ?: 0L,
         sigExpiresAtMs = sigExpiresAt(s),
         keyExpiresAtMs = expiryOf(keyCreated, s),
-        keyFlags = s.keyFlags
+        keyFlags = s.keyFlags,
+        adsk = s.adskFlag
     )
 
     private fun revocationOf(s: SigBody): Revocation =

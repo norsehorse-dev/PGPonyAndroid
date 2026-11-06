@@ -2982,7 +2982,6 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="certifier_lookup_imported_body">インポートした鍵がこの鍵に付けた認証が再検証されます。</string>
     <string name="key_detail_refresh_sigs_menu">自己署名を更新</string>
     <string name="key_detail_refresh_sigs_title">自己署名を更新</string>
-    <string name="key_detail_refresh_sigs_body">この鍵のユーザー ID とサブキーのバインディングを SHA-256 で署名し直します。有効期限はすべてそのままです。バインディングに SHA-1 が使われていたために除外されたサブキーは、その秘密鍵がこのスマートフォンにあれば復活します。他の人が新しい署名を受け取れるよう、終わったら鍵を公開してください。</string>
     <string name="key_detail_refresh_sigs_action">更新</string>
     <string name="key_detail_refresh_sigs_done">自己署名を更新しました。</string>
     <plurals name="key_detail_refresh_sigs_done_restored">
@@ -3018,4 +3017,14 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="provider_review_included_format">%1$s によりすでに含まれています</string>
     <!-- 4.7.0 RC7, translated Oct 2026 -->
     <string name="exchange_qr_too_large_inline">この鍵は QR コードには大きすぎます。代わりに下の「鍵をコピー」または「アップロード」をお使いください。</string>
+    <!-- 4.8.0 RC4 (#86) -->
+    <string name="key_detail_refresh_sigs_body_hash_choice">この鍵のユーザー ID とサブキーのバインディングを、下で選んだハッシュで署名し直します。有効期限はすべてそのままです。バインディングに SHA-1 が使われていたために除外されたサブキーは、その秘密鍵がこのスマートフォンにあれば復活します。他の人が新しい署名を受け取れるよう、終わったら鍵を公開してください。</string>
+    <string name="self_sig_hash_label">新しい署名のハッシュ</string>
+    <string name="self_sig_hash_hint">どちらも安全です。SHA-512 は 3072 ビット以上の RSA 鍵や、署名ですでに SHA-512 を使っている鍵に向いています。</string>
+    <!-- 4.8.0 RC4 (4l) -->
+    <string name="keyring_generate_algorithm_caption_ecdsa">同じ曲線で ECDSA 署名と ECDH 暗号化を行う鍵（OpenPGP v4）。対応する曲線はセキュリティキーによって異なるため、鍵を移動する前に、お使いのセキュリティキーがこの曲線に対応しているか確認してください。</string>
+    <!-- 4.8.0 RC4 (#71) -->
+    <string name="err_card_primary_missing">主鍵がこのセキュリティキーの署名スロットにないため、このセキュリティキーではこの変更を行えません</string>
+    <string name="key_detail_add_subkey_card_note">新しいサブキーはこのスマートフォン上で作成されます。この鍵はセキュリティキーで署名と復号を行うため、鍵を共有する前に「セキュリティキーに移動」で新しいサブキーをセキュリティキーに移してください。それまでは、新しい暗号化サブキー宛てに暗号化されたメッセージを開けません。</string>
+    <string name="key_detail_add_subkey_card_new_passphrase_hint">新しいサブキーの秘密鍵はこのスマートフォンに残りますが、ここにあるこの鍵の秘密鍵にはまだどれもパスフレーズが設定されていません。保護するためのパスフレーズを選んでください。</string>
 </resources>

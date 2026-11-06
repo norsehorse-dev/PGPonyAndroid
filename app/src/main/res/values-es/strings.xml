@@ -3007,7 +3007,6 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="certifier_lookup_imported_body">Se vuelven a comprobar las certificaciones que hizo sobre esta clave.</string>
     <string name="key_detail_refresh_sigs_menu">Renovar autofirmas</string>
     <string name="key_detail_refresh_sigs_title">Renovar autofirmas</string>
-    <string name="key_detail_refresh_sigs_body">Vuelve a firmar con SHA-256 los ID de usuario y las vinculaciones de subclaves de esta clave. Todas las fechas de caducidad se mantienen. Una subclave que se omitió porque su vinculación usaba SHA-1 se recupera si su secreto está en este teléfono. Después, publica la clave para que otros reciban las nuevas firmas.</string>
     <string name="key_detail_refresh_sigs_action">Renovar</string>
     <string name="key_detail_refresh_sigs_done">Autofirmas renovadas.</string>
     <plurals name="key_detail_refresh_sigs_done_restored">
@@ -3055,4 +3054,14 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="provider_review_included_format">Ya incluida para %1$s</string>
     <!-- 4.7.0 RC7, translated Oct 2026 -->
     <string name="exchange_qr_too_large_inline">Esta clave es demasiado grande para un código QR. En su lugar, usa los botones Copiar clave o Subir de abajo.</string>
+    <!-- 4.8.0 RC4 (#86) -->
+    <string name="key_detail_refresh_sigs_body_hash_choice">Vuelve a firmar con el hash elegido abajo los ID de usuario y las vinculaciones de subclaves de esta clave. Todas las fechas de caducidad se mantienen. Una subclave que se omitió porque su vinculación usaba SHA-1 se recupera si su secreto está en este teléfono. Después, publica la clave para que otros reciban las nuevas firmas.</string>
+    <string name="self_sig_hash_label">Hash para las nuevas firmas</string>
+    <string name="self_sig_hash_hint">Ambos son seguros. SHA-512 es adecuado para claves RSA de 3072 bits o más y para claves cuyas firmas ya lo usan.</string>
+    <!-- 4.8.0 RC4 (4l) -->
+    <string name="keyring_generate_algorithm_caption_ecdsa">Firma ECDSA con cifrado ECDH en la misma curva (OpenPGP v4). Cada llave de seguridad admite curvas distintas, así que comprueba que la tuya acepta esta antes de mover una clave a ella.</string>
+    <!-- 4.8.0 RC4 (#71) -->
+    <string name="err_card_primary_missing">La clave principal no está en la ranura de firma de esta llave de seguridad, así que no se puede hacer este cambio con ella</string>
+    <string name="key_detail_add_subkey_card_note">La nueva subclave se crea en este teléfono. Esta clave firma y descifra con la llave de seguridad, así que mueve allí la nueva subclave con Mover a una llave de seguridad antes de compartir la clave. Hasta entonces, los mensajes cifrados para una nueva subclave de cifrado no se pueden abrir.</string>
+    <string name="key_detail_add_subkey_card_new_passphrase_hint">El secreto de la nueva subclave se queda en este teléfono, y ningún secreto de esta clave tiene aquí todavía frase de contraseña. Elige una para protegerlo.</string>
 </resources>

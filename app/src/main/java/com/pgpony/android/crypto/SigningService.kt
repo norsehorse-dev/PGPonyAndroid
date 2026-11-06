@@ -106,10 +106,13 @@ class SigningService private constructor() {
         com.pgpony.android.crypto.pqc.CompositeSubkeySigning.forPicked(signingKey, passphrase)?.let { c ->
             return com.pgpony.android.crypto.pqc.CompositeDocumentSigner.signCleartext(c.suite, c.secret, c.fingerprint, text)
         }
+        // 4.8.0 (4l, #109): an ECDSA key signs with a hash as long as its
+        // curve, and the Hash: header must name the hash actually used.
+        val hash = EcCurveOid.signatureHash(signingKey.publicKey, hashAlgorithm)
         val sigGen = buildSignatureGenerator(
             signingKey = signingKey,
             passphrase = passphrase,
-            hashAlgorithm = hashAlgorithm,
+            hashAlgorithm = hash,
             signatureType = PGPSignature.CANONICAL_TEXT_DOCUMENT
         )
         sigGen.setCleartext() // 4.7.3: a v5 signer hashes the cleartext marker
@@ -118,7 +121,7 @@ class SigningService private constructor() {
         val armored = ArmoredOutputStream(out).stripVersion()
 
         try {
-            armored.beginClearText(hashAlgorithm)
+            armored.beginClearText(hash)
 
             // Display side: write the user's text exactly as supplied so
             // line breaks and dash-escaping land naturally via BC's
@@ -324,7 +327,11 @@ class SigningService private constructor() {
         }
 
         val sigGen = PonySigGen(
-            BcPGPContentSignerBuilder(signingKey.publicKey.algorithm, hashAlgorithm),
+            // 4.8.0 (4l, #109): an ECDSA key signs with a hash as long as its curve.
+            BcPGPContentSignerBuilder(
+                signingKey.publicKey.algorithm,
+                EcCurveOid.signatureHash(signingKey.publicKey, hashAlgorithm)
+            ),
             signingKey.publicKey
         )
         sigGen.init(signatureType, privateKey)

@@ -11,6 +11,8 @@ package com.pgpony.android.ui.keyring
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -19,14 +21,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
+import com.pgpony.android.crypto.KeyExpirationService
 import com.pgpony.android.ui.components.PassphraseVisibilityToggle
 import com.pgpony.android.ui.util.dismissKeyboardOnTap
 import com.pgpony.android.ui.util.keepsKeyboard
+import org.bouncycastle.bcpg.HashAlgorithmTags
 import java.text.DateFormat
 import java.util.Date
 
@@ -295,6 +300,10 @@ private fun FlowRowPresets(
  * [subkeyLabel] is set when one subkey is the target; otherwise
  * [userIdCount] live User IDs are re-signed, plus [currentSubkeyCount]
  * subkeys when that option was ticked (0 when it was not).
+ *
+ * 4.8.0 (#86): [hashChoice] is the hash picked for the new signatures, shown
+ * as a choice through [onHashChoice]; null hides it (the card path, whose
+ * signer fixes the hash).
  */
 @Composable
 internal fun ConfirmExpiryChangeDialog(
@@ -304,7 +313,9 @@ internal fun ConfirmExpiryChangeDialog(
     userIdCount: Int,
     currentSubkeyCount: Int,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    hashChoice: Int? = null,
+    onHashChoice: (Int) -> Unit = {}
 ) {
     val never = stringResource(R.string.expiration_never)
     val fmt = DateFormat.getDateInstance(DateFormat.MEDIUM)
@@ -329,6 +340,9 @@ internal fun ConfirmExpiryChangeDialog(
                         )
                     }
                 }
+                if (hashChoice != null) {
+                    SelfSigHashChoice(selected = hashChoice, onSelect = onHashChoice)
+                }
                 Text(
                     stringResource(R.string.key_detail_expiry_confirm_publish),
                     style = MaterialTheme.typography.bodySmall,
@@ -343,4 +357,43 @@ internal fun ConfirmExpiryChangeDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_button_cancel)) }
         }
     )
+}
+
+/**
+ * 4.8.0 (#86): SHA-256 or SHA-512 for the self-signatures an edit makes (the
+ * expiry confirmation and Refresh self-signatures). Radio rows, as the
+ * certification level in CertifySheet.
+ */
+@Composable
+internal fun SelfSigHashChoice(
+    selected: Int,
+    enabled: Boolean = true,
+    onSelect: (Int) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth().selectableGroup()) {
+        Text(stringResource(R.string.self_sig_hash_label), style = MaterialTheme.typography.titleSmall)
+        KeyExpirationService.SELF_SIG_HASHES.forEach { hash ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectable(selected = selected == hash, enabled = enabled, role = Role.RadioButton) { onSelect(hash) }
+                    .padding(vertical = 4.dp)
+            ) {
+                RadioButton(selected = selected == hash, onClick = null, enabled = enabled)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    stringResource(
+                        if (hash == HashAlgorithmTags.SHA512) R.string.self_sig_hash_sha512 else R.string.self_sig_hash_sha256
+                    ),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+        Text(
+            stringResource(R.string.self_sig_hash_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }

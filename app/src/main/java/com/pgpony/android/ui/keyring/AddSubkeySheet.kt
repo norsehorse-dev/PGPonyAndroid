@@ -4,9 +4,10 @@
 // Modal bottom sheet to add a classical subkey (RSA 2048/4096,
 // Ed25519, X25519) to an existing software key pair. Same shape as
 // EditExpirationSheet: type chips, expiry presets + custom date,
-// passphrase field. Card-backed and public-only keys never reach this
-// sheet — KeyDetailScreen only wires the Add Subkey button for
-// software key pairs, matching the Edit Expiry row's own gating.
+// passphrase field. Public-only keys never reach this sheet.
+// 4.8.0 (#71): a key linked to a security key does (classical subkeys
+// only, with a note), and when its primary is on the security key the
+// sheet asks for the card PIN and the binding is signed there.
 //
 // item 7 (#55): post-quantum subkey types are offered here too, in a
 // second "Post-Quantum" group — ML-KEM encryption (768 on any key, 1024
@@ -48,7 +49,19 @@ fun AddSubkeySheet(
     isCompositeSign: Boolean = false,
     onApply: (choice: AddSubkeyChoice, expiresAtEpochSeconds: Long?, passphrase: String?) -> Unit,
     onDismiss: () -> Unit,
+    /** 4.8.0 (#71): a key linked to a security key, which signs and decrypts
+     *  there: classical subkeys only, and a note that the new one stays on
+     *  this phone until it is moved. */
+    cardLinked: Boolean = false,
+    /** 4.8.0 (#71): the primary is on the security key, so its binding is
+     *  signed there: ask for the card PIN, and the key's passphrase when
+     *  [askPassphrase] (the key's secrets on this phone have one). Without
+     *  it, a new passphrase is chosen (and confirmed) for the new subkey,
+     *  whose secret is never stored unprotected. */
+    onApplyCard: ((choice: AddSubkeyChoice, expiresAtEpochSeconds: Long?, pin: String, passphrase: String?) -> Unit)? = null,
+    askPassphrase: Boolean = true,
 ) {
+    val onCard = onApplyCard != null
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var selectedChoice: AddSubkeyChoice by remember {
@@ -59,6 +72,12 @@ fun AddSubkeySheet(
     var showDatePicker by remember { mutableStateOf(false) }
     var passphrase by remember { mutableStateOf("") }
     var passphraseShown by remember { mutableStateOf(false) }
+    var pin by remember { mutableStateOf("") }
+    // 4.8.0 (#71): no protected secret on the phone, so the new subkey gets a new passphrase.
+    val newPassphraseMode = onCard && !askPassphrase
+    var confirm by remember { mutableStateOf("") }
+    var confirmShown by remember { mutableStateOf(false) }
+    val newPassphraseOk = !newPassphraseMode || (passphrase.isNotBlank() && passphrase == confirm)
 
     fun computeExpiresAtEpochSeconds(): Long? {
         val preset = selectedPreset
@@ -70,7 +89,10 @@ fun AddSubkeySheet(
     }
 
     val hasValidExpiry = selectedPreset != null || customMillis != null
-    val canApply = !isProcessing && hasValidExpiry
+    // 4.8.0 (#71): on the card path the key's own passphrase (when it has one)
+    // is needed before the tap, so the card is not asked for nothing.
+    val canApply = !isProcessing && hasValidExpiry && (!onCard || pin.isNotEmpty()) && newPassphraseOk &&
+        (!onCard || !askPassphrase || passphrase.isNotEmpty())
 
     ModalBottomSheet(
         onDismissRequest = { if (!isProcessing) onDismiss() },
@@ -105,8 +127,16 @@ fun AddSubkeySheet(
                 selected = selectedChoice,
                 isV6 = isV6,
                 isCompositeSign = isCompositeSign,
-                onSelect = { selectedChoice = it }
+                onSelect = { selectedChoice = it },
+                showPostQuantum = !cardLinked
             )
+            if (cardLinked) {
+                Text(
+                    text = stringResource(R.string.key_detail_add_subkey_card_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
 
             Text(
                 text = stringResource(R.string.key_detail_add_subkey_expiry_label),
@@ -131,17 +161,74 @@ fun AddSubkeySheet(
                 ) { Text(label) }
             }
 
-            OutlinedTextField(
-                value = passphrase,
-                onValueChange = { passphrase = it },
-                label = { Text(stringResource(R.string.key_detail_add_subkey_passphrase_label)) },
-                visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
-                singleLine = true,
-                enabled = !isProcessing,
-                modifier = Modifier.keepsKeyboard().fillMaxWidth()
-            )
+            if (!onCard || askPassphrase) {
+                OutlinedTextField(
+                    value = passphrase,
+                    onValueChange = { passphrase = it },
+                    label = { Text(stringResource(R.string.key_detail_add_subkey_passphrase_label)) },
+                    visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
+                    singleLine = true,
+                    enabled = !isProcessing,
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth()
+                )
+            }
+            if (newPassphraseMode) {
+                Text(
+                    text = stringResource(R.string.key_detail_add_subkey_card_new_passphrase_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = passphrase,
+                    onValueChange = { passphrase = it },
+                    label = { Text(stringResource(R.string.change_passphrase_new_label)) },
+                    visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
+                    singleLine = true,
+                    enabled = !isProcessing,
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = confirm,
+                    onValueChange = { confirm = it },
+                    label = { Text(stringResource(R.string.keyring_generate_passphrase_confirm_label)) },
+                    visualTransformation = if (confirmShown) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = { PassphraseVisibilityToggle(confirmShown) { confirmShown = !confirmShown } },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
+                    singleLine = true,
+                    isError = passphrase != confirm,
+                    enabled = !isProcessing,
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth()
+                )
+                if (passphrase != confirm) {
+                    Text(
+                        text = stringResource(R.string.keyring_error_passphrase_mismatch),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+            // 4.8.0 (#71): the binding is signed on the security key.
+            if (onCard) {
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = { pin = it },
+                    label = { Text(stringResource(R.string.card_decrypt_pin_label)) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
+                    singleLine = true,
+                    enabled = !isProcessing,
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth()
+                )
+                Text(
+                    text = stringResource(R.string.key_detail_expiry_card_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             if (errorMessage != null) {
                 Text(
@@ -165,7 +252,13 @@ fun AddSubkeySheet(
                         // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
                         val entered = passphrase
                         passphrase = ""
-                        onApply(selectedChoice, computeExpiresAtEpochSeconds(), entered.ifBlank { null })
+                        confirm = ""
+                        val cardApply = onApplyCard
+                        if (cardApply != null) {
+                            cardApply(selectedChoice, computeExpiresAtEpochSeconds(), pin, entered.ifBlank { null })
+                        } else {
+                            onApply(selectedChoice, computeExpiresAtEpochSeconds(), entered.ifBlank { null })
+                        }
                     },
                     enabled = canApply,
                     modifier = Modifier.weight(1f)
@@ -180,6 +273,13 @@ fun AddSubkeySheet(
                         Text(stringResource(R.string.key_detail_add_subkey_apply))
                     }
                 }
+            }
+            if (onCard && isProcessing) {
+                Text(
+                    text = stringResource(R.string.card_decrypt_hold_card),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }
@@ -256,7 +356,9 @@ private fun AddSubkeyTypeChips(
     selected: AddSubkeyChoice,
     isV6: Boolean,
     isCompositeSign: Boolean,
-    onSelect: (AddSubkeyChoice) -> Unit
+    onSelect: (AddSubkeyChoice) -> Unit,
+    /** 4.8.0 (#71): false on a key linked to a security key. */
+    showPostQuantum: Boolean = true
 ) {
     val classical = AddSubkeyChoice.classicalFor(isV6, isCompositeSign)
     val postQuantum = AddSubkeyChoice.postQuantumFor(isV6)
@@ -284,18 +386,20 @@ private fun AddSubkeyTypeChips(
                 color = MaterialTheme.colorScheme.tertiary
             )
         }
-        Text(
-            text = stringResource(R.string.key_detail_add_subkey_group_pq),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            postQuantum.forEach { choice ->
-                FilterChip(
-                    selected = selected == choice,
-                    onClick = { onSelect(choice) },
-                    label = { Text(addSubkeyChoiceLabel(choice)) }
-                )
+        if (showPostQuantum) {
+            Text(
+                text = stringResource(R.string.key_detail_add_subkey_group_pq),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                postQuantum.forEach { choice ->
+                    FilterChip(
+                        selected = selected == choice,
+                        onClick = { onSelect(choice) },
+                        label = { Text(addSubkeyChoiceLabel(choice)) }
+                    )
+                }
             }
         }
     }

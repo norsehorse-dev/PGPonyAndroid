@@ -34,12 +34,20 @@
 //     (0x19) made BY the subkey, so the new expiry lands on the signing subkey
 //     too (issue #4). The card path still skips them, since the card cannot
 //     sign as the subkey.
+//   • 4.8.0 (#86): the software path signs with the hash the user picks,
+//     SHA-256 or SHA-512 ([SELF_SIG_HASHES], default from [defaultSelfSigHash]).
+//     Every signature an edit makes uses it: User ID self-certifications,
+//     subkey bindings and a signing subkey's back-signature. The card path
+//     keeps the hash its signer fixes (CardPGPContentSigner: SHA-256 for RSA
+//     and EdDSA, the curve's hash for ECDSA), since the card's RSA input is
+//     a SHA-256 DigestInfo.
 
 package com.pgpony.android.crypto
 
 import com.pgpony.android.crypto.card.CardPGPContentSignerBuilder
 import com.pgpony.android.crypto.card.OpenPgpCardSession
 import org.bouncycastle.bcpg.HashAlgorithmTags
+import org.bouncycastle.bcpg.PublicKeyAlgorithmTags
 import org.bouncycastle.bcpg.SignatureSubpacketTags
 import org.bouncycastle.openpgp.PGPException
 import org.bouncycastle.openpgp.PGPKeyFlags
@@ -56,6 +64,74 @@ class KeyExpirationService private constructor() {
 
     companion object {
         val shared = KeyExpirationService()
+
+        /** 4.8.0 (#86): the hashes a self-signature edit offers. A user with
+         *  a large RSA key asked for SHA-512; SHA-256 stays for everything else. */
+        val SELF_SIG_HASHES = listOf(HashAlgorithmTags.SHA256, HashAlgorithmTags.SHA512)
+
+        /** RSA primaries of this size or more default to SHA-512. */
+        private const val RSA_SHA512_MIN_BITS = 3072
+
+        private val SELF_SIG_TYPES = setOf(
+            PGPSignature.DEFAULT_CERTIFICATION,
+            PGPSignature.NO_CERTIFICATION,
+            PGPSignature.CASUAL_CERTIFICATION,
+            PGPSignature.POSITIVE_CERTIFICATION,
+            PGPSignature.DIRECT_KEY
+        )
+
+        /**
+         * 4.8.0 (#86): the hash a self-signature edit starts on. SHA-512 when
+         * the primary is RSA of 3072 bits or more (what owners of large RSA
+         * keys, and the tools they use, tend to expect), when it is Ed448 (RFC
+         * 9580 asks for a 512-bit hash there), or when the newest
+         * self-signature the primary made already uses SHA-512, so an edit
+         * does not step a key down from it. SHA-256 otherwise.
+         */
+        fun defaultSelfSigHash(publicRing: PGPPublicKeyRing): Int {
+            val primary = publicRing.publicKey
+            if (selfSigHashFixedByKey(publicRing)) return HashAlgorithmTags.SHA512
+            val rsa = primary.algorithm == PublicKeyAlgorithmTags.RSA_GENERAL ||
+                primary.algorithm == PublicKeyAlgorithmTags.RSA_SIGN ||
+                primary.algorithm == PublicKeyAlgorithmTags.RSA_ENCRYPT
+            if (rsa && primary.bitStrength >= RSA_SHA512_MIN_BITS) return HashAlgorithmTags.SHA512
+            if (primary.algorithm == PublicKeyAlgorithmTags.Ed448) return HashAlgorithmTags.SHA512
+            return if (newestSelfSignature(publicRing)?.hashAlgorithm == HashAlgorithmTags.SHA512)
+                HashAlgorithmTags.SHA512 else HashAlgorithmTags.SHA256
+        }
+
+        /**
+         * 4.8.0 (#86): the primary sets the hash itself, so the dialog offers no
+         * choice and SHA-512 is used. Ed448 needs a 512-bit hash, and an ECDSA
+         * primary on a 384 or 512-bit curve would raise SHA-256 to its own size
+         * anyway, so a SHA-256 option there would not be the hash used.
+         */
+        fun selfSigHashFixedByKey(publicRing: PGPPublicKeyRing): Boolean {
+            val primary = publicRing.publicKey
+            return EcCurveOid.signatureHash(primary, HashAlgorithmTags.SHA256) != HashAlgorithmTags.SHA256
+        }
+
+        /** The newest User ID self-certification, direct-key signature or
+         *  subkey binding made by the primary. Revocations are not counted. */
+        private fun newestSelfSignature(publicRing: PGPPublicKeyRing): PGPSignature? {
+            val primary = publicRing.publicKey
+            var newest: PGPSignature? = null
+            fun consider(sig: PGPSignature) {
+                if (sig.keyID != primary.keyID) return
+                val current = newest
+                if (current == null || sig.creationTime.after(current.creationTime)) newest = sig
+            }
+            primary.signatures.forEach { sig ->
+                if (sig.signatureType in SELF_SIG_TYPES) consider(sig)
+            }
+            publicRing.publicKeys.forEach { key ->
+                if (key.isMasterKey) return@forEach
+                key.signatures.forEach { sig ->
+                    if (sig.signatureType == PGPSignature.SUBKEY_BINDING) consider(sig)
+                }
+            }
+            return newest
+        }
     }
 
     sealed class ExpirationError(message: String) : Exception(message) {
@@ -94,12 +170,14 @@ class KeyExpirationService private constructor() {
      * verified apart from the hash), is put back first; holding its secret is
      * what makes that safe, since the SHA-1 risk is a binding forged over a
      * subkey someone else controls. Then every live User ID and every subkey
-     * binding not revoked is re-signed with SHA-256, keeping each expiry.
+     * binding not revoked is re-signed, keeping each expiry. 4.8.0 (#86): with
+     * [hashAlgorithm], SHA-256 or SHA-512 (it was always SHA-256).
      */
     fun refreshSelfSignatures(
         secretRing: PGPSecretKeyRing,
         publicRing: PGPPublicKeyRing,
-        passphrase: String?
+        passphrase: String?,
+        hashAlgorithm: Int = HashAlgorithmTags.SHA256
     ): Refreshed {
         var base = publicRing
         val restored = mutableListOf<String>()
@@ -116,7 +194,7 @@ class KeyExpirationService private constructor() {
             base = PGPPublicKeyRing.insertPublicKey(base, pub)
             restored += fp
         }
-        val rings = setExpirationSoftware(secretRing, base, null, passphrase, Target.Refresh)
+        val rings = setExpirationSoftware(secretRing, base, null, passphrase, Target.Refresh, hashAlgorithm)
         return Refreshed(rings, restored)
     }
 
@@ -136,22 +214,30 @@ class KeyExpirationService private constructor() {
      * secret key from [secretRing]. [expiresAtEpochSeconds] null = never.
      * Returns the updated public ring plus a secret ring whose public
      * material carries the new signatures.
+     *
+     * 4.8.0 (#86): [hashAlgorithm] (one of [SELF_SIG_HASHES]) signs every new
+     * self-certification, binding and back-signature.
      */
     fun setExpirationSoftware(
         secretRing: PGPSecretKeyRing,
         publicRing: PGPPublicKeyRing,
         expiresAtEpochSeconds: Long?,
         passphrase: String?,
-        target: Target = Target.Primary()
+        target: Target = Target.Primary(),
+        hashAlgorithm: Int = HashAlgorithmTags.SHA256
     ): UpdatedRings {
+        if (hashAlgorithm !in SELF_SIG_HASHES) {
+            throw ExpirationError.Failed("Unsupported hash algorithm $hashAlgorithm for a self-signature")
+        }
         val primarySecret = secretRing.secretKey
         val privateKey = extractPrivate(primarySecret, passphrase)
         val signerBuilder = BcPGPContentSignerBuilder(
             primarySecret.publicKey.algorithm,
-            HashAlgorithmTags.SHA256
+            // 4.8.0 (#86, 4l): the chosen hash, raised for an ECDSA primary to one as long as its curve.
+            EcCurveOid.signatureHash(primarySecret.publicKey, hashAlgorithm)
         )
         val newPublic = try {
-            rebuildExpiration(publicRing, expiresAtEpochSeconds, secretRing, passphrase, target) { type ->
+            rebuildExpiration(publicRing, expiresAtEpochSeconds, secretRing, passphrase, target, hashAlgorithm) { type ->
                 PonySigGen(signerBuilder, primarySecret.publicKey).apply { init(type, privateKey) }
             }
         } catch (e: ExpirationError) {
@@ -189,11 +275,10 @@ class KeyExpirationService private constructor() {
             throw com.pgpony.android.crypto.card.OpenPgpCardException.Malformed(CARD_PRIMARY_MISSING_MESSAGE)
         }
         val newPublic = try {
-            rebuildExpiration(publicRing, expiresAtEpochSeconds, null, null, target) { type ->
-                PonySigGen(CardPGPContentSignerBuilder(session, pin, primaryPublic), primaryPublic).apply {
-                    init(type, PGPPrivateKey(primaryPublic.keyID, primaryPublic.publicKeyPacket, null))
-                }
-            }
+            rebuildWith(
+                PrimarySigner.external(primaryPublic, CardPGPContentSignerBuilder(session, pin, primaryPublic)),
+                publicRing, expiresAtEpochSeconds, target
+            )
         } catch (e: ExpirationError) {
             throw e
         } catch (e: PGPException) {
@@ -204,6 +289,42 @@ class KeyExpirationService private constructor() {
         return UpdatedRings(newPublic, null)
     }
 
+    /**
+     * 4.8.0 (#71): the card path's rebuild with any [PrimarySigner] that holds
+     * no secret here, so tests can run it with a software key. A signing
+     * subkey's binding is passed over (or refused for Target.Subkey), since
+     * its back-signature needs the subkey's own secret. [storedSecretRing]
+     * (the divert-to-card stubs) only takes the new public material.
+     */
+    fun setExpirationWith(
+        signer: PrimarySigner,
+        publicRing: PGPPublicKeyRing,
+        storedSecretRing: PGPSecretKeyRing?,
+        expiresAtEpochSeconds: Long?,
+        target: Target = Target.Primary()
+    ): SignedEdit {
+        val newPublic = try {
+            rebuildWith(signer, publicRing, expiresAtEpochSeconds, target)
+        } catch (e: ExpirationError) {
+            throw e
+        } catch (e: PGPException) {
+            val cause = e.cause
+            if (cause is com.pgpony.android.crypto.card.OpenPgpCardException) throw cause
+            throw ExpirationError.Failed(e.message ?: "Could not update expiration on card")
+        }
+        return SignedEdit.of(newPublic, storedSecretRing)
+    }
+
+    private fun rebuildWith(
+        signer: PrimarySigner,
+        publicRing: PGPPublicKeyRing,
+        expiresAtEpochSeconds: Long?,
+        target: Target,
+        // 4.8.0 (#86): unused on the card path, which never makes a back-signature.
+        backSigHash: Int = HashAlgorithmTags.SHA256
+    ): PGPPublicKeyRing =
+        rebuildExpiration(publicRing, expiresAtEpochSeconds, null, null, target, backSigHash) { type -> signer.generator(type) }
+
     // ── Core rebuild ────────────────────────────────────────────────────
 
     private fun rebuildExpiration(
@@ -212,6 +333,7 @@ class KeyExpirationService private constructor() {
         secretRing: PGPSecretKeyRing?,
         passphrase: String?,
         target: Target,
+        backSigHash: Int,
         makeGenerator: (Int) -> PonySigGen
     ): PGPPublicKeyRing {
         var primary = publicRing.publicKey
@@ -280,7 +402,7 @@ class KeyExpirationService private constructor() {
                     val subSecret = secretRing.getSecretKey(subkey.keyID)
                     if (subSecret == null || OfflineStub.isStub(subSecret)) continue
                 }
-                buildSigningSubkeyBinding(primary, subkey, oldBinding, subExpiry, secretRing, passphrase, makeGenerator)
+                buildSigningSubkeyBinding(primary, subkey, oldBinding, subExpiry, secretRing, passphrase, backSigHash, makeGenerator)
             } else {
                 val gen = makeGenerator(PGPSignature.SUBKEY_BINDING)
                 val sub = PGPSignatureSubpacketGenerator()
@@ -394,7 +516,8 @@ class KeyExpirationService private constructor() {
      * expiry, with the required embedded 0x19 primary-key back-signature made
      * BY the subkey (RFC 9580 5.2.3.34). Binding is signed by the primary via
      * [makeBindingGenerator]; the back-signature is signed by the subkey's own
-     * secret from [secretRing].
+     * secret from [secretRing], with [backSigHash] (4.8.0, #86: the hash the
+     * user picked, so binding and back-signature match).
      */
     private fun buildSigningSubkeyBinding(
         primary: PGPPublicKey,
@@ -403,13 +526,15 @@ class KeyExpirationService private constructor() {
         expirySeconds: Long?,
         secretRing: PGPSecretKeyRing,
         passphrase: String?,
+        backSigHash: Int,
         makeBindingGenerator: (Int) -> PonySigGen
     ): PGPSignature {
         val subSecret = secretRing.getSecretKey(subkey.keyID)
             ?: throw ExpirationError.UnsupportedKey("Missing secret material for the signing subkey")
         val subPrivate = extractPrivate(subSecret, passphrase)
         val backGen = PonySigGen(
-            BcPGPContentSignerBuilder(subkey.algorithm, HashAlgorithmTags.SHA256), subkey
+            // 4.8.0 (#86, 4l): the chosen hash, raised for an ECDSA subkey to one as long as its curve.
+            BcPGPContentSignerBuilder(subkey.algorithm, EcCurveOid.signatureHash(subkey, backSigHash)), subkey
         )
         backGen.init(PGPSignature.PRIMARYKEY_BINDING, subPrivate)
         val backSig = backGen.generateCertification(primary, subkey)

@@ -123,6 +123,28 @@ data class CommandApdu(
             data.contentEquals(other.data)
     }
 
+    companion object {
+        /**
+         * 4.8.0 (#108): MANAGE SECURITY ENVIRONMENT, SET for the
+         * confidentiality template (OpenPGP card 3.4, 7.2.18):
+         * 00 22 41 B8 03 83 01 [keyRef]. With [keyRef] 0x03 the next
+         * PSO:DECIPHER uses the authentication key; 0x02 puts the decryption
+         * key back. No Le: the card answers with a status word only.
+         */
+        fun mseSetDecipherKey(keyRef: Int): CommandApdu {
+            require(keyRef == OpenPgpCard.MSE_KEY_REF_DECRYPTION || keyRef == OpenPgpCard.MSE_KEY_REF_AUTHENTICATION) {
+                "MSE key reference must be 2 or 3 (was $keyRef)"
+            }
+            return CommandApdu(
+                cla = 0x00,
+                ins = OpenPgpCard.INS_MANAGE_SECURITY_ENVIRONMENT,
+                p1 = OpenPgpCard.P1_MSE_SET_COMPUTE,
+                p2 = OpenPgpCard.CRT_DECRYPTION,
+                data = byteArrayOf(OpenPgpCard.DO_MSE_KEY_REFERENCE.toByte(), 0x01, keyRef.toByte())
+            )
+        }
+    }
+
     override fun hashCode(): Int {
         var result = cla
         result = 31 * result + ins

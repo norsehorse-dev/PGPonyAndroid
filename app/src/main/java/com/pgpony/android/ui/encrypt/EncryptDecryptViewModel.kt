@@ -5769,7 +5769,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     armoredKey = armored,
                     previewUserId = preview.userID,
                     previewFingerprint = preview.fingerprint,
-                    previewAlgorithm = preview.algorithm.displayName
+                    // 4.8.0 (#88): DSA, ElGamal and other keys KeyAlgorithm does not
+                    // model read their algorithm and size from the key, not Unknown.
+                    previewAlgorithm = com.pgpony.android.crypto.KeyAlgorithmLabel.lookupCard(
+                        preview.algorithm, preview.publicKeyRing
+                    )
                 )
             )
         }

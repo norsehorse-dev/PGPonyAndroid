@@ -17,6 +17,11 @@
 // if the slot does not decrypt the test message, the native RFC 7748 order is
 // written instead and tested again.
 //
+// 4.8.0 (4l, #109): ECDSA and ECDH keys on NIST, brainpool and secp256k1
+// curves move as well. Their slot attributes name the curve; a card that does
+// not hold that curve refuses the write (UNSUPPORTED_MESSAGE) or fails the
+// check, and the phone keeps its keys.
+//
 // The user PIN is checked first, before anything on the card is overwritten,
 // so a mistyped user PIN cannot leave freshly written slots unchecked. A wrong
 // admin PIN surfaces as WrongAdminPin so the screen can name it.
@@ -151,6 +156,12 @@ object KeyToCardService {
                     attrs = KeyToCard.attributes(k.kind, 0, 0, 0)
                     parts = KeyToCard.ecParts(KeyToCard.cv25519Secret(m.priv, native = cv25519Native))
                 }
+                // 4.8.0 (4l, #109): the curve goes into the attributes, the
+                // field-length scalar into tag 92.
+                KeyToCard.Kind.EC_SIGN, KeyToCard.Kind.EC_DECRYPT -> {
+                    attrs = KeyToCard.attributes(k.kind, 0, 0, 0, k.curveOid)
+                    parts = KeyToCard.ecParts(KeyToCard.weierstrassSecret(m.pub, m.priv))
+                }
             }
             try {
                 // Cards whose attributes cannot change refuse even an unchanged
@@ -238,6 +249,8 @@ object KeyToCardService {
             val engine = org.bouncycastle.crypto.encodings.PKCS1Encoding(org.bouncycastle.crypto.engines.RSAEngine())
             engine.init(false, org.bouncycastle.crypto.params.RSAKeyParameters(false, key.modulus, key.publicExponent))
             MessageDigest.isEqual(engine.processBlock(out, 0, out.size), input)
+        } else if (pub.algorithm == CardSigningFormat.ECDSA) {
+            verifyEcdsa(pub, input, out)
         } else {
             val key = pub.publicKeyPacket.key as org.bouncycastle.bcpg.EdDSAPublicBCPGKey
             val point = key.encodedPoint.toByteArray().let { b ->
@@ -250,6 +263,24 @@ object KeyToCardService {
             verifier.update(input, 0, input.size)
             out.size == 64 && verifier.verifySignature(out)
         }
+    }
+
+    /**
+     * 4.8.0 (4l, #109): an ECDSA authentication from the card, raw r followed
+     * by s (each half the length), verifies over [digest] under [pub].
+     */
+    private fun verifyEcdsa(pub: PGPPublicKey, digest: ByteArray, raw: ByteArray): Boolean {
+        if (raw.isEmpty() || raw.size % 2 != 0) return false
+        val key = pub.publicKeyPacket.key as org.bouncycastle.bcpg.ECPublicBCPGKey
+        val x9 = org.bouncycastle.asn1.x9.ECNamedCurveTable.getByOID(key.curveOID) ?: return false
+        val domain = org.bouncycastle.crypto.params.ECDomainParameters(x9.curve, x9.g, x9.n, x9.h)
+        val point = x9.curve.decodePoint(org.bouncycastle.util.BigIntegers.asUnsignedByteArray(key.encodedPoint))
+        val half = raw.size / 2
+        val r = java.math.BigInteger(1, raw.copyOfRange(0, half))
+        val s = java.math.BigInteger(1, raw.copyOfRange(half, raw.size))
+        val verifier = org.bouncycastle.crypto.signers.ECDSASigner()
+        verifier.init(false, org.bouncycastle.crypto.params.ECPublicKeyParameters(point, domain))
+        return verifier.verifySignature(digest, r, s)
     }
 
     private fun hex(b: ByteArray): String = b.joinToString("") { "%02X".format(it) }

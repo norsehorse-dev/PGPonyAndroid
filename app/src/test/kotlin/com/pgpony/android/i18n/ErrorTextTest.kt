@@ -187,6 +187,7 @@ class ErrorTextTest {
         "Every signing key in this key pair has expired or been revoked" to R.string.err_signing_keys_expired,
         "This security key does not hold the key chosen to certify with" to R.string.err_certify_card_mismatch,
         "The primary key is not in this security key's signature slot, so the expiry cannot be changed with it" to R.string.err_card_expiry_primary_missing,
+        "The primary key is not in this security key's signature slot, so this change cannot be made with it" to R.string.err_card_primary_missing,
         "This security key cannot hold one of the chosen keys. Choose another key or slot." to R.string.err_move_to_card_unsupported,
         "The security key did not pass the check after the keys were written, so nothing on this phone was changed. Do not rely on the keys on the security key." to R.string.err_move_to_card_check_failed,
         "The passphrase did not unlock every secret key in this file for 1DB1A626. The stored secret keys were kept and nothing was imported." to R.string.err_replace_secrets_passphrase,

@@ -195,6 +195,16 @@ data class KeyDetailUiState(
     /** 4.7.0 (item 22): the stored primary is a stub (offline primary or
      *  divert-to-card), so the edits that need the primary are hidden. */
     val primaryStub: com.pgpony.android.crypto.OfflineStub.Kind? = null,
+    /** 4.8.0 (#71): the primary is in the linked card's Signature slot and not
+     *  on the phone, so the edits it signs ask for the card and its PIN
+     *  (KeyRepository.primarySignsOnCard). */
+    val cardPrimaryEdits: Boolean = false,
+    /** 4.8.0 (#71): with [cardPrimaryEdits], a secret ring (the stubs) is
+     *  stored, which a new subkey's secret goes into. */
+    val cardPrimaryCanAddSubkey: Boolean = false,
+    /** 4.8.0 (#71): the subkey the revoke sheet is open for is the key's last
+     *  usable encryption subkey (asked before the card is tapped). */
+    val subkeyRevokeLastEncryption: Boolean = false,
     /** 4.7.0 (item 58, #89): the primary key's usage (SubkeyCapability bits)
      *  from its newest self-signature carrying key flags; null when unknown. */
     val primaryUsage: Int? = null,
@@ -209,6 +219,12 @@ data class KeyDetailUiState(
     val showRefreshSigs: Boolean = false,
     val refreshSigsInFlight: Boolean = false,
     val refreshSigsError: String? = null,
+    /** 4.8.0 (#86): the hash picked in the Refresh self-signatures and expiry
+     *  confirmations (HashAlgorithmTags, SHA-256 or SHA-512). Set to the key's
+     *  default (KeyExpirationService.defaultSelfSigHash) when either opens. */
+    val selfSigHash: Int = org.bouncycastle.bcpg.HashAlgorithmTags.SHA256,
+    /** 4.8.0 (#86): the key's own algorithm sets the hash; no choice is shown. */
+    val selfSigHashFixed: Boolean = false,
     // 4.7.0 (item 31, #79): certifications of this key's User IDs, and the
     // Certify flow (public keys only).
     val certifications: List<com.pgpony.android.data.repository.KeyRepository.CertificationRow> = emptyList(),
@@ -513,6 +529,8 @@ class KeyDetailViewModel(
                 primaryStub = loaded?.takeIf { it.isKeyPair }?.let {
                     withContext(Dispatchers.IO) { runCatching { repo.primaryStubKind(it.fingerprint) }.getOrNull() }
                 },
+                cardPrimaryEdits = loaded?.let { cardPrimaryEditsFor(it) } ?: false,
+                cardPrimaryCanAddSubkey = loaded?.let { cardPrimaryCanAddSubkeyFor(it) } ?: false,
                 keyServerCheck = loaded?.let { com.pgpony.android.data.KeyServerCheckStore.last(it.fingerprint) },
                 primaryUsage = loaded?.let { e ->
                     withContext(Dispatchers.IO) {
@@ -1034,9 +1052,23 @@ class KeyDetailViewModel(
             try {
                 // 4.7.0 (item 60, #90): fetchByFingerprint throws on a transport
                 // failure, so a failed check is no longer reported as "not found".
-                val found = keyServer.fetchByFingerprint(key.fingerprint)
-                val server = com.pgpony.android.network.KeyServerRepository.CHECK_SERVER_NAME
-                com.pgpony.android.data.KeyServerCheckStore.record(key.fingerprint, server, found != null)
+                // 4.8.0 (#90): ask the servers marked for lookup, in the user's
+                // order, and name the one that has the key. Not found names the
+                // servers that answered; a server that cannot be reached is
+                // skipped, and the check fails only when every server failed.
+                val directory = runCatching {
+                    com.pgpony.android.keyserver.KeyServerDirectory.get(PGPonyApp.instance).readOnce()
+                }.getOrDefault(emptyList())
+                val outcome = com.pgpony.android.keyserver.KeyServerCheck.askInOrder(
+                    com.pgpony.android.keyserver.KeyServerCheck.serversToAsk(directory),
+                    { it.label }
+                ) { com.pgpony.android.keyserver.MultiKeyServerService.shared.fetchByFingerprint(it, key.fingerprint) }
+                val (found, server) = when (outcome) {
+                    is com.pgpony.android.keyserver.KeyServerCheck.Outcome.Found -> true to outcome.server
+                    is com.pgpony.android.keyserver.KeyServerCheck.Outcome.NotFound -> false to outcome.asked.joinToString(", ")
+                    is com.pgpony.android.keyserver.KeyServerCheck.Outcome.Failed -> throw outcome.error
+                }
+                com.pgpony.android.data.KeyServerCheckStore.record(key.fingerprint, server, found)
                 repo.markKeyServerChecked(key.fingerprint)
                 val reloaded = repo.getByFingerprint(key.fingerprint)
                 _state.value = _state.value.copy(
@@ -1044,7 +1076,7 @@ class KeyDetailViewModel(
                     isCheckingKeyServer = false,
                     keyServerCheck = com.pgpony.android.data.KeyServerCheckStore.last(key.fingerprint),
                     successMessage = PGPonyApp.instance.getString(
-                        if (found != null) R.string.kd_vm_check_found_on else R.string.kd_vm_check_not_found_on,
+                        if (found) R.string.kd_vm_check_found_on else R.string.kd_vm_check_not_found_on,
                         server
                     )
                 )
@@ -1569,7 +1601,38 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
     // ── 4.7.0 (item 51, #86): refresh self-signatures ─────────────────
 
     fun openRefreshSigs() {
-        _state.value = _state.value.copy(showRefreshSigs = true, refreshSigsError = null)
+        val fp = _state.value.key?.fingerprint ?: return
+        // 4.8.0 (#86): the dialog opens with the key's default hash already
+        // chosen, so the choice the user sees is the one that is used.
+        viewModelScope.launch {
+            val hash = repo.defaultSelfSigHash(fp)
+            val fixed = repo.selfSigHashFixed(fp)
+            _state.value = _state.value.copy(
+                showRefreshSigs = true, refreshSigsError = null, selfSigHash = hash, selfSigHashFixed = fixed
+            )
+        }
+    }
+
+    /** 4.8.0 (#86): the hash for the next self-signature edit. */
+    fun setSelfSigHash(hash: Int) {
+        if (hash !in KeyExpirationService.SELF_SIG_HASHES) return
+        _state.value = _state.value.copy(selfSigHash = hash)
+    }
+
+    /** 4.8.0 (#86): start an expiry edit on the key's default hash. The sheet
+     *  comes first and the choice is in the confirmation after it, so the
+     *  default is in place well before it is shown. */
+    private fun loadDefaultSelfSigHash() {
+        val fp = _state.value.key?.fingerprint ?: return
+        _state.value = _state.value.copy(selfSigHash = org.bouncycastle.bcpg.HashAlgorithmTags.SHA256)
+        // 4.8.0 (#86): a composite ML-DSA key gets no choice and its own
+        // generators use SHA-256, so the state says the same.
+        if (_state.value.key?.algorithm?.isCompositeSign == true) return
+        viewModelScope.launch {
+            val hash = repo.defaultSelfSigHash(fp)
+            val fixed = repo.selfSigHashFixed(fp)
+            _state.value = _state.value.copy(selfSigHash = hash, selfSigHashFixed = fixed)
+        }
     }
 
     fun dismissRefreshSigs() {
@@ -1579,10 +1642,11 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
 
     fun applyRefreshSigs(passphrase: String?) {
         val key = _state.value.key ?: return
+        val hash = _state.value.selfSigHash
         _state.value = _state.value.copy(refreshSigsInFlight = true, refreshSigsError = null)
         viewModelScope.launch {
             try {
-                val restored = repo.refreshSelfSignatures(key.fingerprint, passphrase)
+                val restored = repo.refreshSelfSignatures(key.fingerprint, passphrase, hash)
                 val reloaded = repo.getByFingerprint(key.fingerprint)
                 _state.value = _state.value.copy(
                     key = reloaded ?: key,
@@ -1652,7 +1716,11 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                     armoredKey = armored,
                     previewUserId = preview.userID,
                     previewFingerprint = preview.fingerprint,
-                    previewAlgorithm = preview.algorithm.displayName
+                    // 4.8.0 (#88): DSA, ElGamal and other keys KeyAlgorithm does not
+                    // model read their algorithm and size from the key, not Unknown.
+                    previewAlgorithm = com.pgpony.android.crypto.KeyAlgorithmLabel.lookupCard(
+                        preview.algorithm, preview.publicKeyRing
+                    )
                 )
             )
         }
@@ -1687,11 +1755,13 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
 
     fun showExpirySheet() {
         _state.value = _state.value.copy(showExpirySheet = true, expirySubkey = null, expiryError = null)
+        loadDefaultSelfSigHash()
     }
 
     /** 4.7.0 (item 53, #86): change one subkey's expiry. */
     fun showSubkeyExpirySheet(sub: SubkeyDisplayInfo) {
         _state.value = _state.value.copy(showExpirySheet = true, expirySubkey = sub, expiryError = null)
+        loadDefaultSelfSigHash()
     }
 
     fun dismissExpirySheet() {
@@ -1709,14 +1779,16 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
     /**
      * Software key pair: re-sign with the new expiry and persist. Mirrors
      * applyRevocation's error handling. [expiresAtEpochSeconds] null = never.
+     * 4.8.0 (#86): signed with the hash picked in the confirmation.
      */
     fun applyExpirationSoftware(expiresAtEpochSeconds: Long?, passphrase: String?, alsoCurrentSubkeys: Boolean = false) {
         val key = _state.value.key ?: return
         val target = expiryTarget(alsoCurrentSubkeys)
+        val hash = _state.value.selfSigHash
         _state.value = _state.value.copy(expiryInFlight = true, expiryError = null)
         viewModelScope.launch {
             try {
-                repo.setKeyExpirationSoftware(key.fingerprint, expiresAtEpochSeconds, passphrase, target)
+                repo.setKeyExpirationSoftware(key.fingerprint, expiresAtEpochSeconds, passphrase, target, hash)
                 val reloaded = repo.getByFingerprint(key.fingerprint)
                 _state.value = _state.value.copy(
                     key = reloaded ?: key,
@@ -1788,6 +1860,183 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
         }
     }
 
+    // ── 4.8.0 (#71): edits the primary signs on the card ──────────────
+    // The screen runs the card operation (NFC or USB, through
+    // MainActivity.startCardOperation) with a CardPrimarySigner and reports
+    // here, as the card expiry change and card certification do.
+
+    private suspend fun cardPrimaryEditsFor(entity: PGPKeyEntity): Boolean =
+        withContext(Dispatchers.IO) { runCatching { repo.primarySignsOnCard(entity) }.getOrDefault(false) }
+
+    private suspend fun cardPrimaryCanAddSubkeyFor(entity: PGPKeyEntity): Boolean =
+        cardPrimaryEditsFor(entity) &&
+            withContext(Dispatchers.IO) { runCatching { repo.loadSecretKeyRing(entity.fingerprint) != null }.getOrDefault(false) }
+
+    /** A card edit's failure: a wrong PIN with the tries left, else the
+     *  localized message, else [fallbackRes]. */
+    private fun cardEditErrorText(e: Throwable, fallbackRes: Int): String {
+        val app = PGPonyApp.instance
+        return when (e) {
+            is com.pgpony.android.crypto.card.OpenPgpCardException.WrongPin ->
+                app.getString(R.string.provider_cardop_wrong_pin_usb, e.triesRemaining)
+            else -> ErrorText.localize(e.message) ?: app.getString(fallbackRes)
+        }
+    }
+
+    /** Reload the key and everything a card edit can change. */
+    private suspend fun reloadAfterCardEdit(key: PGPKeyEntity): PGPKeyEntity {
+        val reloaded = repo.getByFingerprint(key.fingerprint) ?: key
+        _state.value = _state.value.copy(
+            key = reloaded,
+            userIds = deriveUserIds(reloaded),
+            subkeys = deriveSubkeys(reloaded),
+            sshPublicKey = deriveSshPublicKey(reloaded),
+            notations = withContext(Dispatchers.IO) { repo.readNotations(reloaded.fingerprint) },
+            privateKeyIsProtected = if (reloaded.isKeyPair)
+                withContext(Dispatchers.IO) { repo.isPrivateKeyPassphraseProtected(reloaded.fingerprint) } else false,
+            exportNeedsPassphrase = if (reloaded.isKeyPair) withContext(Dispatchers.IO) {
+                runCatching { repo.privateExportNeedsPassphrase(reloaded.fingerprint) }.getOrDefault(false)
+            } else false,
+            primaryStub = if (reloaded.isKeyPair)
+                withContext(Dispatchers.IO) { runCatching { repo.primaryStubKind(reloaded.fingerprint) }.getOrNull() } else null,
+            cardPrimaryEdits = cardPrimaryEditsFor(reloaded),
+            cardPrimaryCanAddSubkey = cardPrimaryCanAddSubkeyFor(reloaded)
+        )
+        refreshSigningSubkeys()
+        return reloaded
+    }
+
+    fun onCardAddSubkeyStarted() {
+        _state.value = _state.value.copy(addSubkeyInFlight = true, addSubkeyError = null)
+    }
+
+    fun onCardAddSubkeyFailure(e: Throwable) {
+        _state.value = _state.value.copy(
+            addSubkeyInFlight = false,
+            addSubkeyError = cardEditErrorText(e, R.string.key_detail_add_subkey_failed)
+        )
+    }
+
+    fun onCardSubkeyAdded(edit: com.pgpony.android.crypto.SignedEdit) {
+        val key = _state.value.key ?: return
+        viewModelScope.launch {
+            try {
+                repo.persistCardSubkeyAdd(key.fingerprint, edit)
+                reloadAfterCardEdit(key)
+                _state.value = _state.value.copy(addSubkeyInFlight = false, showAddSubkeySheet = false)
+            } catch (e: Exception) {
+                onCardAddSubkeyFailure(e)
+            }
+        }
+    }
+
+    fun onCardAddUserIdStarted() {
+        _state.value = _state.value.copy(addUserIdInFlight = true, addUserIdError = null)
+    }
+
+    fun onCardAddUserIdFailure(e: Throwable) {
+        _state.value = _state.value.copy(
+            addUserIdInFlight = false,
+            addUserIdError = cardEditErrorText(e, R.string.key_detail_add_userid_failed)
+        )
+    }
+
+    fun onCardUserIdAdded(edit: com.pgpony.android.crypto.SignedEdit, userId: String, makePrimary: Boolean) {
+        val key = _state.value.key ?: return
+        viewModelScope.launch {
+            try {
+                repo.persistCardUserIdEdit(key.fingerprint, edit, if (makePrimary) userId else null, addedUserId = userId)
+                reloadAfterCardEdit(key)
+                _state.value = _state.value.copy(addUserIdInFlight = false, showAddUserIdSheet = false)
+            } catch (e: Exception) {
+                onCardAddUserIdFailure(e)
+            }
+        }
+    }
+
+    fun onCardUserIdActionStarted() {
+        _state.value = _state.value.copy(userIdActionInFlight = true, userIdActionError = null)
+    }
+
+    fun onCardUserIdActionFailure(e: Throwable) {
+        _state.value = _state.value.copy(
+            userIdActionInFlight = false,
+            userIdActionError = cardEditErrorText(e, R.string.key_detail_userid_action_failed)
+        )
+    }
+
+    /** [request] was REVOKE or MAKE_PRIMARY; REMOVE signs nothing. */
+    fun onCardUserIdActionDone(edit: com.pgpony.android.crypto.SignedEdit, request: UserIdActionRequest) {
+        val key = _state.value.key ?: return
+        viewModelScope.launch {
+            try {
+                val newPrimary = if (request.kind == UserIdActionRequest.Kind.MAKE_PRIMARY) request.userId else null
+                repo.persistCardUserIdEdit(key.fingerprint, edit, newPrimary)
+                reloadAfterCardEdit(key)
+                _state.value = _state.value.copy(userIdActionInFlight = false, userIdAction = null)
+            } catch (e: Exception) {
+                onCardUserIdActionFailure(e)
+            }
+        }
+    }
+
+    fun onCardSubkeyRevokeStarted() {
+        _state.value = _state.value.copy(subkeyRevokeInFlight = true, subkeyRevokeError = null)
+    }
+
+    fun onCardSubkeyRevokeFailure(e: Throwable) {
+        _state.value = _state.value.copy(
+            subkeyRevokeInFlight = false,
+            subkeyRevokeError = cardEditErrorText(e, R.string.key_detail_subkey_action_failed)
+        )
+    }
+
+    fun onCardSubkeyRevoked(edit: com.pgpony.android.crypto.SignedEdit) {
+        val key = _state.value.key ?: return
+        viewModelScope.launch {
+            try {
+                repo.persistCardSubkeyRevocation(key.fingerprint, edit)
+                reloadAfterCardEdit(key)
+                _state.value = _state.value.copy(
+                    subkeyRevokeInFlight = false,
+                    showSubkeyRevokeSheet = false,
+                    subkeyRevokeTarget = null,
+                    subkeyRevokeLastEncryption = false
+                )
+            } catch (e: Exception) {
+                onCardSubkeyRevokeFailure(e)
+            }
+        }
+    }
+
+    fun onCardRefreshStarted() {
+        _state.value = _state.value.copy(refreshSigsInFlight = true, refreshSigsError = null)
+    }
+
+    fun onCardRefreshFailure(e: Throwable) {
+        _state.value = _state.value.copy(
+            refreshSigsInFlight = false,
+            refreshSigsError = cardEditErrorText(e, R.string.key_detail_expiry_failed)
+        )
+    }
+
+    fun onCardRefreshed(updatedPublicRing: org.bouncycastle.openpgp.PGPPublicKeyRing) {
+        val key = _state.value.key ?: return
+        viewModelScope.launch {
+            try {
+                repo.persistCardExpiration(key.fingerprint, updatedPublicRing, null, KeyExpirationService.Target.Refresh)
+                reloadAfterCardEdit(key)
+                _state.value = _state.value.copy(
+                    refreshSigsInFlight = false,
+                    showRefreshSigs = false,
+                    successMessage = PGPonyApp.instance.getString(R.string.key_detail_refresh_sigs_done)
+                )
+            } catch (e: Exception) {
+                onCardRefreshFailure(e)
+            }
+        }
+    }
+
     // ── Add Subkey (RC3 §17.2 H) ─────────────────────────────────────────
 
     fun showAddSubkeySheet() {
@@ -1854,8 +2103,22 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
 
     fun showSubkeyRevokeSheet(sub: SubkeyDisplayInfo) {
         _state.value = _state.value.copy(
-            subkeyRevokeTarget = sub, showSubkeyRevokeSheet = true, subkeyRevokeError = null
+            subkeyRevokeTarget = sub, showSubkeyRevokeSheet = true, subkeyRevokeError = null,
+            subkeyRevokeLastEncryption = false
         )
+        // 4.8.0 (#71): the card path asks about the last encryption subkey
+        // before the tap, so the card is not held for a revocation that waits.
+        val key = _state.value.key ?: return
+        if (_state.value.cardPrimaryEdits) {
+            viewModelScope.launch {
+                val last = withContext(Dispatchers.IO) {
+                    runCatching { repo.isLastEncryptionSubkeyOf(key.fingerprint, sub.fingerprint) }.getOrDefault(false)
+                }
+                if (_state.value.subkeyRevokeTarget?.fingerprint == sub.fingerprint) {
+                    _state.value = _state.value.copy(subkeyRevokeLastEncryption = last)
+                }
+            }
+        }
     }
 
     fun dismissSubkeyRevokeSheet() {
@@ -2184,7 +2447,8 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                             MoveToCardCandidate(
                                 fingerprint = org.bouncycastle.util.encoders.Hex.toHexString(pub.fingerprint).uppercase(),
                                 keyIdHex = String.format("%016X", pub.keyID),
-                                algorithmLabel = algo.displayName,
+                                // 4.8.0 (4l, #109): an ECDH subkey on brainpool or secp256k1 names its curve.
+                                algorithmLabel = com.pgpony.android.crypto.EcCurveOid.ecdhLabel(pub) ?: algo.displayName,
                                 isPrimary = pub.isMasterKey,
                                 createdAt = pub.creationTime.time,
                                 canSign = com.pgpony.android.crypto.SubkeyCapability.hasCapability(caps, com.pgpony.android.crypto.SubkeyCapability.Sign),
@@ -2548,6 +2812,27 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
         _state.value = _state.value.copy(showExportPrivateConfirm = false)
     }
 
+    /**
+     * 4.8.0: Save a backup first on the Move to security key sheet runs the
+     * Export Private Key flow and comes back to the sheet when that flow ends
+     * (the export sheet closed, or a step cancelled), instead of leaving the
+     * user on Key Details.
+     */
+    private var returnToMoveToCard = false
+
+    fun backupFromMoveToCard() {
+        returnToMoveToCard = true
+        dismissMoveToCardSheet()
+        showExportPrivateConfirm()
+    }
+
+    /** 4.8.0: the Export Private Key flow ended; reopen Move to security key if it started there. */
+    fun exportFlowEnded() {
+        if (!returnToMoveToCard) return
+        returnToMoveToCard = false
+        openMoveToCardSheet()
+    }
+
     /** 4.8.0 (item 3a): open the passphrase dialog for a protected key's export. */
     fun showExportPassphraseDialog() {
         _state.value = _state.value.copy(
@@ -2663,6 +2948,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
             showExportPrivateResultSheet = false,
             pendingExportedPrivate = null
         )
+        exportFlowEnded()
     }
 
     // ── Phase A8.6: Export public key result sheet ────────────────────

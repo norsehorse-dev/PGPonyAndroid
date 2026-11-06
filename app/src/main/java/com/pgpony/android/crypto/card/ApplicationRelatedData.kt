@@ -30,7 +30,14 @@ data class ApplicationRelatedData(
     /** Epoch milliseconds, or null when the slot has no generation time. */
     val sigGenTimeMs: Long?,
     val decGenTimeMs: Long?,
-    val authGenTimeMs: Long?
+    val authGenTimeMs: Long?,
+    /** 4.8.0 (#108): OpenPGP card spec version from AID octets 6 and 7,
+     *  0x0304 for 3.4. */
+    val specVersion: Int = 0,
+    /** 4.8.0 (#108): the card supports MANAGE SECURITY ENVIRONMENT for the
+     *  decryption and authentication keys, so PSO:DECIPHER can be pointed at
+     *  the authentication key. See [mseSupportedBy]. */
+    val mseSupported: Boolean = false
 ) {
     companion object {
         private const val FINGERPRINT_LEN = 20
@@ -50,6 +57,11 @@ data class ApplicationRelatedData(
                 OpenPgpCard.AID_OFFSET_SERIAL,
                 OpenPgpCard.AID_OFFSET_SERIAL + 4
             )
+            val specVersion =
+                ((aid[AID_OFFSET_VERSION].toInt() and 0xFF) shl 8) or (aid[AID_OFFSET_VERSION + 1].toInt() and 0xFF)
+
+            // ── 4.8.0 (#108): Extended Capabilities (C0) → MSE support ──
+            val extCaps = Tlv.findRecursive(raw, OpenPgpCard.DO_EXTENDED_CAPABILITIES)?.value
 
             // ── Algorithm attributes (C1 / C2 / C3) ──
             val sigAlgo = Tlv.findRecursive(raw, OpenPgpCard.DO_ALGORITHM_ATTRIBUTES_SIG)
@@ -91,8 +103,29 @@ data class ApplicationRelatedData(
                 pw3TriesRemaining = pw3Tries,
                 sigGenTimeMs = sigGen,
                 decGenTimeMs = decGen,
-                authGenTimeMs = authGen
+                authGenTimeMs = authGen,
+                specVersion = specVersion,
+                mseSupported = mseSupportedBy(specVersion, extCaps)
             )
+        }
+
+        /** AID octets 6 and 7: the spec version, BCD-like (03 04 = 3.4). */
+        private const val AID_OFFSET_VERSION = 6
+
+        /**
+         * 4.8.0 (#108): does a card of [specVersion] with Extended
+         * Capabilities [extCaps] (DO C0) support MANAGE SECURITY ENVIRONMENT
+         * for key numbers 2 (DEC) and 3 (AUT)? OpenPGP card 3.4, 4.4.3.7: in
+         * the ten-octet C0 of a 3.3 or later card, the ninth octet is the PIN
+         * block 2 format flag and the tenth is MSE, 00 (not supported) or 01
+         * (supported). On a 2.x card the same octet is the low byte of the
+         * maximum response length, so the version is checked first and an
+         * older card never counts.
+         */
+        internal fun mseSupportedBy(specVersion: Int, extCaps: ByteArray?): Boolean {
+            if (specVersion < OpenPgpCard.SPEC_VERSION_MSE) return false
+            if (extCaps == null || extCaps.size < 10) return false
+            return (extCaps[9].toInt() and 0x01) != 0
         }
 
         private fun fingerprintAt(all: ByteArray?, index: Int): String? {

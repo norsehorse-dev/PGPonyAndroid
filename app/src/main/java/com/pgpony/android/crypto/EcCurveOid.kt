@@ -8,7 +8,10 @@
 
 package com.pgpony.android.crypto
 
+import com.pgpony.android.crypto.card.CardSigningFormat
 import org.bouncycastle.bcpg.ECPublicBCPGKey
+import org.bouncycastle.bcpg.HashAlgorithmTags
+import org.bouncycastle.bcpg.PublicKeyAlgorithmTags
 import org.bouncycastle.openpgp.PGPPublicKey
 
 object EcCurveOid {
@@ -37,4 +40,53 @@ object EcCurveOid {
 
     /** The human curve label for an EC key, or null when the curve is unknown. */
     fun label(publicKey: PGPPublicKey): String? = oidOf(publicKey)?.let { LABELS[it] }
+
+    /**
+     * 4.8.0 (4l, #109): a component label for an ECDH key on a Weierstrass
+     * curve ("ECDH brainpoolP384r1"), or null for any other key. detectAlgorithm
+     * labels such a subkey Unknown, since KeyAlgorithm has no ECDH entries; the
+     * choosers that list single keys use this instead.
+     */
+    fun ecdhLabel(publicKey: PGPPublicKey): String? {
+        if (publicKey.algorithm != PublicKeyAlgorithmTags.ECDH) return null
+        val curve = label(publicKey) ?: return null
+        if (curve == "Curve25519" || curve == "X25519" || curve == "X448") return null
+        return "ECDH $curve"
+    }
+
+    /**
+     * 4.8.0 (4l, #109): the hash a new signature by [publicKey] uses when the
+     * caller asks for [requested]. An ECDSA key signs with a hash at least as
+     * long as its curve, as gpg does when it signs: SHA-384 for a 384-bit
+     * curve, SHA-512 for brainpoolP512r1 and P-521 (the table
+     * CardSigningFormat.ecdsaHashFor keeps for card keys). A longer
+     * [requested] hash is kept; every other key type gets [requested]
+     * unchanged.
+     */
+    fun signatureHash(publicKey: PGPPublicKey, requested: Int): Int {
+        // 4.8.0 (#86): RFC 9580 wants a 512-bit hash for Ed448 signatures.
+        if (isEd448(publicKey)) {
+            return if (digestBits(requested) >= 512) requested else HashAlgorithmTags.SHA512
+        }
+        if (publicKey.algorithm != PublicKeyAlgorithmTags.ECDSA) return requested
+        val minimum = CardSigningFormat.ecdsaHashFor(oidOf(publicKey))
+        return if (digestBits(requested) >= digestBits(minimum)) requested else minimum
+    }
+
+    /** 4.8.0 (#86): an Ed448 key, as algorithm 28 or as legacy EdDSA on the Ed448 curve. */
+    fun isEd448(publicKey: PGPPublicKey): Boolean =
+        publicKey.algorithm == PublicKeyAlgorithmTags.Ed448 ||
+            (publicKey.algorithm == PublicKeyAlgorithmTags.EDDSA_LEGACY && oidOf(publicKey) == ED448_OID)
+
+    private const val ED448_OID = "1.3.101.113"
+
+    /** Digest length in bits of an OpenPGP hash id; 0 when unknown here. */
+    private fun digestBits(hashAlgorithm: Int): Int = when (hashAlgorithm) {
+        HashAlgorithmTags.SHA1, HashAlgorithmTags.RIPEMD160 -> 160
+        HashAlgorithmTags.SHA224 -> 224
+        HashAlgorithmTags.SHA256, HashAlgorithmTags.SHA3_256 -> 256
+        HashAlgorithmTags.SHA384 -> 384
+        HashAlgorithmTags.SHA512, HashAlgorithmTags.SHA3_512 -> 512
+        else -> 0
+    }
 }

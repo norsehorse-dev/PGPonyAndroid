@@ -3007,7 +3007,6 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="certifier_lookup_imported_body">As certificações que ela fez nesta chave serão verificadas novamente.</string>
     <string name="key_detail_refresh_sigs_menu">Renovar autoassinaturas</string>
     <string name="key_detail_refresh_sigs_title">Renovar autoassinaturas</string>
-    <string name="key_detail_refresh_sigs_body">Assina novamente os IDs de usuário e os vínculos de subchave desta chave com SHA-256. Todas as datas de validade continuam como estão. Uma subchave que ficou de fora porque seu vínculo usava SHA-1 volta, desde que a chave privada dela esteja neste telefone. Depois, publique a chave para que outras pessoas recebam as novas assinaturas.</string>
     <string name="key_detail_refresh_sigs_action">Renovar</string>
     <string name="key_detail_refresh_sigs_done">Autoassinaturas renovadas.</string>
     <plurals name="key_detail_refresh_sigs_done_restored">
@@ -3055,4 +3054,14 @@ Opcionalmente, bloqueie o app com sua impressão digital ou rosto para mais tran
     <string name="provider_review_included_format">Já incluída para %1$s</string>
     <!-- 4.7.0 RC7, translated Oct 2026 -->
     <string name="exchange_qr_too_large_inline">Esta chave é grande demais para um código QR. Use Copiar chave ou Enviar abaixo.</string>
+    <!-- 4.8.0 RC4 (#86) -->
+    <string name="key_detail_refresh_sigs_body_hash_choice">Assina novamente os IDs de usuário e os vínculos de subchave desta chave com o hash escolhido abaixo. Todas as datas de validade continuam como estão. Uma subchave que ficou de fora porque seu vínculo usava SHA-1 volta, desde que a chave privada dela esteja neste telefone. Depois, publique a chave para que outras pessoas recebam as novas assinaturas.</string>
+    <string name="self_sig_hash_label">Hash das novas assinaturas</string>
+    <string name="self_sig_hash_hint">Ambos são seguros. O SHA-512 é indicado para chaves RSA de 3072 bits ou mais e para chaves cujas assinaturas já o usam.</string>
+    <!-- 4.8.0 RC4 (4l) -->
+    <string name="keyring_generate_algorithm_caption_ecdsa">Assinatura ECDSA com criptografia ECDH na mesma curva (OpenPGP v4). As chaves de segurança variam nas curvas que suportam, então verifique se a sua aceita esta antes de mover uma chave para ela.</string>
+    <!-- 4.8.0 RC4 (#71) -->
+    <string name="err_card_primary_missing">A chave principal não está no slot de assinatura desta chave de segurança, então esta alteração não pode ser feita com ela</string>
+    <string name="key_detail_add_subkey_card_note">A nova subchave é criada neste telefone. Esta chave assina e decifra com a chave de segurança, então mova a nova subchave para lá com Mover para chave de segurança antes de compartilhar a chave. Até lá, mensagens criptografadas para uma nova subchave de criptografia não podem ser abertas.</string>
+    <string name="key_detail_add_subkey_card_new_passphrase_hint">A chave privada da nova subchave fica neste telefone, e nenhuma chave privada desta chave aqui tem frase-senha ainda. Escolha uma para protegê-la.</string>
 </resources>

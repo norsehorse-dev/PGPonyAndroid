@@ -3077,7 +3077,6 @@
     <string name="certifier_lookup_imported_body">Onaylayanın bu anahtardaki onayları yeniden doğrulanır.</string>
     <string name="key_detail_refresh_sigs_menu">Öz imzaları yenile</string>
     <string name="key_detail_refresh_sigs_title">Öz imzaları yenile</string>
-    <string name="key_detail_refresh_sigs_body">Bu anahtarın Kullanıcı Kimliklerini ve alt anahtar bağlamalarını SHA-256 ile yeniden imzalar. Tüm son kullanma tarihleri olduğu gibi kalır. Bağlaması SHA-1 kullandığı için dışarıda kalmış bir alt anahtar, gizli anahtarı bu telefondaysa geri gelir. Başkalarının yeni imzaları alması için ardından anahtarı yayımlayın.</string>
     <string name="key_detail_refresh_sigs_action">Yenile</string>
     <string name="key_detail_refresh_sigs_done">Öz imzalar yenilendi.</string>
     <plurals name="key_detail_refresh_sigs_done_restored">
@@ -3118,4 +3117,14 @@
     <string name="provider_review_included_format">%1$s için zaten dahil edildi</string>
     <!-- 4.7.0 RC7, translated Oct 2026 -->
     <string name="exchange_qr_too_large_inline">Bu anahtar bir QR kodu için çok büyük. Bunun yerine aşağıdaki Anahtarı Kopyala\'yı veya Yükle\'yi kullanın.</string>
+    <!-- 4.8.0 RC4 (#86) -->
+    <string name="key_detail_refresh_sigs_body_hash_choice">Bu anahtarın Kullanıcı Kimliklerini ve alt anahtar bağlamalarını aşağıda seçilen hash ile yeniden imzalar. Tüm son kullanma tarihleri olduğu gibi kalır. Bağlaması SHA-1 kullandığı için dışarıda kalmış bir alt anahtar, gizli anahtarı bu telefondaysa geri gelir. Başkalarının yeni imzaları alması için ardından anahtarı yayımlayın.</string>
+    <string name="self_sig_hash_label">Yeni imzalar için hash</string>
+    <string name="self_sig_hash_hint">İkisi de güvenlidir. SHA-512, 3072 bit veya daha büyük RSA anahtarlarına ve imzaları zaten onu kullanan anahtarlara uygundur.</string>
+    <!-- 4.8.0 RC4 (4l) -->
+    <string name="keyring_generate_algorithm_caption_ecdsa">Aynı eğri üzerinde ECDSA imzalama ve ECDH şifreleme (OpenPGP v4). Güvenlik anahtarlarının desteklediği eğriler farklıdır, bu yüzden bir anahtarı taşımadan önce sizinkinin bu eğriyi desteklediğini kontrol edin.</string>
+    <!-- 4.8.0 RC4 (#71) -->
+    <string name="err_card_primary_missing">Birincil anahtar bu güvenlik anahtarının imza yuvasında değil, bu yüzden bu değişiklik onunla yapılamaz</string>
+    <string name="key_detail_add_subkey_card_note">Yeni alt anahtar bu telefonda oluşturulur. Bu anahtar, güvenlik anahtarıyla imzalar ve şifre çözer, bu yüzden anahtarı paylaşmadan önce yeni alt anahtarı Güvenlik anahtarına taşı seçeneğiyle oraya taşıyın. O zamana kadar yeni bir şifreleme alt anahtarı için şifrelenmiş mesajlar açılamaz.</string>
+    <string name="key_detail_add_subkey_card_new_passphrase_hint">Yeni alt anahtarın gizli anahtarı bu telefonda kalır ve bu anahtarın buradaki gizli anahtarlarından hiçbirinin henüz parola ifadesi yok. Onu korumak için bir parola ifadesi seçin.</string>
 </resources>

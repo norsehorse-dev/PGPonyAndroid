@@ -6,8 +6,14 @@
 package com.pgpony.android.crypto
 
 import org.bouncycastle.bcpg.HashAlgorithmTags
+import org.bouncycastle.bcpg.S2K
+import org.bouncycastle.bcpg.SecretKeyPacket
+import org.bouncycastle.bcpg.SignatureSubpacketTags
+import org.bouncycastle.bcpg.SymmetricKeyAlgorithmTags
+import org.bouncycastle.bcpg.sig.KeyFlags
 import org.bouncycastle.openpgp.PGPPublicKey
 import org.bouncycastle.openpgp.PGPPublicKeyRing
+import org.bouncycastle.openpgp.PGPSecretKey
 import org.bouncycastle.openpgp.PGPSecretKeyRing
 import org.bouncycastle.openpgp.PGPSignature
 import org.bouncycastle.openpgp.PGPSignatureGenerator
@@ -16,6 +22,7 @@ import org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator
 import org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -156,6 +163,143 @@ class CertificateMergeTest {
         ).encoded
         val merged = CertificateMerge.merge(k.publicKeyData, server, isKeyPair = false)
         assertFalse("Dan <dan@bank.example>" in uids(merged))
+    }
+
+    // ── 4.8.0 (#78): a usage change made in gpg, re-imported ─────────────
+
+    private val certifySign = KeyFlags.CERTIFY_OTHER or KeyFlags.SIGN_DATA
+
+    /** The public ring of [sec] (or [base]) with its first User ID re-certified
+     *  at [at], the primary's key flags set to [flags]. */
+    private fun flaggedUidCert(sec: PGPSecretKeyRing, at: Date, flags: Int, base: ByteArray? = null): ByteArray {
+        val sk = sec.secretKey
+        val uid = sk.publicKey.userIDs.next()
+        val g = PGPSignatureGenerator(BcPGPContentSignerBuilder(sk.publicKey.algorithm, HashAlgorithmTags.SHA512), sk.publicKey)
+        g.init(PGPSignature.POSITIVE_CERTIFICATION, sk.extractPrivateKey(null))
+        g.setHashedSubpackets(PGPSignatureSubpacketGenerator().apply {
+            setSignatureCreationTime(false, at)
+            setIssuerFingerprint(false, sk.publicKey)
+            setKeyFlags(false, flags)
+        }.generate())
+        val cert = g.generateCertification(uid, sk.publicKey)
+        val pubRing = base?.let { pub(it) } ?: PGPPublicKeyRing(sec.publicKeys.asSequence().toList())
+        return PGPPublicKeyRing.insertPublicKey(pubRing, PGPPublicKey.addCertification(pubRing.publicKey, uid, cert)).encoded
+    }
+
+    /** [base] with a direct-key signature (0x1F) at [at] setting the primary's key flags to [flags]. */
+    private fun flaggedDirectKey(sec: PGPSecretKeyRing, at: Date, flags: Int, base: ByteArray): ByteArray {
+        val sk = sec.secretKey
+        val g = PGPSignatureGenerator(BcPGPContentSignerBuilder(sk.publicKey.algorithm, HashAlgorithmTags.SHA512), sk.publicKey)
+        g.init(PGPSignature.DIRECT_KEY, sk.extractPrivateKey(null))
+        g.setHashedSubpackets(PGPSignatureSubpacketGenerator().apply {
+            setSignatureCreationTime(false, at)
+            setIssuerFingerprint(false, sk.publicKey)
+            setKeyFlags(false, flags)
+        }.generate())
+        val sig = g.generateCertification(sk.publicKey)
+        val pubRing = pub(base)
+        return PGPPublicKeyRing.insertPublicKey(pubRing, PGPPublicKey.addCertification(pubRing.publicKey, sig)).encoded
+    }
+
+    /**
+     * The key flags of the newest self-signature on [primary] that carries
+     * them: the same pick as KeyDetailViewModel.primaryUsageOf (private there),
+     * which the Usage row on Key Details reads.
+     */
+    private fun primaryFlags(primary: PGPPublicKey): Int? {
+        val selfTypes = setOf(
+            PGPSignature.DEFAULT_CERTIFICATION,
+            PGPSignature.NO_CERTIFICATION,
+            PGPSignature.CASUAL_CERTIFICATION,
+            PGPSignature.POSITIVE_CERTIFICATION,
+            PGPSignature.DIRECT_KEY
+        )
+        var newest: PGPSignature? = null
+        for (sig in primary.signatures.asSequence()) {
+            if (sig.keyID != primary.keyID || sig.signatureType !in selfTypes) continue
+            if (sig.hashedSubPackets?.hasSubpacket(SignatureSubpacketTags.KEY_FLAGS) != true) continue
+            val current = newest
+            if (current == null || sig.creationTime.after(current.creationTime)) newest = sig
+        }
+        return newest?.hashedSubPackets?.keyFlags
+    }
+
+    /** [key] as gpg exports an offline primary: GNU S2K mode 1001, no secret material. */
+    private fun offlineStub(key: PGPSecretKey): PGPSecretKey {
+        val pk = key.publicKey
+        val packet = SecretKeyPacket(
+            pk.publicKeyPacket, SymmetricKeyAlgorithmTags.NULL, SecretKeyPacket.USAGE_CHECKSUM,
+            S2K.gnuDummyS2K(S2K.GNUDummyParams.noPrivateKey()), null, ByteArray(0)
+        )
+        return PGPSecretKey(packet, pk)
+    }
+
+    /**
+     * The stub leg: [k]'s secret ring with its primary turned into an offline
+     * stub takes the public parts of [merged] the way
+     * KeyDeduplicationService.updateSecretRingPublicParts does (private there,
+     * repeated here). The primary must stay a stub, the subkey secret must
+     * still extract, and the primary must read C and S.
+     */
+    private fun assertStubTakesUsage(k: GeneratedKeyResult, merged: ByteArray) {
+        val stubbed = PGPSecretKeyRing(
+            secret(k).secretKeys.asSequence().map { if (it.isMasterKey) offlineStub(it) else it }.toList()
+        )
+        val stored = PGPSecretKeyRing(stubbed.encoded, BcKeyFingerprintCalculator())
+        assertTrue("the stored primary is a stub", OfflineStub.isStub(stored.secretKey))
+
+        val publicRing = pub(merged)
+        val updated = stored.secretKeys.asSequence().map { sk ->
+            val pk = publicRing.getPublicKey(sk.keyID)
+            if (pk != null && pk.fingerprint.contentEquals(sk.publicKey.fingerprint)) PGPSecretKey.replacePublicKey(sk, pk)
+            else sk
+        }.toList()
+        val reread = PGPSecretKeyRing(PGPSecretKeyRing(updated).encoded, BcKeyFingerprintCalculator())
+
+        assertTrue("the primary is still a stub", OfflineStub.isStub(reread.secretKey))
+        assertEquals(OfflineStub.Kind.OFFLINE, OfflineStub.primaryKind(reread))
+        val sub = reread.secretKeys.asSequence().first { !it.isMasterKey }
+        assertFalse(OfflineStub.isStub(sub))
+        assertNotNull("the subkey secret still extracts", sub.extractPrivateKey(null))
+        assertEquals(certifySign, primaryFlags(reread.publicKey))
+    }
+
+    @Test
+    fun `a usage change as a newer User ID certification is taken for a key pair, stub primary too (#78)`() {
+        val k = gen("Hana <hana@pgpony.app>")
+        val sec = secret(k)
+        val now = System.currentTimeMillis()
+        // Stored: the primary certify-only. Re-imported: gpg made it C and S.
+        val stored = flaggedUidCert(sec, Date(now + 2_000L), KeyFlags.CERTIFY_OTHER)
+        assertEquals(KeyFlags.CERTIFY_OTHER, primaryFlags(pub(stored).publicKey))
+        val edited = flaggedUidCert(sec, Date(now + 5_000L), certifySign, base = stored)
+
+        val result = CertificateMerge.mergeDetailed(stored, edited, isKeyPair = true)
+        assertEquals(1, result.selfSignaturesApplied)
+        assertEquals(certifySign, primaryFlags(pub(result.bytes).publicKey))
+        assertEquals(uids(stored), uids(result.bytes))
+
+        assertStubTakesUsage(k, result.bytes)
+    }
+
+    @Test
+    fun `a usage change as a direct-key signature is taken for a key pair, stub primary too (#78)`() {
+        val k = gen("Ivo <ivo@pgpony.app>")
+        val sec = secret(k)
+        val now = System.currentTimeMillis()
+        val stored = flaggedUidCert(sec, Date(now + 2_000L), KeyFlags.CERTIFY_OTHER)
+        val edited = flaggedDirectKey(sec, Date(now + 5_000L), certifySign, base = stored)
+
+        val result = CertificateMerge.mergeDetailed(stored, edited, isKeyPair = true)
+        assertEquals(1, result.selfSignaturesApplied)
+        val primary = pub(result.bytes).publicKey
+        assertTrue(
+            "the direct-key signature arrives",
+            primary.getSignaturesOfType(PGPSignature.DIRECT_KEY).asSequence().any()
+        )
+        assertEquals(certifySign, primaryFlags(primary))
+
+        assertStubTakesUsage(k, result.bytes)
     }
 
     @Test

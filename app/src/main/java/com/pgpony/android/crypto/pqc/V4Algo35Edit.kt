@@ -60,16 +60,19 @@ object V4Algo35Edit {
     }.toByteArray()
 
     /** A signature of [type] by the primary of [secretRing] over the primary and
-     *  [subPublicBody], with [hashed] as its hashed area. Returns the packet body. */
+     *  [subPublicBody], with [hashed] as its hashed area. Returns the packet body.
+     *  4.8.0 (#86): [hashAlgorithm] lets an expiry change use the hash the user
+     *  picked; everything else keeps SHA-256. */
     private fun signOverSubkey(
         secretRing: PGPSecretKeyRing,
         primaryPrivate: PGPPrivateKey,
         subPublicBody: ByteArray,
         type: Int,
-        hashed: PGPSignatureSubpacketGenerator
+        hashed: PGPSignatureSubpacketGenerator,
+        hashAlgorithm: Int = HashAlgorithmTags.SHA256
     ): ByteArray {
         val primary = secretRing.publicKey
-        val gen = PGPSignatureGenerator(BcPGPContentSignerBuilder(primary.algorithm, HashAlgorithmTags.SHA256), primary)
+        val gen = PGPSignatureGenerator(BcPGPContentSignerBuilder(primary.algorithm, hashAlgorithm), primary)
         gen.init(type, primaryPrivate)
         hashed.setSignatureCreationTime(false, Date())
         hashed.setIssuerFingerprint(false, primary)
@@ -84,12 +87,14 @@ object V4Algo35Edit {
      * A fresh 0x18 binding for [subPublicBody] carrying the absolute expiry
      * [expiresAtEpochSeconds] (null = never). Throws when the expiry is not
      * after the subkey's creation, like the Bouncy Castle expiry path.
+     * 4.8.0 (#86): signed with [hashAlgorithm], the hash picked for the edit.
      */
     fun binding(
         secretRing: PGPSecretKeyRing,
         primaryPrivate: PGPPrivateKey,
         subPublicBody: ByteArray,
-        expiresAtEpochSeconds: Long?
+        expiresAtEpochSeconds: Long?,
+        hashAlgorithm: Int = HashAlgorithmTags.SHA256
     ): ByteArray {
         val hashed = PGPSignatureSubpacketGenerator()
         hashed.setKeyFlags(false, FLAGS_ENCRYPT)
@@ -100,7 +105,7 @@ object V4Algo35Edit {
             require(rel > 0) { "Expiration date is before the subkey's creation date." }
             hashed.setKeyExpirationTime(false, rel)
         }
-        return signOverSubkey(secretRing, primaryPrivate, subPublicBody, SIG_SUBKEY_BINDING, hashed)
+        return signOverSubkey(secretRing, primaryPrivate, subPublicBody, SIG_SUBKEY_BINDING, hashed, hashAlgorithm)
     }
 
     /** A 0x28 subkey revocation for [subPublicBody]. */

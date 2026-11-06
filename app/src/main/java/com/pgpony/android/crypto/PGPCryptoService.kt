@@ -380,6 +380,14 @@ class PGPCryptoService private constructor() {
                 buildEd25519KeyRingGenerator(userID, passphrase, creationDate, expirationSeconds).let {
                     it.generateSecretKeyRing() to it.generatePublicKeyRing()
                 }
+            // 4.8.0 (4l, #109): v4 ECDSA + ECDH on brainpool or secp256k1.
+            KeyAlgorithm.ECDSA_BRAINPOOL_P256,
+            KeyAlgorithm.ECDSA_BRAINPOOL_P384,
+            KeyAlgorithm.ECDSA_BRAINPOOL_P512,
+            KeyAlgorithm.ECDSA_SECP256K1 ->
+                buildEcdsaKeyRingGenerator(userID, algorithm, passphrase, creationDate, expirationSeconds).let {
+                    it.generateSecretKeyRing() to it.generatePublicKeyRing()
+                }
             KeyAlgorithm.V6_ED25519 ->
                 buildV6Ed25519X25519KeyRings(userID, passphrase, creationDate, expirationSeconds)
             KeyAlgorithm.MLKEM768_X25519_V6 -> {
@@ -582,6 +590,91 @@ class PGPCryptoService private constructor() {
         val certSigGen = org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder(
             masterKeyPair.publicKey.algorithm,
             HashAlgorithmTags.SHA256
+        )
+        val encryptor = passphrase?.let {
+            S2kPolicy.v4EncryptorBuilder().build(it.toCharArray()) // 4.6.0 (item 17.6)
+        }
+
+        val gen = PGPKeyRingGenerator(
+            PGPSignature.POSITIVE_CERTIFICATION,
+            masterKeyPair,
+            userID,
+            sha1Calc,
+            sigHashGen.generate(),
+            null,
+            certSigGen,
+            encryptor
+        )
+
+        gen.addSubKey(encKeyPair, encHashGen.generate(), null)
+        return gen
+    }
+
+    /**
+     * 4.8.0 (4l, #109): a v4 key on brainpoolP256r1, brainpoolP384r1,
+     * brainpoolP512r1 or secp256k1, in the shape gpg makes for these curves:
+     *
+     *   - ECDSA (algo 19) primary, certify + sign
+     *   - ECDH (algo 18) encryption subkey on the same curve, with the RFC 6637
+     *     KDF parameters gpg uses for the curve size (see EcdsaKeygen)
+     *
+     * The self-certification and the subkey binding use the hash that matches
+     * the curve size (SHA-256, SHA-384 or SHA-512), as gpg does, so no
+     * signature hash is shorter than the curve. Passphrase protection and the
+     * subpackets follow the Ed25519 v4 builder above.
+     */
+    private fun buildEcdsaKeyRingGenerator(
+        userID: String,
+        algorithm: KeyAlgorithm,
+        passphrase: String?,
+        creationDate: Date,
+        expirationSeconds: Long?
+    ): PGPKeyRingGenerator {
+        val curve = EcdsaKeygen.curveFor(algorithm)
+            ?: throw PGPCryptoError.KeyGenerationFailed("Cannot generate ${algorithm.displayName} keys")
+        val random = SecureRandom()
+
+        val masterKeyPair = BcPGPKeyPair(
+            org.bouncycastle.bcpg.PublicKeyPacket.VERSION_4,
+            PublicKeyAlgorithmTags.ECDSA,  // 19
+            EcdsaKeygen.generateKeyPair(curve, random),
+            creationDate
+        )
+        val encKeyPair = BcPGPKeyPair(
+            org.bouncycastle.bcpg.PublicKeyPacket.VERSION_4,
+            PublicKeyAlgorithmTags.ECDH,  // 18
+            EcdsaKeygen.kdfParameters(curve),
+            EcdsaKeygen.generateKeyPair(curve, random),
+            creationDate
+        )
+
+        val sigHashGen = PGPSignatureSubpacketGenerator()
+        sigHashGen.setKeyFlags(false,
+            PGPKeyFlags.CAN_SIGN or PGPKeyFlags.CAN_CERTIFY)
+        sigHashGen.setPreferredSymmetricAlgorithms(false, intArrayOf(
+            SymmetricKeyAlgorithmTags.AES_256,
+            SymmetricKeyAlgorithmTags.AES_192,
+            SymmetricKeyAlgorithmTags.AES_128
+        ))
+        sigHashGen.setPreferredHashAlgorithms(false, intArrayOf(
+            HashAlgorithmTags.SHA256,
+            HashAlgorithmTags.SHA384,
+            HashAlgorithmTags.SHA512
+        ))
+        sigHashGen.setIssuerFingerprint(false, masterKeyPair.publicKey)
+        if (expirationSeconds != null) {
+            sigHashGen.setKeyExpirationTime(false, expirationSeconds)
+        }
+
+        val encHashGen = PGPSignatureSubpacketGenerator()
+        encHashGen.setKeyFlags(false,
+            PGPKeyFlags.CAN_ENCRYPT_COMMS or PGPKeyFlags.CAN_ENCRYPT_STORAGE)
+
+        val sha1Calc = org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider()
+            .get(HashAlgorithmTags.SHA1)
+        val certSigGen = org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder(
+            masterKeyPair.publicKey.algorithm,
+            curve.hashAlgorithm
         )
         val encryptor = passphrase?.let {
             S2kPolicy.v4EncryptorBuilder().build(it.toCharArray()) // 4.6.0 (item 17.6)
@@ -1231,10 +1324,9 @@ class PGPCryptoService private constructor() {
         // can read fine. 4.6.0 (item 17.1): decided by the key that will
         // actually be used, so a composite subkey that fails its binding
         // check cannot force the container choice.
+        // 4.8.0 (#108): every key the message goes to counts, ADSKs included.
         val anyCompositeRecipient = recipientPublicKeys.any { r ->
-            findEncryptionKey(r, recipientSubkeyChoices[fingerprintHex(r.publicKey)])?.let {
-                com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(it.algorithm) != null
-            } == true
+            anyCompositeTarget(r, recipientSubkeyChoices[fingerprintHex(r.publicKey)])
         }
         // item 14 (#56): a v4 algo-35 recipient uses a v6 PKESK, which MUST
         // pair with SEIPDv2 (RFC 9580 5.1), so it forces AEAD as well.
@@ -1385,23 +1477,13 @@ class PGPCryptoService private constructor() {
 
             val encryptedGen = PGPEncryptedDataGenerator(encGen)
 
-            // Add each recipient's encryption subkey
+            // Add each recipient's encryption subkey.
+            // 4.8.0 (#108): and every ADSK the recipient's key carries, as GnuPG
+            // does, so a holder of only the ADSK can read the message.
             for (ring in recipientPublicKeys) {
-                val encKey = findEncryptionKey(ring, recipientSubkeyChoices[fingerprintHex(ring.publicKey)])
+                val keys = recipientEncryptionKeys(ring, recipientSubkeyChoices[fingerprintHex(ring.publicKey)])
                     ?: throw noEncryptionKey(ring)
-                if (com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(encKey.algorithm) != null) {
-                    encryptedGen.addMethod(
-                        com.pgpony.android.crypto.pqc.CompositeEncryptionMethodGenerator(encKey)
-                    )
-                } else if (encKey.algorithm == com.pgpony.android.crypto.pqc.CompositeKemLibrePGP.ALGORITHM_ID) {
-                    encryptedGen.addMethod(
-                        com.pgpony.android.crypto.pqc.CompositeLibrePGPEncryptionMethodGenerator(encKey)
-                    )
-                } else {
-                    // 4.7.3: GnuPG's X448 (bare 56-octet value) gets PGPony's own
-                    // ECDH; Bouncy Castle cannot read that encoding. See GnuPgX448.
-                    encryptedGen.addMethod(GnuPgX448.encryptionMethod(encKey))
-                }
+                for (encKey in keys) addRecipientMethod(encryptedGen, encKey)
             }
 
             // item 14 (#56): add a method generator per v4 algo-35 recipient. The
@@ -1510,7 +1592,9 @@ class PGPCryptoService private constructor() {
                 sigGen = PonySigGen(
                     org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder(
                         // 3.0.0 (5d-3): the strongest hash every recipient lists.
-                        signingKey.publicKey.algorithm, RecipientPreferences.hashFor(recipientPublicKeys)
+                        signingKey.publicKey.algorithm,
+                        // 4.8.0 (4l, #109): never shorter than an ECDSA signer's curve.
+                        EcCurveOid.signatureHash(signingKey.publicKey, RecipientPreferences.hashFor(recipientPublicKeys))
                     ),
                     signingKey.publicKey
                 )
@@ -1711,7 +1795,9 @@ class PGPCryptoService private constructor() {
             sigGen = PonySigGen(
                 org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder(
                     // 3.0.0 (5d-3): the strongest hash every recipient lists.
-                    signingKey.publicKey.algorithm, RecipientPreferences.hashFor(recipientPublicKeys)
+                    signingKey.publicKey.algorithm,
+                    // 4.8.0 (4l, #109): never shorter than an ECDSA signer's curve.
+                    EcCurveOid.signatureHash(signingKey.publicKey, RecipientPreferences.hashFor(recipientPublicKeys))
                 ),
                 signingKey.publicKey
             )
@@ -1728,10 +1814,9 @@ class PGPCryptoService private constructor() {
             // 4.6.0 (item 17.1): decided by the key that will actually be used,
             // so a composite subkey that fails its binding check cannot force
             // the container choice.
+            // 4.8.0 (#108): ADSKs included, as in usesSeipdV2.
             val anyCompositeRecipient = recipientPublicKeys.any { r ->
-                findEncryptionKey(r, recipientSubkeyChoices[fingerprintHex(r.publicKey)])?.let {
-                    com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(it.algorithm) != null
-                } == true
+                anyCompositeTarget(r, recipientSubkeyChoices[fingerprintHex(r.publicKey)])
             }
             // Composite (ML-KEM+X25519) recipients mandate v6 framing (SEIPDv2),
             // so a composite recipient forces AEAD regardless of the version scan.
@@ -1758,21 +1843,10 @@ class PGPCryptoService private constructor() {
             }
             val encryptedGen = PGPEncryptedDataGenerator(encGen)
             for (ring in recipientPublicKeys) {
-                val encKey = findEncryptionKey(ring, recipientSubkeyChoices[fingerprintHex(ring.publicKey)])
+                // 4.8.0 (#108): the chosen encryption subkey plus every ADSK.
+                val keys = recipientEncryptionKeys(ring, recipientSubkeyChoices[fingerprintHex(ring.publicKey)])
                     ?: throw noEncryptionKey(ring)
-                if (com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(encKey.algorithm) != null) {
-                    encryptedGen.addMethod(
-                        com.pgpony.android.crypto.pqc.CompositeEncryptionMethodGenerator(encKey)
-                    )
-                } else if (encKey.algorithm == com.pgpony.android.crypto.pqc.CompositeKemLibrePGP.ALGORITHM_ID) {
-                    encryptedGen.addMethod(
-                        com.pgpony.android.crypto.pqc.CompositeLibrePGPEncryptionMethodGenerator(encKey)
-                    )
-                } else {
-                    // 4.7.3: GnuPG's X448 (bare 56-octet value) gets PGPony's own
-                    // ECDH; Bouncy Castle cannot read that encoding. See GnuPgX448.
-                    encryptedGen.addMethod(GnuPgX448.encryptionMethod(encKey))
-                }
+                for (encKey in keys) addRecipientMethod(encryptedGen, encKey)
             }
 
             // item 14 (#56): a method generator per v4 algo-35 recipient (v6 PKESK,
@@ -3065,7 +3139,9 @@ class PGPCryptoService private constructor() {
 
             val sigGen = PonySigGen(
                 org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder(
-                    signingKey.publicKey.algorithm, HashAlgorithmTags.SHA256
+                    // 4.8.0 (4l, #109): an ECDSA key signs with a hash as long as its curve.
+                    signingKey.publicKey.algorithm,
+                    EcCurveOid.signatureHash(signingKey.publicKey, HashAlgorithmTags.SHA256)
                 ),
                 signingKey.publicKey
             )
@@ -3359,7 +3435,8 @@ class PGPCryptoService private constructor() {
                 isPrimary = pub.isMasterKey,
                 isPostQuantum = com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(pub.algorithm) != null ||
                     pub.algorithm == com.pgpony.android.crypto.pqc.CompositeKemLibrePGP.ALGORITHM_ID,
-                algorithmLabel = detectAlgorithm(pub).displayName
+                // 4.8.0 (4l, #109): an ECDH subkey on brainpool or secp256k1 names its curve.
+                algorithmLabel = EcCurveOid.ecdhLabel(pub) ?: detectAlgorithm(pub).displayName
             )
         }
 
@@ -3404,17 +3481,103 @@ class PGPCryptoService private constructor() {
         }?.let { return it }
         var primaryCandidate: PGPPublicKey? = null
         var algorithmFallback: PGPPublicKey? = null
+        // 4.8.0 (#108): the NEWEST usable encryption subkey, as GnuPG picks it.
+        // Taking the first one in the ring sent messages to an older subkey
+        // when a key had several, so a card holding the newest could not
+        // decrypt them. A tie on creation time keeps the later one in the ring.
+        var subkeyCandidate: PGPPublicKey? = null
         vring.publicKeys.forEach { key ->
             if (!key.isEncryptionKey) return@forEach
             if (!usable(key)) return@forEach
             if (algorithmFallback == null) algorithmFallback = key
             val caps = SubkeyCapability.fromPgpPublicKey(key, detectAlgorithm(key), key.isMasterKey)
             if (SubkeyCapability.hasCapability(caps, SubkeyCapability.Encrypt)) {
-                if (!key.isMasterKey) return key            // prefer an encryption subkey
-                if (primaryCandidate == null) primaryCandidate = key
+                if (!key.isMasterKey) {
+                    val current = subkeyCandidate
+                    if (current == null || !key.creationTime.before(current.creationTime)) subkeyCandidate = key
+                } else if (primaryCandidate == null) {
+                    primaryCandidate = key
+                }
             }
         }
-        return primaryCandidate ?: algorithmFallback
+        return subkeyCandidate ?: primaryCandidate ?: algorithmFallback
+    }
+
+    /**
+     * 4.8.0 (#108): the subkeys of [ring] that carry the ADSK key flag
+     * (0x0400, "additional decryption subkey", GnuPG 2.4.1 and later) and may
+     * receive a message now: bound by a verified binding in force, not
+     * revoked, not expired, under a usable primary, of an algorithm that can
+     * encrypt and is not weak. Read from the verified view, like
+     * [findEncryptionKey]. The flag sits in the second key flags octet, which
+     * CertificateBindings reads from the raw subpacket. An ADSK needs no
+     * encryption flag of its own (a user's key carries it on authentication
+     * subkeys, flags 0x20 0x04), so it is never the automatic pick; it is
+     * added next to that pick by [recipientEncryptionKeys].
+     */
+    internal fun additionalDecryptionKeys(ring: PGPPublicKeyRing): List<PGPPublicKey> {
+        val view = CertificateBindings.verified(ring)
+        val report = view.report ?: return emptyList()
+        if (!report.supported) return emptyList()
+        val now = System.currentTimeMillis()
+        return view.ring.publicKeys.asSequence().filter { key ->
+            !key.isMasterKey &&
+                canEncryptTo(key) &&
+                !KeyPolicy.isWeak(key, view.ring.publicKey) &&
+                report.isUsableAdsk(fingerprintHex(key), now)
+        }.toList()
+    }
+
+    /** 4.8.0 (#108): [key]'s algorithm can take a PKESK: anything Bouncy
+     *  Castle calls an encryption algorithm, or a composite ML-KEM it cannot see. */
+    private fun canEncryptTo(key: PGPPublicKey): Boolean =
+        key.isEncryptionKey ||
+            com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(key.algorithm) != null ||
+            key.algorithm == com.pgpony.android.crypto.pqc.CompositeLibrePGPKeyMaterial.ALGORITHM_ID
+
+    /**
+     * 4.8.0 (#108): every key of [ring] a message is encrypted to, as GnuPG
+     * does it: the encryption key [findEncryptionKey] picks (the automatic
+     * pick, or [preferredKeyId] when the user chose a subkey), followed by
+     * every usable ADSK ([additionalDecryptionKeys]), each key once. Other
+     * ordinary encryption subkeys are not added; GnuPG encrypts to the newest
+     * one only. Null when the ring has no encryption key at all, so the
+     * caller reports it as before; ADSKs alone do not make a recipient.
+     */
+    internal fun recipientEncryptionKeys(ring: PGPPublicKeyRing, preferredKeyId: Long? = null): List<PGPPublicKey>? {
+        val main = findEncryptionKey(ring, preferredKeyId) ?: return null
+        val out = LinkedHashMap<String, PGPPublicKey>()
+        out[fingerprintHex(main)] = main
+        for (k in additionalDecryptionKeys(ring)) {
+            val fp = fingerprintHex(k)
+            if (!out.containsKey(fp)) out[fp] = k
+        }
+        return out.values.toList()
+    }
+
+    /** 4.8.0 (#108): does any key [recipientEncryptionKeys] returns for [ring]
+     *  use an IETF composite ML-KEM method? Such a key needs a v6 PKESK and so
+     *  a SEIPDv2 container, whether it is the chosen key or an ADSK. */
+    private fun anyCompositeTarget(ring: PGPPublicKeyRing, preferredKeyId: Long?): Boolean =
+        recipientEncryptionKeys(ring, preferredKeyId)?.any {
+            com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(it.algorithm) != null
+        } == true
+
+    /**
+     * 4.8.0 (#108): add the PKESK method for one recipient key to [gen]. The
+     * same three branches encrypt() and the streaming encrypt used inline for
+     * the one key per recipient; ADSKs go through here too.
+     */
+    private fun addRecipientMethod(gen: PGPEncryptedDataGenerator, encKey: PGPPublicKey) {
+        if (com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(encKey.algorithm) != null) {
+            gen.addMethod(com.pgpony.android.crypto.pqc.CompositeEncryptionMethodGenerator(encKey))
+        } else if (encKey.algorithm == com.pgpony.android.crypto.pqc.CompositeKemLibrePGP.ALGORITHM_ID) {
+            gen.addMethod(com.pgpony.android.crypto.pqc.CompositeLibrePGPEncryptionMethodGenerator(encKey))
+        } else {
+            // 4.7.3: GnuPG's X448 (bare 56-octet value) gets PGPony's own
+            // ECDH; Bouncy Castle cannot read that encoding. See GnuPgX448.
+            gen.addMethod(GnuPgX448.encryptionMethod(encKey))
+        }
     }
 
     /**

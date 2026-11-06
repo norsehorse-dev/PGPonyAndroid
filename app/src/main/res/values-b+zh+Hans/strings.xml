@@ -3056,7 +3056,6 @@
     <string name="certifier_lookup_imported_body">它对此密钥所做的认证将重新检查。</string>
     <string name="key_detail_refresh_sigs_menu">刷新自签名</string>
     <string name="key_detail_refresh_sigs_title">刷新自签名</string>
-    <string name="key_detail_refresh_sigs_body">使用 SHA-256 重新签名此密钥的用户 ID 和子钥绑定。所有有效期保持不变。因绑定使用 SHA-1 而被排除的子钥，如果其私钥在此手机上，将会恢复。完成后请发布此密钥，以便其他人获得新的签名。</string>
     <string name="key_detail_refresh_sigs_action">刷新</string>
     <string name="key_detail_refresh_sigs_done">自签名已刷新。</string>
     <plurals name="key_detail_refresh_sigs_done_restored">
@@ -3092,4 +3091,14 @@
     <string name="provider_review_included_format">已通过 %1$s 包含在内</string>
     <!-- 4.7.0 RC7, translated Oct 2026 -->
     <string name="exchange_qr_too_large_inline">此密钥太大，无法生成二维码。请改用下方的「复制密钥」或「上传」。</string>
+    <!-- 4.8.0 RC4 (#86) -->
+    <string name="key_detail_refresh_sigs_body_hash_choice">使用下方所选的哈希重新签名此密钥的用户 ID 和子钥绑定。所有有效期保持不变。因绑定使用 SHA-1 而被排除的子钥，如果其私钥在此手机上，将会恢复。完成后请发布此密钥，以便其他人获得新的签名。</string>
+    <string name="self_sig_hash_label">新签名使用的哈希</string>
+    <string name="self_sig_hash_hint">两者都安全。SHA-512 适合 3072 位及以上的 RSA 密钥，以及签名已在使用它的密钥。</string>
+    <!-- 4.8.0 RC4 (4l) -->
+    <string name="keyring_generate_algorithm_caption_ecdsa">在同一条曲线上使用 ECDSA 签名和 ECDH 加密（OpenPGP v4）。不同硬件密钥支持的曲线各不相同，因此在将密钥移至硬件密钥之前，请确认你的硬件密钥支持此曲线。</string>
+    <!-- 4.8.0 RC4 (#71) -->
+    <string name="err_card_primary_missing">主钥不在此硬件密钥的签名槽位中，因此无法用它进行此更改</string>
+    <string name="key_detail_add_subkey_card_note">新子钥在此手机上生成。此密钥通过硬件密钥签名和解密，因此请在共享此密钥之前，使用「移至硬件密钥」将新子钥移到硬件密钥上。在此之前，加密给新加密子钥的消息将无法打开。</string>
+    <string name="key_detail_add_subkey_card_new_passphrase_hint">新子钥的私钥保留在此手机上，而此密钥在这里的私钥都还没有设置口令。请设置一个口令来保护它。</string>
 </resources>

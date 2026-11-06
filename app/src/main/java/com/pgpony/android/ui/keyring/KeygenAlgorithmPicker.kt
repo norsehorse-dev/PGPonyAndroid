@@ -4,8 +4,9 @@
 // The key-generation algorithm picker, shared by the Keyring generate sheet
 // and the onboarding generate sheet so the two cannot drift. Organized by
 // security tier (Classical, Post-Quantum) with the niche compatibility options
-// (RSA, LibrePGP) tucked behind an Advanced expander, and a caption explaining
-// the selected algorithm. The group lists live on KeyAlgorithm.
+// (RSA, ECDSA on brainpool and secp256k1, LibrePGP) tucked behind an Advanced
+// expander, and a caption explaining the selected algorithm. The group lists
+// live on KeyAlgorithm.
 
 package com.pgpony.android.ui.keyring
 
@@ -222,6 +223,9 @@ private fun captionFor(algorithm: KeyAlgorithm): String = when {
         stringResource(R.string.keyring_generate_algorithm_caption_v6)
     algorithm == KeyAlgorithm.ED25519_CV25519 ->
         stringResource(R.string.keyring_generate_algorithm_caption_ed25519)
+    // 4.8.0 (4l, #109): brainpool and secp256k1, with the card caveat.
+    algorithm in KeyAlgorithm.generatableEcdsa ->
+        stringResource(R.string.keyring_generate_algorithm_caption_ecdsa)
     else ->
         stringResource(R.string.keyring_generate_algorithm_caption_rsa)
 }

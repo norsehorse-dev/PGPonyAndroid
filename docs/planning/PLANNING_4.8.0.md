@@ -83,6 +83,20 @@ Origin: #71 (follow-up to 4.7.0 items 13 and 55). Add Subkey, User ID edits and 
 on a key whose primary sits in the card's Signature slot, signed on the card. 4.7.0 keeps Add Subkey off for a
 partial move (a new subkey would stay on the phone).
 
+Done in RC4: PrimarySigner (software, or external through CardPGPContentSigner) under the edits;
+CardPrimarySigner checks the Signature slot holds the primary, and every signature verifies PW1 again before its
+PSO:CDS (DO C4). When the stored primary is a divert-to-card stub, or a card-generated key has no secret ring,
+Key Detail asks for the card PIN and the tap for: Add Subkey (0x18 on the card, 0x19 by the new subkey, which
+stays on the phone; the key becomes a key pair linked to the card so Move to security key is offered for it),
+add User ID, make primary, revoke User ID, expiry of the primary and of a non-signing subkey, Refresh
+self-signatures, revoke a subkey. The stub ring takes the new public material. Add Subkey on a key pair linked to
+a card (item 55) is no longer blocked; the sheet offers classical types only and says to move the new subkey. When no
+secret of the key on the phone has a passphrase, Add Subkey asks for a new one, so the new subkey's secret is never
+stored unprotected (decided Nov 5).
+Left out: revoking the key, notations, removing a User ID or subkey on a key with every secret on the card, a
+signing subkey's expiry (its back-signature needs the subkey), post-quantum subkeys. Tests:
+CardPrimaryEditTest.
+
 
 ## 3a. Private key export: ask for the key's passphrase, and gate Backup (user email, Oct 22)
 
@@ -120,6 +134,9 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
 - #101: a setting to turn off drag to reorder on the Keyring. Done in RC2; the reorder mode follow-up is item 4m.
 - #93 follow-up: a long press on a key starts select mode (4.7.0 item 63).
 - #86 follow-up: choose the hash (SHA-512 for large RSA keys) when re-signing self-signatures (4.7.0 item 51).
+  Done in RC4: SHA-256 or SHA-512 in the Refresh and expiry confirmations, default SHA-512 for RSA 3072+.
+  No choice where the key sets the hash: Ed448 and ECDSA on a 384 or 512-bit curve use SHA-512, a card signs with
+  its own hash, and composite ML-DSA keys keep SHA-256.
 - #100 follow-up: slower or paused QR playback by default.
 - #95: QR exchange rework and the optional PGPONY2 format. Needs review, iOS and desktop must read it first, a
   rebase on 4.7.0's Exchange changes, and its planning-doc edit taken out.
@@ -183,6 +200,16 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
     so it needs the 4.8.0 work: MSE so PSO:DECIPHER uses the authentication slot (OpenPGP card 3.3 and later)
     when the only matching PKESK names the key in that slot, plus encrypting to ADSKs. Check whether the iOS card
     path has the same first-match selection.
+  - Done in RC4 (Nov 5). Encrypt: each recipient gets the chosen encryption subkey (automatic pick or the picker's
+    override, unchanged) plus every usable ADSK (flag 0x0400 read from the second key flags octet; bound, unrevoked,
+    unexpired, an encrypting algorithm, not weak). Other ordinary encryption subkeys are not added, which is what
+    GnuPG does (newest encryption subkey plus ADSKs), not "every valid encryption subkey" as written above. An ADSK
+    is never the main pick and a key with only an ADSK is still not a recipient. Software decrypt: a secret ADSK was
+    refused by mayDecryptWith (first flags octet 0x20 only); it now counts. Card: pass 1 reads the slots whenever a
+    packet names a ring key and prefers the decryption slot; when only the authentication slot's key has a packet and
+    the card advertises MSE (C0 tenth octet, spec 3.3 and later), it sends MSE 00 22 41 B8 83 01 03, PSO:DECIPHER, then
+    MSE back to 02 (also on failure). Without MSE the old "different key" error, now without a PSO:DECIPHER. Not
+    covered: a hidden-recipient (wildcard) packet for an auth-slot ADSK.
 
 
 - In-app viewer for decrypted files (user email, Oct 23): a decrypted PDF or image always goes to the Android
@@ -367,6 +394,12 @@ If yes: add them to the generate picker's Advanced group (v4 only, ECDSA primary
 curve), check what Bouncy Castle 1.85 generates against gpg 2.4 and 2.5 (import, sign, encrypt both ways), and say
 in the captions that cards differ in which curves they hold. iOS and desktop mirror once verified.
 
+Done in RC4: brainpoolP256r1, brainpoolP384r1, brainpoolP512r1 and secp256k1 are in the Advanced group (v4 only),
+each an ECDSA primary with an ECDH subkey on the same curve, KDF SHA-256/AES-128, SHA-384/AES-192 or SHA-512/AES-256
+by curve size, self-signatures with the matching hash (EcdsaKeygen). New signatures by any ECDSA key (messages,
+cleartext, detached, User ID, expiry and revocation signatures) now use a hash at least as long as the curve. Move to
+Security Key takes ECDSA and ECDH keys on NIST, brainpool and secp256k1 curves. The gpg 2.4 / 2.5 checks are still to do.
+
 
 ## 4m. Reorder mode on the Keyring (#101 follow-up, Nov 4)
 
@@ -421,6 +454,8 @@ A tester confirmed the 4.7.0 fixes for #82, #87, #89, #91 and #92 and asked thre
   KeyServerCheckStore so Details shows it. Not found names the servers asked. A network failure on one server moves
   to the next and is reported only when every server failed.
 Desktop takes #88 and #90 from the sync when it mirrors RC4; #78's test is Android only.
+
+Done in RC4.
 
 
 ## 5. Contributor PRs waiting on a decision

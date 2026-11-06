@@ -80,6 +80,9 @@ enum class KeyAlgorithm(
     // the curve OID and maps algo 19 to one of these, so a NIST / brainpool
     // primary shows its real curve instead of "ECDSA" (bits 0) or "RSA 4096".
     // Import-only; keyBits is the curve field size.
+    // 4.8.0 (4l, #109): the brainpool and secp256k1 entries are also generated
+    // (v4, ECDSA primary + ECDH subkey on the same curve; see [generatableEcdsa]).
+    // The NIST entries stay import-only.
     ECDSA_NIST_P256("ECDSA (NIST P-256)", "NIST P-256", 256),
     ECDSA_NIST_P384("ECDSA (NIST P-384)", "NIST P-384", 384),
     ECDSA_NIST_P521("ECDSA (NIST P-521)", "NIST P-521", 521),
@@ -161,8 +164,12 @@ enum class KeyAlgorithm(
         val generatableInterop = listOf(
             MLKEM768_X25519_V6, MLKEM768_X25519_V4, MLKEM768_X25519_LIBREPGP
         )
-        val generatableAdvanced = listOf(
-            RSA_4096, RSA_2048,
+        // 4.8.0 (4l, #109): v4 ECDSA keys on the curves some hardware cards
+        // hold. v4 only: they appear in no v6 or granular composer menu.
+        val generatableEcdsa = listOf(
+            ECDSA_BRAINPOOL_P256, ECDSA_BRAINPOOL_P384, ECDSA_BRAINPOOL_P512, ECDSA_SECP256K1
+        )
+        val generatableAdvanced = listOf(RSA_4096, RSA_2048) + generatableEcdsa + listOf(
             MLKEM1024_X448_LIBREPGP, MLKEM768_BP256_LIBREPGP
         )
 

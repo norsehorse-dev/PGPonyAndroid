@@ -15,6 +15,7 @@
 
 package com.pgpony.android.crypto.card
 
+import com.pgpony.android.crypto.EcCurveOid
 import com.pgpony.android.crypto.SigningService
 import org.bouncycastle.bcpg.ArmoredOutputStream
 import com.pgpony.android.data.ArmorCommentHeader
@@ -91,7 +92,13 @@ class CardSigningService private constructor() {
         val out = ByteArrayOutputStream()
         val armored = ArmoredOutputStream(out).stripVersion()
         try {
-            armored.beginClearText(HashAlgorithmTags.SHA256)
+            // 4.8.0 (4l, #109): the Hash: header names the hash the card signs
+            // with; an ECDSA key on a 384- or 512-bit curve uses SHA-384 or
+            // SHA-512 (CardPGPContentSigner), and gpg rejects a header that
+            // does not match the signature.
+            armored.beginClearText(
+                EcCurveOid.signatureHash(publicKey, HashAlgorithmTags.SHA256)
+            )
             val textBytes = text.toByteArray(Charsets.UTF_8)
             armored.write(textBytes)
             // RFC 4880 §7: the signature armor must start on its own line.
