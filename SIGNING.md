@@ -42,6 +42,19 @@ with nothing to push it does nothing.
 
 Never run it on commits that are already pushed.
 
+A contributor's pull request is the exception. Their commits are theirs and
+stay unsigned; merge them with a signed merge commit (`git merge --no-ff -S`)
+and never run the rebase above over them, since it would re-sign them as
+norsehorse-dev, flatten the merge and move any tag already pushed on top. Check
+that only the contributor's commits are unsigned, then push past the hook:
+
+```
+git log --format='%h %G? %an %s' origin/main..HEAD
+git push --no-verify origin main
+```
+
+4.8.0 RC6 merged #95 this way (merge d4a972c).
+
 A pre-push hook enforces this: it refuses a push while any commit in it is
 unsigned, and prints the rebase command. Install it once per clone:
 
