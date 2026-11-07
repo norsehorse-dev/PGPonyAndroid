@@ -102,9 +102,25 @@ fun ApiClientsScreen(onDismiss: () -> Unit) {
 
     LaunchedEffect(refresh) {
         clients = dao.getAll()
-        keyLabels = PGPonyApp.instance.keyRepository.getAllKeys().associate {
+        val openPgpLabels = PGPonyApp.instance.keyRepository.getAllKeys().associate {
             it.fingerprint.uppercase() to (it.userID.ifBlank { it.shortFingerprint })
         }
+        // 4.8.0 RC7 (item 1): an approved SSH-only key ("ssh:SHA256:...") shows its
+        // label and type, not its raw id. The store blocks, so read it off the main thread.
+        // A store failure falls back to raw ids; a cancelled effect (screen left,
+        // refresh bumped) still ends here, so CancellationException is rethrown.
+        val sshLabels: Map<String, String> = try {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                PGPonyApp.instance.sshKeyStore.list().associate {
+                    it.id to com.pgpony.android.provider.SshOnlyKeys.description(it)
+                }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emptyMap()
+        }
+        keyLabels = openPgpLabels + sshLabels
         loaded = true
     }
 

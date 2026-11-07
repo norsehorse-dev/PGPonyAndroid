@@ -70,6 +70,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -759,6 +760,14 @@ private fun SessionPane(
                     Text(stringResource(R.string.pair_copy))
                 }
             }
+        }
+        // 4.8.0 RC7 (item 1): SSH-only keys the sent backup lacks.
+        outgoing?.sshSkipped?.takeIf { it > 0 }?.let { n ->
+            Text(
+                pluralStringResource(R.plurals.ssh_backup_skipped, n, n),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
+            )
         }
     } else {
         progress?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }

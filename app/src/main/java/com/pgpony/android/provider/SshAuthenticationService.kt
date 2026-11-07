@@ -45,6 +45,15 @@
 // connection, and with a single binding every approval undid the previous
 // one, so the picker came back on every connection. Each key is now approved
 // once.
+//
+// 4.8.0 RC7 (item 1): SSH-only ssh-mldsa44-ed25519 keys (OpenSSH 10.6)
+// (data/ssh/SshKeyStore), which no OpenPGP subkey or card can hold. Their key
+// id is "ssh:SHA256:..." (SshKeyStore.isSshKeyId), and every action routes on
+// it before any OpenPGP lookup, so findEntity never sees one and the OpenPGP
+// path is unchanged. Such a key is approved per app like an OpenPGP key (the
+// picker lists both), has no passphrase and no card, and answers SELECT_KEY,
+// GET_SSH_PUBLIC_KEY and SIGN. GET_PUBLIC_KEY has no algorithm code for it and
+// returns INVALID_ALGORITHM; neither OkcAgent nor okc-agents calls it.
 
 package com.pgpony.android.provider
 
@@ -61,6 +70,8 @@ import com.pgpony.android.crypto.ssh.SshSigningKey
 import com.pgpony.android.data.ApiClientEntity
 import com.pgpony.android.data.PGPKeyEntity
 import com.pgpony.android.data.repository.KeyRepository
+import com.pgpony.android.data.ssh.SshKeyEntry
+import com.pgpony.android.data.ssh.SshKeyStore
 import com.pgpony.android.i18n.ErrorText
 import kotlinx.coroutines.runBlocking
 import org.openintents.ssh.authentication.ISshAuthenticationService
@@ -100,6 +111,11 @@ class SshAuthenticationService : Service() {
 
     private val repo: KeyRepository
         get() = (application as PGPonyApp).keyRepository
+
+    // 4.8.0 RC7 (item 1): it caches nothing, so a key made in the main process
+    // is seen here on the next request, without a restart of :remote_api.
+    private val sshKeys: SshKeyStore
+        get() = (application as PGPonyApp).sshKeyStore
 
     private val authorizer: ApiClientAuthorizer by lazy {
         ApiClientAuthorizer(
@@ -177,6 +193,11 @@ class SshAuthenticationService : Service() {
         if (id.isNullOrEmpty()) {
             return Lookup.Fail(error(SshAuthenticationApiError.NO_KEY_ID, "No key id in request"))
         }
+        // 4.8.0 RC7 (item 1): every action routes SSH-only ids away before
+        // this; the guard keeps findEntity from ever seeing one.
+        if (SshKeyStore.isSshKeyId(id)) {
+            return Lookup.Fail(error(SshAuthenticationApiError.NO_SUCH_KEY, "Key not found in PGPony"))
+        }
         val entity = runBlocking { findEntity(id) }
             ?: return Lookup.Fail(error(SshAuthenticationApiError.NO_SUCH_KEY, "Key not found in PGPony"))
         if (entity.isRevoked) {
@@ -225,16 +246,21 @@ class SshAuthenticationService : Service() {
     }
 
     private fun keyPicker(data: Intent, callingPackage: String, onlyFingerprint: String?): Intent {
+        // 4.8.0 RC7 (item 1): [onlyFingerprint] may be an SSH-only key id,
+        // whose base64 must keep its case (normalizeSshKey uppercases only
+        // OpenPGP fingerprints) and holds '/' and '+', so it is encoded for
+        // the URI (a hex fingerprint encodes to itself).
+        val only = onlyFingerprint?.let { ApiClientEntity.normalizeSshKey(it) }
         val picker = Intent(this, ProviderKeyPickerActivity::class.java).apply {
             putExtra(ProviderKeyPickerActivity.EXTRA_API_DATA, data)
             putExtra(ProviderKeyPickerActivity.EXTRA_FOR_SSH, true)
             putExtra(ProviderKeyPickerActivity.EXTRA_SSH_CLIENT_PACKAGE, callingPackage)
-            if (onlyFingerprint != null) {
-                putExtra(ProviderKeyPickerActivity.EXTRA_SSH_ONLY_FINGERPRINT, onlyFingerprint.uppercase())
+            if (only != null) {
+                putExtra(ProviderKeyPickerActivity.EXTRA_SSH_ONLY_FINGERPRINT, only)
             }
             setData(
                 android.net.Uri.parse(
-                    "pgpony-ssh-selectkey://$callingPackage/${onlyFingerprint?.uppercase() ?: "any"}"
+                    "pgpony-ssh-selectkey://$callingPackage/${only?.let { android.net.Uri.encode(it) } ?: "any"}"
                 )
             )
         }
@@ -250,6 +276,15 @@ class SshAuthenticationService : Service() {
         if (data.getStringExtra(EXTRA_KEY_ID).isNullOrEmpty()) {
             return keyPicker(data, callingPackage, onlyFingerprint = null)
         }
+        SshOnlyKeys.sshOnlyId(data.getStringExtra(EXTRA_KEY_ID))?.let { id ->
+            return when (val l = resolveSshOnlyBound(id, data, callingPackage)) {
+                is SshOnlyLookup.Fail -> l.response
+                is SshOnlyLookup.Ok -> success().apply {
+                    putExtra(EXTRA_KEY_ID, l.entry.id)
+                    putExtra(EXTRA_KEY_DESCRIPTION, SshOnlyKeys.description(l.entry))
+                }
+            }
+        }
         return when (val l = resolveBound(data, callingPackage)) {
             is Lookup.Fail -> l.response
             is Lookup.Ok -> success().apply {
@@ -259,8 +294,11 @@ class SshAuthenticationService : Service() {
         }
     }
 
-    private fun publicKey(data: Intent, callingPackage: String, sshFormat: Boolean): Intent =
-        when (val l = resolveBound(data, callingPackage)) {
+    private fun publicKey(data: Intent, callingPackage: String, sshFormat: Boolean): Intent {
+        SshOnlyKeys.sshOnlyId(data.getStringExtra(EXTRA_KEY_ID))?.let { id ->
+            return sshOnlyPublicKey(id, data, callingPackage, sshFormat)
+        }
+        return when (val l = resolveBound(data, callingPackage)) {
             is Lookup.Fail -> l.response
             is Lookup.Ok -> if (sshFormat) {
                 success().apply {
@@ -274,6 +312,7 @@ class SshAuthenticationService : Service() {
                 }
             }
         }
+    }
 
     private fun sign(data: Intent, callingPackage: String): Intent {
         val challenge = data.getByteArrayExtra(EXTRA_CHALLENGE)
@@ -284,6 +323,9 @@ class SshAuthenticationService : Service() {
             return error(SshAuthenticationApiError.GENERIC_ERROR, "Challenge too large")
         }
         val hash = data.getIntExtra(EXTRA_HASH_ALGORITHM, SshAuthenticationApiError.INVALID_HASH_ALGORITHM)
+        SshOnlyKeys.sshOnlyId(data.getStringExtra(EXTRA_KEY_ID))?.let { id ->
+            return sshOnlySign(id, data, callingPackage, challenge, hash)
+        }
         val r = when (val l = resolveBound(data, callingPackage)) {
             is Lookup.Fail -> return l.response
             is Lookup.Ok -> l.r
@@ -348,6 +390,57 @@ class SshAuthenticationService : Service() {
             setData(android.net.Uri.parse("pgpony-ssh-cardop://$opKey"))
         }
         return interaction(PendingIntent.getActivity(this, 13, cardIntent, pendingFlags()))
+    }
+
+    // ── SSH-only keys (4.8.0 RC7, item 1) ──────────────────────────────
+
+    private sealed class SshOnlyLookup {
+        class Ok(val entry: SshKeyEntry) : SshOnlyLookup()
+        class Fail(val response: Intent) : SshOnlyLookup()
+    }
+
+    /**
+     * The SSH-only key [id] if [callingPackage] is approved for it; otherwise
+     * the picker, limited to that key, as for an OpenPGP key. A key deleted
+     * after the client stored its id is NO_SUCH_KEY.
+     */
+    private fun resolveSshOnlyBound(id: String, data: Intent, callingPackage: String): SshOnlyLookup {
+        val entry = sshKeys.get(id)
+            ?: return SshOnlyLookup.Fail(error(SshAuthenticationApiError.NO_SUCH_KEY, "Key not found in PGPony"))
+        if (runBlocking { authorizer.sshKeyAllowed(callingPackage, entry.id) }) return SshOnlyLookup.Ok(entry)
+        return SshOnlyLookup.Fail(keyPicker(data, callingPackage, onlyFingerprint = entry.id))
+    }
+
+    private fun sshOnlyPublicKey(id: String, data: Intent, callingPackage: String, sshFormat: Boolean): Intent {
+        // GET_PUBLIC_KEY's algorithm codes (RSA, ECDSA, EdDSA, DSA) have none
+        // for this type. Answered before any lookup, so it says nothing about
+        // which keys exist and opens no picker for a request that cannot work.
+        if (!sshFormat) {
+            return error(SshAuthenticationApiError.INVALID_ALGORITHM, "Algorithm not supported for SSH")
+        }
+        return when (val l = resolveSshOnlyBound(id, data, callingPackage)) {
+            is SshOnlyLookup.Fail -> l.response
+            is SshOnlyLookup.Ok -> success().apply { putExtra(EXTRA_SSH_PUBLIC_KEY, SshOnlyKeys.sshPublicKey(l.entry)) }
+        }
+    }
+
+    /**
+     * No passphrase and no card: once the app is approved for the key, the
+     * signature is made at once, the same as an OpenPGP SSH key with no
+     * passphrase. The hash argument is ignored (SshOnlyKeys.sign).
+     */
+    private fun sshOnlySign(id: String, data: Intent, callingPackage: String, challenge: ByteArray, hash: Int): Intent {
+        val entry = when (val l = resolveSshOnlyBound(id, data, callingPackage)) {
+            is SshOnlyLookup.Fail -> return l.response
+            is SshOnlyLookup.Ok -> l.entry
+        }
+        return when (val r = SshOnlyKeys.sign(sshKeys, entry.id, challenge, hash)) {
+            is SshOnlyKeys.SignResult.Ok -> success().apply { putExtra(EXTRA_SIGNATURE, r.blob) }
+            SshOnlyKeys.SignResult.NoSuchKey ->
+                error(SshAuthenticationApiError.NO_SUCH_KEY, "Key not found in PGPony")
+            SshOnlyKeys.SignResult.Unreadable ->
+                error(SshAuthenticationApiError.NO_AUTH_KEY, getString(R.string.ssh_error_sshkey_unreadable))
+        }
     }
 
     // ── Interaction results ────────────────────────────────────────────

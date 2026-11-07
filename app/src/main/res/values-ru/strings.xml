@@ -2205,7 +2205,7 @@
     <string name="ssh_error_storage_recoverable">Защищённое хранилище ключей PGPony на этом устройстве было сброшено системой. Откройте PGPony, один раз разблокируйте этот ключ парольной фразой и повторите попытку.</string>
     <string name="ssh_error_storage_unreadable">Защищённое хранилище ключей PGPony на этом устройстве было сброшено системой, а у этого ключа нет парольной фразы для восстановления. Импортируйте ключ в PGPony заново.</string>
     <string name="ssh_keypicker_title">Выберите ключ для SSH</string>
-    <string name="ssh_keypicker_empty">Ни у одного из ваших ключей нет подключа аутентификации SSH. Откройте пару ключей в PGPony, добавьте подключ аутентификации и повторите попытку.</string>
+    <string name="ssh_keypicker_empty">Ни у одного из ваших ключей нет подключа аутентификации SSH, и SSH-ключей тоже нет. В PGPony добавьте подключ аутентификации к паре ключей или создайте ключ в разделе «Настройки», «SSH-ключи» и повторите попытку.</string>
     <string name="key_detail_action_copy_ssh_key">Копировать открытый SSH-ключ</string>
     <string name="key_detail_ssh_key_copied">Открытый SSH-ключ скопирован</string>
     <string name="keyring_generate_ssh_auth_toggle">Добавить подключ аутентификации SSH</string>
@@ -3198,4 +3198,47 @@
     <string name="qr_camera_error">Не удалось запустить камеру. Закройте другие приложения камеры и повторите попытку.</string>
     <string name="qr_retry">Повторить</string>
     <string name="qr_focus_hint">Нажмите на код для фокусировки.</string>
+    <!-- 4.8.0 RC7 (item 1, provider) -->
+    <string name="ssh_keypicker_sshkey_kind">SSH-ключ, ML-DSA-44 + Ed25519 (экспериментальный)</string>
+    <string name="ssh_error_sshkey_unreadable">Этот SSH-ключ больше не удаётся прочитать на этом устройстве. Удалите его в PGPony и восстановите из резервной копии или импортируйте заново.</string>
+    <!-- 4.8.0 RC7 (item 1, SSH keys screen) -->
+    <string name="ssh_keys_title">SSH-ключи</string>
+    <string name="ssh_keys_row_subtitle">Экспериментальные постквантовые SSH-ключи, хранящиеся на этом телефоне</string>
+    <string name="ssh_keys_intro">Это постквантовые ключи для входа по SSH типа ssh-mldsa44-ed25519, который в OpenSSH 10.6 включён по умолчанию. И серверу, и вашему клиенту ssh нужен OpenSSH 10.6 или новее. Они используются из Termux через OkcAgent, как и другие SSH-ключи PGPony.</string>
+    <string name="ssh_keys_experimental_label">Экспериментальная функция</string>
+    <string name="ssh_keys_experimental_body">Формат ещё может измениться, и ключ, возможно, придётся создать заново.</string>
+    <string name="ssh_keys_generate">Создать ключ</string>
+    <string name="ssh_keys_import">Импортировать файл ключа</string>
+    <string name="ssh_keys_empty">SSH-ключей пока нет. Создайте ключ или импортируйте файл ключа, созданный командой ssh-keygen -t mldsa44-ed25519.</string>
+    <string name="ssh_keys_load_failed">Не удалось прочитать SSH-ключи на этом телефоне.</string>
+    <string name="ssh_keys_created_format">Создан %1$s</string>
+    <string name="ssh_keys_copy_public">Копировать открытый ключ</string>
+    <string name="ssh_keys_share_public">Поделиться открытым ключом</string>
+    <string name="ssh_keys_export_private">Экспортировать закрытый ключ</string>
+    <string name="ssh_keys_rename">Переименовать</string>
+    <string name="ssh_keys_generate_title">Новый SSH-ключ</string>
+    <string name="ssh_keys_rename_title">Переименовать SSH-ключ</string>
+    <string name="ssh_keys_label_field">Метка</string>
+    <string name="ssh_keys_label_hint">Комментарий в конце строки открытого ключа</string>
+    <string name="ssh_keys_delete_title">Удалить этот SSH-ключ?</string>
+    <string name="ssh_keys_delete_body">Ключ «%1$s» будет удалён с этого телефона, и серверы, которые знают только этот ключ, перестанут вас пускать. Если он может понадобиться снова, сначала экспортируйте его.</string>
+    <string name="ssh_keys_export_body">Файл ключа сохраняется зашифрованным этой парольной фразой. ssh запрашивает её при использовании ключа.</string>
+    <string name="ssh_keys_import_pass_title">Этот файл ключа защищён парольной фразой</string>
+    <string name="ssh_keys_generated">SSH-ключ создан.</string>
+    <string name="ssh_keys_imported">SSH-ключ импортирован.</string>
+    <string name="ssh_keys_already_held">Этот ключ уже есть на этом телефоне.</string>
+    <string name="ssh_keys_error_wrong_type">В этом файле ключ %1$s, а не ключ ssh-mldsa44-ed25519.</string>
+    <string name="ssh_keys_error_encryption">Этот файл ключа зашифрован способом, который PGPony не может прочитать (%1$s).</string>
+    <string name="ssh_keys_error_malformed">Это не файл закрытого ключа OpenSSH, или он повреждён.</string>
+    <string name="ssh_keys_error_not_found">Этого SSH-ключа больше нет на этом телефоне.</string>
+    <string name="ssh_keys_error_unreadable">Этот SSH-ключ больше не удаётся прочитать на этом телефоне. Удалите его и импортируйте заново.</string>
+    <string name="ssh_keys_error_generate">Не удалось создать SSH-ключ.</string>
+    <string name="ssh_keys_error_change">Не удалось сохранить изменение SSH-ключа.</string>
+    <string name="restore_ssh_added">Добавлено SSH-ключей</string>
+    <plurals name="ssh_backup_skipped">
+        <item quantity="one">%1$d SSH-ключ не удалось прочитать и добавить в эту резервную копию.</item>
+        <item quantity="few">%1$d SSH-ключа не удалось прочитать и добавить в эту резервную копию.</item>
+        <item quantity="many">%1$d SSH-ключей не удалось прочитать и добавить в эту резервную копию.</item>
+        <item quantity="other">%1$d SSH-ключа не удалось прочитать и добавить в эту резервную копию.</item>
+    </plurals>
 </resources>

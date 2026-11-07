@@ -44,6 +44,9 @@ class BackupViewModel : ViewModel() {
         val recoveryGrouped: String? = null,   // the code to show, 4×6 hyphenated
         val confirmInput: String = "",
         val confirmMismatch: Boolean = false,
+        // 4.8.0 RC7 (item 1): SSH-only keys the saved backup lacks because
+        // they could not be read; BackupDone says so when above 0.
+        val sshSkipped: Int = 0,
         // Restore
         val restoreCode: String = "",
         val okcBackup: Boolean = false,   // OpenKeychain backup (numeric code)
@@ -96,13 +99,13 @@ class BackupViewModel : ViewModel() {
         _state.value = _state.value.copy(working = true, error = null)
         viewModelScope.launch {
             try {
-                val bytes = service.exportBackup(canonical)
+                val export = service.exportBackup(canonical)
                 withContext(Dispatchers.IO) {
                     (resolver.openOutputStream(uri)
                         ?: throw IllegalStateException(PGPonyApp.instance.getString(R.string.backup_error_open_for_writing)))
-                        .use { it.write(bytes); it.flush() }
+                        .use { it.write(export.bytes); it.flush() }
                 }
-                _state.value = _state.value.copy(working = false, phase = Phase.BackupDone)
+                _state.value = _state.value.copy(working = false, phase = Phase.BackupDone, sshSkipped = export.sshSkipped)
             } catch (e: BackupError) {
                 _state.value = _state.value.copy(working = false, error = ErrorText.localize(e.message))
             } catch (e: Exception) {

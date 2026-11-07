@@ -44,6 +44,15 @@
 //   <fp>.pub   public blob,  AES-256-GCM under the DEK
 //   <fp>.priv  private blob, AES-256-GCM under the DEK
 // Sealed-blob bytes: [ivLen:1][iv][GCM ciphertext incl. 128-bit tag].
+//
+// 4.8.0 RC7 (item 1): SSH-only keys (data/ssh/SshKeyStore) live in the same
+// directory under the same scheme, keyed by a storage name <h> (the hex
+// SHA-256 of the SSH public key blob):
+//   ssh-<h>.dek                DEK envelope (never a passphrase wrap)
+//   pgpony_ssh_<h>_secret      the 64 seed octets, AES-256-GCM under the DEK
+//   pgpony_ssh_<h>_meta        label, creation time, public key (JSON), same
+// The "ssh-" prefix can never collide with a hex OpenPGP fingerprint, and
+// wipeAll and cryptoErase cover these files like every other.
 
 package com.pgpony.android.data
 
@@ -380,7 +389,10 @@ class SecureKeyStore(context: Context) {
 
     // For reading: hardware path only. Returns null and sets the appropriate
     // session flag when the hardware key can no longer open the DEK.
-    private fun dekForRead(fp: String): SecretKey? {
+    // 4.8.0 RC7 (item 1): [flagUnreadable] false leaves the session flags alone
+    // (SSH-only keys), so a lost SSH key never raises the OpenPGP "unreadable
+    // key material" warning that KeyRepository.keyMaterialUnreadable drives.
+    private fun dekForRead(fp: String, flagUnreadable: Boolean = true): SecretKey? {
         val env = readEnvelope(fp) ?: return null
         val hw = loadHwKey()
         if (hw != null) {
@@ -390,7 +402,9 @@ class SecureKeyStore(context: Context) {
                 Log.w(TAG, "Hardware DEK unwrap failed for $fp: ${e.message}")
             }
         }
-        if (env.pwPresent) sawRecoverable = true else sawUnrecoverable = true
+        if (flagUnreadable) {
+            if (env.pwPresent) sawRecoverable = true else sawUnrecoverable = true
+        }
         return null
     }
 
@@ -426,15 +440,16 @@ class SecureKeyStore(context: Context) {
         }
     }
 
-    private fun readBlob(fp: String, name: String): ByteArray? {
+    // 4.8.0 RC7 (item 1): [flagUnreadable] as in dekForRead.
+    private fun readBlob(fp: String, name: String, flagUnreadable: Boolean = true): ByteArray? {
         val f = blobFile(name)
         if (!f.exists()) return null
-        val dek = dekForRead(fp) ?: return null
+        val dek = dekForRead(fp, flagUnreadable) ?: return null
         return try {
             open(dek, f.readBytes())
         } catch (e: Exception) {
             Log.w(TAG, "Blob $name is undecryptable: ${e.message}")
-            sawUnrecoverable = true
+            if (flagUnreadable) sawUnrecoverable = true
             null
         }
     }
@@ -579,6 +594,67 @@ class SecureKeyStore(context: Context) {
         }
         sawUnrecoverable = false
         sawRecoverable = false
+    }
+
+    // ── SSH-only keys (4.8.0 RC7, item 1) ───────────────────────────────
+
+    // 4.8.0 RC7 (item 1): names are checked so a caller can never reach a file
+    // outside the SSH namespace (no path parts, no OpenPGP fingerprints).
+    private val sshNamePattern = Regex("[0-9a-f]{64}")
+    private val sshEnvelopePattern = Regex("ssh-([0-9a-f]{64})\\.dek")
+
+    private fun sshEnvelopeId(name: String): String {
+        require(sshNamePattern.matches(name)) { "Bad SSH key storage name" }
+        return "ssh-$name"
+    }
+
+    private fun sshSecretName(name: String) = "pgpony_ssh_${name}_secret"
+    private fun sshMetaName(name: String) = "pgpony_ssh_${name}_meta"
+
+    /** 4.8.0 RC7 (item 1): storage names of every SSH key with a DEK envelope. */
+    fun sshKeyNames(): List<String> =
+        dir.listFiles()?.mapNotNull { f -> sshEnvelopePattern.matchEntire(f.name)?.groupValues?.get(1) }.orEmpty()
+
+    /** 4.8.0 RC7 (item 1): store an SSH key's seeds, then its metadata. */
+    fun storeSshKey(name: String, secret: ByteArray, meta: ByteArray) {
+        val id = sshEnvelopeId(name)
+        writeBlob(id, sshSecretName(name), secret)
+        writeBlob(id, sshMetaName(name), meta)
+    }
+
+    /** 4.8.0 RC7 (item 1): replace an SSH key's metadata (a rename). */
+    fun storeSshMeta(name: String, meta: ByteArray) {
+        writeBlob(sshEnvelopeId(name), sshMetaName(name), meta)
+    }
+
+    // 4.8.0 RC7 (item 1): SSH reads do not set the OpenPGP unreadable-material
+    // flags; SshKeyStore reports an unreadable SSH key itself.
+    fun loadSshSecret(name: String): ByteArray? =
+        readBlob(sshEnvelopeId(name), sshSecretName(name), flagUnreadable = false)
+
+    fun loadSshMeta(name: String): ByteArray? =
+        readBlob(sshEnvelopeId(name), sshMetaName(name), flagUnreadable = false)
+
+    /** 4.8.0 RC7 (item 1): delete one SSH key's blobs and envelope. */
+    fun deleteSshKey(name: String) {
+        val id = sshEnvelopeId(name)
+        crossProcess {
+            blobFile(sshSecretName(name)).delete()
+            blobFile(sshMetaName(name)).delete()
+            envelopeFile(id).delete()
+        }
+    }
+
+    /**
+     * 4.8.0 RC7 (item 1): delete every SSH key file, envelope or blob, whether
+     * or not its envelope survives (cryptoErase removes envelopes first).
+     */
+    fun deleteAllSshKeys() {
+        crossProcess {
+            dir.listFiles()?.forEach { f ->
+                if (f.name.startsWith("ssh-") || f.name.startsWith("pgpony_ssh_")) f.delete()
+            }
+        }
     }
 
     fun hasPublicKey(fingerprint: String): Boolean {

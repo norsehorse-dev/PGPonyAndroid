@@ -87,7 +87,9 @@ fun SettingsScreen(
     onOpenPassStore: () -> Unit = {},
     onKeysChanged: () -> Unit = {},
     onOpenRecycleBin: () -> Unit = {},
-    onOpenPair: () -> Unit = {}
+    onOpenPair: () -> Unit = {},
+    // 4.8.0 RC7 (item 1): the SSH keys page, a pushed route like Pair.
+    onOpenSshKeys: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     // RC3 §J (#20): which category sub-page is open; null = the top-level
@@ -845,6 +847,15 @@ fun SettingsScreen(
                 icon = Icons.Filled.Terminal,
                 iconTint = Color(0xFF8B5CF6),
                 onClick = { showSshTermux = true }
+            )
+            // 4.8.0 RC7 (item 1): experimental SSH-only post-quantum keys,
+            // kept outside the OpenPGP keyring.
+            SettingsAction(
+                title = stringResource(R.string.ssh_keys_title),
+                subtitle = stringResource(R.string.ssh_keys_row_subtitle),
+                icon = Icons.Filled.VpnKey,
+                iconTint = Color(0xFF8B5CF6),
+                onClick = onOpenSshKeys
             )
             Spacer(modifier = Modifier.height(16.dp))
             // RC1 offline switch (hard gate): the network surfaces below are

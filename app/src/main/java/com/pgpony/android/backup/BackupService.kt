@@ -12,6 +12,10 @@
 // AES-256 / SEIPDv1 (gpg -c style, no Argon2) and ASCII-armored with a
 // `Comment: PGPony Backup v1` header.
 //
+// 4.8.0 RC7 (item 1): SSH-only keys travel as additive ssh-keys/ entries
+// (SshKeyBackup); old versions and iOS skip them, and old backups restore as
+// before. A backup with only SSH keys is allowed.
+//
 // Restore is a MERGE: each key runs through the existing
 // KeyRepository.importArmoredKeyDetailed, so a held secret is never
 // overwritten and a public-only key is upgraded in place. Hardware/card
@@ -24,12 +28,16 @@ import com.pgpony.android.PGPonyApp
 import com.pgpony.android.crypto.PGPCryptoError
 import com.pgpony.android.crypto.PGPCryptoService
 import com.pgpony.android.data.TrustLevel
+import com.pgpony.android.data.ssh.SshKeyBackupSet
+import com.pgpony.android.data.ssh.SshKeyStore
 import com.pgpony.android.data.repository.ImportResolution
 import com.pgpony.android.data.repository.KeyRepository
 import com.pgpony.android.keyserver.KeyServer
 import com.pgpony.android.keyserver.KeyServerDirectory
 import com.pgpony.android.network.HttpClientFactory
 import com.pgpony.android.network.ProxyPrefs
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.bouncycastle.bcpg.ArmoredOutputStream
 import org.json.JSONArray
 import org.json.JSONObject
@@ -53,10 +61,23 @@ data class MergeReport(
     /** 4.6.0 (item 17.9): the backup's settings (proxy, key servers), NOT yet
      *  applied. The UI asks first and calls BackupService.applyBackupSettings
      *  only when the user agrees. */
-    val pendingSettings: String? = null
+    val pendingSettings: String? = null,
+    /** 4.8.0 RC7 (item 1): SSH-only keys added from the backup
+     *  (fingerprint = the SSH key id, "ssh:SHA256:..."). */
+    val sshAdded: List<RestoredKey> = emptyList(),
+    /** 4.8.0 RC7 (item 1): SSH-only keys already on the device. */
+    val sshUnchanged: List<RestoredKey> = emptyList(),
+    /** 4.8.0 RC7 (item 1): SSH key files in the backup that could not be read. */
+    val sshFailed: List<RestoredKey> = emptyList()
 ) {
-    val totalRestored: Int get() = added.size + upgraded.size + updated.size
+    val totalRestored: Int get() = added.size + upgraded.size + updated.size + sshAdded.size
 }
+
+/**
+ * 4.8.0 RC7 (item 1): a finished backup, and how many SSH-only keys it could
+ * not read and so does not carry (the backup screens say so when above 0).
+ */
+class BackupExport(val bytes: ByteArray, val sshSkipped: Int)
 
 /** Which app's backup a file is — drives code format + payload parsing. */
 enum class BackupKind { PGPONY, OPENKEYCHAIN, UNKNOWN }
@@ -74,7 +95,10 @@ sealed class BackupError(message: String) : Exception(message) {
 
 class BackupService(
     private val repo: KeyRepository,
-    private val crypto: PGPCryptoService = PGPCryptoService.shared
+    private val crypto: PGPCryptoService = PGPCryptoService.shared,
+    // 4.8.0 RC7 (item 1): the SSH-only keys to back up and restore into; null
+    // leaves them out (no app instance, as in JVM tests).
+    private val sshKeys: SshKeyStore? = runCatching { PGPonyApp.instance.sshKeyStore }.getOrNull()
 ) {
 
     companion object {
@@ -92,11 +116,29 @@ class BackupService(
     /**
      * Build an encrypted backup of the whole keyring, sealed with
      * [recoveryCanonical] (the normalized recovery-code string from
-     * [CrockfordBase32]). Returns the armored `.pgpony` bytes.
+     * [CrockfordBase32]). Returns the armored `.pgpony` bytes, with the
+     * number of SSH-only keys left out because they could not be read.
      */
-    suspend fun exportBackup(recoveryCanonical: String): ByteArray {
+    suspend fun exportBackup(recoveryCanonical: String): BackupExport {
         val keys = repo.getAllKeys()
-        if (keys.isEmpty()) throw BackupError.EmptyKeyring
+        // 4.8.0 RC7 (item 1): SSH-only keys, read before the emptiness check so
+        // a device with only SSH keys can still back them up. Keys that cannot
+        // be read are counted and shown, never dropped silently. If the SSH
+        // store itself fails, the OpenPGP backup still goes ahead and the SSH
+        // keys count as skipped; how many is unknown then, so it reports one,
+        // which is enough to tell the user this backup lacks SSH keys.
+        val sshSet: SshKeyBackupSet? = sshKeys?.let { store ->
+            withContext(Dispatchers.IO) {
+                try {
+                    store.backupItems()
+                } catch (e: Exception) {
+                    SshKeyBackupSet(emptyList(), skipped = 1)
+                }
+            }
+        }
+        val sshItems = sshSet?.items.orEmpty()
+        val sshSkipped = sshSet?.skipped ?: 0
+        if (keys.isEmpty() && sshItems.isEmpty()) throw BackupError.EmptyKeyring
 
         val entries = ArrayList<UstarArchive.Entry>()
         val metaKeys = JSONArray()
@@ -130,7 +172,7 @@ class BackupService(
             })
         }
 
-        if (metaKeys.length() == 0) throw BackupError.EmptyKeyring
+        if (metaKeys.length() == 0 && sshItems.isEmpty()) throw BackupError.EmptyKeyring
 
         val meta = JSONObject().apply {
             put("appVersion", appVersion())
@@ -144,6 +186,8 @@ class BackupService(
         val ordered = ArrayList<UstarArchive.Entry>(entries.size + 2)
         ordered.add(UstarArchive.Entry(META_NAME, meta.toString(2).toByteArray(Charsets.UTF_8)))
         ordered.addAll(entries)
+        // 4.8.0 RC7 (item 1): additive, after the OpenPGP keys.
+        ordered.addAll(SshKeyBackup.entries(sshItems))
         runCatching { settingsJson() }.getOrNull()?.let {
             ordered.add(UstarArchive.Entry(SETTINGS_NAME, it.toByteArray(Charsets.UTF_8)))
         }
@@ -163,7 +207,7 @@ class BackupService(
         )
         // §4.3: the backup captured these keys' secret material.
         backedUpFps.forEach { repo.markBackedUp(it) }
-        return armorMessage(sealed)
+        return BackupExport(armorMessage(sealed), sshSkipped)
     }
 
     private fun armorMessage(binary: ByteArray): ByteArray {
@@ -273,8 +317,20 @@ class BackupService(
             ?.let { String(it.data, Charsets.UTF_8) }
             ?.takeIf { hasApplicableSettings(it) }
 
+        // 4.8.0 RC7 (item 1): SSH-only keys, merged by fingerprint. A backup
+        // without ssh-keys/ entries (every backup before RC7) yields none.
+        val sshItems = SshKeyBackup.items(entries)
+        val sshReport = if (sshItems.isNotEmpty() && sshKeys != null) {
+            withContext(Dispatchers.IO) { runCatching { sshKeys.restoreItems(sshItems) }.getOrNull() }
+        } else null
+        val sshFailedAll = sshReport?.failed
+            ?: if (sshItems.isNotEmpty() && sshKeys != null) sshItems.map { it.label.ifBlank { it.fingerprint } } else emptyList()
+
         return MergeReport(added, upgraded, updated, unchanged, failed,
-            settingsApplied = false, pendingSettings = pendingSettings)
+            settingsApplied = false, pendingSettings = pendingSettings,
+            sshAdded = sshReport?.added.orEmpty().map { RestoredKey(it.id, it.label.ifBlank { it.fingerprint }) },
+            sshUnchanged = sshReport?.unchanged.orEmpty().map { RestoredKey(it.id, it.label.ifBlank { it.fingerprint }) },
+            sshFailed = sshFailedAll.map { RestoredKey(it, it) })
     }
 
     // ── OpenKeychain migration (Succession) ──────────────────────────

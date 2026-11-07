@@ -326,4 +326,65 @@ class ApiClientAuthorizerTest {
         assertEquals(listOf(fpA, fpB), ApiClientEntity.parseSshKeys(" ${fpA.lowercase()} ,,$fpB,$fpA"))
         assertNull(ApiClientEntity.joinSshKeys(emptyList()))
     }
+
+    // ── 4.8.0 RC7 (item 1): SSH-only keys ("ssh:SHA256:...") ──────────
+
+    private val sshA = "ssh:SHA256:MHrtMS/Vf35zxTemIBpFyKqv9rT1bd1XMLqM9CnT8WY"
+    // The same characters in another case: a different key, never the same one.
+    private val sshAOtherCase = "ssh:SHA256:mhRTms/vF35ZXtEMibPfYkQV9Rt1BD1xmlQm9cNt8wy"
+    private val sshB = "ssh:SHA256:Zq+0bYk1n2/abcDEF0123456789abcdefGHIJKLmnop"
+
+    @Test
+    fun sshOnlyKey_needsApproval_thenIsAllowed_withItsCaseKept() = runTest {
+        signatures[agent] = sigA
+        authorizer.grant(agent, SSH)
+        // First use asks: nothing is approved yet.
+        assertFalse(authorizer.sshKeyAllowed(agent, sshA))
+        assertTrue(authorizer.bindSshKey(agent, " $sshA "))
+        assertEquals(listOf(sshA), authorizer.sshKeys(agent))
+        assertEquals(sshA, dao.getByPackage(agent)?.sshKeyFingerprint)
+        assertTrue(authorizer.sshKeyAllowed(agent, sshA))
+        // Base64 is case sensitive, so another case is another key.
+        assertFalse(authorizer.sshKeyAllowed(agent, sshAOtherCase))
+        assertFalse(authorizer.sshKeyAllowed(agent, sshB))
+    }
+
+    @Test
+    fun sshOnlyKeys_andOpenPgpKeys_shareTheAppsApprovals() = runTest {
+        signatures[agent] = sigA
+        authorizer.grant(agent, SSH)
+        authorizer.bindSshKey(agent, fpA.lowercase())
+        authorizer.bindSshKey(agent, sshA)
+        authorizer.bindSshKey(agent, sshB)
+        authorizer.bindSshKey(agent, sshA)
+        assertEquals(listOf(fpA, sshA, sshB), authorizer.sshKeys(agent))
+        assertTrue(authorizer.sshKeyAllowed(agent, fpA))
+        assertTrue(authorizer.sshKeyAllowed(agent, sshB))
+        authorizer.unbindSshKey(agent, sshAOtherCase)
+        assertTrue(authorizer.sshKeyAllowed(agent, sshA))
+        authorizer.unbindSshKey(agent, sshA)
+        assertFalse(authorizer.sshKeyAllowed(agent, sshA))
+        assertEquals(listOf(fpA, sshB), authorizer.sshKeys(agent))
+        // A mail client with only the OpenPGP scope can approve no SSH-only key either.
+        signatures[tbird] = sigA
+        authorizer.grant(tbird, PGP)
+        assertFalse(authorizer.bindSshKey(tbird, sshA))
+        assertFalse(authorizer.sshKeyAllowed(tbird, sshA))
+        // Revoking SSH drops SSH-only approvals with the rest.
+        authorizer.revokeScope(agent, SSH)
+        authorizer.grant(agent, SSH)
+        assertTrue(authorizer.sshKeys(agent).isEmpty())
+    }
+
+    @Test
+    fun sshOnlyIds_roundTripThroughTheColumn() {
+        val stored = ApiClientEntity.joinSshKeys(listOf(fpA.lowercase(), sshA, sshB))
+        assertEquals("$fpA,$sshA,$sshB", stored)
+        assertEquals(listOf(fpA, sshA, sshB), ApiClientEntity.parseSshKeys(stored))
+        assertEquals(sshA, ApiClientEntity.normalizeSshKey("  $sshA\n"))
+        assertEquals(fpA, ApiClientEntity.normalizeSshKey(fpA.lowercase()))
+        assertTrue(ApiClientEntity.sameSshKey(fpA, fpA.lowercase()))
+        assertFalse(ApiClientEntity.sameSshKey(sshA, sshAOtherCase))
+        assertFalse(ApiClientEntity.sameSshKey(sshA, fpA))
+    }
 }

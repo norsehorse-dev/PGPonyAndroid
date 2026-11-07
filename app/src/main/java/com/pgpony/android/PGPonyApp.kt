@@ -51,6 +51,15 @@ class PGPonyApp : Application() {
     lateinit var contactsService: ContactsService
         private set
 
+    /**
+     * 4.8.0 RC7 (item 1): SSH-only ssh-mldsa44-ed25519 keys, held
+     * outside the OpenPGP keyring. Built on first use in either process; it
+     * caches nothing, so both processes always read the same keys.
+     */
+    val sshKeyStore: com.pgpony.android.data.ssh.SshKeyStore by lazy {
+        com.pgpony.android.data.ssh.SshKeyStore(com.pgpony.android.data.ssh.SecureSshKeyVault(secureKeyStore))
+    }
+
     override fun onCreate() {
         super.onCreate()
 

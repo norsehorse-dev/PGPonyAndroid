@@ -9,7 +9,8 @@
 // servers), the session policy file, the app lock, scratch and export files,
 // held provider plaintext, folder grants (Password Store), expiry reminders and
 // posted notifications, the clipboard, the background key refresh job, the
-// fingerprint unlock key and the passphrase hold service. Every step runs even
+// fingerprint unlock key and the passphrase hold service; since 4.8.0 RC7
+// (item 1) also the SSH-only keys. Every step runs even
 // when an earlier one fails; the first failure is returned for Clear All Data
 // to report. The app language is reset by [resetAppLocale], on the main thread.
 
@@ -66,6 +67,10 @@ object AppReset {
         // 4.7.0 (item 33): live keys and Recently Deleted together, then the
         // whole secure store with its hardware wrapping key.
         failures.attempt { pgpony.keyRepository.clearAllKeys() }
+        // 4.8.0 RC7 (item 1): SSH-only keys. They sit in the secure store, so
+        // cryptoErase and wipeAll already cover them; deleting them by name as
+        // well keeps that true if they ever move.
+        failures.attempt { pgpony.sshKeyStore.deleteAll() }
         // Provider and SSH approvals (allowed_api_clients), Autocrypt peers and
         // every other table.
         failures.attempt { pgpony.database.clearAllTables() }

@@ -2124,7 +2124,7 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="ssh_error_storage_recoverable">El almacén seguro de claves de PGPony en este dispositivo fue restablecido por el sistema. Abre PGPony, desbloquea esta clave una vez con su frase de contraseña y vuelve a intentarlo.</string>
     <string name="ssh_error_storage_unreadable">El almacén seguro de claves de PGPony en este dispositivo fue restablecido por el sistema y esta clave no tiene frase de contraseña para recuperarla. Vuelve a importar la clave en PGPony.</string>
     <string name="ssh_keypicker_title">Elige una clave para SSH</string>
-    <string name="ssh_keypicker_empty">Ninguna de tus claves tiene una subclave de autenticación SSH. En PGPony, abre un par de claves, añade una subclave de autenticación y vuelve a intentarlo.</string>
+    <string name="ssh_keypicker_empty">Ninguna de tus claves tiene una subclave de autenticación SSH, y no hay claves SSH. En PGPony, añade una subclave de autenticación a un par de claves o crea una clave en Ajustes, Claves SSH, y vuelve a intentarlo.</string>
     <string name="key_detail_action_copy_ssh_key">Copiar clave pública SSH</string>
     <string name="key_detail_ssh_key_copied">Clave pública SSH copiada</string>
     <string name="keyring_generate_ssh_auth_toggle">Añadir subclave de autenticación SSH</string>
@@ -3098,4 +3098,46 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="qr_camera_error">No se pudo iniciar la cámara. Cierra otras aplicaciones de cámara e inténtalo de nuevo.</string>
     <string name="qr_retry">Reintentar</string>
     <string name="qr_focus_hint">Toca el código para enfocar.</string>
+    <!-- 4.8.0 RC7 (item 1, provider) -->
+    <string name="ssh_keypicker_sshkey_kind">Clave SSH, ML-DSA-44 + Ed25519 (experimental)</string>
+    <string name="ssh_error_sshkey_unreadable">Esta clave SSH ya no se puede leer en este dispositivo. En PGPony, elimínala y restáurala desde una copia de seguridad o vuelve a importarla.</string>
+    <!-- 4.8.0 RC7 (item 1, SSH keys screen) -->
+    <string name="ssh_keys_title">Claves SSH</string>
+    <string name="ssh_keys_row_subtitle">Claves SSH poscuánticas experimentales guardadas en este teléfono</string>
+    <string name="ssh_keys_intro">Son claves SSH poscuánticas para iniciar sesión, del tipo ssh-mldsa44-ed25519, que OpenSSH 10.6 activó por defecto. Tanto el servidor como tu cliente ssh necesitan OpenSSH 10.6 o posterior. Las usas desde Termux a través de OkcAgent, como las demás claves SSH de PGPony.</string>
+    <string name="ssh_keys_experimental_label">Experimental</string>
+    <string name="ssh_keys_experimental_body">El formato aún puede cambiar, y puede que haya que volver a crear una clave.</string>
+    <string name="ssh_keys_generate">Generar clave</string>
+    <string name="ssh_keys_import">Importar archivo de clave</string>
+    <string name="ssh_keys_empty">Aún no hay claves SSH. Genera una o importa un archivo de clave creado con ssh-keygen -t mldsa44-ed25519.</string>
+    <string name="ssh_keys_load_failed">No se pudieron leer las claves SSH de este teléfono.</string>
+    <string name="ssh_keys_created_format">Creada %1$s</string>
+    <string name="ssh_keys_copy_public">Copiar clave pública</string>
+    <string name="ssh_keys_share_public">Compartir clave pública</string>
+    <string name="ssh_keys_export_private">Exportar clave privada</string>
+    <string name="ssh_keys_rename">Cambiar nombre</string>
+    <string name="ssh_keys_generate_title">Nueva clave SSH</string>
+    <string name="ssh_keys_rename_title">Cambiar nombre de la clave SSH</string>
+    <string name="ssh_keys_label_field">Etiqueta</string>
+    <string name="ssh_keys_label_hint">El comentario al final de la línea de la clave pública</string>
+    <string name="ssh_keys_delete_title">¿Eliminar esta clave SSH?</string>
+    <string name="ssh_keys_delete_body">%1$s se eliminará de este teléfono, y los servidores que solo conozcan esta clave ya no te dejarán entrar. Expórtala antes si es posible que la vuelvas a necesitar.</string>
+    <string name="ssh_keys_export_body">El archivo de clave se guarda cifrado con esta frase de contraseña. ssh la pide cuando se usa la clave.</string>
+    <string name="ssh_keys_import_pass_title">Este archivo de clave tiene frase de contraseña</string>
+    <string name="ssh_keys_generated">Clave SSH creada.</string>
+    <string name="ssh_keys_imported">Clave SSH importada.</string>
+    <string name="ssh_keys_already_held">Esta clave ya está en este teléfono.</string>
+    <string name="ssh_keys_error_wrong_type">Este archivo contiene una clave %1$s, no una clave ssh-mldsa44-ed25519.</string>
+    <string name="ssh_keys_error_encryption">Este archivo de clave está cifrado de una forma que PGPony no puede leer (%1$s).</string>
+    <string name="ssh_keys_error_malformed">No es un archivo de clave privada de OpenSSH, o está dañado.</string>
+    <string name="ssh_keys_error_not_found">Esta clave SSH ya no está en este teléfono.</string>
+    <string name="ssh_keys_error_unreadable">Esta clave SSH ya no se puede leer en este teléfono. Elimínala y vuelve a importarla.</string>
+    <string name="ssh_keys_error_generate">No se pudo crear la clave SSH.</string>
+    <string name="ssh_keys_error_change">No se pudo guardar el cambio en la clave SSH.</string>
+    <string name="restore_ssh_added">Claves SSH añadidas</string>
+    <plurals name="ssh_backup_skipped">
+        <item quantity="one">%1$d clave SSH no se pudo leer y no está en esta copia de seguridad.</item>
+        <item quantity="many">%1$d claves SSH no se pudieron leer y no están en esta copia de seguridad.</item>
+        <item quantity="other">%1$d claves SSH no se pudieron leer y no están en esta copia de seguridad.</item>
+    </plurals>
 </resources>

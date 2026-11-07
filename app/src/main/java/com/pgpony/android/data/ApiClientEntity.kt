@@ -25,6 +25,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import com.pgpony.android.data.ssh.SshKeyStore
 
 // ── Entity ─────────────────────────────────────────────────────────────
 
@@ -63,30 +64,48 @@ data class ApiClientEntity(
      * as uppercase hex fingerprints joined by [SSH_KEY_SEPARATOR]. A 4.6.0 to
      * 4.6.2 row holds one fingerprint, which reads as a set of one, so no
      * migration is needed. Read it through [sshKeyFingerprints].
+     *
+     * 4.8.0 RC7 (item 1): an SSH-only key is stored by its own id
+     * ("ssh:SHA256:..." in base64, where case matters), as it is.
      */
     val sshKeyFingerprint: String? = null
 ) {
     fun has(scope: Int): Boolean = scopes and scope == scope
 
-    /** 4.6.3 (#68): the approved SSH keys, uppercase, in the order approved. */
+    /** 4.6.3 (#68): the approved SSH keys, in the order approved (see [normalizeSshKey]). */
     fun sshKeyFingerprints(): List<String> = parseSshKeys(sshKeyFingerprint)
 
     companion object {
         const val SCOPE_OPENPGP = 1
         const val SCOPE_SSH = 2
 
-        /** Fingerprints are hex, so a comma never occurs inside one. */
+        /** Fingerprints are hex, so a comma never occurs inside one. 4.8.0
+         *  RC7 (item 1): nor in an SSH-only key id (base64, ':' and "ssh"). */
         const val SSH_KEY_SEPARATOR = ","
+
+        /**
+         * 4.8.0 RC7 (item 1): one approved key as it is stored and compared.
+         * An OpenPGP fingerprint is hex, so it is uppercased as before; an
+         * SSH-only key id carries a base64 fingerprint, where uppercasing
+         * would name another key, so it is kept as it is.
+         */
+        fun normalizeSshKey(key: String): String {
+            val t = key.trim()
+            return if (SshKeyStore.isSshKeyId(t)) t else t.uppercase()
+        }
+
+        /** 4.8.0 RC7 (item 1): true when [a] and [b] name the same approved key. */
+        fun sameSshKey(a: String, b: String): Boolean = normalizeSshKey(a) == normalizeSshKey(b)
 
         fun parseSshKeys(stored: String?): List<String> =
             stored.orEmpty().split(SSH_KEY_SEPARATOR)
-                .map { it.trim().uppercase() }
+                .map { normalizeSshKey(it) }
                 .filter { it.isNotEmpty() }
                 .distinct()
 
         /** The column value for [keys], or null when there are none. */
         fun joinSshKeys(keys: List<String>): String? =
-            keys.map { it.trim().uppercase() }
+            keys.map { normalizeSshKey(it) }
                 .filter { it.isNotEmpty() }
                 .distinct()
                 .takeIf { it.isNotEmpty() }

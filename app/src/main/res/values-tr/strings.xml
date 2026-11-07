@@ -2215,7 +2215,7 @@
     <string name="ssh_error_storage_recoverable">PGPony\'nin bu cihazdaki güvenli anahtar deposu sistem tarafından sıfırlandı. PGPony\'yi açın ve bu anahtarın kilidini parola ifadesiyle bir kez açın, ardından yeniden deneyin.</string>
     <string name="ssh_error_storage_unreadable">PGPony\'nin bu cihazdaki güvenli anahtar deposu sistem tarafından sıfırlandı ve bu anahtarın onu kurtaracak bir parola ifadesi yok. Anahtarı PGPony\'ye yeniden içe aktarın.</string>
     <string name="ssh_keypicker_title">SSH için bir anahtar seçin</string>
-    <string name="ssh_keypicker_empty">Anahtarlarınızın hiçbirinde SSH kimlik doğrulama alt anahtarı yok. PGPony\'de bir anahtar çifti açıp Kimlik Doğrulama alt anahtarı ekleyin, ardından yeniden deneyin.</string>
+    <string name="ssh_keypicker_empty">Anahtarlarınızın hiçbirinde SSH kimlik doğrulama alt anahtarı yok ve hiç SSH anahtarı da yok. PGPony\'de bir anahtar çiftine Kimlik Doğrulama alt anahtarı ekleyin veya Ayarlar, SSH anahtarları bölümünde bir anahtar oluşturun, ardından yeniden deneyin.</string>
     <string name="key_detail_action_copy_ssh_key">SSH Açık Anahtarını Kopyala</string>
     <string name="key_detail_ssh_key_copied">SSH açık anahtarı kopyalandı</string>
     <string name="keyring_generate_ssh_auth_toggle">SSH kimlik doğrulama alt anahtarı ekle</string>
@@ -3161,4 +3161,45 @@
     <string name="qr_camera_error">Kamera başlatılamadı. Diğer kamera uygulamalarını kapatıp yeniden deneyin.</string>
     <string name="qr_retry">Yeniden Dene</string>
     <string name="qr_focus_hint">Odaklamak için koda dokunun.</string>
+    <!-- 4.8.0 RC7 (item 1, provider) -->
+    <string name="ssh_keypicker_sshkey_kind">SSH anahtarı, ML-DSA-44 + Ed25519 (deneysel)</string>
+    <string name="ssh_error_sshkey_unreadable">Bu SSH anahtarı artık bu cihazda okunamıyor. PGPony\'de anahtarı silip bir yedekten geri yükleyin veya yeniden içe aktarın.</string>
+    <!-- 4.8.0 RC7 (item 1, SSH keys screen) -->
+    <string name="ssh_keys_title">SSH anahtarları</string>
+    <string name="ssh_keys_row_subtitle">Bu telefonda saklanan deneysel kuantum sonrası SSH anahtarları</string>
+    <string name="ssh_keys_intro">Bunlar, OpenSSH 10.6 ile varsayılan olarak açılan ssh-mldsa44-ed25519 türündeki kuantum sonrası SSH oturum açma anahtarlarıdır. Hem sunucunun hem de ssh istemcinizin OpenSSH 10.6 veya sonrasına ihtiyacı vardır. Bu anahtarları, PGPony\'nin diğer SSH anahtarları gibi Termux\'tan OkcAgent üzerinden kullanırsınız.</string>
+    <string name="ssh_keys_experimental_label">Deneysel</string>
+    <string name="ssh_keys_experimental_body">Biçim hâlâ değişebilir ve bir anahtarın yeniden oluşturulması gerekebilir.</string>
+    <string name="ssh_keys_generate">Anahtar oluştur</string>
+    <string name="ssh_keys_import">Anahtar dosyasını içe aktar</string>
+    <string name="ssh_keys_empty">Henüz SSH anahtarı yok. Bir tane oluşturun veya ssh-keygen -t mldsa44-ed25519 ile oluşturulmuş bir anahtar dosyasını içe aktarın.</string>
+    <string name="ssh_keys_load_failed">Bu telefondaki SSH anahtarları okunamadı.</string>
+    <string name="ssh_keys_created_format">Oluşturulma: %1$s</string>
+    <string name="ssh_keys_copy_public">Açık anahtarı kopyala</string>
+    <string name="ssh_keys_share_public">Açık anahtarı paylaş</string>
+    <string name="ssh_keys_export_private">Gizli anahtarı dışa aktar</string>
+    <string name="ssh_keys_rename">Yeniden adlandır</string>
+    <string name="ssh_keys_generate_title">Yeni SSH anahtarı</string>
+    <string name="ssh_keys_rename_title">SSH anahtarını yeniden adlandır</string>
+    <string name="ssh_keys_label_field">Etiket</string>
+    <string name="ssh_keys_label_hint">Açık anahtar satırının sonundaki yorum</string>
+    <string name="ssh_keys_delete_title">Bu SSH anahtarı silinsin mi?</string>
+    <string name="ssh_keys_delete_body">%1$s bu telefondan kaldırılacak ve yalnızca bu anahtarı tanıyan sunucular artık girişinize izin vermeyecek. Yeniden ihtiyacınız olabilirse önce dışa aktarın.</string>
+    <string name="ssh_keys_export_body">Anahtar dosyası bu parola ifadesiyle şifrelenmiş olarak kaydedilir. Anahtar kullanıldığında ssh bu parola ifadesini sorar.</string>
+    <string name="ssh_keys_import_pass_title">Bu anahtar dosyasının bir parola ifadesi var</string>
+    <string name="ssh_keys_generated">SSH anahtarı oluşturuldu.</string>
+    <string name="ssh_keys_imported">SSH anahtarı içe aktarıldı.</string>
+    <string name="ssh_keys_already_held">Bu anahtar zaten bu telefonda.</string>
+    <string name="ssh_keys_error_wrong_type">Bu dosyada ssh-mldsa44-ed25519 anahtarı değil, %1$s anahtarı var.</string>
+    <string name="ssh_keys_error_encryption">Bu anahtar dosyası, PGPony\'nin okuyamadığı bir yöntemle şifrelenmiş (%1$s).</string>
+    <string name="ssh_keys_error_malformed">Bu bir OpenSSH gizli anahtar dosyası değil veya dosya hasarlı.</string>
+    <string name="ssh_keys_error_not_found">Bu SSH anahtarı artık bu telefonda değil.</string>
+    <string name="ssh_keys_error_unreadable">Bu SSH anahtarı artık bu telefonda okunamıyor. Anahtarı silip yeniden içe aktarın.</string>
+    <string name="ssh_keys_error_generate">SSH anahtarı oluşturulamadı.</string>
+    <string name="ssh_keys_error_change">SSH anahtarındaki değişiklik kaydedilemedi.</string>
+    <string name="restore_ssh_added">Eklenen SSH anahtarları</string>
+    <plurals name="ssh_backup_skipped">
+        <item quantity="one">%1$d SSH anahtarı okunamadı ve bu yedekte yer almıyor.</item>
+        <item quantity="other">%1$d SSH anahtarı okunamadı ve bu yedekte yer almıyor.</item>
+    </plurals>
 </resources>

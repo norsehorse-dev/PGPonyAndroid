@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -150,6 +151,10 @@ fun BackupScreen(
                     BackupViewModel.Phase.BackupDone -> DoneBody(
                         title = stringResource(R.string.backup_saved_title),
                         body = stringResource(R.string.backup_saved_body),
+                        // 4.8.0 RC7 (item 1): SSH-only keys this backup lacks.
+                        warning = if (state.sshSkipped > 0) {
+                            pluralStringResource(R.plurals.ssh_backup_skipped, state.sshSkipped, state.sshSkipped)
+                        } else null,
                         onDone = onDismiss
                     )
 
@@ -322,9 +327,18 @@ private fun RestoreReportBody(
         ReportLine(stringResource(R.string.restore_added), report.added.size, Color(0xFF22C55E))
         ReportLine(stringResource(R.string.restore_upgraded), report.upgraded.size, Color(0xFF8B5CF6))
         ReportLine(stringResource(R.string.restore_updated), report.updated.size, Color(0xFF3B82F6))
-        ReportLine(stringResource(R.string.restore_unchanged), report.unchanged.size, MaterialTheme.colorScheme.onSurfaceVariant)
-        if (report.failed.isNotEmpty()) {
-            ReportLine(stringResource(R.string.restore_failed), report.failed.size, MaterialTheme.colorScheme.error)
+        // 4.8.0 RC7 (item 1): SSH-only keys get their own Added line; ones
+        // already held and ones that could not be read join the shared lines.
+        if (report.sshAdded.isNotEmpty()) {
+            ReportLine(stringResource(R.string.restore_ssh_added), report.sshAdded.size, Color(0xFF22C55E))
+        }
+        ReportLine(
+            stringResource(R.string.restore_unchanged),
+            report.unchanged.size + report.sshUnchanged.size,
+            MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (report.failed.isNotEmpty() || report.sshFailed.isNotEmpty()) {
+            ReportLine(stringResource(R.string.restore_failed), report.failed.size + report.sshFailed.size, MaterialTheme.colorScheme.error)
         }
         if (report.settingsApplied) {
             Spacer(Modifier.height(8.dp))
@@ -367,10 +381,14 @@ private fun ReportLine(label: String, count: Int, tint: Color) {
 }
 
 @Composable
-private fun DoneBody(title: String, body: String, onDone: () -> Unit) {
+private fun DoneBody(title: String, body: String, onDone: () -> Unit, warning: String? = null) {
     Text(title, style = MaterialTheme.typography.titleMedium)
     Spacer(Modifier.height(8.dp))
     Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    warning?.let {
+        Spacer(Modifier.height(8.dp))
+        Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+    }
     Spacer(Modifier.height(20.dp))
     Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.backup_done))

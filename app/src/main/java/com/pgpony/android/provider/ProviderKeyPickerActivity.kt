@@ -19,6 +19,11 @@
 // The "No key" row returns key id 0 (the API's NO_KEY sentinel): the
 // client disables signing for that account. Dismissing = CANCELED, no
 // change.
+//
+// 4.8.0 RC7 (item 1): for SSH the picker also lists the SSH-only
+// ssh-mldsa44-ed25519 keys (data/ssh/SshKeyStore) below the
+// OpenPGP keys, marked as SSH keys of an experimental type. Picking one
+// approves it for the app and returns its "ssh:SHA256:..." id.
 
 package com.pgpony.android.provider
 
@@ -44,6 +49,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -64,6 +70,7 @@ import com.pgpony.android.PGPonyApp
 import com.pgpony.android.PGPonyTheme
 import com.pgpony.android.R
 import com.pgpony.android.data.PGPKeyEntity
+import com.pgpony.android.data.ssh.SshKeyEntry
 import org.openintents.openpgp.util.OpenPgpApi
 
 class ProviderKeyPickerActivity : ComponentActivity() {
@@ -106,7 +113,8 @@ class ProviderKeyPickerActivity : ComponentActivity() {
 
         /** 4.6.0: the client asked for this key (primary fingerprint) but it is
          *  not one the app is bound to, so only it is offered, for approval.
-         *  4.6.3 (#68): approving it adds it to the app's keys. */
+         *  4.6.3 (#68): approving it adds it to the app's keys.
+         *  4.8.0 RC7 (item 1): or an SSH-only key id, as it is (case kept). */
         const val EXTRA_SSH_ONLY_FINGERPRINT = "com.pgpony.android.provider.SSH_ONLY_FINGERPRINT"
     }
 
@@ -177,6 +185,19 @@ class ProviderKeyPickerActivity : ComponentActivity() {
                                 .thenBy { it.userName.lowercase() }
                         )
                 }
+                // 4.8.0 RC7 (item 1): SSH-only keys, for SSH picks only. The
+                // store reads files and the Keystore, so off the main thread;
+                // an unreadable store lists nothing rather than failing the pick.
+                val sshOnlyKeys by produceState<List<SshKeyEntry>?>(initialValue = if (forSsh) null else emptyList()) {
+                    if (forSsh) {
+                        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            runCatching { (application as PGPonyApp).sshKeyStore.list() }.getOrDefault(emptyList())
+                                .filter { entry -> sshOnly == null || entry.id == sshOnly }
+                        }
+                    }
+                }
+                val loaded = keys != null && sshOnlyKeys != null
+                val nothingToPick = loaded && keys.isNullOrEmpty() && sshOnlyKeys.isNullOrEmpty()
 
                 AlertDialog(
                     onDismissRequest = { cancel() },
@@ -227,7 +248,13 @@ class ProviderKeyPickerActivity : ComponentActivity() {
                                     }
                                 )
                             }
-                            if (keys?.isEmpty() == true) {
+                            sshOnlyKeys?.forEach { entry ->
+                                SshOnlyKeyRow(
+                                    entry = entry,
+                                    onClick = { pickSshOnly(apiData, entry, sshClient!!) }
+                                )
+                            }
+                            if (nothingToPick) {
                                 Text(
                                     stringResource(
                                         if (forSsh) R.string.ssh_keypicker_empty else R.string.provider_keypicker_empty
@@ -237,7 +264,7 @@ class ProviderKeyPickerActivity : ComponentActivity() {
                                     modifier = Modifier.padding(vertical = 8.dp)
                                 )
                             }
-                            if (!keys.isNullOrEmpty()) {
+                            if (!keys.isNullOrEmpty() || !sshOnlyKeys.isNullOrEmpty()) {
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                             }
                             if (keys != null && !forOp && !forSsh) {
@@ -270,18 +297,26 @@ class ProviderKeyPickerActivity : ComponentActivity() {
      * intent. The pick is the user's approval, so it binds [client]'s SSH
      * logins to [key] first; the service refuses any other key for that app.
      */
-    private fun pickSsh(apiData: Intent?, key: PGPKeyEntity, client: String) {
+    private fun pickSsh(apiData: Intent?, key: PGPKeyEntity, client: String) =
+        approveSsh(apiData, key.fingerprint.uppercase(), client)
+
+    /** 4.8.0 RC7 (item 1): an SSH-only key, approved and returned by its "ssh:SHA256:..." id. */
+    private fun pickSshOnly(apiData: Intent?, entry: SshKeyEntry, client: String) =
+        approveSsh(apiData, entry.id, client)
+
+    /** Bind [keyId] to [client]'s SSH logins, then return it as the API's key id. */
+    private fun approveSsh(apiData: Intent?, keyId: String, client: String) {
         val authorizer = ApiClientAuthorizer(
             dao = (application as PGPonyApp).database.apiClientDao(),
             signatureSha256Of = ApiClientAuthorizer.platformSignatureLookup(packageManager)
         )
         lifecycleScope.launch {
-            if (!authorizer.bindSshKey(client, key.fingerprint)) {
+            if (!authorizer.bindSshKey(client, keyId)) {
                 cancel()
                 return@launch
             }
             val result = Intent(apiData ?: Intent())
-            result.putExtra(SshAuthenticationService.EXTRA_KEY_ID, key.fingerprint.uppercase())
+            result.putExtra(SshAuthenticationService.EXTRA_KEY_ID, keyId)
             setResult(Activity.RESULT_OK, result)
             finish()
         }
@@ -360,6 +395,49 @@ private fun KeyRow(
                 } else {
                     key.shortFingerprint
                 },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * 4.8.0 RC7 (item 1): an SSH-only key. Its label, then what it is (an SSH key,
+ * not an OpenPGP key, of a type OpenSSH itself marks experimental), then its
+ * fingerprint as ssh-add -l prints it, so the user can match the two.
+ */
+@Composable
+private fun SshOnlyKeyRow(entry: SshKeyEntry, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Filled.Terminal,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        val kind = stringResource(R.string.ssh_keypicker_sshkey_kind)
+        Column {
+            Text(
+                entry.label.ifBlank { kind },
+                style = MaterialTheme.typography.bodyLarge
+            )
+            if (entry.label.isNotBlank()) {
+                Text(
+                    kind,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Text(
+                entry.fingerprint,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

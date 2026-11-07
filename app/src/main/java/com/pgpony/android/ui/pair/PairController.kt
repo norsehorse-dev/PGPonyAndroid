@@ -52,8 +52,17 @@ class PairController(private val repo: KeyRepository) {
         data class Backup(override val name: String) : Outgoing()
     }
 
-    /** Offered items with their bytes, and the backup's recovery code when a backup is among them. */
-    class Prepared(val items: List<PairItem>, val payloads: Map<Int, ByteArray>, val recoveryCode: String?)
+    /**
+     * Offered items with their bytes, and the backup's recovery code when a backup is among them.
+     * 4.8.0 RC7 (item 1): [sshSkipped] counts SSH-only keys the backup could not read and so
+     * does not carry; the send pane says so when above 0.
+     */
+    class Prepared(
+        val items: List<PairItem>,
+        val payloads: Map<Int, ByteArray>,
+        val recoveryCode: String?,
+        val sshSkipped: Int = 0
+    )
 
     /** What this keyring could send. Card-backed keys go as public keys only. */
     suspend fun candidates(): List<Outgoing> = withContext(Dispatchers.IO) {
@@ -66,7 +75,10 @@ class PairController(private val repo: KeyRepository) {
             }
         }
         for (k in keys) out += Outgoing.PublicKey(k.fingerprint, k.userID.ifBlank { k.fingerprint })
-        if (keys.isNotEmpty()) out += Outgoing.Backup(str(R.string.pair_item_backup))
+        // 4.8.0 RC7 (item 1): the backup also carries SSH-only keys, so a phone
+        // with only those can still send one.
+        val hasSshKeys = runCatching { PGPonyApp.instance.sshKeyStore.list().isNotEmpty() }.getOrDefault(false)
+        if (keys.isNotEmpty() || hasSshKeys) out += Outgoing.Backup(str(R.string.pair_item_backup))
         out
     }
 
@@ -79,6 +91,7 @@ class PairController(private val repo: KeyRepository) {
         val items = ArrayList<PairItem>()
         val payloads = HashMap<Int, ByteArray>()
         var recovery: String? = null
+        var sshSkipped = 0
         picked.forEachIndexed { i, o ->
             val id = i + 1
             val kind: String
@@ -112,14 +125,16 @@ class PairController(private val repo: KeyRepository) {
                     fingerprint = null
                     val code = CrockfordBase32.generate()
                     recovery = code.grouped
-                    bytes = BackupService(repo).exportBackup(code.canonical)
+                    val export = BackupService(repo).exportBackup(code.canonical)
+                    bytes = export.bytes
+                    sshSkipped = export.sshSkipped
                 }
             }
             if (bytes.size > PairSession.MAX_ITEM_BYTES) throw PairPrepareException(str(R.string.pair_err_too_large, o.name))
             items += PairItem(id, kind, o.name, fingerprint, bytes.size.toLong())
             payloads[id] = bytes
         }
-        Prepared(items, payloads, recovery)
+        Prepared(items, payloads, recovery, sshSkipped)
     }
 
     /**
@@ -196,7 +211,8 @@ class PairController(private val repo: KeyRepository) {
                     val code = backupCode?.takeIf { it.isNotBlank() }
                         ?: throw PairPrepareException(str(R.string.pair_err_backup_code))
                     val report = BackupService(repo).restoreBackup(bytes, code)
-                    val n = report.added.size + report.upgraded.size + report.updated.size
+                    // 4.8.0 RC7 (item 1): SSH-only keys the backup added count too.
+                    val n = report.added.size + report.upgraded.size + report.updated.size + report.sshAdded.size
                     PGPonyApp.instance.resources.getQuantityString(R.plurals.pair_restore_summary, n, n)
                 }
                 else -> throw PairPrepareException(str(R.string.pair_err_import, item.name))

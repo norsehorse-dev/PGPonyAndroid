@@ -57,6 +57,33 @@ Decision (Oct 20): (b) in 4.8.0, marked experimental like OpenSSH's own option, 
 after iOS 8.4.0 catches up with Android, about two weeks out; the user was told that and will hear if it starts
 sooner. If the draft changes the format later, the key is generated again.
 
+Core done in RC7: crypto/ssh/MlDsaEd25519Ssh (keys from the two seeds, SHA-512 composite input, ML-DSA-44 pure
+with the label as context, Ed25519 plain), OpenSshKeyFile (openssh-key-v1 read and write, bcrypt_pbkdf with
+aes256-ctr, 32 rounds as ssh-keygen 10.6 writes), data/ssh/SshKeyStore (ids "ssh:SHA256:...", seeds and metadata
+sealed in SecureKeyStore, no Room change), backup as additive ssh-keys/ entries merged by fingerprint, and Clear
+All Data. First checked against OpenSSH 10.4's test vectors, and ssh-keygen 10.4 read the exported file and
+verified an SSHSIG made by PGPony. Provider wiring and Settings follow.
+
+Rename in RC7 (Nov 6): OpenSSH 10.6 (Oct 2026) renamed the type to `ssh-mldsa44-ed25519` (IANA codepoint; cert
+`ssh-mldsa44-ed25519-cert`), kept no alias for the @openssh.com name, turned it on by default, and raised the
+default bcrypt rounds to 32. Blob, private section, signature and M' are unchanged. 10.4 and 10.5 know only the old
+name, 10.6 only the new one. PGPony now writes only the new name (blob, .pub line, key file, signature, ids and
+fingerprints), still imports a 10.4/10.5 key file, .pub line or blob under the old name and re-encodes it, and
+refuses a signature under the old name as 10.6 does. Still experimental: draft-ietf-sshm-composite-sigs is at -00.
+Keys stored by earlier RC7 builds are not migrated (never published); they drop out of the list. Unit tests now use
+OpenSSH 10.6's test data, plus the 10.4 key file as a legacy import fixture. Device checks (Nov 6): ssh-keygen 10.6
+reads a PGPony export after its passphrase, and Termux's OpenSSH 10.6p2 logs in to a 10.6 sshd with a PGPony key
+through OkcAgent and okc-ssh-agent. Not run: ssh-keygen 10.6 verifying a PGPony SSHSIG.
+
+Provider done in RC7: SshAuthenticationService routes "ssh:" ids to SshKeyStore before any OpenPGP lookup
+(SELECT_KEY, GET_SSH_PUBLIC_KEY with no comment, SIGN with the hash ignored; GET_PUBLIC_KEY is INVALID_ALGORITHM),
+the SSH key picker lists SSH-only keys marked experimental, and per-app approval covers them (ids kept case-exact).
+Settings done in RC7: Settings > Keys & Servers > SSH keys (ui/settings/SshKeysScreen, a pushed "ssh_keys" route),
+marked experimental: generate with a label, copy or share the authorized_keys line, export the private key as an
+OpenSSH file under a passphrase asked twice (device check first, FLAG_SECURE dialogs), import an ssh-keygen file
+(passphrase prompt when encrypted, other key types named), rename, delete. The restore report and the pairing
+backup count include SSH keys.
+
 
 ## 2. ECDSA card signing and card key labels (#102)
 

@@ -1495,7 +1495,15 @@ fun PGPonyMainScreen(
                         onOpenPassStore = { navController.navigate("pass_store") },
                         onKeysChanged = { keyringVm.loadKeys() },
                         onOpenRecycleBin = { navController.navigate("recently_deleted") },
-                        onOpenPair = { navController.navigate("pair") }
+                        onOpenPair = { navController.navigate("pair") },
+                        onOpenSshKeys = { navController.navigate("ssh_keys") { launchSingleTop = true } }
+                    )
+                }
+                // 4.8.0 RC7 (item 1): Settings > SSH keys, the experimental
+                // ssh-mldsa44-ed25519 keys held outside the OpenPGP keyring.
+                composable("ssh_keys") {
+                    com.pgpony.android.ui.settings.SshKeysScreen(
+                        onBack = { navController.popBackStack() }
                     )
                 }
                 // 4.6.3 (4.7.0 item 21): pair with PGPony Desktop or another phone.

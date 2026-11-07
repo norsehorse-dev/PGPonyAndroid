@@ -2175,10 +2175,10 @@
     <string name="ssh_cardop_body">PGPony가 하드웨어 키의 인증 슬롯으로 SSH 로그인에 서명합니다. 카드 PIN을 입력한 다음 키를 휴대폰 뒷면에 대세요.</string>
     <string name="ssh_cardop_slot_mismatch">이 카드의 인증 슬롯에 선택한 SSH 키가 없습니다.</string>
     <string name="ssh_error_unsupported_algorithm">이 인증 키의 알고리즘은 SSH에 사용할 수 없습니다.</string>
-    <string name="ssh_error_storage_recoverable">이 기기에서 PGPony의 보안 키 저장소가 시스템에 의해 초기화되었습니다. PGPony를 열고 이 키를 암호문으로 한 번 잠금 해제한 뒤 다시 시도하세요.</string>
-    <string name="ssh_error_storage_unreadable">이 기기에서 PGPony의 보안 키 저장소가 시스템에 의해 초기화되었고, 이 키에는 복구할 암호문이 없습니다. PGPony에서 키를 다시 가져오세요.</string>
+    <string name="ssh_error_storage_recoverable">이 기기에서 PGPony의 보안 키 저장소가 시스템에 의해 초기화되었습니다. PGPony를 열고 이 키를 비밀구절으로 한 번 잠금 해제한 뒤 다시 시도하세요.</string>
+    <string name="ssh_error_storage_unreadable">이 기기에서 PGPony의 보안 키 저장소가 시스템에 의해 초기화되었고, 이 키에는 복구할 비밀구절이 없습니다. PGPony에서 키를 다시 가져오세요.</string>
     <string name="ssh_keypicker_title">SSH에 사용할 키 선택</string>
-    <string name="ssh_keypicker_empty">SSH 인증 보조 키가 있는 키가 없습니다. PGPony에서 키 쌍을 열고 인증 보조 키를 추가한 뒤 다시 시도하세요.</string>
+    <string name="ssh_keypicker_empty">SSH 인증 보조 키가 있는 키가 없고, SSH 키도 없습니다. PGPony에서 키쌍에 인증 보조 키를 추가하거나 ‘설정’의 ‘SSH 키’에서 키를 만든 뒤 다시 시도하세요.</string>
     <string name="key_detail_action_copy_ssh_key">SSH 공개 키 복사</string>
     <string name="key_detail_ssh_key_copied">SSH 공개 키를 복사했습니다</string>
     <string name="keyring_generate_ssh_auth_toggle">SSH 인증 보조 키 추가</string>
@@ -2194,7 +2194,7 @@
 3. OkcAgent에서 Settings, Crypto provider를 열어 PGPony를 선택하고 OkcAgent 알림을 허용하세요.
 4. OkcAgent에서 Add SSH key를 탭하고 키를 선택하세요.
 5. Termux에서 pkg install okc-agents를 실행한 뒤 eval $(okc-ssh-agent)를 실행하세요. 이제 ssh와 ssh를 통한 git이 내 키를 사용합니다.</string>
-    <string name="ssh_help_note">암호문과 보안 키 확인은 OkcAgent 알림으로 옵니다. ssh가 멈춘 것 같으면 알림을 확인하세요. GrapheneOS에서는 OkcAgent의 네트워크 권한도 켜세요. Termux가 로컬 연결로 OkcAgent에 접속하므로 권한이 없으면 ssh가 멈춥니다.</string>
+    <string name="ssh_help_note">비밀구절과 보안 키 확인은 OkcAgent 알림으로 옵니다. ssh가 멈춘 것 같으면 알림을 확인하세요. GrapheneOS에서는 OkcAgent의 네트워크 권한도 켜세요. Termux가 로컬 연결로 OkcAgent에 접속하므로 권한이 없으면 ssh가 멈춥니다.</string>
     <string name="key_detail_action_ssh_setup">Termux에서 SSH 설정</string>
     <!-- 4.6.0: API consent and SSH scope -->
     <string name="ssh_error_dual_use_auth">이 키의 인증 보조 키는 서명도 할 수 있습니다. 키 세부 정보에서 인증 전용 보조 키를 추가하세요.</string>
@@ -3133,4 +3133,44 @@
     <string name="qr_camera_error">카메라를 시작할 수 없습니다. 다른 카메라 앱을 닫고 다시 시도하세요.</string>
     <string name="qr_retry">다시 시도</string>
     <string name="qr_focus_hint">코드를 눌러 초점을 맞추세요.</string>
+    <!-- 4.8.0 RC7 (item 1, provider) -->
+    <string name="ssh_keypicker_sshkey_kind">SSH 키, ML-DSA-44 + Ed25519 (실험적)</string>
+    <string name="ssh_error_sshkey_unreadable">이 SSH 키를 이 기기에서 더 이상 읽을 수 없습니다. PGPony에서 삭제한 뒤 백업에서 복구하거나 다시 가져오세요.</string>
+    <!-- 4.8.0 RC7 (item 1, SSH keys screen) -->
+    <string name="ssh_keys_title">SSH 키</string>
+    <string name="ssh_keys_row_subtitle">이 폰에 보관된 실험적 포스트 양자 SSH 키</string>
+    <string name="ssh_keys_intro">OpenSSH 10.6에서 기본으로 켜진 ssh-mldsa44-ed25519 유형의 포스트 양자 SSH 로그인 키입니다. 서버와 ssh 클라이언트 모두 OpenSSH 10.6 이상이 필요합니다. PGPony의 다른 SSH 키처럼 Termux에서 OkcAgent를 통해 사용합니다.</string>
+    <string name="ssh_keys_experimental_label">실험적</string>
+    <string name="ssh_keys_experimental_body">형식이 아직 바뀔 수 있으며, 키를 다시 만들어야 할 수도 있습니다.</string>
+    <string name="ssh_keys_generate">키 생성</string>
+    <string name="ssh_keys_import">키 파일 가져오기</string>
+    <string name="ssh_keys_empty">아직 SSH 키가 없습니다. 키를 생성하거나 ssh-keygen -t mldsa44-ed25519로 만든 키 파일을 가져오세요.</string>
+    <string name="ssh_keys_load_failed">이 폰의 SSH 키를 읽을 수 없습니다.</string>
+    <string name="ssh_keys_created_format">%1$s에 생성됨</string>
+    <string name="ssh_keys_copy_public">공개 키 복사</string>
+    <string name="ssh_keys_share_public">공개 키 공유</string>
+    <string name="ssh_keys_export_private">개인 키 내보내기</string>
+    <string name="ssh_keys_rename">이름 바꾸기</string>
+    <string name="ssh_keys_generate_title">새 SSH 키</string>
+    <string name="ssh_keys_rename_title">SSH 키 이름 바꾸기</string>
+    <string name="ssh_keys_label_field">라벨</string>
+    <string name="ssh_keys_label_hint">공개 키 줄 끝에 붙는 주석</string>
+    <string name="ssh_keys_delete_title">이 SSH 키를 삭제할까요?</string>
+    <string name="ssh_keys_delete_body">%1$s 키가 이 폰에서 삭제되며, 이 키만 알고 있는 서버에는 더 이상 로그인할 수 없습니다. 다시 필요할 수 있다면 먼저 내보내세요.</string>
+    <string name="ssh_keys_export_body">키 파일은 이 비밀구절로 암호화되어 저장됩니다. 키를 사용할 때 ssh가 비밀구절을 묻습니다.</string>
+    <string name="ssh_keys_import_pass_title">이 키 파일에는 비밀구절이 있습니다</string>
+    <string name="ssh_keys_generated">SSH 키를 만들었습니다.</string>
+    <string name="ssh_keys_imported">SSH 키를 가져왔습니다.</string>
+    <string name="ssh_keys_already_held">이 키는 이미 이 폰에 있습니다.</string>
+    <string name="ssh_keys_error_wrong_type">이 파일에는 ssh-mldsa44-ed25519 키가 아니라 %1$s 키가 들어 있습니다.</string>
+    <string name="ssh_keys_error_encryption">이 키 파일은 PGPony가 읽을 수 없는 방식으로 암호화되어 있습니다 (%1$s).</string>
+    <string name="ssh_keys_error_malformed">OpenSSH 개인 키 파일이 아니거나 손상되었습니다.</string>
+    <string name="ssh_keys_error_not_found">이 SSH 키는 더 이상 이 폰에 없습니다.</string>
+    <string name="ssh_keys_error_unreadable">이 SSH 키를 이 폰에서 더 이상 읽을 수 없습니다. 삭제한 뒤 다시 가져오세요.</string>
+    <string name="ssh_keys_error_generate">SSH 키를 만들 수 없습니다.</string>
+    <string name="ssh_keys_error_change">SSH 키 변경 사항을 저장할 수 없습니다.</string>
+    <string name="restore_ssh_added">SSH 키가 추가되었습니다</string>
+    <plurals name="ssh_backup_skipped">
+        <item quantity="other">SSH 키 %1$d개를 읽을 수 없어 이 백업에 포함되지 않았습니다.</item>
+    </plurals>
 </resources>

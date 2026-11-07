@@ -95,7 +95,8 @@ class ApiClientAuthorizer(
     /**
      * 4.6.3 (#68): every key the user approved for this app's SSH logins,
      * uppercase hex primary fingerprints, in the order approved. Empty when
-     * the app has no SSH scope or no key approved yet.
+     * the app has no SSH scope or no key approved yet. 4.8.0 RC7 (item 1): an
+     * approved SSH-only key appears as its "ssh:SHA256:..." id.
      */
     suspend fun sshKeys(packageName: String): List<String> =
         dao.getByPackage(packageName)?.takeIf { it.has(ApiClientEntity.SCOPE_SSH) }
@@ -110,7 +111,10 @@ class ApiClientAuthorizer(
      * picker for the user to approve that key once.
      */
     suspend fun sshKeyAllowed(packageName: String, fingerprint: String): Boolean =
-        sshKeys(packageName).any { it.equals(fingerprint.trim(), ignoreCase = true) }
+        // 4.8.0 RC7 (item 1): an SSH-only key id ("ssh:SHA256:...") is approved
+        // and checked the same way, but compared exactly (its base64 is case
+        // sensitive); OpenPGP fingerprints still ignore case.
+        sshKeys(packageName).any { ApiClientEntity.sameSshKey(it, fingerprint) }
 
     /**
      * Approve [fingerprint] (the key the user picked) for this app's SSH
@@ -122,7 +126,8 @@ class ApiClientAuthorizer(
     suspend fun bindSshKey(packageName: String, fingerprint: String): Boolean {
         val row = dao.getByPackage(packageName) ?: return false
         if (!row.has(ApiClientEntity.SCOPE_SSH)) return false
-        val keys = row.sshKeyFingerprints() + fingerprint.trim().uppercase()
+        // 4.8.0 RC7 (item 1): normalizeSshKey keeps an SSH-only key id as it is.
+        val keys = row.sshKeyFingerprints() + ApiClientEntity.normalizeSshKey(fingerprint)
         dao.updateAccess(packageName, row.scopes, ApiClientEntity.joinSshKeys(keys))
         return true
     }
@@ -133,7 +138,7 @@ class ApiClientAuthorizer(
      */
     suspend fun unbindSshKey(packageName: String, fingerprint: String) {
         val row = dao.getByPackage(packageName) ?: return
-        val keys = row.sshKeyFingerprints().filterNot { it.equals(fingerprint.trim(), ignoreCase = true) }
+        val keys = row.sshKeyFingerprints().filterNot { ApiClientEntity.sameSshKey(it, fingerprint) }
         dao.updateAccess(packageName, row.scopes, ApiClientEntity.joinSshKeys(keys))
     }
 
