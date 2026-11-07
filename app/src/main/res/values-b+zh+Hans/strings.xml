@@ -3122,4 +3122,17 @@
     <string name="share_target_action_sign_file_subtitle">生成分离签名（.asc 或 .sig）。文件本身保持不变。</string>
     <string name="share_target_sign_result_subtitle">请将签名与文件放在一起，以便其他人确认文件来自你且未被更改。</string>
     <string name="share_target_action_restore_subtitle">这是密钥环备份。请打开「恢复」并输入它的恢复代码。</string>
+
+    <!-- Public-key QR exchange controls and recovery feedback. -->
+    <string name="qr_density_normal">标准码点</string>
+    <string name="qr_density_roomy">较大码点</string>
+    <string name="qr_playback_slow">慢速播放</string>
+    <string name="qr_enlarge">放大二维码</string>
+    <string name="qr_render_small">请放大二维码或减小系统显示缩放。</string>
+    <string name="qr_unsupported_version">此二维码格式需要更新的 PGPony。请让发送方使用兼容模式。</string>
+    <string name="qr_integrity_error">分片内容不一致，请重新扫描此公钥。</string>
+    <string name="qr_enhanced_progress_format">已收到 %1$d / %2$d 个所需分片，请继续扫描。</string>
+    <string name="qr_camera_error">无法启动相机，请关闭其他使用相机的应用后重试。</string>
+    <string name="qr_retry">重试</string>
+    <string name="qr_focus_hint">点击二维码区域以对焦。</string>
 </resources>

@@ -99,6 +99,7 @@ fun ImportKeyScreen(
     if (state.showImportQRScanner) {
         QRScannerScreen(
             onScanned = { text -> viewModel.onImportQRScanned(text) },
+            onScannedWithTiming = { text, timing -> viewModel.onImportQRScanned(text, timing) },
             onDismiss = { viewModel.dismissImportQRScanner() }
         )
         return
@@ -198,6 +199,10 @@ internal fun ImportMethodBody(state: KeyringUiState, viewModel: KeyringViewModel
 
     // ── Preview + Import buttons ──────────────────────────────
     state.importPreview?.let { preview ->
+        LaunchedEffect(preview, state.qrPreviewTiming) {
+            withFrameNanos { }
+            state.qrPreviewTiming?.previewShown()
+        }
         ImportPreviewCard(
             preview = preview,
             lookupSource = state.importLookupSource,

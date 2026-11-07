@@ -1,0 +1,470 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "f04501acd56f74da190789bd32c2ceed90a75e8c",
+  "origin": "public repository certificates and deterministic synthetic QR luminance; no camera captures",
+  "certificates": [
+    {
+      "id": "rfc9580-v6",
+      "source": "app/src/test/resources/rfc9580/a3_cert.asc",
+      "asset": "rfc9580-v6.asc",
+      "type": "RFC 9580 A.3 version 6 certificate",
+      "sha256": "0e9fde2dcf7a10b8e2188cffd4091bbbeefb5e8c9e9dd18a40fe72403760dd7b",
+      "armorChars": 650,
+      "armorBytes": 650,
+      "binaryBytes": 424
+    },
+    {
+      "id": "rsa",
+      "source": "app/src/test/resources/keys/uid-selfsig-expiry-rsa.asc",
+      "asset": "rsa.asc",
+      "type": "RSA certificate with UID self-signature expiry",
+      "sha256": "5b0339e98237592e7937ccebdadae6c9dcd1b74fe64ff952d603756070dd69b4",
+      "armorChars": 2468,
+      "armorBytes": 2468,
+      "binaryBytes": 1762
+    },
+    {
+      "id": "mlkem768",
+      "source": "app/src/test/resources/pqc/rfc9980-a2-v4-ed25519-mlkem768-pub.asc",
+      "asset": "mlkem768.asc",
+      "type": "RFC 9980 A.2 Ed25519 and ML-KEM-768 public certificate",
+      "sha256": "4ff0c22f4a9fd0c02fa64bb0faea1806743a030455225f1af4c9ee4e4981dc95",
+      "armorChars": 2348,
+      "armorBytes": 2348,
+      "binaryBytes": 1680
+    },
+    {
+      "id": "mldsa65",
+      "source": "app/src/test/resources/pqc/rfc9980-a3-mldsa65-ed25519-cert.asc",
+      "asset": "mldsa65.asc",
+      "type": "RFC 9980 A.3 ML-DSA-65 and Ed25519 public certificate",
+      "sha256": "4880dead81e043038df20e961ab74a7c61f14245371d6a229c1888be79813764",
+      "armorChars": 18554,
+      "armorBytes": 18554,
+      "binaryBytes": 13647
+    }
+  ],
+  "capacityInputs": [
+    {
+      "generator": "ASCII A repeated",
+      "characters": 32000,
+      "expectedFrames": 32
+    },
+    {
+      "generator": "ASCII A repeated",
+      "characters": 32001,
+      "expectedResult": "rejected",
+      "scope": "protocol capacity only"
+    }
+  ],
+  "replays": [
+    {
+      "asset": "rfc9580-v6-clean-4px.y",
+      "sha256": "74653fa234eb375f5c57af8afdb09ec20d8002181db7facdffcc6b79fbd17c92",
+      "origin": "synthetic-production-matrix",
+      "fixture": "rfc9580-v6",
+      "profile": "BASELINE",
+      "frameIndex": 0,
+      "width": 388,
+      "height": 388,
+      "rowStride": 401,
+      "pixelStride": 1,
+      "bufferPosition": 7,
+      "rotationDegrees": 0,
+      "crop": [
+        0,
+        0,
+        388,
+        388
+      ],
+      "previewToAnalysis": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "modulePixels": 4,
+      "boxBlurRadius": 0,
+      "expectedResult": "decoded"
+    },
+    {
+      "asset": "rfc9580-v6-boxblur1-4px.y",
+      "sha256": "da3f35232e4947087189c8d1c0780f864e217bd513ff92930ac52f05272f9d6d",
+      "origin": "synthetic-production-matrix",
+      "fixture": "rfc9580-v6",
+      "profile": "BASELINE",
+      "frameIndex": 0,
+      "width": 388,
+      "height": 388,
+      "rowStride": 401,
+      "pixelStride": 1,
+      "bufferPosition": 7,
+      "rotationDegrees": 0,
+      "crop": [
+        0,
+        0,
+        388,
+        388
+      ],
+      "previewToAnalysis": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "modulePixels": 4,
+      "boxBlurRadius": 1,
+      "expectedResult": "decoded"
+    },
+    {
+      "asset": "rfc9580-v6-rotated-padded-3px.y",
+      "sha256": "e0a16e79491c279f80bca07d5a50714104b950d474cfe8510640c5f8e7c35cfc",
+      "origin": "synthetic-production-matrix",
+      "fixture": "rfc9580-v6",
+      "profile": "BASELINE",
+      "frameIndex": 0,
+      "width": 291,
+      "height": 291,
+      "rowStride": 595,
+      "pixelStride": 2,
+      "bufferPosition": 7,
+      "rotationDegrees": 90,
+      "crop": [
+        0,
+        0,
+        291,
+        291
+      ],
+      "previewToAnalysis": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "modulePixels": 3,
+      "boxBlurRadius": 0,
+      "expectedResult": "decoded"
+    },
+    {
+      "asset": "rsa-clean-4px.y",
+      "sha256": "4461c37c1703c2009241dbb195ac09a01c26a8d2d5bdf4f8a2334ffe60974ab6",
+      "origin": "synthetic-production-matrix",
+      "fixture": "rsa",
+      "profile": "BASELINE",
+      "frameIndex": 0,
+      "width": 468,
+      "height": 468,
+      "rowStride": 481,
+      "pixelStride": 1,
+      "bufferPosition": 7,
+      "rotationDegrees": 0,
+      "crop": [
+        0,
+        0,
+        468,
+        468
+      ],
+      "previewToAnalysis": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "modulePixels": 4,
+      "boxBlurRadius": 0,
+      "expectedResult": "decoded"
+    },
+    {
+      "asset": "rsa-boxblur1-4px.y",
+      "sha256": "4542715163ddae4686c3d5bae05571fa718f1684e1873c5bd095db23bcbd0e54",
+      "origin": "synthetic-production-matrix",
+      "fixture": "rsa",
+      "profile": "BASELINE",
+      "frameIndex": 0,
+      "width": 468,
+      "height": 468,
+      "rowStride": 481,
+      "pixelStride": 1,
+      "bufferPosition": 7,
+      "rotationDegrees": 0,
+      "crop": [
+        0,
+        0,
+        468,
+        468
+      ],
+      "previewToAnalysis": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "modulePixels": 4,
+      "boxBlurRadius": 1,
+      "expectedResult": "decoded"
+    },
+    {
+      "asset": "rsa-rotated-padded-3px.y",
+      "sha256": "ab1fe181f3bfd07eca1083b8824947aa7eb4a9705083a12ad5d9e8f859851145",
+      "origin": "synthetic-production-matrix",
+      "fixture": "rsa",
+      "profile": "BASELINE",
+      "frameIndex": 0,
+      "width": 351,
+      "height": 351,
+      "rowStride": 715,
+      "pixelStride": 2,
+      "bufferPosition": 7,
+      "rotationDegrees": 90,
+      "crop": [
+        0,
+        0,
+        351,
+        351
+      ],
+      "previewToAnalysis": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "modulePixels": 3,
+      "boxBlurRadius": 0,
+      "expectedResult": "decoded"
+    },
+    {
+      "asset": "mlkem768-clean-4px.y",
+      "sha256": "84f691ea7636fb1114f1a2a920cadb5a13bba9699ed997d9bdd380f026b2fb41",
+      "origin": "synthetic-production-matrix",
+      "fixture": "mlkem768",
+      "profile": "BASELINE",
+      "frameIndex": 0,
+      "width": 468,
+      "height": 468,
+      "rowStride": 481,
+      "pixelStride": 1,
+      "bufferPosition": 7,
+      "rotationDegrees": 0,
+      "crop": [
+        0,
+        0,
+        468,
+        468
+      ],
+      "previewToAnalysis": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "modulePixels": 4,
+      "boxBlurRadius": 0,
+      "expectedResult": "decoded"
+    },
+    {
+      "asset": "mlkem768-boxblur1-4px.y",
+      "sha256": "236cc03c7dfff6fe22a86728814142df86652de847f08ece26f3ef39446a059e",
+      "origin": "synthetic-production-matrix",
+      "fixture": "mlkem768",
+      "profile": "BASELINE",
+      "frameIndex": 0,
+      "width": 468,
+      "height": 468,
+      "rowStride": 481,
+      "pixelStride": 1,
+      "bufferPosition": 7,
+      "rotationDegrees": 0,
+      "crop": [
+        0,
+        0,
+        468,
+        468
+      ],
+      "previewToAnalysis": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "modulePixels": 4,
+      "boxBlurRadius": 1,
+      "expectedResult": "decoded"
+    },
+    {
+      "asset": "mlkem768-rotated-padded-3px.y",
+      "sha256": "7c5f6dd551bb761cc470ecefcb1daee2b462ad56d0bbbc6b80fe6afe353fba2a",
+      "origin": "synthetic-production-matrix",
+      "fixture": "mlkem768",
+      "profile": "BASELINE",
+      "frameIndex": 0,
+      "width": 351,
+      "height": 351,
+      "rowStride": 715,
+      "pixelStride": 2,
+      "bufferPosition": 7,
+      "rotationDegrees": 90,
+      "crop": [
+        0,
+        0,
+        351,
+        351
+      ],
+      "previewToAnalysis": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "modulePixels": 3,
+      "boxBlurRadius": 0,
+      "expectedResult": "decoded"
+    },
+    {
+      "asset": "mldsa65-clean-4px.y",
+      "sha256": "bb9b7a813223ca8b9187beee3f0d8d02145a1d63e48e12bbe3aa1b3195d10c5c",
+      "origin": "synthetic-production-matrix",
+      "fixture": "mldsa65",
+      "profile": "BASELINE",
+      "frameIndex": 0,
+      "width": 468,
+      "height": 468,
+      "rowStride": 481,
+      "pixelStride": 1,
+      "bufferPosition": 7,
+      "rotationDegrees": 0,
+      "crop": [
+        0,
+        0,
+        468,
+        468
+      ],
+      "previewToAnalysis": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "modulePixels": 4,
+      "boxBlurRadius": 0,
+      "expectedResult": "decoded"
+    },
+    {
+      "asset": "mldsa65-boxblur1-4px.y",
+      "sha256": "e9f556717fb08bffb1fd5dfc13cb70a52045bab121e2e1165340e7b144c1a4f4",
+      "origin": "synthetic-production-matrix",
+      "fixture": "mldsa65",
+      "profile": "BASELINE",
+      "frameIndex": 0,
+      "width": 468,
+      "height": 468,
+      "rowStride": 481,
+      "pixelStride": 1,
+      "bufferPosition": 7,
+      "rotationDegrees": 0,
+      "crop": [
+        0,
+        0,
+        468,
+        468
+      ],
+      "previewToAnalysis": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "modulePixels": 4,
+      "boxBlurRadius": 1,
+      "expectedResult": "decoded"
+    },
+    {
+      "asset": "mldsa65-rotated-padded-3px.y",
+      "sha256": "5e3425ecec60baf1ebd5ff4649c66570baab159913c79aaa77e03d9c30303b0f",
+      "origin": "synthetic-production-matrix",
+      "fixture": "mldsa65",
+      "profile": "BASELINE",
+      "frameIndex": 0,
+      "width": 351,
+      "height": 351,
+      "rowStride": 715,
+      "pixelStride": 2,
+      "bufferPosition": 7,
+      "rotationDegrees": 90,
+      "crop": [
+        0,
+        0,
+        351,
+        351
+      ],
+      "previewToAnalysis": [
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1
+      ],
+      "modulePixels": 3,
+      "boxBlurRadius": 0,
+      "expectedResult": "not-decoded"
+    }
+  ]
+}

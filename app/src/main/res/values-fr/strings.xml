@@ -3083,4 +3083,17 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="share_target_action_sign_file_subtitle">Créer une signature détachée (.asc ou .sig). Le fichier lui-même reste inchangé.</string>
     <string name="share_target_sign_result_subtitle">Gardez la signature avec le fichier, pour que d\'autres puissent vérifier qu\'il vient de vous et n\'a pas été modifié.</string>
     <string name="share_target_action_restore_subtitle">Ceci est une sauvegarde de trousseau. Ouvrez « Restaurer » et saisissez son code de récupération.</string>
+
+    <!-- Public-key QR exchange controls and recovery feedback. -->
+    <string name="qr_density_normal">Standard</string>
+    <string name="qr_density_roomy">Points plus grands</string>
+    <string name="qr_playback_slow">Lecture plus lente</string>
+    <string name="qr_enlarge">Agrandir le code QR</string>
+    <string name="qr_render_small">Agrandissez le code ou réduisez la mise à l’échelle de l’écran.</string>
+    <string name="qr_unsupported_version">Ce format QR nécessite une version plus récente de PGPony. Demandez à l’expéditeur d’utiliser le mode Compatible.</string>
+    <string name="qr_integrity_error">Les parties ne correspondent pas. Scannez de nouveau cette clé.</string>
+    <string name="qr_enhanced_progress_format">%1$d parties reçues sur %2$d nécessaires. Continuez à scanner.</string>
+    <string name="qr_camera_error">Impossible de démarrer la caméra. Fermez les autres applications utilisant la caméra et réessayez.</string>
+    <string name="qr_retry">Réessayer</string>
+    <string name="qr_focus_hint">Touchez le code pour faire la mise au point.</string>
 </resources>

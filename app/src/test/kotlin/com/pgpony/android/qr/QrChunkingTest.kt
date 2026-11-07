@@ -258,4 +258,39 @@ class QrChunkingTest {
             )
         }
     }
+    @Test
+    fun alteredPayloadCannotCompleteWithAnUnchangedContentId() {
+        val frames = QrChunking.split("a".repeat(2_001))!!.toMutableList()
+        frames[1] = frames[1].dropLast(1) + "b"
+        val collector = QrChunking.Collector()
+        assertEquals(QrChunking.Outcome.Malformed, frames.map(collector::offer).last())
+        assertEquals(0, collector.have)
+    }
+
+    @Test
+    fun conflictingDuplicateResetsInsteadOfOverwritingACollectedPart() {
+        val frames = QrChunking.split("a".repeat(2_001))!!
+        val collector = QrChunking.Collector()
+        collector.offer(frames[0])
+        assertEquals(QrChunking.Outcome.Malformed, collector.offer(frames[0].dropLast(1) + "b"))
+        assertEquals(0, collector.have)
+    }
+
+    @Test
+    fun frameAndAggregatePayloadBoundsAreCheckedBeforeCollection() {
+        assertNull(QrChunking.parse("PGPONY1:1:32:deadbeef:" + "a".repeat(32_001)))
+        val collector = QrChunking.Collector()
+        assertEquals(QrChunking.Outcome.Progress(1, 2), collector.offer("PGPONY1:1:2:deadbeef:" + "a".repeat(32_000)))
+        assertEquals(QrChunking.Outcome.Malformed, collector.offer("PGPONY1:2:2:deadbeef:b"))
+        assertEquals(0, collector.have)
+    }
+    @Test
+    fun olderSenderWithLargerFramesStillReassemblesWithinTheTextCeiling() {
+        val text = "a".repeat(5_001)
+        val payloads = text.chunked(1_800)
+        val frames = payloads.mapIndexed { index, part ->
+            "PGPONY1:${index + 1}:${payloads.size}:${QrChunking.idFor(text)}:$part"
+        }
+        assertEquals(QrChunking.Outcome.Complete(text), feed(frames.reversed()))
+    }
 }

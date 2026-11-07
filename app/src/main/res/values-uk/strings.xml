@@ -3200,4 +3200,17 @@
     <string name="share_target_action_sign_file_subtitle">Створити окремий підпис (.asc або .sig). Сам файл не зміниться.</string>
     <string name="share_target_sign_result_subtitle">Зберігайте підпис разом із файлом, щоб інші могли перевірити, що файл надійшов від вас і його не змінено.</string>
     <string name="share_target_action_restore_subtitle">Це резервна копія зв’язки ключів. Відкрийте «Відновити» й введіть її код відновлення.</string>
+
+    <!-- Public-key QR exchange controls and recovery feedback. -->
+    <string name="qr_density_normal">Звичайні точки</string>
+    <string name="qr_density_roomy">Більші точки</string>
+    <string name="qr_playback_slow">Повільніше</string>
+    <string name="qr_enlarge">Збільшити QR-код</string>
+    <string name="qr_render_small">Збільште код або зменште масштаб екрана.</string>
+    <string name="qr_unsupported_version">Для цього QR-формату потрібна новіша версія PGPony. Попросіть відправника використати сумісний режим.</string>
+    <string name="qr_integrity_error">Частини не збігаються. Відскануйте цей ключ знову.</string>
+    <string name="qr_enhanced_progress_format">Отримано %1$d із %2$d потрібних частин. Продовжуйте сканування.</string>
+    <string name="qr_camera_error">Не вдалося запустити камеру. Закрийте інші програми камери та спробуйте знову.</string>
+    <string name="qr_retry">Спробувати знову</string>
+    <string name="qr_focus_hint">Торкніться коду для фокусування.</string>
 </resources>

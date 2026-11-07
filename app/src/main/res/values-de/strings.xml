@@ -3072,4 +3072,17 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="share_target_action_sign_file_subtitle">Eine abgetrennte Signatur (.asc oder .sig) erstellen. Die Datei selbst bleibt unverändert.</string>
     <string name="share_target_sign_result_subtitle">Bewahre die Signatur zusammen mit der Datei auf, damit andere prüfen können, dass sie von dir stammt und nicht verändert wurde.</string>
     <string name="share_target_action_restore_subtitle">Das ist ein Backup des Schlüsselbunds. Öffne „Wiederherstellen“ und gib seinen Wiederherstellungscode ein.</string>
+
+    <!-- Public-key QR exchange controls and recovery feedback. -->
+    <string name="qr_density_normal">Standard</string>
+    <string name="qr_density_roomy">Größere Punkte</string>
+    <string name="qr_playback_slow">Langsamer abspielen</string>
+    <string name="qr_enlarge">QR-Code vergrößern</string>
+    <string name="qr_render_small">Vergrößere den Code oder verkleinere die Anzeigeskalierung.</string>
+    <string name="qr_unsupported_version">Dieses QR-Format erfordert eine neuere PGPony-Version. Bitte den Sender, den kompatiblen Modus zu verwenden.</string>
+    <string name="qr_integrity_error">Die Teile passen nicht zusammen. Scanne den Schlüssel erneut.</string>
+    <string name="qr_enhanced_progress_format">%1$d von %2$d benötigten Teilen empfangen. Weiter scannen.</string>
+    <string name="qr_camera_error">Die Kamera konnte nicht gestartet werden. Schließe andere Kamera-Apps und versuche es erneut.</string>
+    <string name="qr_retry">Erneut versuchen</string>
+    <string name="qr_focus_hint">Tippe auf den Code, um zu fokussieren.</string>
 </resources>

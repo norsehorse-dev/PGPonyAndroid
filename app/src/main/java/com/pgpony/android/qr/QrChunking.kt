@@ -1,37 +1,3 @@
-// QrChunking.kt
-// PGPony Android — 4.1.0 Phase 9 (issue #3)
-//
-// Splitting a key across several QR codes, and collecting it back.
-//
-// THE PROBLEM. A single QR code holds roughly 2,953 bytes in byte mode at
-// error-correction level L, which is what ZXing defaults to. An ML-KEM v6
-// public key armors out to about 2.3 to 3.0 KB, so it sits ON that ceiling:
-// a lean cert squeaks under, and adding a comment, a longer UID or an
-// expiration subpacket tips it over into "QR generation failed - data too
-// big" (issue #3, hulkspec). ML-KEM-1024 in 4.2.0 will not fit under any
-// amount of shrinking.
-//
-// WHY NOT ZXing'S STRUCTURED APPEND. ZXing supports it in the encoder, but
-// QRCodeWriter.encode does not expose it, and that is the API both QR call
-// sites use. Reaching past QRCodeWriter into the internal encoder to emit
-// structured-append headers would be a much larger change for a format that
-// still no ordinary scanner reassembles on its own.
-//
-// SO THIS IS AN APPLICATION-LEVEL FORMAT, AND THAT IS A REAL TRADE-OFF.
-// Multi-part transfer is PGPony to PGPony. Say so on issue #3 and in the
-// release notes rather than letting someone discover it with a camera. What
-// it buys is that the QR path keeps working for exactly the keys that broke
-// it, with no new dependency and no reach into ZXing's internals.
-//
-// COMPATIBILITY IS PRESERVED FOR EVERYTHING THAT WORKS TODAY. Anything at or
-// under SINGLE_MAX is emitted as ONE unheadered symbol, byte-identical to what
-// 4.0.x produced, so classic v4 keys still scan in any QR reader. Only keys
-// that would have failed outright get the chunked form.
-//
-// Pure Kotlin, no Android imports, so the format is unit-testable rather than
-// reachable only through a camera. See PHASE_4.1.0-7_NOTES.md for why that is
-// now the default rather than an afterthought.
-
 package com.pgpony.android.qr
 
 import java.security.MessageDigest
@@ -41,32 +7,18 @@ object QrChunking {
     /** Frame marker. The digit is the format version, not the frame number. */
     const val PREFIX = "PGPONY1:"
 
-    /**
-     * At or under this, emit one unheadered symbol. Kept near the per-frame
-     * payload rather than the encoder's ~2,953-byte ceiling: a symbol that
-     * dense renders with tiny modules a second phone struggles to scan (#63),
-     * so a key past this splits into several roomier frames instead.
-     */
+    /** Raw symbols at or below this threshold preserve the released single-QR format. */
     const val SINGLE_MAX = 1_200
 
-    /**
-     * Payload characters per frame. Back to 1,000 for 4.5.1 (#63). 4.5.0 raised
-     * this to 1,800 to fit a large post-quantum cert, but that packs each frame
-     * into a dense ~version-30 symbol whose small modules a second phone
-     * struggles to scan. A composite ML-DSA (PQ-only) cert still fits because
-     * the capacity now comes from more frames (MAX_FRAMES) rather than denser
-     * ones, which is the scannable trade.
-     */
+    /** Released default payload width. Optional profiles may use smaller canonical slices. */
     const val PAYLOAD_MAX = 1_000
 
-    /**
-     * Ceiling on frames. At 1,000 chars each this is ~32 KB of capacity, which
-     * holds a composite ML-DSA PQ-only cert (~18.5 KB, ~19 frames) with headroom
-     * for the larger ML-DSA-87 / ML-KEM-1024 shapes to come. Past this the
-     * caller falls back to the actionable "use Share or Copy" message rather
-     * than emitting a sequence nobody will finish scanning.
-     */
+    /** The compatible transport retains its released ceiling of 32 parts and 32,000 characters. */
     const val MAX_FRAMES = 32
+
+    /** Maximum retained text, including older senders with larger per-frame payloads. */
+    const val MAX_TEXT_CHARS = PAYLOAD_MAX * MAX_FRAMES
+    private const val MAX_HEADER_CHARS = 64
 
     private const val ID_LEN = 8
     private const val HEX = "0123456789abcdef"
@@ -79,7 +31,7 @@ object QrChunking {
     )
 
     sealed interface Outcome {
-        /** Every frame is in; [text] is the reassembled original. */
+        /** Every frame is in and the reassembled [text] matches the content ID. */
         data class Complete(val text: String) : Outcome
 
         /** A new frame landed. */
@@ -99,7 +51,7 @@ object QrChunking {
         /** Not one of ours. The caller should treat it as a single QR. */
         data object NotAFrame : Outcome
 
-        /** Carries our prefix but the header is unreadable. */
+        /** Invalid framing, conflicting content, resource overflow or a failed content-ID check. */
         data object Malformed : Outcome
     }
 
@@ -110,20 +62,31 @@ object QrChunking {
      * one symbol, a list of framed chunks when it does not, and **null** when
      * even chunking cannot hold it, which is the caller's cue to show the
      * actionable too-large message instead of a raw encoder exception.
+     * Profiles retain the same wire grammar and single-symbol threshold. If a
+     * preferred width would exceed 32 parts, the width rises to fit that cap.
      */
-    fun split(text: String): List<String>? {
+    fun split(text: String, policy: QrEncodingPolicy = QrEncodingPolicy.BASELINE): List<String>? {
         if (text.length <= SINGLE_MAX) return listOf(text)
+        if (text.length > MAX_TEXT_CHARS) return null
 
-        val total = (text.length + PAYLOAD_MAX - 1) / PAYLOAD_MAX
-        if (total > MAX_FRAMES) return null
-
+        val payload = maxOf(policy.payloadChars, ceilDiv(text.length, MAX_FRAMES))
+        val total = ceilDiv(text.length, payload)
+        // Old collectors identify a sequence by content ID and count alone.
+        // Equal counts must therefore imply equal slices across every profile.
+        val width = if (total == ceilDiv(text.length, PAYLOAD_MAX)) {
+            PAYLOAD_MAX
+        } else {
+            ceilDiv(text.length, total)
+        }
         val id = idFor(text)
         return (0 until total).map { i ->
-            val from = i * PAYLOAD_MAX
-            val to = minOf(from + PAYLOAD_MAX, text.length)
+            val from = i * width
+            val to = minOf(from + width, text.length)
             PREFIX + (i + 1) + ":" + total + ":" + id + ":" + text.substring(from, to)
         }
     }
+
+    private fun ceilDiv(value: Int, divisor: Int): Int = (value + divisor - 1) / divisor
 
     /** True when [raw] carries our marker. Cheap pre-check for the scanner. */
     fun isFrame(raw: String): Boolean = raw.startsWith(PREFIX)
@@ -139,7 +102,7 @@ object QrChunking {
      * large enough to need chunking in the first place.
      */
     fun parse(raw: String): Frame? {
-        if (!raw.startsWith(PREFIX)) return null
+        if (!raw.startsWith(PREFIX) || raw.length > MAX_TEXT_CHARS + MAX_HEADER_CHARS) return null
         val rest = raw.substring(PREFIX.length)
 
         val c1 = rest.indexOf(':')
@@ -156,6 +119,7 @@ object QrChunking {
 
         if (seq < 1 || total < 1 || seq > total || total > MAX_FRAMES) return null
         if (id.length != ID_LEN || !id.all { it in HEX }) return null
+        if (payload.length > MAX_TEXT_CHARS) return null
 
         return Frame(seq, total, id, payload)
     }
@@ -171,6 +135,7 @@ object QrChunking {
         private var id: String? = null
         private var total: Int = 0
         private val parts = mutableMapOf<Int, String>()
+        private var retainedChars = 0
 
         val have: Int get() = parts.size
         val expected: Int get() = total
@@ -179,6 +144,7 @@ object QrChunking {
             id = null
             total = 0
             parts.clear()
+            retainedChars = 0
         }
 
         fun offer(raw: String): Outcome {
@@ -195,11 +161,28 @@ object QrChunking {
                 total = frame.total
             }
 
-            val fresh = parts.put(frame.seq, frame.payload) == null
+            val previous = parts[frame.seq]
+            if (previous != null && previous != frame.payload) {
+                reset()
+                return Outcome.Malformed
+            }
+            val fresh = previous == null
+            if (fresh) {
+                if (retainedChars + frame.payload.length > MAX_TEXT_CHARS) {
+                    reset()
+                    return Outcome.Malformed
+                }
+                parts[frame.seq] = frame.payload
+                retainedChars += frame.payload.length
+            }
 
             if (parts.size == total) {
                 val text = buildString {
                     for (i in 1..total) append(parts[i])
+                }
+                if (idFor(text) != id) {
+                    reset()
+                    return Outcome.Malformed
                 }
                 return Outcome.Complete(text)
             }
@@ -213,10 +196,9 @@ object QrChunking {
 
     /**
      * Sequence identifier: first four bytes of SHA-256 over the whole text,
-     * hex. Deterministic on purpose, so the same key always produces the same
-     * frames and a test can assert on them. It is a collision tag, not a
-     * checksum: it exists to stop two different keys being spliced together,
-     * which is the one failure mode of this format that would be silent.
+     * hex. Receivers verify this tag after reassembly to detect mixed or
+     * corrupted frames. Its 32-bit scope provides limited collision resistance;
+     * it does not authenticate a key owner or replace fingerprint verification.
      */
     fun idFor(text: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
