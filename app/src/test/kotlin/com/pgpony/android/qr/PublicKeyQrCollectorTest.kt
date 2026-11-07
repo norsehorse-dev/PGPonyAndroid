@@ -8,7 +8,15 @@ class PublicKeyQrCollectorTest {
     @Test fun `pairing scanner can accept the existing invitation URI`() {
         val invite = "pgpony-pair:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKWg"
         assertEquals(PublicKeyQrResult.Complete(invite), PublicKeyQrCollector(true).offer(invite))
-        assertEquals(PublicKeyQrResult.Malformed, PublicKeyQrCollector().offer(invite))
+        assertEquals(PublicKeyQrResult.NotAKey, PublicKeyQrCollector().offer(invite))
+    }
+    // 4.8.0 RC6 (#95): an upper-case invite is not an unknown PGPony transport version.
+    @Test fun `upper-case pairing invite is not an unsupported version`() {
+        val invite = "PGPONY-PAIR:1?a=192.168.1.20:49152&h=Z8ov_W_p76s9duN8NJkKWg"
+        assertEquals(PublicKeyQrResult.Complete(invite), PublicKeyQrCollector(true).offer(invite))
+        assertEquals(PublicKeyQrResult.NotAKey, PublicKeyQrCollector().offer(invite))
+        assertEquals(PublicKeyQrResult.Unsupported, PublicKeyQrCollector().offer("PGPONY12:x"))
+        assertEquals(PublicKeyQrResult.NotAKey, PublicKeyQrCollector().offer("PGPONYX:x"))
     }
     @Test fun `preview timing is delivered exactly once across recomposition`() {
         val events = mutableListOf<ScanMilestone>()
@@ -40,7 +48,10 @@ class PublicKeyQrCollectorTest {
     @Test fun `unframed public key retains existing import path`() {
         val armor = "-----BEGIN PGP PUBLIC KEY BLOCK-----\nbody\n-----END PGP PUBLIC KEY BLOCK-----"
         assertEquals(PublicKeyQrResult.Complete(armor), PublicKeyQrCollector().offer(armor))
-        assertEquals(PublicKeyQrResult.Malformed, PublicKeyQrCollector().offer("https://example.org"))
+        // 4.8.0 RC6 (#95): a link is not a key, which is not the same as parts that do not match.
+        assertEquals(PublicKeyQrResult.NotAKey, PublicKeyQrCollector().offer("https://example.org"))
+        assertEquals(PublicKeyQrResult.NotAKey, PublicKeyQrCollector().offer("hello"))
+        assertEquals(PublicKeyQrResult.Malformed, PublicKeyQrCollector().offer("PGPONY1:not-a-frame"))
     }
 
     @Test fun `public key surrounded by explanatory text reaches import preview unchanged`() {

@@ -1,9 +1,12 @@
 package com.pgpony.android.qr
 
+import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
+import com.google.zxing.EncodeHintType
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
 import com.google.zxing.qrcode.QRCodeReader
+import com.google.zxing.qrcode.QRCodeWriter
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -39,6 +42,24 @@ class QrSymbolLayoutTest {
                 }
                 val result = QRCodeReader().decode(BinaryBitmap(HybridBinarizer(RGBLuminanceSource(size, size, pixels))))
                 assertEquals(frame, result.text)
+            }
+        }
+    }
+
+    // 4.8.0 RC6 (#95): ASCII codes carry no ECI header, so they match the plain
+    // encoding the earlier releases produced for the iOS and desktop scanners.
+    @Test fun asciiFramesEncodeWithoutCharacterSetHint() {
+        val text = javaClass.getResource("/pqc/rfc9980-a3-mldsa65-ed25519-cert.asc")!!.readText()
+        for (policy in QrEncodingPolicy.entries) {
+            val frames = QrChunking.split(text, policy)!!
+            val layout = QrSymbolLayout.forFrames(frames, policy)
+            for (frame in listOf(frames.first(), frames.last())) {
+                val plain = QRCodeWriter().encode(frame, BarcodeFormat.QR_CODE, 1, 1, mapOf(
+                    EncodeHintType.ERROR_CORRECTION to policy.errorCorrection,
+                    EncodeHintType.MARGIN to QrSymbolLayout.QUIET_ZONE_MODULES,
+                    EncodeHintType.QR_VERSION to layout.version,
+                ))
+                assertEquals("$policy", plain, layout.encode(frame, policy))
             }
         }
     }

@@ -82,8 +82,8 @@ the following exact structural shapes and preserves their original bytes:
 - Signature algorithms 30 and 31: version 6 only. Hashed and unhashed areas have four-byte
   lengths bounded by the packet. They are followed by two digest-prefix bytes, one salt
   length byte, the salt, and an exact 3,373-byte or 4,741-byte signature respectively.
-  Hash algorithms 8/12 require 16 salt bytes, 9 requires 24, 10/14 require 32, and 11
-  requires 28. Other hash algorithms are rejected in these composite signatures.
+  Hash algorithms 8/11/12 require 16 salt bytes, 9 requires 24 and 10/14 require 32, as in
+  RFC 9580. Other hash algorithms are rejected in these composite signatures.
 
 These are structural checks. The transport does not validate certificate self-signatures,
 bindings, expiry, revocations or ownership. The existing importer performs its normal
@@ -98,7 +98,7 @@ PGPONY2:<D>:<L>:<k>:<r>:<i>:<C>:<B>
 ```
 
 `D` is the full SHA-256 digest of the unpadded certificate, encoded as exactly 64 uppercase
-hexadecimal characters (`0`–`9`, `A`–`F`). `L`, `k`, `r` and `i` use canonical unsigned
+hexadecimal characters (`0` to `9`, `A` to `F`). `L`, `k`, `r` and `i` use canonical unsigned
 base-10 notation: no sign, whitespace or leading zero, except the integer zero itself
 for index zero. `k` and `r` must match the equations above; redundant counts do not
 permit alternate shard layouts. `C` is exactly eight uppercase hexadecimal characters.
@@ -160,7 +160,7 @@ digests for a different certificate. Neither mechanism authenticates the key own
 
 ## 5. Exact erasure code
 
-The code is systematic Reed–Solomon over the field GF(256). The field's irreducible
+The code is systematic Reed-Solomon over the field GF(256). The field's irreducible
 polynomial is `x^8 + x^4 + x^3 + x^2 + 1` (`0x11D`). A byte's bits represent polynomial
 coefficients; addition is bitwise XOR. Multiplication is polynomial multiplication
 modulo `0x11D`. The primitive generator used by the implementation's logarithm table is
@@ -235,7 +235,7 @@ The erasure implementation is small project-authored Kotlin source in
 `app/src/main/java/com/pgpony/android/qr/v2/ErasureCode.kt`. It introduces no dependency
 and copies no third-party implementation. The exact field and matrix specification above
 is the interoperability contract. No external audit or third-party implementation
-endorsement is implied. ZXing's QR Reed–Solomon classes are not used for shard recovery.
+endorsement is implied. ZXing's QR Reed-Solomon classes are not used for shard recovery.
 
 Run the independent Python standard-library reference from the repository root:
 

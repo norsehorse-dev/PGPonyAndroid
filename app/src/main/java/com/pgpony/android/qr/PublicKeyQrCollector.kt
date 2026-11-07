@@ -10,6 +10,8 @@ sealed interface PublicKeyQrResult {
     data object Duplicate : PublicKeyQrResult
     data object Malformed : PublicKeyQrResult
     data object Unsupported : PublicKeyQrResult
+    /** 4.8.0 RC6 (#95): a single code that is neither a key nor a PGPony frame, such as a link. */
+    data object NotAKey : PublicKeyQrResult
 }
 
 /**
@@ -53,11 +55,18 @@ class PublicKeyQrCollector(private val acceptOtherText: Boolean = false) {
                 else -> PublicKeyQrResult.Malformed
             }
         }
-        if (text.startsWith("PGPONY")) return PublicKeyQrResult.Unsupported
+        // 4.8.0 RC6 (#95): only a versioned transport prefix (PGPONY1:, PGPONY2:, PGPONY<n>:)
+        // is an unknown version. Other text that happens to start with PGPONY, such as an
+        // upper-case pairing invite, falls through to the checks below.
+        if (UNKNOWN_TRANSPORT.containsMatchIn(text)) return PublicKeyQrResult.Unsupported
         // Import preview extracts armor from surrounding text and supports private-key imports.
         // Preserve the original payload; parsing and confirmation remain the preview's job.
         return if (acceptOtherText || ArmorExtractor.extractForImport(text) != null) {
             PublicKeyQrResult.Complete(text)
-        } else PublicKeyQrResult.Malformed
+        } else PublicKeyQrResult.NotAKey
+    }
+
+    private companion object {
+        val UNKNOWN_TRANSPORT = Regex("^PGPONY[0-9]+:")
     }
 }

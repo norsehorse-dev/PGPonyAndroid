@@ -3089,9 +3089,9 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="qr_density_roomy">Points plus grands</string>
     <string name="qr_playback_slow">Lecture plus lente</string>
     <string name="qr_enlarge">Agrandir le code QR</string>
-    <string name="qr_render_small">Agrandissez le code ou réduisez la mise à l’échelle de l’écran.</string>
-    <string name="qr_unsupported_version">Ce format QR nécessite une version plus récente de PGPony. Demandez à l’expéditeur d’utiliser le mode Compatible.</string>
-    <string name="qr_integrity_error">Les parties ne correspondent pas. Scannez de nouveau cette clé.</string>
+    <string name="qr_render_small">Ce code est trop petit pour s\'afficher ici. Réduisez la « Taille d\'affichage » dans les paramètres de votre téléphone.</string>
+    <string name="qr_unsupported_version">Ce code QR nécessite une version plus récente de PGPony. Mettez l\'application à jour ou demandez à l\'expéditeur de partager la clé autrement.</string>
+    <string name="qr_integrity_error">Les parties de ce code ne correspondent pas entre elles. Scannez à nouveau la clé.</string>
     <string name="qr_enhanced_progress_format">%1$d parties reçues sur %2$d nécessaires. Continuez à scanner.</string>
     <string name="qr_camera_error">Impossible de démarrer la caméra. Fermez les autres applications utilisant la caméra et réessayez.</string>
     <string name="qr_retry">Réessayer</string>

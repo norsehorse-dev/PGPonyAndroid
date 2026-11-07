@@ -20,6 +20,19 @@ class QrFrameStoreTest {
         assertNull(QrFrameStore.create("a".repeat(32_001)))
     }
 
+    // 4.8.0 RC6 (#95): Larger dots never makes a single code denser.
+    @Test fun singleCodeAlwaysUsesBaselineWhateverThePolicy() {
+        val text = "a".repeat(1_200)
+        val baseline = QrFrameStore.create(text, QrEncodingPolicy.BASELINE)!!
+        val robust = QrFrameStore.create(text, QrEncodingPolicy.ROBUST)!!
+        assertEquals(1, robust.frameCount)
+        assertEquals(QrEncodingPolicy.BASELINE, robust.policy)
+        assertEquals(baseline.version, robust.version)
+        val multi = QrFrameStore.create("a".repeat(3_000), QrEncodingPolicy.ROBUST)!!
+        assertTrue(multi.frameCount > 1)
+        assertEquals(QrEncodingPolicy.ROBUST, multi.policy)
+    }
+
     @Test fun genericFrameBoundsFailBeforeExpensiveEncoding() {
         for (frames in listOf(emptyList(), List(257) { "a" }, listOf("a".repeat(4_097)))) {
             try {

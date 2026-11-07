@@ -165,24 +165,19 @@ sealed class Screen(
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector
 ) {
-    data object Keyring : Screen("keyring", R.string.main_tab_keyring, Icons.Filled.VpnKey, Icons.Outlined.VpnKey)
-    data object Encrypt : Screen("encrypt", R.string.main_tab_encrypt, Icons.Filled.Lock, Icons.Outlined.Lock)
-    data object Decrypt : Screen("decrypt", R.string.main_tab_decrypt, DecryptLockOpen, Icons.Outlined.LockOpen)
-    data object Exchange : Screen("exchange", R.string.main_tab_exchange, Icons.Filled.Share, Icons.Outlined.Share)
-    data object Contacts : Screen("contacts", R.string.main_tab_contacts, Icons.Filled.Contacts, Icons.Outlined.Contacts)
-    data object Settings : Screen("settings", R.string.main_tab_settings, Icons.Filled.Settings, Icons.Outlined.Settings)
+    data object Keyring : Screen(NavRoutes.KEYRING, R.string.main_tab_keyring, Icons.Filled.VpnKey, Icons.Outlined.VpnKey)
+    data object Encrypt : Screen(NavRoutes.ENCRYPT, R.string.main_tab_encrypt, Icons.Filled.Lock, Icons.Outlined.Lock)
+    data object Decrypt : Screen(NavRoutes.DECRYPT, R.string.main_tab_decrypt, DecryptLockOpen, Icons.Outlined.LockOpen)
+    data object Exchange : Screen(NavRoutes.EXCHANGE, R.string.main_tab_exchange, Icons.Filled.Share, Icons.Outlined.Share)
+    // 4.8.0 RC6 (tabs): Contacts is no longer a tab. It opens from the Keyring's
+    // top bar as a pushed page (NavRoutes.CONTACTS, see NavTabs.kt).
+    data object Settings : Screen(NavRoutes.SETTINGS, R.string.main_tab_settings, Icons.Filled.Settings, Icons.Outlined.Settings)
 }
 
+// 4.8.0 RC6 (tabs): five tabs, in the order of bottomNavRoutes (NavTabs.kt).
+// keyringOwnedRoutes moved to NavTabs.kt as well, now with Contacts in it.
 val bottomNavScreens = listOf(
-    Screen.Keyring, Screen.Encrypt, Screen.Decrypt, Screen.Exchange, Screen.Contacts, Screen.Settings
-)
-
-// Top-level routes that belong to the Keyring tab: the NFC/card flow and the
-// recycle bin, reached from the Keyring but registered as their own
-// destinations. Tapping the Keyring tab from any of them returns to the list.
-val keyringOwnedRoutes = setOf(
-    "card_scan", "card_pin_change", "card_keygen",
-    "card_management", "card_sign", "card_decrypt", "recently_deleted"
+    Screen.Keyring, Screen.Encrypt, Screen.Decrypt, Screen.Exchange, Screen.Settings
 )
 
 // ── Activity ───────────────────────────────────────────────────────────
@@ -1255,6 +1250,9 @@ fun PGPonyMainScreen(
                         // #45 (RC4, CertainBot): the Keyring tab stays UN-highlighted on
                         // Key Detail on purpose. An unlit tab reads as "tap me to go back",
                         // the cue for returning to the list.
+                        // 4.8.0 RC6 (tabs): Contacts, now pushed from the Keyring, is
+                        // treated the same as the other Keyring sub-screens: the bar
+                        // stays, no tab is lit, and a tap on Keyring pops back to the list.
                         val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
                         NavigationBarItem(
                             icon = {
@@ -1274,12 +1272,10 @@ fun PGPonyMainScreen(
                                 // ("keyring/{fingerprint}") and the Keyring's top-level
                                 // sub-screens — the NFC/card flow and Recently Deleted — which
                                 // are registered as their own routes but belong to the Keyring
-                                // tab (CertainBot, #45).
-                                val onSubScreenOfTappedTab = current != null && (
-                                    current.startsWith(screen.route + "/") ||
-                                        (screen.route == Screen.Keyring.route &&
-                                            current in keyringOwnedRoutes)
-                                )
+                                // tab (#45).
+                                // 4.8.0 RC6 (tabs): the rule moved to isSubScreenOfTab
+                                // (NavTabs.kt) and now covers Contacts too.
+                                val onSubScreenOfTappedTab = isSubScreenOfTab(current, screen.route)
                                 if (onSubScreenOfTappedTab) {
                                     navController.popBackStack(screen.route, inclusive = false)
                                 } else {
@@ -1318,6 +1314,11 @@ fun PGPonyMainScreen(
                         onScanCard = { navController.navigate("card_scan") },
                         onOpenRecycleBin = { navController.navigate("recently_deleted") },
                         onOpenPair = { navController.navigate("pair") },
+                        // 4.8.0 RC6 (tabs): Contacts left the bottom bar and opens
+                        // from the Keyring's top bar as a pushed page.
+                        onOpenContacts = {
+                            navController.navigate(NavRoutes.CONTACTS) { launchSingleTop = true }
+                        },
                         // 4.7.0 RC6 (item 64, #92): the Exchange tab for that method.
                         onOpenExchange = { method ->
                             exchangeVm.setSection(
@@ -1469,7 +1470,12 @@ fun PGPonyMainScreen(
                 composable(Screen.Encrypt.route) { EncryptScreen(viewModel = encDecVm) }
                 composable(Screen.Decrypt.route) { DecryptScreen(viewModel = encDecVm) }
                 composable(Screen.Exchange.route) { ExchangeScreen(viewModel = exchangeVm, keyringViewModel = keyringVm) }
-                composable(Screen.Contacts.route) { ContactsScreen(viewModel = contactsVm) }
+                // 4.8.0 RC6 (tabs): a pushed destination under the Keyring, not a
+                // tab. contactsVm stays activity-scoped, so the search query and the
+                // loaded list outlive the page; Back (arrow or system) pops to the Keyring.
+                composable(NavRoutes.CONTACTS) {
+                    ContactsScreen(viewModel = contactsVm, onBack = { navController.popBackStack() })
+                }
                 composable("backup") {
                     // Consume the pending bytes exactly once so navigating
                     // back and forth doesn't re-trigger the restore.

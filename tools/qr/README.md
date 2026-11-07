@@ -41,4 +41,4 @@ failure of all decoder retries, a complete multipart scan or any physical camera
 See `docs/qa/QR_EXCHANGE_BENCHMARK.md` for results and physical validation still required.
 
 `reference_vectors.py` independently calculates the enhanced transport's Base45 and
-Reed–Solomon vectors; it is maintained with the PGPONY2 protocol tests.
+Reed-Solomon vectors; it is maintained with the PGPONY2 protocol tests.

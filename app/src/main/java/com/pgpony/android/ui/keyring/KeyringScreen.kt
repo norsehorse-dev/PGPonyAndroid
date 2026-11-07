@@ -27,6 +27,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Contacts
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -99,7 +100,10 @@ fun KeyringScreen(
     // 4.6.3 (4.7.0 item 21): pair with PGPony Desktop or another phone.
     onOpenPair: () -> Unit = {},
     // 4.7.0 RC6 (item 64, #92): Import's QR, Server and GitHub open Exchange.
-    onOpenExchange: (ImportMethod) -> Unit = {}
+    onOpenExchange: (ImportMethod) -> Unit = {},
+    // 4.8.0 RC6 (tabs): Contacts left the bottom bar; it opens from this
+    // screen's top bar instead.
+    onOpenContacts: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     // 4.6.0 (item 20): the key whose shared identity is being listed.
@@ -228,6 +232,12 @@ fun KeyringScreen(
                         Icon(Icons.Filled.IosShare, stringResource(R.string.keyring_export_selected_cd))
                     }
                   } else {
+                    // 4.8.0 RC6 (tabs): the door to Contacts, now that it is not a
+                    // tab. Only in the normal bar: select and reorder mode swap
+                    // these actions out. Outlined, the way the tab looked unselected.
+                    IconButton(onClick = onOpenContacts) {
+                        Icon(Icons.Outlined.Contacts, stringResource(R.string.main_tab_contacts))
+                    }
                     var sortMenuOpen by remember { mutableStateOf(false) }
                     IconButton(onClick = { sortMenuOpen = true }) {
                         Icon(Icons.AutoMirrored.Filled.Sort, stringResource(R.string.keyring_sort_cd))

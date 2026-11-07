@@ -628,6 +628,10 @@ RC5, new ways in:
   passphrase does not unlock it (found in RC5 device testing).
 
 RC6: #95 whole, with #100's slower playback.
+- Five tabs (added Nov 6, owner decision): Contacts leaves the bottom bar, which is now Keyring, Encrypt, Decrypt,
+  Exchange and Settings. Contacts opens from a Contacts icon in the Keyring's top bar (normal bar only, not in select
+  or reorder mode) as a pushed page with a Back arrow, under the Keyring like Recently Deleted: the bar stays, no tab
+  is lit, and Keyring or Back returns to the list. The "contacts" route keeps its name. Android only. Done in RC6.
 
 RC7: item 1, SSH with ML-DSA-44 + Ed25519, after the OkcAgent, okc-agents and OpenSSH 10.4 checks in the item.
 

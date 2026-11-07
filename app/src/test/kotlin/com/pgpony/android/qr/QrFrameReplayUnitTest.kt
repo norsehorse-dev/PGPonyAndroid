@@ -63,9 +63,11 @@ class QrFrameReplayUnitTest {
 
     @Test fun quarterTurnFallbackRecoversAnUprightPublicKeyFrameWithinTheExistingBudget() {
         val armor = javaClass.getResource("/keys/uid-selfsig-expiry-rsa.asc")!!.readText()
-        val policy = QrEncodingPolicy.ROBUST
+        // 4.8.0 RC6 (#95): with no ECI header the frame that needs the quarter turn
+        // is the second BASELINE part; the ROBUST fourth part now reads upright.
+        val policy = QrEncodingPolicy.BASELINE
         val frames = QrChunking.split(armor, policy)!!
-        val expected = frames[3]
+        val expected = frames[1]
         val layout = QrSymbolLayout.forFrames(frames, policy)
         val matrix = layout.encode(expected, policy)
         val scale = layout.fit(947).moduleScale

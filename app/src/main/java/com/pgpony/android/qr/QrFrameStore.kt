@@ -40,8 +40,13 @@ class QrFrameStore private constructor(
         private const val MAX_STORED_CHARS = 256 * 4_096
         private const val MAX_RENDER_PIXELS = 4_096
 
+        // 4.8.0 RC6 (#95): a key that fits in one code always uses BASELINE. A higher
+        // error correction level there only forces a denser version with smaller dots,
+        // the opposite of what Larger dots is for.
         fun create(text: String, policy: QrEncodingPolicy = QrEncodingPolicy.BASELINE): QrFrameStore? =
-            QrChunking.split(text, policy)?.let { fromFrames(it, policy) }
+            QrChunking.split(text, policy)?.let {
+                fromFrames(it, if (it.size == 1) QrEncodingPolicy.BASELINE else policy)
+            }
 
         /** Accepts framed text from either transport; it does not interpret the wire protocol. */
         fun fromFrames(frames: List<String>, policy: QrEncodingPolicy = QrEncodingPolicy.BASELINE): QrFrameStore {

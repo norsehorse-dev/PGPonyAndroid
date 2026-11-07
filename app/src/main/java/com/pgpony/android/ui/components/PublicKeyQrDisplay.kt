@@ -58,10 +58,18 @@ fun PublicKeyQrDisplay(
     val playback = remember(store) { store?.let(::QrPlaybackState) }
     val dialogHeight = LocalConfiguration.current.screenHeightDp.dp * 0.9f
     var enlarged by remember { mutableStateOf(false) }
-    var slow by remember { mutableStateOf(false) }
+    // 4.8.0 (#100): a multi-part code starts at the slower pace (one part a
+    // second); the chip switches to the normal 500 ms.
+    var slow by remember { mutableStateOf(true) }
+    // 4.8.0 RC6 (#95): a single code is always drawn the standard way, so the
+    // Standard and Larger dots chips only show for a multi-part code. The last
+    // known count keeps them in place while a new policy is being encoded.
+    var lastFrameCount by remember { mutableIntStateOf(0) }
+    LaunchedEffect(store) { store?.let { lastFrameCount = it.frameCount } }
+    val multiPart = (store?.frameCount ?: lastFrameCount) > 1
     Column(horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (multiPart) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(selected = policy == QrEncodingPolicy.BASELINE,
                 onClick = { onPolicyChange(QrEncodingPolicy.BASELINE) },
                 label = { Text(stringResource(R.string.qr_density_normal)) })

@@ -60,7 +60,7 @@
   "replays": [
     {
       "asset": "rfc9580-v6-clean-4px.y",
-      "sha256": "74653fa234eb375f5c57af8afdb09ec20d8002181db7facdffcc6b79fbd17c92",
+      "sha256": "fca04b976a41d0c02673619e81113f553bffb0d4d2e9532260f0fec9a2993407",
       "origin": "synthetic-production-matrix",
       "fixture": "rfc9580-v6",
       "profile": "BASELINE",
@@ -94,7 +94,7 @@
     },
     {
       "asset": "rfc9580-v6-boxblur1-4px.y",
-      "sha256": "da3f35232e4947087189c8d1c0780f864e217bd513ff92930ac52f05272f9d6d",
+      "sha256": "152b5731181c4dccc9bd405c61fe97178737ee1965b8eb3626bd7ca86a66f3d2",
       "origin": "synthetic-production-matrix",
       "fixture": "rfc9580-v6",
       "profile": "BASELINE",
@@ -128,7 +128,7 @@
     },
     {
       "asset": "rfc9580-v6-rotated-padded-3px.y",
-      "sha256": "e0a16e79491c279f80bca07d5a50714104b950d474cfe8510640c5f8e7c35cfc",
+      "sha256": "ec3fe020226c9d0524fefa9562962a4f6a008c40b2dbd716a86286abcaa503e4",
       "origin": "synthetic-production-matrix",
       "fixture": "rfc9580-v6",
       "profile": "BASELINE",
@@ -162,7 +162,7 @@
     },
     {
       "asset": "rsa-clean-4px.y",
-      "sha256": "4461c37c1703c2009241dbb195ac09a01c26a8d2d5bdf4f8a2334ffe60974ab6",
+      "sha256": "67cf3b1ce364ec5da705d8ea217c0e7134158cfc93ffcd3d13f1ca504e0eb4c7",
       "origin": "synthetic-production-matrix",
       "fixture": "rsa",
       "profile": "BASELINE",
@@ -196,7 +196,7 @@
     },
     {
       "asset": "rsa-boxblur1-4px.y",
-      "sha256": "4542715163ddae4686c3d5bae05571fa718f1684e1873c5bd095db23bcbd0e54",
+      "sha256": "8bbf652eabe3b62124d5e20e56a93f56f457012d8baad1a569b95777682aad61",
       "origin": "synthetic-production-matrix",
       "fixture": "rsa",
       "profile": "BASELINE",
@@ -230,7 +230,7 @@
     },
     {
       "asset": "rsa-rotated-padded-3px.y",
-      "sha256": "ab1fe181f3bfd07eca1083b8824947aa7eb4a9705083a12ad5d9e8f859851145",
+      "sha256": "a32cddb2f0bbb0f3b8e67dfd72ea3c7e9ae5fb57f349083970b3567effb713c7",
       "origin": "synthetic-production-matrix",
       "fixture": "rsa",
       "profile": "BASELINE",
@@ -264,7 +264,7 @@
     },
     {
       "asset": "mlkem768-clean-4px.y",
-      "sha256": "84f691ea7636fb1114f1a2a920cadb5a13bba9699ed997d9bdd380f026b2fb41",
+      "sha256": "c65898106c1c057ec8b089982c087149f6c4c44c1d62c2c313b317f0cedea974",
       "origin": "synthetic-production-matrix",
       "fixture": "mlkem768",
       "profile": "BASELINE",
@@ -298,7 +298,7 @@
     },
     {
       "asset": "mlkem768-boxblur1-4px.y",
-      "sha256": "236cc03c7dfff6fe22a86728814142df86652de847f08ece26f3ef39446a059e",
+      "sha256": "fe389798dba39795dc0dc62a7d60499393bf77870fd36fd3cea7d3803ebe42cf",
       "origin": "synthetic-production-matrix",
       "fixture": "mlkem768",
       "profile": "BASELINE",
@@ -332,7 +332,7 @@
     },
     {
       "asset": "mlkem768-rotated-padded-3px.y",
-      "sha256": "7c5f6dd551bb761cc470ecefcb1daee2b462ad56d0bbbc6b80fe6afe353fba2a",
+      "sha256": "bfc148248daeb55771ac66a6d818ee76642d3c2c6b4f9af4d921403b144e3f12",
       "origin": "synthetic-production-matrix",
       "fixture": "mlkem768",
       "profile": "BASELINE",
@@ -366,7 +366,7 @@
     },
     {
       "asset": "mldsa65-clean-4px.y",
-      "sha256": "bb9b7a813223ca8b9187beee3f0d8d02145a1d63e48e12bbe3aa1b3195d10c5c",
+      "sha256": "cf8d89a106a2eb63ee4739ffc0f1bd3612970b8ac7e71c93af05ebc8cf2da895",
       "origin": "synthetic-production-matrix",
       "fixture": "mldsa65",
       "profile": "BASELINE",
@@ -400,7 +400,7 @@
     },
     {
       "asset": "mldsa65-boxblur1-4px.y",
-      "sha256": "e9f556717fb08bffb1fd5dfc13cb70a52045bab121e2e1165340e7b144c1a4f4",
+      "sha256": "77ff8fb59bbe1fc9a001ca1ab2afdf1413a2527e04cb5b15fcb00b6c75319bd3",
       "origin": "synthetic-production-matrix",
       "fixture": "mldsa65",
       "profile": "BASELINE",
@@ -434,7 +434,7 @@
     },
     {
       "asset": "mldsa65-rotated-padded-3px.y",
-      "sha256": "5e3425ecec60baf1ebd5ff4649c66570baab159913c79aaa77e03d9c30303b0f",
+      "sha256": "e6573cff49eca9f105b3d88cf96f926a083943da9214602ef2c53716f5a4c26e",
       "origin": "synthetic-production-matrix",
       "fixture": "mldsa65",
       "profile": "BASELINE",
@@ -464,7 +464,7 @@
       ],
       "modulePixels": 3,
       "boxBlurRadius": 0,
-      "expectedResult": "not-decoded"
+      "expectedResult": "decoded"
     }
   ]
 }

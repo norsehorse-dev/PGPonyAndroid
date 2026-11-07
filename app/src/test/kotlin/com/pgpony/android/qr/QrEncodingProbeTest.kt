@@ -97,10 +97,11 @@ object QrEncodingProbe {
     data class Variant(val name: String, val scale: Int, val blurRadius: Int, val pixelStride: Int, val rotation: Int)
     val variants = listOf(Variant("clean-4px",4,0,1,0), Variant("boxblur1-4px",4,1,1,0),
         Variant("rotated-padded-3px",3,0,2,90))
-    // The dense first ML-DSA frame currently misses at rotated 3 px/module.
-    // Preserve that observed synthetic limit instead of silently discarding it.
-    fun expectedDecode(fixture: Fixture, variant: Variant): Boolean =
-        fixture.id != "mldsa65" || variant.name != "rotated-padded-3px"
+    // 4.8.0 RC6 (#95): the dense first ML-DSA frame missed at rotated 3 px/module
+    // while every code carried a UTF-8 ECI header. Without it that frame decodes too,
+    // so every recorded replay is now expected to decode.
+    @Suppress("UNUSED_PARAMETER")
+    fun expectedDecode(fixture: Fixture, variant: Variant): Boolean = true
 
     data class Replay(val bytes: ByteArray, val expected: String, val width: Int, val height: Int,
         val rowStride: Int, val pixelStride: Int, val rotation: Int, val bufferPosition: Int)

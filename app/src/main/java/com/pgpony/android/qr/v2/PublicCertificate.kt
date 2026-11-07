@@ -116,7 +116,8 @@ internal object PublicCertificate {
             val unhashedEnd = hashedEnd + 4 + length(hashedEnd)
             val saltOffset = unhashedEnd + 2
             val saltLength = octet(saltOffset)
-            val expectedSalt = when (octet(3)) { 8, 12 -> 16; 9 -> 24; 10, 14 -> 32; 11 -> 28; else -> 0 }
+            // 4.8.0 RC6 (#95): v6 salt sizes from RFC 9580 section 9.5; SHA2-224 (11) uses 16.
+            val expectedSalt = when (octet(3)) { 8, 11, 12 -> 16; 9 -> 24; 10, 14 -> 32; else -> 0 }
             require(expectedSalt != 0 && saltLength == expectedSalt)
             require(body.size == saltOffset + 1 + saltLength + signatureLength)
             return true

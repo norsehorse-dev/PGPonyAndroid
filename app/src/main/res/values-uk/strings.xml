@@ -3206,11 +3206,11 @@
     <string name="qr_density_roomy">Більші точки</string>
     <string name="qr_playback_slow">Повільніше</string>
     <string name="qr_enlarge">Збільшити QR-код</string>
-    <string name="qr_render_small">Збільште код або зменште масштаб екрана.</string>
-    <string name="qr_unsupported_version">Для цього QR-формату потрібна новіша версія PGPony. Попросіть відправника використати сумісний режим.</string>
-    <string name="qr_integrity_error">Частини не збігаються. Відскануйте цей ключ знову.</string>
+    <string name="qr_render_small">Цей код замалий, щоб показати його тут. Зменште «Розмір елементів» у налаштуваннях телефона.</string>
+    <string name="qr_unsupported_version">Для цього QR-коду потрібна новіша версія PGPony. Оновіть застосунок або попросіть відправника поділитися ключем іншим способом.</string>
+    <string name="qr_integrity_error">Частини цього коду не підходять одна до одної. Відскануйте ключ знову.</string>
     <string name="qr_enhanced_progress_format">Отримано %1$d із %2$d потрібних частин. Продовжуйте сканування.</string>
-    <string name="qr_camera_error">Не вдалося запустити камеру. Закрийте інші програми камери та спробуйте знову.</string>
+    <string name="qr_camera_error">Не вдалося запустити камеру. Закрийте інші застосунки, що використовують камеру, і спробуйте знову.</string>
     <string name="qr_retry">Спробувати знову</string>
     <string name="qr_focus_hint">Торкніться коду для фокусування.</string>
 </resources>

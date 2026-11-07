@@ -156,7 +156,11 @@ fun QRScannerScreen(
                                 metrics.collection(session.id,
                                     if (outcome.restarted) CollectionEvent.RESTARTED else CollectionEvent.NEW_PART)
                                 haptics.tap()
-                                scanProgress = context.getString(
+                                // 4.8.0 RC6 (#95): a different key mid-scan says so, and the
+                                // next part's progress replaces it.
+                                scanProgress = if (outcome.restarted) {
+                                    context.getString(R.string.qr_scan_restarted)
+                                } else context.getString(
                                     if (outcome.enhanced) R.string.qr_enhanced_progress_format else R.string.qr_scan_progress_format,
                                     outcome.have, outcome.required)
                                 true
@@ -172,6 +176,11 @@ fun QRScannerScreen(
                             PublicKeyQrResult.Malformed -> {
                                 metrics.collection(session.id, CollectionEvent.MALFORMED)
                                 scanProgress = context.getString(R.string.qr_integrity_error)
+                                false
+                            }
+                            // 4.8.0 RC6 (#95): a link or plain text is not a key, not a broken part.
+                            PublicKeyQrResult.NotAKey -> {
+                                scanProgress = context.getString(R.string.keyring_error_no_key_data)
                                 false
                             }
                         }

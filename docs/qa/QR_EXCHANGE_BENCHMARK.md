@@ -5,6 +5,12 @@ Recorded on 2026-10-17. The source reference is 4.7.0 RC6,
 and synthetic luminance results from measurements requiring physical phones.
 **Phone-to-phone performance and release acceptance remain untested.**
 
+4.8.0 RC6 changed three things after this record: a single code is always built with the
+standard profile, codes carry no UTF-8 ECI header unless the text has non-ASCII characters,
+and the replay assets were regenerated for that. Figures below that depend on those (single
+code error correction, the ML-DSA rotated miss, the test count and which frame needs the
+quarter-turn fallback) describe the PR as submitted, not RC6.
+
 The QR changes target a release after 4.7.0. Android offers compatible sending only;
 PGPONY2 receiving and reference encoding are retained for interoperability testing.
 Enhanced sending is deferred until the iOS and desktop clients can read the protocol.
@@ -60,7 +66,7 @@ parts and identical frame bytes. The 650-character certificate stays unframed.
 
 The CSV also reproduces RC6 encoding geometry: its default frame text, ZXing 3.5.3,
 default L correction, one-module margin and individually selected versions. RC6 version
-ranges were 18–18, 15–23, 13–23 and 16–23 for the four fixtures in table order. This is
+ranges were 18 to 18, 15 to 23, 13 to 23 and 16 to 23 for the four fixtures in table order. This is
 an executable reconstruction of encoder geometry; it is **not an unmodified RC6 app
 execution, RC6 camera benchmark or timing baseline**. The independent released-format
 collector test accepts current default and optional profile frame text.
@@ -183,7 +189,7 @@ text, key identifiers or camera images. Public fixtures may be recorded by the Q
 
 | Required run | Physical devices and directions | Result |
 | --- | --- | --- |
-| RC6 → RC6 on affected phones | Both directions, same fixture and conditions | UNTESTED — affected phones unavailable |
+| RC6 → RC6 on affected phones | Both directions, same fixture and conditions | UNTESTED: affected phones unavailable |
 | Current → current on affected phones | Both directions; compare medians, p95 and timeouts with RC6 | UNTESTED |
 | RC6 / 4.6.4 → current | Both fixture sizes and raw single QR | UNTESTED |
 | Current compatible → RC6 / 4.6.4 | Both fixture sizes and raw single QR | UNTESTED |
@@ -194,7 +200,7 @@ text, key identifiers or camera images. Public fixtures may be recorded by the Q
 
 Record model, OS, refresh rate, camera resolution, APK commit/hash, sender profile,
 frame count, playback cadence, distance, ambient lighting and screen brightness. Begin
-with ordinary lighting and 20–30 cm distance. Keep darker, oblique and reflective stress
+with ordinary lighting and 20 to 30 cm distance. Keep darker, oblique and reflective stress
 cases separate. Parameter selection compares profiles and 500/750/1,000 ms intervals
 in stages. Preserve all failures and timeouts in the dataset.
 

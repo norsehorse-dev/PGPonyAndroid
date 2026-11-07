@@ -736,7 +736,13 @@ class KeyDetailViewModel(
         qrJob = viewModelScope.launch {
             try {
                 val armored = withContext(Dispatchers.IO) { repo.exportArmoredPublicKey(key.fingerprint) }
-                if (armored.isNullOrBlank()) error("Public key export failed")
+                // 4.8.0 RC6 (#95): a failed export says so in the user's language and
+                // closes the sheet, as before #95, instead of an English detail.
+                if (armored.isNullOrBlank()) {
+                    if (generation == qrGeneration) _state.value = _state.value.copy(showQRSheet = false,
+                        errorMessage = PGPonyApp.instance.getString(R.string.kd_vm_error_export_for_qr))
+                    return@launch
+                }
                 // Keep sending compatible until the other clients can receive PGPONY2.
                 val store = withContext(Dispatchers.Default) { QrFrameStore.create(armored, policy) }
                 if (generation != qrGeneration || !_state.value.showQRSheet) return@launch

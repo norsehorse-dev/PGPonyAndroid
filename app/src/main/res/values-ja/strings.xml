@@ -3054,10 +3054,10 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="qr_density_roomy">大きいドット</string>
     <string name="qr_playback_slow">ゆっくり再生</string>
     <string name="qr_enlarge">QR コードを拡大</string>
-    <string name="qr_render_small">コードを拡大するか、画面の表示倍率を下げてください。</string>
-    <string name="qr_unsupported_version">この QR 形式には新しい PGPony が必要です。送信側に互換モードの使用を依頼してください。</string>
-    <string name="qr_integrity_error">分割データが一致しません。この鍵を再度スキャンしてください。</string>
-    <string name="qr_enhanced_progress_format">必要な %2$d 個中 %1$d 個を受信しました。スキャンを続けてください。</string>
+    <string name="qr_render_small">このコードは小さすぎてここに表示できません。スマートフォンの設定で「表示サイズ」を小さくしてください。</string>
+    <string name="qr_unsupported_version">この QR コードには新しいバージョンの PGPony が必要です。アプリを更新するか、送信者に別の方法で鍵を共有するよう依頼してください。</string>
+    <string name="qr_integrity_error">このコードのパートが一致しません。鍵をもう一度スキャンしてください。</string>
+    <string name="qr_enhanced_progress_format">必要な %2$d 個中 %1$d 個のパートを受信しました。スキャンを続けてください。</string>
     <string name="qr_camera_error">カメラを起動できません。他のカメラアプリを閉じて再試行してください。</string>
     <string name="qr_retry">再試行</string>
     <string name="qr_focus_hint">コードをタップしてピントを合わせてください。</string>

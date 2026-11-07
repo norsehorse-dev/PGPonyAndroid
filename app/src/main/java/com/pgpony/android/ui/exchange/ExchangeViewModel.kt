@@ -102,7 +102,14 @@ class ExchangeViewModel(
     // ── Show Key (QR) ──────────────────────────────────────────────────
 
     fun selectKey(key: PGPKeyEntity) {
-        _state.value = _state.value.copy(selectedKey = key)
+        // 4.8.0 RC6 (#95): another key drops the previous key's armor, so Copy Key
+        // and Upload never act on it while the new one exports. The same key (a
+        // return to the tab) keeps it on screen.
+        val sameKey = key.fingerprint == _state.value.selectedKey?.fingerprint
+        _state.value = _state.value.copy(
+            selectedKey = key,
+            armoredPublicKey = if (sameKey) _state.value.armoredPublicKey else null
+        )
         generateQR(key)
     }
 
@@ -117,12 +124,26 @@ class ExchangeViewModel(
         val generation = ++qrGeneration
         val policy = _state.value.qrPolicy
         _state.value.qrStore?.clear()
-        _state.value = _state.value.copy(qrStore = null, qrError = null, armoredPublicKey = null, qrTooLarge = false)
+        _state.value = _state.value.copy(qrStore = null, qrError = null, qrTooLarge = false)
         qrJob = viewModelScope.launch {
             try {
+                // 4.8.0 RC6 (#95): a key that will not export says so in place of
+                // the code, instead of a spinner that never ends.
                 val armored = withContext(Dispatchers.IO) {
                     repo.exportArmoredPublicKey(key.fingerprint)
-                } ?: error("Public key export failed")
+                } ?: run {
+                    if (generation == qrGeneration) {
+                        _state.value = _state.value.copy(
+                            qrError = PGPonyApp.instance.getString(R.string.kd_vm_error_export_for_qr)
+                        )
+                    }
+                    return@launch
+                }
+                // 4.8.0 RC6 (#95): the key's name, fingerprint, Copy Key and Upload show
+                // as soon as the key exports, so they do not vanish while the code is
+                // encoded or stay gone when encoding fails.
+                if (generation != qrGeneration) return@launch
+                _state.value = _state.value.copy(armoredPublicKey = armored)
                 // Keep sending compatible until the other clients can receive PGPONY2.
                 val store = withContext(Dispatchers.Default) { QrFrameStore.create(armored, policy) }
                 // Cancellation is cooperative; a finished old encoder must not replace a newer selection.
@@ -130,8 +151,7 @@ class ExchangeViewModel(
                 // 4.7.0 RC7 (item 69, #100): a key too large for a QR code is said
                 // in place of the code, with no pop-up, and the key's name,
                 // fingerprint and buttons stay on screen.
-                _state.value = _state.value.copy(armoredPublicKey = armored, qrStore = store,
-                    qrTooLarge = store == null)
+                _state.value = _state.value.copy(qrStore = store, qrTooLarge = store == null)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {

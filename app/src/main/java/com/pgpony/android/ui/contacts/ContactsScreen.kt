@@ -1,8 +1,10 @@
 // ContactsScreen.kt
 // PGPony Android — Phase A0 + A9
 //
-// Contacts tab UI — shows device contacts with linked PGP keys,
+// Contacts UI: shows device contacts with linked PGP keys,
 // auto-match, and keyserver discovery. Matches iOS ContactsView.
+// 4.8.0 RC6 (tabs): no longer a bottom-bar tab. It opens from the Keyring's
+// top bar as a pushed page with a Back arrow.
 //
 // Phase A9 additions:
 //   • Search bar at top of contact list (OutlinedTextField with
@@ -31,6 +33,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -56,7 +59,12 @@ import com.pgpony.android.ui.components.ScreenTooltip
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ContactsScreen(viewModel: ContactsViewModel) {
+fun ContactsScreen(
+    viewModel: ContactsViewModel,
+    // 4.8.0 RC6 (tabs): the page is pushed from the Keyring, so the app bar
+    // carries the way back (MainActivity pops the back stack).
+    onBack: () -> Unit
+) {
     val state by viewModel.state.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -89,6 +97,14 @@ fun ContactsScreen(viewModel: ContactsViewModel) {
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.contacts_screen_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.common_button_back)
+                        )
+                    }
+                },
                 actions = {
                     if (state.isAuthorized) {
                         var menuExpanded by remember { mutableStateOf(false) }

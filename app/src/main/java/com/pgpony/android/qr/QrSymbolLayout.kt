@@ -24,7 +24,7 @@ data class QrSymbolLayout(val version: Int) {
 
     /** Natural module matrix. Every frame uses this layout's shared QR version. */
     fun encode(text: String, policy: QrEncodingPolicy = QrEncodingPolicy.BASELINE): BitMatrix =
-        QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 1, 1, hints(policy) + mapOf(
+        QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 1, 1, hints(text, policy) + mapOf(
             EncodeHintType.MARGIN to QUIET_ZONE_MODULES,
             EncodeHintType.QR_VERSION to version,
         ))
@@ -36,14 +36,19 @@ data class QrSymbolLayout(val version: Int) {
         fun forFrames(frames: List<String>, policy: QrEncodingPolicy = QrEncodingPolicy.BASELINE): QrSymbolLayout {
             require(frames.isNotEmpty())
             val version = frames.maxOf {
-                Encoder.encode(it, policy.errorCorrection, hints(policy)).version.versionNumber
+                Encoder.encode(it, policy.errorCorrection, hints(it, policy)).version.versionNumber
             }
             return QrSymbolLayout(version)
         }
 
-        private fun hints(policy: QrEncodingPolicy): Map<EncodeHintType, Any> = mapOf(
-            EncodeHintType.CHARACTER_SET to "UTF-8",
-            EncodeHintType.ERROR_CORRECTION to policy.errorCorrection,
-        )
+        // 4.8.0 RC6 (#95): ZXing writes a UTF-8 ECI header into every byte-mode code
+        // that carries a CHARACTER_SET hint. Key armor, PGPONY frames and pairing
+        // invites are ASCII, so they get no hint and stay the codes the iOS and
+        // desktop scanners already read. Only text with non-ASCII characters asks for UTF-8.
+        private fun hints(text: String, policy: QrEncodingPolicy): Map<EncodeHintType, Any> =
+            if (text.any { it.code > 0x7F }) mapOf(
+                EncodeHintType.CHARACTER_SET to "UTF-8",
+                EncodeHintType.ERROR_CORRECTION to policy.errorCorrection,
+            ) else mapOf(EncodeHintType.ERROR_CORRECTION to policy.errorCorrection)
     }
 }

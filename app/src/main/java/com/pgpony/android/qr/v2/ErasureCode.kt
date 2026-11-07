@@ -1,7 +1,7 @@
 package com.pgpony.android.qr.v2
 
 /**
- * Systematic Vandermonde Reed–Solomon erasure code over GF(256), polynomial 0x11D.
+ * Systematic Vandermonde Reed-Solomon erasure code over GF(256), polynomial 0x11D.
  * Rows evaluate at the integer field elements 0..n-1; the first k rows become identity.
  * This is a transport erasure code, independent of QR symbol error correction.
  * No decoder guesses corrupt shards: the caller must verify each shard's checksum first.
