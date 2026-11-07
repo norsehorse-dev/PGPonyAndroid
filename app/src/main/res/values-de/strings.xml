@@ -3051,4 +3051,25 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="err_card_primary_missing">Der Hauptschlüssel liegt nicht im Signatur-Slot dieses Sicherheitsschlüssels, daher kann diese Änderung damit nicht vorgenommen werden</string>
     <string name="key_detail_add_subkey_card_note">Der neue Unterschlüssel wird auf diesem Telefon erzeugt. Dieser Schlüssel signiert und entschlüsselt mit dem Sicherheitsschlüssel, verschiebe den neuen Unterschlüssel also mit „Auf Sicherheitsschlüssel verschieben“ dorthin, bevor du den Schlüssel teilst. Bis dahin lassen sich Nachrichten, die an einen neuen Verschlüsselungs-Unterschlüssel verschlüsselt wurden, nicht öffnen.</string>
     <string name="key_detail_add_subkey_card_new_passphrase_hint">Der geheime Teil des neuen Unterschlüssels bleibt auf diesem Telefon, und noch kein geheimer Teil dieses Schlüssels hat hier eine Passphrase. Wähle eine, um ihn zu schützen.</string>
+    <!-- 4.8.0 RC5 (#106) -->
+    <string name="verify_file_multi_hint">Du kannst die Signatur und ihre Datei zusammen wählen oder jeweils mehrere. Jede Signatur wird ihrer Datei anhand des Namens zugeordnet.</string>
+    <string name="verify_pair_signature_format">Signatur: %1$s</string>
+    <string name="verify_pair_file_not_picked">Die Datei zu dieser Signatur wurde nicht gewählt.</string>
+    <string name="verify_pair_several_files">Mehr als eine gewählte Datei passt zum Namen dieser Signatur.</string>
+    <string name="verify_pair_no_signature">Nicht verifiziert: Für diese Datei wurde keine Signatur gewählt.</string>
+    <!-- 4.8.0 RC5 (#103) -->
+    <string name="process_text_encrypt_label">Mit PGPony verschlüsseln</string>
+    <string name="process_text_sign_label">Mit PGPony signieren</string>
+    <string name="process_text_input_label">Ausgewählter Text</string>
+    <string name="process_text_result_not_replaced">Dieser Text kann an der markierten Stelle nicht ersetzt werden, daher hier das Ergebnis zum Kopieren oder Teilen.</string>
+    <!-- 4.8.0 RC5 (#104) -->
+    <string name="settings_compress_large_title">Große Dateien komprimieren</string>
+    <string name="settings_compress_large_subtitle">Auch Dateien über 16 MB komprimieren. Langsamer, und die Ersparnis hängt von der Datei ab.</string>
+    <!-- 4.8.0 RC5 (4m) -->
+    <string name="keyring_reorder_menu">Schlüssel umsortieren</string>
+    <string name="keyring_reorder_title">Schlüssel umsortieren</string>
+    <!-- 4.8.0 RC5 (#72, #67) -->
+    <string name="share_target_action_sign_file_subtitle">Eine abgetrennte Signatur (.asc oder .sig) erstellen. Die Datei selbst bleibt unverändert.</string>
+    <string name="share_target_sign_result_subtitle">Bewahre die Signatur zusammen mit der Datei auf, damit andere prüfen können, dass sie von dir stammt und nicht verändert wurde.</string>
+    <string name="share_target_action_restore_subtitle">Das ist ein Backup des Schlüsselbunds. Öffne „Wiederherstellen“ und gib seinen Wiederherstellungscode ein.</string>
 </resources>

@@ -114,6 +114,8 @@ data class SettingsUiState(
     // darkvegas interop: passphrase encryption uses gpg-friendly S2K type 3 by
     // default; this opts back into Argon2id (needs GnuPG 2.4+). Default off.
     val useArgon2: Boolean = false,
+    // 4.8.0 (#104): ZLIB-compress files over 16 MB too (default off).
+    val compressLargeFiles: Boolean = false,
     val allowExpiredKeys: Boolean = false,
     // item 8 (#request): offer the post-keygen publish prompt (default on).
     val offerPublishAfterKeygen: Boolean = true,
@@ -208,6 +210,16 @@ class SettingsViewModel(
         _state.value = _state.value.copy(useArgon2 = enabled)
     }
 
+    /** 4.8.0 (#104): lift the 16 MB ZLIB limit so every file is compressed.
+     *  EncryptDecryptViewModel reads it live at each file encrypt. Off by
+     *  default because deflate over a large file costs minutes. */
+    fun setCompressLargeFiles(enabled: Boolean) {
+        prefs.edit().putBoolean(
+            com.pgpony.android.ui.encrypt.CompressionPolicy.PREF_COMPRESS_LARGE_FILES, enabled
+        ).apply()
+        _state.value = _state.value.copy(compressLargeFiles = enabled)
+    }
+
     fun setAllowExpiredKeys(enabled: Boolean) {
         prefs.edit().putBoolean("allow_expired_keys", enabled).apply()
         _state.value = _state.value.copy(allowExpiredKeys = enabled)
@@ -253,6 +265,9 @@ class SettingsViewModel(
             // 3.1.0 always-on behavior.
             clearInputsAfterEncrypt = prefs.getBoolean("clear_inputs_after_encrypt", true),
             useArgon2 = prefs.getBoolean("use_argon2", false),
+            compressLargeFiles = prefs.getBoolean(
+                com.pgpony.android.ui.encrypt.CompressionPolicy.PREF_COMPRESS_LARGE_FILES, false
+            ),
             allowExpiredKeys = prefs.getBoolean("allow_expired_keys", false),
             offerPublishAfterKeygen = prefs.getBoolean("offer_publish_after_keygen", true),
             keyringDragReorder = prefs.getBoolean("keyring_drag_reorder", true),

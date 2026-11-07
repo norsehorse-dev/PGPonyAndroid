@@ -11,6 +11,8 @@
 //   ShareTargetPhase.PickDecryptKey  → ShareDecryptScreen
 //   ShareTargetPhase.NeedPassphrase  → ShareDecryptScreen
 //   ShareTargetPhase.DecryptResult   → ShareDecryptResultContent
+//   ShareTargetPhase.PickSigner      → ShareSignPicker          (4.8.0, #72)
+//   ShareTargetPhase.SignResult      → ShareSignResultContent   (4.8.0, #72)
 //   ShareTargetPhase.Error           → ShareErrorContent
 //
 // The activity is intentionally a single-screen surface — every phase
@@ -39,7 +41,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Verified
 import com.pgpony.android.intent.IntentHandler
 import androidx.compose.material.icons.filled.ContentCopy
@@ -86,12 +91,40 @@ fun ShareTargetScreen(
 ) {
     val state by vm.state.collectAsState()
     // 4.7.0 (item 10): recipients marked Don't use, waiting on confirmation.
-    var dontUsePrompt by remember { mutableStateOf<List<com.pgpony.android.data.PGPKeyEntity>?>(null) }
-    dontUsePrompt?.let { keys ->
+    // 4.8.0 (#72): the signer too, and the action to run once confirmed
+    // (Encrypt, or Sign).
+    var dontUsePrompt by remember {
+        mutableStateOf<Pair<List<com.pgpony.android.data.PGPKeyEntity>, () -> Unit>?>(null)
+    }
+    dontUsePrompt?.let { (keys, action) ->
         com.pgpony.android.ui.components.DontUseConfirmDialog(
             keys = keys,
-            onConfirm = { dontUsePrompt = null; vm.performEncrypt() },
+            onConfirm = { dontUsePrompt = null; action() },
             onDismiss = { dontUsePrompt = null }
+        )
+    }
+    // 4.8.0 (#72): 4.6.0 (item 14), as on the Encrypt screen. An ML-DSA
+    // signer encrypting to a v4 recipient: PGPony reads the signature,
+    // GnuPG and Thunderbird do not. Let the user choose.
+    if (state.showPqcV4SignPrompt) {
+        AlertDialog(
+            onDismissRequest = { vm.dismissPqcV4SignPrompt() },
+            icon = { Icon(Icons.Filled.Info, contentDescription = null) },
+            title = { Text(stringResource(R.string.pqc_v4_sign_title)) },
+            text = { Text(stringResource(R.string.pqc_v4_sign_message)) },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = { vm.answerPqcV4SignPrompt(signAnyway = true) }) {
+                        Text(stringResource(R.string.pqc_v4_sign_anyway))
+                    }
+                    TextButton(onClick = { vm.answerPqcV4SignPrompt(signAnyway = false) }) {
+                        Text(stringResource(R.string.pqc_v4_send_unsigned))
+                    }
+                    TextButton(onClick = { vm.dismissPqcV4SignPrompt() }) {
+                        Text(stringResource(R.string.common_button_cancel))
+                    }
+                }
+            }
         )
     }
     val context = LocalContext.current
@@ -160,6 +193,7 @@ fun ShareTargetScreen(
                     ShareTargetPhase.PickDecryptKey,
                     ShareTargetPhase.NeedPassphrase,
                     ShareTargetPhase.CardPin,
+                    ShareTargetPhase.PickSigner,
                 )
             ) {
                 ShareInputPreview(content = state.content)
@@ -170,6 +204,11 @@ fun ShareTargetScreen(
                     state = state,
                     onEncrypt = { vm.beginEncrypt() },
                     onDecrypt = { vm.beginDecrypt() },
+                    onSign = { vm.beginSign() },
+                    onRestoreBackup = { file ->
+                        forwardBackupToMainApp(context, file)
+                        onDismiss()
+                    },
                     onOpenFullApp = { launchFullApp(context); onDismiss() },
                     onForwardKeyToMainApp = { armoredKey ->
                         launchFullAppWithForward(context, armoredKey)
@@ -190,12 +229,59 @@ fun ShareTargetScreen(
                     onToggleRecipient = vm::toggleRecipient,
                     onConfirm = {
                         // 4.7.0 (item 10): encrypting to a key marked Don't use asks first.
+                        // 4.8.0 (#72): signing with one too.
                         val flagged = com.pgpony.android.ui.components.dontUseKeys(
-                            state.availableRecipients.filter { it.fingerprint in state.selectedRecipients }
+                            state.availableRecipients.filter { it.fingerprint in state.selectedRecipients } +
+                                listOfNotNull(state.signingKey)
                         )
-                        if (flagged.isEmpty()) { vm.performEncrypt() } else { dontUsePrompt = flagged }
+                        if (flagged.isEmpty()) { vm.performEncrypt() } else {
+                            dontUsePrompt = flagged to { vm.performEncrypt() }
+                        }
                     },
                     onBack = { vm.goBackToActionPicker() },
+                    onSelectSigner = vm::selectSigner,
+                    onSignPassphraseChange = vm::updateSignPassphrase,
+                )
+
+                ShareTargetPhase.PickSigner -> ShareSignPicker(
+                    state = state,
+                    onSelectSigner = vm::selectSigner,
+                    onSetArmor = vm::setSignArmor,
+                    onSignPassphraseChange = vm::updateSignPassphrase,
+                    onSign = {
+                        // 4.7.0 (item 10), as on the Sign a file sheet: a key marked Don't use asks first.
+                        val flagged = com.pgpony.android.ui.components.dontUseKeys(listOf(state.signingKey))
+                        if (flagged.isEmpty()) { vm.performSign() } else {
+                            dontUsePrompt = flagged to { vm.performSign() }
+                        }
+                    },
+                    onBack = { vm.goBackToActionPicker() },
+                )
+
+                ShareTargetPhase.SignResult -> ShareSignResultContent(
+                    state = state,
+                    onSave = {
+                        saveResult(
+                            context,
+                            state.signatureBytes,
+                            null,
+                            state.signatureFileName ?: "signature.asc",
+                            onTask = onQuickSaveTask,
+                        ) { saveNote = it }
+                    },
+                    saveNote = saveNote,
+                    onShare = {
+                        shareFile(
+                            context,
+                            state.signatureBytes,
+                            null,
+                            state.signatureFileName ?: "signature.asc",
+                            // As the Sign a file sheet shares one (shareSignatureFile).
+                            mimeType = "application/pgp-signature",
+                            chooserTitle = R.string.sign_file_share_button,
+                        )
+                    },
+                    onDone = onDismiss,
                 )
 
                 ShareTargetPhase.PickDecryptKey -> ShareDecryptKeyPicker(
@@ -354,10 +440,14 @@ fun ShareTargetScreen(
 }
 
 // ── Scaffold ───────────────────────────────────────────────────────────
+//
+// 4.8.0 (#103): the scaffold, processing, preview, result row, error and
+// save helpers are internal so the text selection flow (ProcessTextScreen)
+// shows the same screens.
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ShareScaffold(
+internal fun ShareScaffold(
     title: String,
     onDismiss: () -> Unit,
     content: @Composable (PaddingValues) -> Unit,
@@ -400,6 +490,9 @@ private fun ShareTitleForPhase(phase: ShareTargetPhase): String = when (phase) {
     ShareTargetPhase.EncryptFileResult -> stringResource(R.string.share_target_encrypt_file_result_title)
     ShareTargetPhase.DecryptResult -> stringResource(R.string.share_target_decrypt_result_title)
     ShareTargetPhase.DecryptFileResult -> stringResource(R.string.share_target_decrypt_file_result_title)
+    // 4.8.0 (#72)
+    ShareTargetPhase.PickSigner -> stringResource(R.string.sign_file_sheet_title)
+    ShareTargetPhase.SignResult -> stringResource(R.string.encrypt_sign_detached_label)
     ShareTargetPhase.Error -> stringResource(R.string.app_name)
 }
 
@@ -517,6 +610,8 @@ private fun ShareRootContent(
     state: ShareTargetUiState,
     onEncrypt: () -> Unit,
     onDecrypt: () -> Unit,
+    onSign: () -> Unit,
+    onRestoreBackup: (ShareIntentContent.PgpFile) -> Unit,
     onOpenFullApp: () -> Unit,
     onForwardKeyToMainApp: (String) -> Unit,
     onForwardEncryptText: (String) -> Unit,
@@ -551,6 +646,23 @@ private fun ShareRootContent(
     }
     val payload = remember(sharedText) { sharedText?.let { SharePayload.of(it) } }
 
+    // 4.8.0 (#67): a keyring backup opens Restore, and nothing else: it is
+    // sealed with its recovery code, so Decrypt could never open it. Checked
+    // before the empty-keyring case, because restoring is how an empty
+    // keyring gets its keys back.
+    val sharedFile = content as? ShareIntentContent.PgpFile
+    if (sharedFile != null && sharedFile.looksLikeBackup) {
+        SingleFileActionCards(
+            actions = ShareFileActions.forFile(isBackup = true, looksLikeMessage = sharedFile.looksLikePgpMessage),
+            state = state,
+            onEncrypt = onEncrypt,
+            onDecrypt = onDecrypt,
+            onSign = onSign,
+            onRestore = { onRestoreBackup(sharedFile) },
+        )
+        return
+    }
+
     // Empty keyring: only a public key can be acted on (by importing it).
     if (noKeyPairs && noRecipients && payload?.publicKey == null && payload?.privateKey == null) {
         ShareActionCard(
@@ -565,9 +677,16 @@ private fun ShareRootContent(
     if (payload == null) {
         // A binary file: decrypt it when it looks like a PGP message,
         // otherwise encrypt it.
-        val looksLikeMessage = (content as? ShareIntentContent.PgpFile)?.looksLikePgpMessage == true
-        if (looksLikeMessage) {
-            DecryptCard(onDecrypt, noKeyPairs)
+        // 4.8.0 (#72): or sign it (a detached signature), see ShareFileActions.
+        if (sharedFile != null) {
+            SingleFileActionCards(
+                actions = ShareFileActions.forFile(isBackup = false, looksLikeMessage = sharedFile.looksLikePgpMessage),
+                state = state,
+                onEncrypt = onEncrypt,
+                onDecrypt = onDecrypt,
+                onSign = onSign,
+                onRestore = { onRestoreBackup(sharedFile) },
+            )
         } else {
             EncryptCard(onEncrypt, noRecipients)
         }
@@ -630,6 +749,50 @@ private fun ShareRootContent(
                 onClick = { onForwardEncryptText(sharedText ?: other) },
             )
         }
+    }
+}
+
+/** 4.8.0 (#72, #67): the cards for one shared file, in [actions] order. */
+@Composable
+private fun SingleFileActionCards(
+    actions: List<ShareFileActions.Action>,
+    state: ShareTargetUiState,
+    onEncrypt: () -> Unit,
+    onDecrypt: () -> Unit,
+    onSign: () -> Unit,
+    onRestore: () -> Unit,
+) {
+    for (action in actions) {
+        when (action) {
+            ShareFileActions.Action.RESTORE -> ShareActionCard(
+                title = stringResource(R.string.backup_menu_restore_title),
+                subtitle = stringResource(R.string.share_target_action_restore_subtitle),
+                icon = Icons.Filled.Restore,
+                onClick = onRestore,
+            )
+            ShareFileActions.Action.DECRYPT -> DecryptCard(onDecrypt, state.availableKeyPairs.isEmpty())
+            ShareFileActions.Action.ENCRYPT -> EncryptCard(onEncrypt, state.availableRecipients.isEmpty())
+            ShareFileActions.Action.SIGN -> SignCard(onSign, state.availableSigners.isEmpty())
+        }
+    }
+}
+
+/** 4.8.0 (#72): a detached signature over the shared file. */
+@Composable
+private fun SignCard(onSign: () -> Unit, noSigners: Boolean) {
+    ShareActionCard(
+        title = stringResource(R.string.sign_file_sheet_title),
+        subtitle = stringResource(R.string.share_target_action_sign_file_subtitle),
+        icon = Icons.Filled.Draw,
+        onClick = onSign,
+        enabled = !noSigners,
+    )
+    if (noSigners) {
+        Text(
+            text = stringResource(R.string.encrypt_sign_as_no_key_pair),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
     }
 }
 
@@ -729,7 +892,7 @@ fun ShareActionCard(
 // ── Processing ─────────────────────────────────────────────────────────
 
 @Composable
-private fun ShareProcessingContent() {
+internal fun ShareProcessingContent() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -860,6 +1023,86 @@ private fun ShareEncryptFileResultContent(
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(stringResource(R.string.share_target_encrypt_file_result_share_button))
+    }
+    ShareSaveNote(saveNote)
+    TextButton(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.share_target_result_done))
+    }
+}
+
+// ── Sign result (4.8.0, #72) ───────────────────────────────────────────
+
+/** The detached signature: its name and size, Save, Share, Done, as the
+ *  encrypted file result shows a file. */
+@Composable
+private fun ShareSignResultContent(
+    state: ShareTargetUiState,
+    onSave: () -> Unit,
+    saveNote: String?,
+    onShare: () -> Unit,
+    onDone: () -> Unit,
+) {
+    val name = state.signatureFileName ?: "signature.asc"
+    val size = state.signatureBytes?.size?.toLong() ?: 0L
+    Text(
+        text = stringResource(R.string.share_target_sign_result_subtitle),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Draw,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = stringResource(
+                        R.string.share_target_encrypt_file_result_size_format,
+                        size,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    Button(
+        onClick = onSave,
+        enabled = LocalShareSaveState.current !is SafeSave.State.Running,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.SaveAlt,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(stringResource(R.string.common_button_save))
+    }
+    OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth()) {
+        Icon(
+            imageVector = Icons.Filled.Share,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(stringResource(R.string.sign_file_share_button))
     }
     ShareSaveNote(saveNote)
     TextButton(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
@@ -1011,7 +1254,7 @@ private fun ShareDecryptResultContent(
 }
 
 @Composable
-private fun ShareCipherPreview(text: String, monospace: Boolean = true) {
+internal fun ShareCipherPreview(text: String, monospace: Boolean = true) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -1031,7 +1274,7 @@ private fun ShareCipherPreview(text: String, monospace: Boolean = true) {
 // ── Result action row (Copy / Share / Done) ────────────────────────────
 
 @Composable
-private fun ShareResultActionRow(
+internal fun ShareResultActionRow(
     onCopy: () -> Unit,
     onSave: () -> Unit,
     onShare: () -> Unit,
@@ -1098,8 +1341,8 @@ private fun ShareResultActionRow(
  */
 /** 4.7.0 (item 37): the running Quick Action save, for ShareSaveNote and
  *  the Save buttons, provided once at the root. */
-private val LocalShareSaveState = compositionLocalOf<SafeSave.State?> { null }
-private val LocalShareSaveCancel = compositionLocalOf<(() -> Unit)?> { null }
+internal val LocalShareSaveState = compositionLocalOf<SafeSave.State?> { null }
+internal val LocalShareSaveCancel = compositionLocalOf<(() -> Unit)?> { null }
 
 @Composable
 private fun ShareSaveNote(note: String?) {
@@ -1123,7 +1366,7 @@ private fun ShareSaveNote(note: String?) {
 // ── Error ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun ShareErrorContent(
+internal fun ShareErrorContent(
     message: String?,
     onBack: () -> Unit,
     onDismiss: () -> Unit,
@@ -1176,6 +1419,8 @@ private fun shareFile(
     scratch: File?,
     filename: String,
     mimeType: String = "application/pgp-encrypted",
+    // 4.8.0 (#72): a signature is not an encrypted message.
+    chooserTitle: Int = R.string.share_target_share_chooser_encrypted,
 ) {
     try {
         // 4.0.4 — a streamed result already sits in cacheDir/scratch,
@@ -1200,7 +1445,7 @@ private fun shareFile(
         }
         val chooser = Intent.createChooser(
             send,
-            context.getString(R.string.share_target_share_chooser_encrypted),
+            context.getString(chooserTitle),
         )
         chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(chooser)
@@ -1233,7 +1478,7 @@ private fun shareFile(
  * A cancelled picker is silent — the user chose that, and reporting it as
  * an outcome reads like a failure.
  */
-private fun saveResult(
+internal fun saveResult(
     context: Context,
     bytes: ByteArray?,
     scratch: File?,
@@ -1310,6 +1555,38 @@ private fun forwardToMainApp(context: Context, action: String, extra: String, te
         putExtra(extra, text)
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
     }
+    context.startActivity(intent)
+}
+
+/**
+ * 4.8.0 (#67): hand a shared keyring backup to the main app's Restore, the
+ * route a .pgpony opened from a file manager takes (IntentAction.RestoreBackup,
+ * the "backup" screen with the file loaded). The bytes ride as an extra when
+ * they were read and fit under FORWARD_SIZE_LIMIT, as a forwarded detached
+ * signature does; otherwise the file's URI goes as ACTION_VIEW, which
+ * IntentHandler.handleFileUri reads and routes to Restore the same way.
+ * MainActivity reads it in onCreate or onNewIntent, while this activity
+ * still holds the share's read grant; the grant flag passes it on as well.
+ */
+private fun forwardBackupToMainApp(context: Context, file: ShareIntentContent.PgpFile) {
+    val bytes = file.data
+    val uri = file.uri
+    val intent = Intent(context, MainActivity::class.java)
+    if (bytes != null && bytes.size <= IntentHandler.FORWARD_SIZE_LIMIT) {
+        intent.action = IntentHandler.ACTION_RESTORE_BACKUP
+        intent.putExtra(IntentHandler.EXTRA_BACKUP_BYTES, bytes)
+    } else if (uri != null) {
+        intent.action = Intent.ACTION_VIEW
+        intent.data = uri
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    } else {
+        return
+    }
+    // CLEAR_TOP + SINGLE_TOP: deliver to a running MainActivity through
+    // onNewIntent, as the detached-signature forward does.
+    intent.addFlags(
+        Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+    )
     context.startActivity(intent)
 }
 

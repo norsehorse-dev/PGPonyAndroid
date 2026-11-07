@@ -20,6 +20,12 @@
 // Selection model: tap a row to toggle in/out of selectedRecipients
 // (Set<String> of fingerprints, owned by ShareTargetViewModel). The
 // Encrypt button is disabled until at least one recipient is picked.
+//
+// 4.8.0 (#72): a shared file can be signed here too. Encrypt gains a Sign
+// as row (None by default, so an Encrypt is unsigned unless asked), and
+// the Sign phase (ShareSignPicker) makes a detached signature. Both use the
+// app's SignAsSheet and the Sign a file sheet's format chips and passphrase
+// field.
 
 package com.pgpony.android.ui.share
 
@@ -27,21 +33,31 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pgpony.android.R
 import com.pgpony.android.data.PGPKeyEntity
+import com.pgpony.android.intent.ShareIntentContent
+import com.pgpony.android.ui.util.autofillPassword
 
 @Composable
 fun ShareEncryptPicker(
@@ -49,6 +65,8 @@ fun ShareEncryptPicker(
     onToggleRecipient: (String) -> Unit,
     onConfirm: () -> Unit,
     onBack: () -> Unit,
+    onSelectSigner: (PGPKeyEntity?) -> Unit = {},
+    onSignPassphraseChange: (String) -> Unit = {},
 ) {
     val recipients = state.availableRecipients
     if (recipients.isEmpty()) {
@@ -70,6 +88,16 @@ fun ShareEncryptPicker(
             selected = selected,
             onClick = { onToggleRecipient(key.fingerprint) },
         )
+    }
+
+    // 4.8.0 (#72): encrypt and sign a shared file. Only a file that is not
+    // armored text: text keeps its own Sign route to the Encrypt screen.
+    val file = state.content as? ShareIntentContent.PgpFile
+    if (file != null && file.armoredText == null && state.availableSigners.isNotEmpty()) {
+        ShareSignAsRow(state = state, allowNone = true, onSelectSigner = onSelectSigner)
+        if (state.signingKey != null) {
+            ShareSignPassphraseField(value = state.signPassphrase, onValueChange = onSignPassphraseChange)
+        }
     }
 
     if (state.errorMessage != null) {
@@ -147,6 +175,169 @@ fun ShareRecipientRow(
                     fontFamily = FontFamily.Monospace,
                 )
             }
+        }
+    }
+}
+
+// ── 4.8.0 (#72): Sign as, the Sign phase ───────────────────────────────
+
+/**
+ * The Sign as row. Tapping it opens the app's SignAsSheet over the software
+ * key pairs ([ShareTargetUiState.availableSigners]); [allowNone] adds its
+ * "None (don't sign)" entry, which Encrypt starts on.
+ */
+@Composable
+fun ShareSignAsRow(
+    state: ShareTargetUiState,
+    allowNone: Boolean,
+    onSelectSigner: (PGPKeyEntity?) -> Unit,
+) {
+    var showSheet by remember { mutableStateOf(false) }
+    val key = state.signingKey
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = state.availableSigners.isNotEmpty()) { showSheet = true },
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.VpnKey,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.encrypt_sign_as_label),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = when {
+                        key != null -> key.pickerLabel
+                        allowNone -> stringResource(R.string.encrypt_sign_none_option)
+                        else -> stringResource(R.string.sign_file_sign_with_none)
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+    if (showSheet) {
+        com.pgpony.android.ui.encrypt.SignAsSheet(
+            keyPairs = state.availableSigners,
+            currentSelection = key,
+            onSelect = { picked ->
+                onSelectSigner(picked)
+                showSheet = false
+            },
+            onDismiss = { showSheet = false },
+            defaultSignerFingerprint = state.defaultSignerFingerprint,
+            allowNone = allowNone,
+            noneSelected = allowNone && key == null,
+            onSelectNone = if (allowNone) {
+                {
+                    onSelectSigner(null)
+                    showSheet = false
+                }
+            } else null,
+        )
+    }
+}
+
+/** The signing passphrase, as on the Sign a file sheet. Optional: an
+ *  unprotected key, or one whose passphrase is cached, needs none. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ShareSignPassphraseField(
+    value: String,
+    onValueChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(stringResource(R.string.sign_file_passphrase_label)) },
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        singleLine = true,
+        // 4.1.0 §3 (issue #8): see ui/util/Autofill.kt.
+        modifier = Modifier
+            .fillMaxWidth()
+            .autofillPassword { onValueChange(it) },
+    )
+}
+
+/**
+ * 4.8.0 (#72): the Sign phase. The Sign as key, .asc or .sig, and the
+ * passphrase, then Sign. Hardware keys are not offered (no card signing in
+ * the Quick Action, as on the Sign a file sheet).
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun ShareSignPicker(
+    state: ShareTargetUiState,
+    onSelectSigner: (PGPKeyEntity?) -> Unit,
+    onSetArmor: (Boolean) -> Unit,
+    onSignPassphraseChange: (String) -> Unit,
+    onSign: () -> Unit,
+    onBack: () -> Unit,
+) {
+    ShareSignAsRow(state = state, allowNone = false, onSelectSigner = onSelectSigner)
+
+    // FlowRow, as on the Sign a file sheet, so a long translation wraps.
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilterChip(
+            selected = state.signArmor,
+            onClick = { onSetArmor(true) },
+            label = { Text(stringResource(R.string.sign_file_format_armored)) },
+        )
+        FilterChip(
+            selected = !state.signArmor,
+            onClick = { onSetArmor(false) },
+            label = { Text(stringResource(R.string.sign_file_format_binary)) },
+        )
+    }
+
+    ShareSignPassphraseField(value = state.signPassphrase, onValueChange = onSignPassphraseChange)
+
+    if (state.errorMessage != null) {
+        Text(
+            text = state.errorMessage,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+        )
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) {
+            Text(stringResource(R.string.common_button_back))
+        }
+        Button(
+            onClick = onSign,
+            modifier = Modifier.weight(1f),
+            enabled = state.signingKey != null,
+        ) {
+            Text(stringResource(R.string.sign_file_sign_button))
         }
     }
 }

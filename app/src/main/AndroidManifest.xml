@@ -308,6 +308,42 @@
             </intent-filter>
         </activity>
         <!--
+          4.8.0 (#103): Encrypt and Sign in the text selection menu
+          (ACTION_PROCESS_TEXT). The menu lists one entry per matching
+          component, labelled by its android:label, so there are two aliases
+          of one activity; ProcessText.modeFor tells them apart by the alias
+          name on the intent. The activity itself has no filter and is not
+          exported; the aliases are. It is a standard activity in the calling
+          app's task (no singleTop, no taskAffinity), so the result of an
+          editable field reaches the caller through setResult.
+        -->
+        <activity
+            android:name=".ui.share.ProcessTextActivity"
+            android:exported="false"
+            android:theme="@style/Theme.PGPony" />
+        <activity-alias
+            android:name=".ui.share.ProcessTextEncrypt"
+            android:targetActivity=".ui.share.ProcessTextActivity"
+            android:label="@string/process_text_encrypt_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".ui.share.ProcessTextSign"
+            android:targetActivity=".ui.share.ProcessTextActivity"
+            android:label="@string/process_text_sign_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
+        <!--
           Phase A7 Fix3 — FileProvider for sharing exported .asc files.
 
           Authority is namespaced with applicationId so it's globally

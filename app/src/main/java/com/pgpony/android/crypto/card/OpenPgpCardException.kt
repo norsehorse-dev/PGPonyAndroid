@@ -88,6 +88,17 @@ sealed class OpenPgpCardException(message: String, cause: Throwable? = null) :
         "A chosen slot on this security key already holds another key"
     )
 
+    /**
+     * 4.8.0 (4p): the card cannot hold a key chosen for a move, with what it
+     * answered in protocol terms ([detail], e.g. "slot B6: key import, status
+     * 6A80"). The message is the usual "cannot hold" text with the detail in
+     * parentheses after it; the move screen shows the localized text followed
+     * by the same untranslated detail, so a report says which command failed.
+     */
+    class CardRefused(val detail: String, cause: Throwable? = null) : OpenPgpCardException(
+        "${KeyToCardService.UNSUPPORTED_MESSAGE} ($detail)", cause
+    )
+
     /** A response was structurally invalid (bad TLV, short data, etc.). */
     class Malformed(message: String, cause: Throwable? = null) :
         OpenPgpCardException(message, cause)

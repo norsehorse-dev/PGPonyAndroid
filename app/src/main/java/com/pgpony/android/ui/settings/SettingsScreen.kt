@@ -421,6 +421,15 @@ fun SettingsScreen(
                 checked = state.useArgon2,
                 onCheckedChange = { viewModel.setUseArgon2(it) }
             )
+            // 4.8.0 (#104): opt in to ZLIB over files past the 16 MB limit.
+            SettingsToggle(
+                title = stringResource(R.string.settings_compress_large_title),
+                subtitle = stringResource(R.string.settings_compress_large_subtitle),
+                icon = Icons.Filled.Lock,
+                iconTint = Color(0xFF8B5CF6),
+                checked = state.compressLargeFiles,
+                onCheckedChange = { viewModel.setCompressLargeFiles(it) }
+            )
             SettingsToggle(
                 title = stringResource(R.string.settings_allow_expired_title),
                 subtitle = stringResource(R.string.settings_allow_expired_subtitle),

@@ -526,7 +526,7 @@ private fun LinkedContactRow(contact: ContactWithKeys) {
                                        .copy(alpha = 0.6f)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        AlgorithmBadge(key.algorithm.shortName)
+                        AlgorithmBadge(com.pgpony.android.crypto.KeyAlgorithmLabel.badge(key.algorithm, key.fingerprint, key.armoredPublicKey))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             key.shortFingerprint,

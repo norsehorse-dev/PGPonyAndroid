@@ -185,6 +185,11 @@ sealed class ShareIntentContent {
         // no verify flow. Default false so existing constructions
         // are unaffected.
         val looksLikeDetachedSignature: Boolean = false,
+        // 4.8.0 (#67): true when the file is a keyring backup by its
+        // content (BackupFileSniff). The Quick Action offers Restore for
+        // it, which opens the main app's Restore with the file. Default
+        // false so existing constructions are unaffected.
+        val looksLikeBackup: Boolean = false,
     ) : ShareIntentContent()
 
     // Nothing usable in the intent. Activity should show an empty-state
@@ -218,6 +223,14 @@ object IntentHandler {
     // app's verify surface (signer lookup, trust, composite signatures).
     const val ACTION_VERIFY_TEXT = "com.pgpony.android.action.VERIFY_TEXT"
     const val EXTRA_VERIFY_TEXT = "com.pgpony.android.extra.VERIFY_TEXT"
+
+    // 4.8.0 (#67): the Quick Action hands a shared keyring backup to the main
+    // app's Restore (IntentAction.RestoreBackup, the route a .pgpony opened
+    // from a file manager takes). The bytes ride as an extra when they fit
+    // under FORWARD_SIZE_LIMIT; a larger backup is forwarded as ACTION_VIEW
+    // on its URI instead, which handleFileUri routes to Restore the same way.
+    const val ACTION_RESTORE_BACKUP = "com.pgpony.android.action.RESTORE_BACKUP"
+    const val EXTRA_BACKUP_BYTES = "com.pgpony.android.extra.BACKUP_BYTES"
 
     // ── 3.1.0 Phase 1 (C3) — size-aware routing constants ──────────────
     //
@@ -351,6 +364,11 @@ object IntentHandler {
             ACTION_VERIFY_TEXT -> {
                 val text = intent.getStringExtra(EXTRA_VERIFY_TEXT)
                 if (!text.isNullOrBlank()) IntentAction.VerifyText(text) else IntentAction.None
+            }
+            // 4.8.0 (#67): a backup shared to the Quick Action.
+            ACTION_RESTORE_BACKUP -> {
+                val bytes = intent.getByteArrayExtra(EXTRA_BACKUP_BYTES)
+                if (bytes != null && bytes.isNotEmpty()) IntentAction.RestoreBackup(bytes) else IntentAction.None
             }
             else -> IntentAction.None
         }
@@ -755,6 +773,8 @@ object IntentHandler {
             looksLikePgpMessage = looksEncrypted,
             looksLikePgpKey = false,
             looksLikeDetachedSignature = false,
+            // 4.8.0 (#67): a large backup is recognized from its head too.
+            looksLikeBackup = com.pgpony.android.backup.BackupFileSniff.isKeyringBackup(head, filename),
         )
     }
 
@@ -808,6 +828,8 @@ object IntentHandler {
                     looksLikePgpKey = isKey,
                     // 3.1.0 Phase 1 Fix3 — armored standalone SIGNATURE block.
                     looksLikeDetachedSignature = isDetachedSignature(trimmed),
+                    // 4.8.0 (#67): a keyring backup, by its armor headers.
+                    looksLikeBackup = com.pgpony.android.backup.BackupFileSniff.isKeyringBackup(bytes, filename),
                 )
             } else if (bytes.isNotEmpty()) {
                 // Distinguish a real encrypted OpenPGP message from an arbitrary

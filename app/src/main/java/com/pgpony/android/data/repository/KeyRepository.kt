@@ -910,7 +910,10 @@ class KeyRepository(
                 userId = importResult.userID,
                 userName = parsed.first,
                 userEmail = parsed.second,
-                algorithmShortName = importResult.algorithm.shortName,
+                // 4.8.0 (#88): a key KeyAlgorithm does not model (DSA with ElGamal)
+                // shows its algorithm and size rather than Unknown.
+                algorithmShortName = if (importResult.algorithm != KeyAlgorithm.UNKNOWN) importResult.algorithm.shortName
+                    else com.pgpony.android.crypto.KeyAlgorithmLabel.lookupCard(importResult.algorithm, importResult.publicKeyRing),
                 hasPrivateKey = importResult.hasPrivateKey,
                 isDuplicate = existing != null,
                 willUpgradeToKeyPair = willUpgrade,

@@ -458,6 +458,10 @@ data class DecryptUiState(
     val verifyFileSigBytes: ByteArray? = null,
     val verifyFileResult: VerificationResult? = null,
     val verifyFileProcessing: Boolean = false,
+    // 4.8.0 (#106): several files picked at once on Verify, each signature
+    // matched to its file by name (DetachedPairing). While this is not
+    // empty the screen shows one row per pair instead of the two slots.
+    val verifyPairs: List<VerifyPairRow> = emptyList(),
 ) {
     /**
      * 4.0.4 — "the user has picked a file", regardless of which side of
@@ -569,20 +573,8 @@ internal class CardScratchOutcome(
     val bundle: com.pgpony.android.crypto.mime.MimeFileMessage?
 )
 
-/**
- * 4.0.4 — above this, file encrypt skips ZLIB.
- *
- * Deflate runs single-threaded over every byte and is the slowest stage
- * in the pipeline by a wide margin — well behind AES and the integrity
- * hash. On the files that get this big (video, photos, archives,
- * anything already compressed) it buys close to nothing, so paying
- * minutes for it is a bad trade. PGPCryptoService.encryptStream already
- * took enableCompression as a parameter for the card path, which skips
- * it for the same reason: to keep the card-held time short.
- *
- * Decrypt is unaffected — it decompresses whatever it is given.
- */
-internal const val COMPRESSION_LIMIT: Long = 16L * 1024 * 1024
+// 4.8.0 (#104): COMPRESSION_LIMIT and the ZLIB decision moved to
+// CompressionPolicy.kt, so the rule is testable without the ViewModel.
 
 class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
 
@@ -602,6 +594,10 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     // SHA-256 (S2K type 3) so any gpg on Linux can read it. Argon2id (type 4,
     // needs GnuPG 2.4+ / libgcrypt 1.10+) is opt-in via Settings.
     private val useArgon2Pref: Boolean get() = appPrefs.getBoolean("use_argon2", false)
+    // 4.8.0 (#104): Settings > Compress large files. Read live at each
+    // encrypt, like the Argon2 setting above, and handed to CompressionPolicy.
+    private val compressLargeFilesPref: Boolean
+        get() = appPrefs.getBoolean(CompressionPolicy.PREF_COMPRESS_LARGE_FILES, false)
 
     // #57: expired keys are blocked from producing output
     // unless the user opts in (Settings -> Allow expired keys). Decrypt/verify
@@ -1848,7 +1844,9 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     armor = false,
                     // 4.0.4 — see COMPRESSION_LIMIT. Deflate over a
                     // 105 MB archive costs minutes and saves nothing.
-                    enableCompression = totalBytes in 0..COMPRESSION_LIMIT,
+                    // 4.8.0 (#104): unless Settings > Compress large files
+                    // is on, which lifts the limit for every file.
+                    enableCompression = CompressionPolicy.shouldCompress(totalBytes, compressLargeFilesPref),
                     messagePassword = messagePassword,
                     useArgon2 = useArgon2Pref,
                     signingKeyId = signingKeyId,
@@ -4505,6 +4503,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      * cleared too — a fresh mode means a fresh operation.
      */
     fun setDecryptMode(m: DecryptMode) {
+        dropVerifyPairs()
         _decryptState.value = _decryptState.value.copy(
             mode = m,
             outputText = "",
@@ -4532,7 +4531,8 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             verifyFileSigName = null,
             verifyFileSigBytes = null,
             verifyFileResult = null,
-            verifyFileProcessing = false
+            verifyFileProcessing = false,
+            verifyPairs = emptyList()
         )
         // 4.0.4 — a mode switch abandons any streamed plaintext.
         ScratchFiles.clearScope(PGPonyApp.instance, ScratchFiles.SCOPE_DECRYPT)
@@ -5535,7 +5535,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     mimeRouteWithAttachments(result.data)
                 }
                 _decryptState.value = _decryptState.value.copy(
-                    outputText = result.plaintext,
+                    // 4.8.0 RC5: a decrypted file is shown as a file (the
+                    // result sheet with Save and Share), not also as text in
+                    // the message box, where a binary file read as garbage.
+                    // The streamed path never filled it either.
+                    outputText = "",
                     outputData = result.data,
                     isProcessing = false,
                     signatureVerified = result.signatureVerified,
@@ -5700,7 +5704,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      * front of this (try WKD by email if we can extract one, fall back
      * to Hagrid by fingerprint). For A3 the only source is Hagrid.
      */
-    fun lookupSigner() {
+    fun lookupSigner(fallbackKeyId: String? = null) {
         val s = _decryptState.value
         val claimedFp = s.pendingUnknownClaimedFingerprint
         // 4.1.0 Phase 14d. This used to return here when there was no
@@ -5715,8 +5719,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         //
         // Fall back to the key ID, which is what UnknownSigner's own doc
         // comment prescribes for signatures lacking the subpacket.
-        val signerKeyId = (s.verificationResult as? VerificationResult.UnknownSigner)
-            ?.signerKeyID?.takeIf { it.isNotBlank() }
+        // 4.8.0 (#106): a multi-file Verify row passes its own key ID, since
+        // its result is not the decrypt's verificationResult.
+        val signerKeyId = fallbackKeyId?.takeIf { it.isNotBlank() }
+            ?: (s.verificationResult as? VerificationResult.UnknownSigner)
+                ?.signerKeyID?.takeIf { it.isNotBlank() }
         val query = claimedFp ?: signerKeyId ?: return
         _decryptState.value = _decryptState.value.copy(
             showSignerLookup = true,
@@ -5799,6 +5806,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 // happens regardless.
                 refreshKeys()
                 val cur = _decryptState.value
+                // 4.8.0 (#106): the multi-file Verify rows check again with
+                // the new key, so every row that key signed turns green.
+                if (cur.mode == DecryptMode.VERIFY && cur.verifyPairs.isNotEmpty()) {
+                    rerunVerifyPairs()
+                }
                 if (cur.inputText.isNotBlank()) {
                     // Re-run decrypt(), which will re-route based on input type
                     decrypt()
@@ -5816,15 +5828,23 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     }
 
     fun dismissSignerLookup() {
+        val borrowed = rowLookupFingerprint
+        val current = _decryptState.value.pendingUnknownClaimedFingerprint
+        // Restore only when nothing has set a newer value since the row lookup.
+        val restore = borrowed != null && (current ?: "") == borrowed
         _decryptState.value = _decryptState.value.copy(
             showSignerLookup = false,
-            signerLookupState = SignerLookupState.Searching
+            signerLookupState = SignerLookupState.Searching,
+            pendingUnknownClaimedFingerprint = if (restore) claimedFpBeforeRowLookup else current
         )
+        rowLookupFingerprint = null
+        claimedFpBeforeRowLookup = null
     }
 
     // ── Phase A3: "Verify a file" (detached signature) ─────────────────
 
     fun openVerifyFileSheet() {
+        dropVerifyPairs()
         _decryptState.value = _decryptState.value.copy(
             mode = DecryptMode.VERIFY,
             verifyFileSignedName = null,
@@ -5833,11 +5853,13 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             verifyFileSigBytes = null,
             verifyFileResult = null,
             verifyFileProcessing = false,
+            verifyPairs = emptyList(),
             errorMessage = null,
         )
     }
 
     fun dismissVerifyFileSheet() {
+        dropVerifyPairs()
         _decryptState.value = _decryptState.value.copy(
             mode = DecryptMode.TEXT,
             verifyFileSignedName = null,
@@ -5846,6 +5868,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             verifyFileSigBytes = null,
             verifyFileResult = null,
             verifyFileProcessing = false,
+            verifyPairs = emptyList(),
         )
     }
 
@@ -5864,22 +5887,262 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
     /** The original (signed) file the user picked — held as a Uri and
      *  streamed at verify time; never buffered (RC3 §J #16). */
     fun setVerifyFileSigned(name: String, uri: android.net.Uri) {
+        // 4.8.0 (#106): one file picked into a slot starts the two-slot flow
+        // again, so the rows of an earlier multi-file pick go.
+        dropVerifyPairs()
         _decryptState.value = _decryptState.value.copy(
             verifyFileSignedName = name,
             verifyFileSignedUri = uri,
             verifyFileResult = null,
+            verifyPairs = emptyList(),
             errorMessage = null,
         )
     }
 
     /** The detached signature file (.sig / .asc) the user picked. */
     fun setVerifyFileSignature(name: String, bytes: ByteArray) {
+        dropVerifyPairs()
         _decryptState.value = _decryptState.value.copy(
             verifyFileSigName = name,
             verifyFileSigBytes = bytes,
             verifyFileResult = null,
+            verifyPairs = emptyList(),
             errorMessage = null,
         )
+    }
+
+    /**
+     * 4.8.0 (#106): bumped whenever the multi-file rows are replaced or
+     * dropped, so a verify still running for the old rows stops writing.
+     */
+    private var verifyPairsGeneration = 0
+
+    private fun dropVerifyPairs() {
+        verifyPairsGeneration++
+    }
+
+    /**
+     * 4.8.0 (#106): several files picked at once on Verify. Each is sorted
+     * into signature or data by its content (a file over
+     * [SIGNATURE_FILE_BUFFER_LIMIT] is data without being read), each
+     * signature is matched to its file by name, and every pair is verified,
+     * one row each. A signature or file already in a slot (a signature shared
+     * into PGPony, say) joins the pick when the pick has none of its kind.
+     * With no signature at all, nothing is verified and the error line asks
+     * for both the file and its signature; the slots stay as they were.
+     */
+    fun startVerifyPairs(picked: List<PickedVerifyFile>) {
+        if (picked.isEmpty()) return
+        dropVerifyPairs()
+        val gen = verifyPairsGeneration
+        val before = _decryptState.value
+        _decryptState.value = before.copy(
+            verifyFileProcessing = true,
+            verifyFileResult = null,
+            verifyPairs = emptyList(),
+            errorMessage = null,
+        )
+        viewModelScope.launch {
+            val sigs = mutableListOf<Pair<String, ByteArray>>()
+            val data = mutableListOf<Pair<String, android.net.Uri>>()
+            withContext(Dispatchers.IO) {
+                for (p in picked) {
+                    val small = p.size == null || p.size <= SIGNATURE_FILE_BUFFER_LIMIT
+                    val bytes = if (small) readAtMost(p.uri, SIGNATURE_FILE_BUFFER_LIMIT) else null
+                    if (bytes != null && DetachedPairing.isDetachedSignature(bytes)) {
+                        sigs.add(p.name to bytes)
+                    } else {
+                        data.add(p.name to p.uri)
+                    }
+                }
+            }
+            if (gen != verifyPairsGeneration) return@launch
+            if (sigs.isEmpty()) {
+                before.verifyFileSigBytes?.let { sigs.add((before.verifyFileSigName ?: "signature") to it) }
+            }
+            if (data.isEmpty()) {
+                before.verifyFileSignedUri?.let { data.add((before.verifyFileSignedName ?: "file") to it) }
+            }
+            if (sigs.isEmpty()) {
+                _decryptState.value = _decryptState.value.copy(
+                    verifyFileProcessing = false,
+                    errorMessage = PGPonyApp.instance.getString(R.string.verify_file_error_pick_both),
+                )
+                return@launch
+            }
+            val pairing = DetachedPairing.pair(sigs.map { it.first }, data.map { it.first })
+            val sigRows = pairing.signatures.mapIndexed { i, match ->
+                val (sigName, sigBytes) = sigs[i]
+                when (match) {
+                    is DetachedPairing.SigMatch.Paired -> VerifyPairRow(
+                        signatureName = sigName,
+                        signatureBytes = sigBytes,
+                        dataName = data[match.dataIndex].first,
+                        dataUri = data[match.dataIndex].second,
+                        running = true,
+                    )
+                    DetachedPairing.SigMatch.Ambiguous -> VerifyPairRow(
+                        signatureName = sigName,
+                        signatureBytes = sigBytes,
+                        dataName = null,
+                        dataUri = null,
+                        problem = VerifyPairProblem.SEVERAL_FILES_MATCH,
+                    )
+                    DetachedPairing.SigMatch.NotPicked -> VerifyPairRow(
+                        signatureName = sigName,
+                        signatureBytes = sigBytes,
+                        dataName = null,
+                        dataUri = null,
+                        problem = VerifyPairProblem.FILE_NOT_PICKED,
+                    )
+                }
+            }
+            val dataRows = pairing.unpairedData.map { d ->
+                VerifyPairRow(
+                    signatureName = null,
+                    signatureBytes = null,
+                    dataName = data[d].first,
+                    dataUri = data[d].second,
+                    problem = VerifyPairProblem.NO_SIGNATURE,
+                )
+            }
+            val rows = sigRows + dataRows
+            // The slots' contents are in the rows now (or were replaced by
+            // the pick), so the two-slot flow starts empty afterwards.
+            _decryptState.value = _decryptState.value.copy(
+                verifyFileProcessing = false,
+                verifyFileSignedName = null,
+                verifyFileSignedUri = null,
+                verifyFileSigName = null,
+                verifyFileSigBytes = null,
+                verifyFileResult = null,
+                verifyPairs = rows,
+            )
+            verifyPairRows(rows.indices.filter { rows[it].ready }, gen)
+        }
+    }
+
+    /**
+     * 4.8.0 (#106): the signed file for one row whose file was not picked (or
+     * not told apart), chosen with that row's own "Choose original file".
+     */
+    fun setVerifyPairFile(index: Int, name: String, uri: android.net.Uri) {
+        val rows = _decryptState.value.verifyPairs
+        val row = rows.getOrNull(index) ?: return
+        if (row.signatureBytes == null) return
+        _decryptState.value = _decryptState.value.copy(
+            verifyPairs = rows.toMutableList().also {
+                it[index] = row.copy(dataName = name, dataUri = uri, problem = null, result = null, running = true)
+            },
+            errorMessage = null,
+        )
+        val gen = verifyPairsGeneration
+        viewModelScope.launch { verifyPairRows(listOf(index), gen) }
+    }
+
+    /** 4.8.0 (#106): the signer lookup for one row's unknown signer. */
+    fun lookupSignerFor(result: VerificationResult.UnknownSigner) {
+        // The row's fingerprint is only borrowed for this lookup: the sheet
+        // shows it, and dismissSignerLookup puts the earlier value back, so a
+        // later single-file Verify or decrypt does not search for this key.
+        if (rowLookupFingerprint == null) {
+            claimedFpBeforeRowLookup = _decryptState.value.pendingUnknownClaimedFingerprint
+        }
+        rowLookupFingerprint = result.claimedFingerprint ?: ""
+        _decryptState.value = _decryptState.value.copy(
+            pendingUnknownClaimedFingerprint = result.claimedFingerprint
+        )
+        lookupSigner(fallbackKeyId = result.signerKeyID)
+    }
+
+    /** 4.8.0 (#106): what lookupSignerFor replaced, restored on dismiss. */
+    private var claimedFpBeforeRowLookup: String? = null
+    private var rowLookupFingerprint: String? = null
+
+    /** 4.8.0 (#106): verify every row that has both sides again. */
+    private fun rerunVerifyPairs() {
+        val rows = _decryptState.value.verifyPairs
+        val ready = rows.indices.filter { rows[it].ready }
+        if (ready.isEmpty()) return
+        _decryptState.value = _decryptState.value.copy(
+            verifyPairs = rows.map { if (it.ready) it.copy(running = true, result = null) else it },
+            errorMessage = null,
+        )
+        val gen = verifyPairsGeneration
+        viewModelScope.launch { verifyPairRows(ready, gen) }
+    }
+
+    /**
+     * 4.8.0 (#106): verify the rows at [indices] one after another, each
+     * streamed from its Uri as the single-file verify does. The keyring loads
+     * once, on the first row that needs it. A row that cannot be read gets
+     * the same red result the single-file verify gives, and the rest go on.
+     */
+    private suspend fun verifyPairRows(indices: List<Int>, gen: Int) {
+        var cachedRings: List<org.bouncycastle.openpgp.PGPPublicKeyRing>? = null
+        val rings: suspend () -> List<org.bouncycastle.openpgp.PGPPublicKeyRing> = {
+            cachedRings ?: loadDetachedVerifyRings().also { cachedRings = it }
+        }
+        for (i in indices) {
+            if (gen != verifyPairsGeneration) return
+            val row = _decryptState.value.verifyPairs.getOrNull(i) ?: continue
+            val sig = row.signatureBytes ?: continue
+            val uri = row.dataUri ?: continue
+            val result = try {
+                detachedFileResult(sig, uri, rings)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                VerificationResult.Invalid(
+                    reason = PGPonyApp.instance.getString(R.string.sign_verify_error_file_unreadable),
+                    signerKeyID = null,
+                    signedContent = null
+                )
+            }
+            if (gen != verifyPairsGeneration) return
+            val now = _decryptState.value
+            if (i !in now.verifyPairs.indices) continue
+            _decryptState.value = now.copy(
+                verifyPairs = now.verifyPairs.toMutableList().also {
+                    it[i] = it[i].copy(running = false, result = result)
+                }
+            )
+        }
+    }
+
+    /** Every public ring in the keyring, for a detached file verify. */
+    private suspend fun loadDetachedVerifyRings(): List<org.bouncycastle.openpgp.PGPPublicKeyRing> =
+        withContext(Dispatchers.IO) {
+            repo.getAllKeys().mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
+        }
+
+    /**
+     * Verify detached signature [sig] over the file at [signedUri]: the
+     * composite path for a composite signature, else BouncyCastle with
+     * [rings], the signed file streamed in 64 KiB chunks (RC3 §J, #16).
+     * 4.8.0 (#106): taken out of runVerifyFile so the multi-file rows share
+     * it; [rings] is only called on the BouncyCastle path.
+     */
+    private suspend fun detachedFileResult(
+        sig: ByteArray,
+        signedUri: android.net.Uri,
+        rings: suspend () -> List<org.bouncycastle.openpgp.PGPPublicKeyRing>,
+    ): VerificationResult {
+        // 4.4.0 RC3 (#30/#31): a composite detached signature cannot go
+        // through BouncyCastle; verify it through the composite path.
+        compositeDetachedFileResult(sig, signedUri)?.let { return it }
+        val loaded = rings()
+        // Dispatchers.IO because the verify is disk-bound.
+        val result = withContext(Dispatchers.IO) {
+            PGPonyApp.instance.contentResolver.openInputStream(signedUri)?.use { input ->
+                verify.verifyDetachedStream(sig, input, loaded)
+            } ?: VerificationResult.Invalid(
+                reason = PGPonyApp.instance.getString(R.string.sign_verify_error_file_unreadable),
+                signerKeyID = null,
+                signedContent = null
+            )
+        }
+        return withSignerTrust(result)
     }
 
     /**
@@ -5891,6 +6154,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      */
     fun runVerifyFile() {
         val s = _decryptState.value
+        // 4.8.0 (#106): with multi-file rows showing, Verify checks them again.
+        if (s.verifyPairs.isNotEmpty()) {
+            rerunVerifyPairs()
+            return
+        }
         val signedUri = s.verifyFileSignedUri
         val sig = s.verifyFileSigBytes
         if (signedUri == null || sig == null) {
@@ -5901,38 +6169,15 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         }
         _decryptState.value = s.copy(verifyFileProcessing = true, errorMessage = null)
         viewModelScope.launch {
-            // 4.4.0 RC3 (#30/#31): a composite detached signature cannot go
-            // through BouncyCastle; verify it through the composite path.
-            val compositeResult = compositeDetachedFileResult(sig, signedUri)
-            if (compositeResult != null) {
-                val cfp = (compositeResult as? VerificationResult.UnknownSigner)?.claimedFingerprint
-                _decryptState.value = _decryptState.value.copy(
-                    verifyFileProcessing = false,
-                    verifyFileResult = compositeResult,
-                    pendingUnknownClaimedFingerprint = cfp
-                        ?: _decryptState.value.pendingUnknownClaimedFingerprint,
-                )
-                return@launch
-            }
-            val rings = withContext(Dispatchers.IO) {
-                repo.getAllKeys().mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
-            }
             // RC3 §J (#16): the signed content streams from its Uri in
-            // 64 KiB chunks — no whole-file buffer, no size ceiling.
-            // Dispatchers.IO because the verify is now disk-bound.
-            val result = withContext(Dispatchers.IO) {
-                PGPonyApp.instance.contentResolver.openInputStream(signedUri)?.use { input ->
-                    verify.verifyDetachedStream(sig, input, rings)
-                } ?: VerificationResult.Invalid(
-                    reason = PGPonyApp.instance.getString(R.string.sign_verify_error_file_unreadable),
-                    signerKeyID = null,
-                    signedContent = null
-                )
-            }
+            // 64 KiB chunks, with no whole-file buffer and no size ceiling.
+            // 4.8.0 (#106): the check itself is detachedFileResult, shared
+            // with the multi-file rows.
+            val result = detachedFileResult(sig, signedUri) { loadDetachedVerifyRings() }
             val claimedFp = (result as? VerificationResult.UnknownSigner)?.claimedFingerprint
             _decryptState.value = _decryptState.value.copy(
                 verifyFileProcessing = false,
-                verifyFileResult = withSignerTrust(result),
+                verifyFileResult = result,
                 pendingUnknownClaimedFingerprint = claimedFp
                     ?: _decryptState.value.pendingUnknownClaimedFingerprint,
             )
@@ -6162,6 +6407,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
      * banner, card-message detection, mode) then reload the key lists.
      */
     fun clearDecrypt() {
+        dropVerifyPairs()
         _decryptState.value = DecryptUiState()
         loadKeys()
     }

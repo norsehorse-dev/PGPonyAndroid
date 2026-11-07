@@ -406,41 +406,66 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
      * full order.
      */
     fun moveManual(fromId: String, toId: String) {
-        if (fromId == toId) return
-        val all = _state.value.allKeys
-        val fromKey = all.firstOrNull { it.id == fromId } ?: return
-        val toKey = all.firstOrNull { it.id == toId } ?: return
-        // Same section only. 4.1.0 Phase 12b — this compared isKeyPair,
-        // which with three sections is not merely incomplete but wrong: it
-        // would let a contact key be dragged into the Public Keys block,
-        // since both have isKeyPair = false.
-        if (fromKey.section() != toKey.section()) return
-
+        val (fromFp, toFp) = resolveMove(fromId, toId) ?: return
         // Seed the working order from the current display order if we don't
         // have a saved one yet (keeps what the user currently sees).
         val current = _state.value
-        val seeded = current.manualOrder.ifEmpty {
+        val seeded = ManualOrder.seed(
+            current.manualOrder,
             current.myKeys.map { it.fingerprint } +
                 current.contactKeys.map { it.fingerprint } +
                 current.publicKeys.map { it.fingerprint }
-        }.toMutableList()
+        )
+        // 4.8.0 (4m): the move itself is ManualOrder.move, shared with
+        // reorder mode's draft.
+        val moved = ManualOrder.move(seeded, fromFp, toFp) ?: return
+        saveManualOrder(moved)
+    }
 
-        // Make sure both fingerprints are represented before moving.
-        if (!seeded.contains(fromKey.fingerprint)) seeded.add(fromKey.fingerprint)
-        if (!seeded.contains(toKey.fingerprint)) seeded.add(toKey.fingerprint)
+    /**
+     * 4.8.0 (4m): the fingerprints behind a drag from [fromId] onto [toId]
+     * (PGPKeyEntity ids, the LazyColumn item keys), or null when the drag
+     * moves nothing: the same row, a row that is gone, or a drop in another
+     * section. Reorder mode moves its draft with the result.
+     */
+    fun resolveMove(fromId: String, toId: String): Pair<String, String>? {
+        if (fromId == toId) return null
+        val all = _state.value.allKeys
+        val fromKey = all.firstOrNull { it.id == fromId } ?: return null
+        val toKey = all.firstOrNull { it.id == toId } ?: return null
+        // Same section only. 4.1.0 Phase 12b: this compared isKeyPair,
+        // which with three sections is not merely incomplete but wrong: it
+        // would let a contact key be dragged into the Public Keys block,
+        // since both have isKeyPair = false.
+        if (fromKey.section() != toKey.section()) return null
+        return fromKey.fingerprint to toKey.fingerprint
+    }
 
-        // Capture BOTH indices before mutating. Using add(toIndex,
-        // removeAt(fromIndex)) — Kotlin evaluates the removeAt argument
-        // first, so the target index (taken pre-removal) lands the item
-        // correctly whether dragging up or down. (Recomputing the target
-        // index after removal was the bug that broke downward drags.)
-        val fromIndex = seeded.indexOf(fromKey.fingerprint)
-        val toIndex = seeded.indexOf(toKey.fingerprint)
-        if (fromIndex < 0 || toIndex < 0) return
-        seeded.add(toIndex, seeded.removeAt(fromIndex))
+    /**
+     * 4.8.0 (4m): the order reorder mode starts from. Every key in Custom
+     * order, whatever the sort and the search show right now, so the draft
+     * covers keys a search hides.
+     */
+    fun reorderStartOrder(): List<String> {
+        val all = _state.value.copy(sortMode = SortMode.MANUAL, searchQuery = "")
+        return all.myKeys.map { it.fingerprint } +
+            all.contactKeys.map { it.fingerprint } +
+            all.publicKeys.map { it.fingerprint }
+    }
 
-        prefs.edit().putString("keyring_manual_order", seeded.joinToString("\n")).apply()
-        _state.value = _state.value.copy(manualOrder = seeded)
+    /**
+     * 4.8.0 (4m): Done in reorder mode. Saves [order] and switches the sort
+     * to Custom order, the only sort that shows it, so the list stays as the
+     * user left it.
+     */
+    fun commitManualOrder(order: List<String>) {
+        saveManualOrder(order)
+        if (_state.value.sortMode != SortMode.MANUAL) setSortMode(SortMode.MANUAL)
+    }
+
+    private fun saveManualOrder(order: List<String>) {
+        prefs.edit().putString("keyring_manual_order", order.joinToString("\n")).apply()
+        _state.value = _state.value.copy(manualOrder = order)
     }
 
     fun loadKeys() {

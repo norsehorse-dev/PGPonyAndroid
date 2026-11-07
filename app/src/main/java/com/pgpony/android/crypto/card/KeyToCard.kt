@@ -179,6 +179,91 @@ object KeyToCard {
         return attr[5].toInt() and 0xFF
     }
 
+    /** 4.8.0 (4p): the bit length of [pub]'s RSA public exponent, or 0 when it is not RSA. */
+    fun rsaExponentBits(pub: PGPPublicKey): Int =
+        (pub.publicKeyPacket.key as? RSAPublicBCPGKey)?.publicExponent?.bitLength() ?: 0
+
+    /**
+     * 4.8.0 (4p): what to do with a slot's algorithm attributes before an
+     * import, decided the way gpg's keytocard decides (rsa_writekey and
+     * change_keyattr in scd/app-openpgp.c). A tester's YubiKey NEO refused
+     * every move with 6A83 while gpg put the same key on it: the NEO's applet
+     * has no PUT DATA for C1 to C3, and its Extended Capabilities (C0) say the
+     * attributes cannot change. We used to write C1 to C3 whenever the bytes
+     * differed from what we built.
+     */
+    sealed class AttributePlan {
+        /** Import with these attributes and leave the slot's own alone. */
+        class Keep(val attributes: ByteArray) : AttributePlan()
+        /** PUT DATA C1, C2 or C3 with these attributes first. */
+        class Write(val attributes: ByteArray) : AttributePlan()
+        /** The slot cannot take this key; [detail] goes into the error, untranslated. */
+        class Refuse(val detail: String) : AttributePlan()
+    }
+
+    /**
+     * 4.8.0 (4p), as PGPony iOS 8.4.1 decides it:
+     * - An RSA key goes into an RSA slot of the same modulus size as the slot
+     *   reports it, whose exponent field is at least as wide as the key's
+     *   exponent, with the slot's own exponent length and import format
+     *   (format 00 when the slot reports only five octets), and nothing is
+     *   written. That is what gpg does, and what lets a NEO take a key.
+     * - Any other RSA slot gets the key's size, the widest of the slot's
+     *   exponent length, the key's and 17, and the slot's format (or 00).
+     * - An EC key (Ed25519, Cv25519, ECDSA, ECDH) is kept when the slot
+     *   already reports the same attributes ([sameAttributes]).
+     * Anything that needs a write is refused before anything is sent when the
+     * card says its attributes cannot change ([changeable] false). Null (no
+     * C0) keeps the earlier behaviour: try the write.
+     */
+    fun attributePlan(
+        kind: Kind, rsaBits: Int, rsaExponentBits: Int, current: ByteArray?, changeable: Boolean?,
+        curveOid: String? = null
+    ): AttributePlan {
+        val wanted: ByteArray
+        if (kind == Kind.RSA) {
+            if (current != null && current.size >= 5 && (current[0].toInt() and 0xFF) == OpenPgpCard.ALGO_RSA) {
+                val slotBits = ((current[1].toInt() and 0xFF) shl 8) or (current[2].toInt() and 0xFF)
+                val slotE = ((current[3].toInt() and 0xFF) shl 8) or (current[4].toInt() and 0xFF)
+                val format = if (current.size >= 6) current[5].toInt() and 0xFF else RSA_FORMAT_STANDARD
+                if (slotBits == rsaBits && slotE >= rsaExponentBits && slotE > 0) {
+                    return AttributePlan.Keep(attributes(Kind.RSA, rsaBits, slotE, format))
+                }
+                wanted = attributes(Kind.RSA, rsaBits, maxOf(slotE, rsaExponentBits, 17), format)
+            } else {
+                wanted = attributes(Kind.RSA, rsaBits, maxOf(rsaExponentBits, 17), RSA_FORMAT_STANDARD)
+            }
+        } else {
+            wanted = attributes(kind, 0, 0, 0, curveOid)
+            if (sameAttributes(current, wanted)) return AttributePlan.Keep(wanted)
+        }
+        if (changeable == false) {
+            return AttributePlan.Refuse("attributes ${current?.let { hex(it) } ?: "none"}, the card cannot change them")
+        }
+        return AttributePlan.Write(wanted)
+    }
+
+    /**
+     * 4.8.0 (RC5, found on a Token2): the format to retry an RSA import with
+     * after the card refused it, or null when there is nothing to retry. Only
+     * a slot this move wrote as RSA ([plan] is Write), in a format without the
+     * modulus (00 or 02), refused with 6984 (data invalidated) or 6A80 (wrong
+     * data): format 03 adds the CRT values and n, which a JavaCard applet that
+     * cannot compute n from p and q needs. A kept slot is the card's own choice
+     * and is never second-guessed.
+     */
+    fun rsaModulusRetryFormat(kind: Kind, plan: AttributePlan, attrs: ByteArray, sw: Int): Int? {
+        if (kind != Kind.RSA || plan !is AttributePlan.Write) return null
+        if (sw != 0x6984 && sw != 0x6A80) return null
+        val format = rsaFormatOf(attrs) ?: return null
+        return if (format == RSA_FORMAT_STANDARD || format == RSA_FORMAT_CRT) 0x03 else null
+    }
+
+    /** 4.8.0 (4p): a slot as the error detail names it, its CRT tag ("slot B6"). */
+    fun statusName(slot: CardSlot): String = "slot %02X".format(slot.crtTag)
+
+    private fun hex(b: ByteArray): String = b.joinToString("") { "%02X".format(it) }
+
     // ── The import data ─────────────────────────────────────────────────
 
     /** One component of the private key template: its tag (0x91 to 0x99) and value. */

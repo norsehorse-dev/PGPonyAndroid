@@ -541,7 +541,7 @@ fun DetailsSection(
     keyServerCheck: com.pgpony.android.data.KeyServerCheckStore.Result? = null
 ) {
     SectionGroup(title = stringResource(R.string.key_detail_section_details)) {
-        DetailRow(label = stringResource(R.string.key_detail_detail_algorithm), value = key.algorithm.displayName)
+        DetailRow(label = stringResource(R.string.key_detail_detail_algorithm), value = com.pgpony.android.crypto.KeyAlgorithmLabel.full(key.algorithm, key.fingerprint, key.armoredPublicKey))
         primaryUsage?.let { bits ->
             DetailRow(
                 label = stringResource(R.string.key_detail_detail_usage),

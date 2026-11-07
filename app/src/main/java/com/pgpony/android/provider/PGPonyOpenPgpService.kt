@@ -547,6 +547,18 @@ class PGPonyOpenPgpService : Service() {
         return result
     }
 
+    /**
+     * 4.8.0 RC5 (4q): true when [ring] is protected and [passphrase] does not
+     * unlock it. False when the check itself cannot run (an Argon2 S2K outside
+     * the policy), so the original error is reported instead.
+     */
+    private fun wrongPassphraseFor(ring: org.bouncycastle.openpgp.PGPSecretKeyRing, passphrase: String): Boolean =
+        runCatching {
+            val raw = ring.encoded
+            com.pgpony.android.crypto.SecretKeyCheck.exportNeedsPassphrase(raw) &&
+                !com.pgpony.android.crypto.SecretKeyCheck.passphraseUnlocks(raw, passphrase.toCharArray())
+        }.getOrDefault(false)
+
     private suspend fun findEntityByKeyId(keyId: Long) =
         repo.getAllKeys().firstOrNull { entity ->
             runCatching {
@@ -1566,6 +1578,14 @@ class PGPonyOpenPgpService : Service() {
             ProviderPassphraseCache.clear(matchedKeyId)
             return passphraseRequiredResult(data, matchedKeyId, matchedEntity.userID, wasWrong = true)
         } catch (e: Exception) {
+            // 4.8.0 RC5 (4q): a wrong passphrase on a composite (ML-KEM) key
+            // fails inside the ML-KEM unlock, not as InvalidPassphrase, so the
+            // mail app showed "Error decrypting" instead of asking again. When
+            // the passphrase does not unlock the matched key, ask again.
+            if (!passphrase.isNullOrEmpty() && wrongPassphraseFor(targeted.first().second, passphrase)) {
+                ProviderPassphraseCache.clear(matchedKeyId)
+                return passphraseRequiredResult(data, matchedKeyId, matchedEntity.userID, wasWrong = true)
+            }
             return errorResult(OpenPgpError.GENERIC_ERROR, e.message ?: "Decryption failed")
         }
 

@@ -1323,7 +1323,8 @@ class KeyDetailViewModel(
             }
             org.bouncycastle.bcpg.PublicKeyAlgorithmTags.EDDSA_LEGACY -> curve ?: "Ed25519"
             org.bouncycastle.bcpg.PublicKeyAlgorithmTags.ECDSA -> if (curve != null) "ECDSA $curve" else "ECDSA"
-            else -> algorithm.shortName
+            // 4.8.0 (#88): DSA and ElGamal subkeys name their size, not Unknown.
+            else -> com.pgpony.android.crypto.KeyAlgorithmLabel.packet(pubKey, algorithm, short = true)
         }
     }
 
@@ -2568,6 +2569,10 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                 app.getString(R.string.move_to_card_wrong_admin_pin, e.triesRemaining)
             is com.pgpony.android.crypto.card.OpenPgpCardException.SlotsOccupied ->
                 app.getString(R.string.move_to_card_slots_occupied)
+            // 4.8.0 (4p): the usual "cannot hold" text in the user's language,
+            // then what the card answered, untranslated (protocol terms).
+            is com.pgpony.android.crypto.card.OpenPgpCardException.CardRefused ->
+                app.getString(R.string.err_move_to_card_unsupported) + " (" + e.detail + ")"
             else -> ErrorText.localize(e.message) ?: app.getString(R.string.move_to_card_failed)
         }
     }

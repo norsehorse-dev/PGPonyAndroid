@@ -37,7 +37,11 @@ data class ApplicationRelatedData(
     /** 4.8.0 (#108): the card supports MANAGE SECURITY ENVIRONMENT for the
      *  decryption and authentication keys, so PSO:DECIPHER can be pointed at
      *  the authentication key. See [mseSupportedBy]. */
-    val mseSupported: Boolean = false
+    val mseSupported: Boolean = false,
+    /** 4.8.0 (4p): whether the card lets PUT DATA change the slots'
+     *  algorithm attributes (C0 first octet, bit 0x04), or null when the card
+     *  reports no C0. See [attributesChangeableBy]. */
+    val attributesChangeable: Boolean? = null
 ) {
     companion object {
         private const val FINGERPRINT_LEN = 20
@@ -61,6 +65,7 @@ data class ApplicationRelatedData(
                 ((aid[AID_OFFSET_VERSION].toInt() and 0xFF) shl 8) or (aid[AID_OFFSET_VERSION + 1].toInt() and 0xFF)
 
             // ── 4.8.0 (#108): Extended Capabilities (C0) → MSE support ──
+            // 4.8.0 (4p): and whether the slots' attributes may change.
             val extCaps = Tlv.findRecursive(raw, OpenPgpCard.DO_EXTENDED_CAPABILITIES)?.value
 
             // ── Algorithm attributes (C1 / C2 / C3) ──
@@ -105,7 +110,8 @@ data class ApplicationRelatedData(
                 decGenTimeMs = decGen,
                 authGenTimeMs = authGen,
                 specVersion = specVersion,
-                mseSupported = mseSupportedBy(specVersion, extCaps)
+                mseSupported = mseSupportedBy(specVersion, extCaps),
+                attributesChangeable = attributesChangeableBy(extCaps)
             )
         }
 
@@ -126,6 +132,18 @@ data class ApplicationRelatedData(
             if (specVersion < OpenPgpCard.SPEC_VERSION_MSE) return false
             if (extCaps == null || extCaps.size < 10) return false
             return (extCaps[9].toInt() and 0x01) != 0
+        }
+
+        /**
+         * 4.8.0 (4p): the "algorithm attributes changeable" flag of Extended
+         * Capabilities [extCaps] (DO C0): bit 0x04 of the first octet, in the
+         * same place on 2.x and 3.x cards. A YubiKey NEO reports F8 there (bit
+         * clear) and answers any PUT DATA C1 to C3 with 6A83. Null when the
+         * card reports no C0, so the move keeps trying the write as before.
+         */
+        internal fun attributesChangeableBy(extCaps: ByteArray?): Boolean? {
+            val first = extCaps?.firstOrNull() ?: return null
+            return (first.toInt() and 0x04) != 0
         }
 
         private fun fingerprintAt(all: ByteArray?, index: Int): String? {

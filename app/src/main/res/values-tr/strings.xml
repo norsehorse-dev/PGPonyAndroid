@@ -3127,4 +3127,25 @@
     <string name="err_card_primary_missing">Birincil anahtar bu güvenlik anahtarının imza yuvasında değil, bu yüzden bu değişiklik onunla yapılamaz</string>
     <string name="key_detail_add_subkey_card_note">Yeni alt anahtar bu telefonda oluşturulur. Bu anahtar, güvenlik anahtarıyla imzalar ve şifre çözer, bu yüzden anahtarı paylaşmadan önce yeni alt anahtarı Güvenlik anahtarına taşı seçeneğiyle oraya taşıyın. O zamana kadar yeni bir şifreleme alt anahtarı için şifrelenmiş mesajlar açılamaz.</string>
     <string name="key_detail_add_subkey_card_new_passphrase_hint">Yeni alt anahtarın gizli anahtarı bu telefonda kalır ve bu anahtarın buradaki gizli anahtarlarından hiçbirinin henüz parola ifadesi yok. Onu korumak için bir parola ifadesi seçin.</string>
+    <!-- 4.8.0 RC5 (#106) -->
+    <string name="verify_file_multi_hint">İmzayı ve dosyasını birlikte ya da her birinden birkaç tane seçebilirsiniz. Her imza, adına göre kendi dosyasıyla eşleştirilir.</string>
+    <string name="verify_pair_signature_format">İmza: %1$s</string>
+    <string name="verify_pair_file_not_picked">Bu imzanın ait olduğu dosya seçilmedi.</string>
+    <string name="verify_pair_several_files">Seçilen dosyalardan birden fazlası bu imzanın adıyla eşleşiyor.</string>
+    <string name="verify_pair_no_signature">Doğrulanmadı: bu dosya için imza seçilmedi.</string>
+    <!-- 4.8.0 RC5 (#103) -->
+    <string name="process_text_encrypt_label">PGPony ile şifrele</string>
+    <string name="process_text_sign_label">PGPony ile imzala</string>
+    <string name="process_text_input_label">Seçili metin</string>
+    <string name="process_text_result_not_replaced">Bu metin seçtiğiniz yerde değiştirilemiyor, bu yüzden kopyalamanız veya paylaşmanız için sonuç burada.</string>
+    <!-- 4.8.0 RC5 (#104) -->
+    <string name="settings_compress_large_title">Büyük dosyaları sıkıştır</string>
+    <string name="settings_compress_large_subtitle">16 MB üzerindeki dosyaları da sıkıştırır. Daha yavaştır ve kazanç dosyaya bağlıdır.</string>
+    <!-- 4.8.0 RC5 (4m) -->
+    <string name="keyring_reorder_menu">Anahtarları yeniden sırala</string>
+    <string name="keyring_reorder_title">Anahtarları yeniden sırala</string>
+    <!-- 4.8.0 RC5 (#72, #67) -->
+    <string name="share_target_action_sign_file_subtitle">Ayrık imza oluşturun (.asc veya .sig). Dosyanın kendisi olduğu gibi kalır.</string>
+    <string name="share_target_sign_result_subtitle">İmzayı dosyayla birlikte saklayın, böylece başkaları dosyanın sizden geldiğini ve değiştirilmediğini kontrol edebilir.</string>
+    <string name="share_target_action_restore_subtitle">Bu bir anahtarlık yedeği. Geri Yükle\'yi açın ve yedeğin kurtarma kodunu girin.</string>
 </resources>

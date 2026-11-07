@@ -22,6 +22,14 @@
 // not hold that curve refuses the write (UNSUPPORTED_MESSAGE) or fails the
 // check, and the phone keeps its keys.
 //
+// 4.8.0 (4p): a slot's algorithm attributes are only written when the key
+// needs them changed (KeyToCard.attributePlan), as gpg does: an RSA slot of
+// the key's size keeps its own exponent length and import format. A card whose
+// C0 says its attributes cannot change (a YubiKey NEO) is never sent PUT DATA
+// C1 to C3, and a key it cannot take is refused before any PIN is sent. A
+// refused attribute write or import names the slot, the command and the
+// card's status after the usual message (OpenPgpCardException.CardRefused).
+//
 // The user PIN is checked first, before anything on the card is overwritten,
 // so a mistyped user PIN cannot leave freshly written slots unchecked. A wrong
 // admin PIN surfaces as WrongAdminPin so the screen can name it.
@@ -63,9 +71,10 @@ object KeyToCardService {
      * Write [moves] to the card in [session] and check them. [certificate]
      * is the key pair's public certificate (for the decryption test). Throws
      * OpenPgpCardException: wrong PIN, card gone, a key the card cannot hold
-     * (UNSUPPORTED_MESSAGE), a slot that failed its check (CHECK_FAILED_MESSAGE),
-     * or, unless [replace], a chosen slot that already holds a different key
-     * (SlotsOccupied, before any PIN is sent).
+     * (UNSUPPORTED_MESSAGE, or CardRefused with the card's answer), a slot
+     * that failed its check (CHECK_FAILED_MESSAGE), or, unless [replace], a
+     * chosen slot that already holds a different key (SlotsOccupied, before
+     * any PIN is sent).
      */
     fun transfer(
         session: OpenPgpCardSession,
@@ -83,8 +92,11 @@ object KeyToCardService {
         }
 
         session.select()
+        // 4.8.0 (4p): read before any PIN, for the occupied check and for C0
+        // (whether the slots' attributes may change).
+        val before = session.getApplicationRelatedData()
+        val changeable = before.attributesChangeable
         if (!replace) {
-            val before = session.getApplicationRelatedData()
             val occupied = moves.any { m ->
                 val held = when (m.slot) {
                     CardSlot.SIGNATURE -> before.sigFingerprint
@@ -95,16 +107,25 @@ object KeyToCardService {
             }
             if (occupied) throw OpenPgpCardException.SlotsOccupied()
         }
+        // 4.8.0 (4p): a key a slot cannot take is refused here, before any
+        // PIN is sent and before any other slot is written.
+        for (m in moves) {
+            val current = runCatching { session.readAlgorithmAttributes(m.slot) }.getOrNull()
+            val plan = planFor(m, kinds.getValue(m), current, changeable)
+            if (plan is KeyToCard.AttributePlan.Refuse) {
+                throw OpenPgpCardException.CardRefused("${KeyToCard.statusName(m.slot)}: ${plan.detail}")
+            }
+        }
         session.verify(OpenPgpCard.PW1_OTHER, userPin)
         verifyAdmin(session, adminPin)
-        for (m in moves) write(session, m, kinds.getValue(m), cv25519Native = false)
+        for (m in moves) write(session, m, kinds.getValue(m), cv25519Native = false, changeable = changeable)
 
         for (m in moves) {
             if (test(session, m, userPin, certificate)) continue
             val k = kinds.getValue(m)
             if (k.kind == KeyToCard.Kind.CV25519) {
                 verifyAdmin(session, adminPin)
-                write(session, m, k, cv25519Native = true)
+                write(session, m, k, cv25519Native = true, changeable = changeable)
                 if (test(session, m, userPin, certificate)) continue
             }
             throw OpenPgpCardException.Malformed(CHECK_FAILED_MESSAGE)
@@ -133,46 +154,106 @@ object KeyToCardService {
 
     // ── Writing one slot ────────────────────────────────────────────────
 
-    private fun write(session: OpenPgpCardSession, m: Move, k: KeyToCard.Eligibility.Movable, cv25519Native: Boolean) {
+    /** 4.8.0 (4p): the attribute plan for [m] into a slot that reports [current]. */
+    private fun planFor(
+        m: Move, k: KeyToCard.Eligibility.Movable, current: ByteArray?, changeable: Boolean?
+    ): KeyToCard.AttributePlan =
+        KeyToCard.attributePlan(
+            kind = k.kind,
+            rsaBits = k.rsaBits,
+            rsaExponentBits = KeyToCard.rsaExponentBits(m.pub),
+            current = current,
+            changeable = changeable,
+            curveOid = k.curveOid
+        )
+
+    /**
+     * Write [m] into its slot: the attributes only when the plan says so, then
+     * the import, the fingerprint and the creation time. [changeable] is the
+     * card's C0 flag (null when it reports none). Internal for the JVM tests.
+     */
+    internal fun write(
+        session: OpenPgpCardSession,
+        m: Move,
+        k: KeyToCard.Eligibility.Movable,
+        cv25519Native: Boolean,
+        changeable: Boolean?
+    ) {
         val current = runCatching { session.readAlgorithmAttributes(m.slot) }.getOrNull()
+        val slotName = KeyToCard.statusName(m.slot)
+        // 4.8.0 (4p): keep the slot's attributes when they fit the key, as gpg
+        // does, and never write them on a card that cannot change them.
+        val plan = planFor(m, k, current, changeable)
+        val attrs: ByteArray = when (plan) {
+            is KeyToCard.AttributePlan.Refuse -> throw OpenPgpCardException.CardRefused("$slotName: ${plan.detail}")
+            is KeyToCard.AttributePlan.Keep -> plan.attributes
+            is KeyToCard.AttributePlan.Write -> plan.attributes
+        }
         var parts: List<KeyToCard.Part> = emptyList()
         var ehl: ByteArray? = null
         try {
-            val attrs: ByteArray
-            when (k.kind) {
+            parts = when (k.kind) {
                 KeyToCard.Kind.RSA -> {
                     val (e, p, q, d) = KeyToCard.rsaSecret(m.pub, m.priv)
-                    // An RSA slot keeps its exponent length and import format, as gpg does.
-                    val eBits = maxOf(KeyToCard.rsaExponentBitsOf(current) ?: 17, e.bitLength())
-                    val format = KeyToCard.rsaFormatOf(current) ?: KeyToCard.RSA_FORMAT_STANDARD
-                    attrs = KeyToCard.attributes(k.kind, k.rsaBits, eBits, format)
-                    parts = KeyToCard.rsaParts(e, p, q, d, k.rsaBits, eBits, format)
+                    // The import uses the exponent length and format of the
+                    // plan's attributes: the slot's own when it is kept.
+                    val eBits = KeyToCard.rsaExponentBitsOf(attrs) ?: 17
+                    val format = KeyToCard.rsaFormatOf(attrs) ?: KeyToCard.RSA_FORMAT_STANDARD
+                    KeyToCard.rsaParts(e, p, q, d, k.rsaBits, eBits, format)
                 }
-                KeyToCard.Kind.ED25519 -> {
-                    attrs = KeyToCard.attributes(k.kind, 0, 0, 0)
-                    parts = KeyToCard.ecParts(KeyToCard.ed25519Seed(m.priv))
-                }
-                KeyToCard.Kind.CV25519 -> {
-                    attrs = KeyToCard.attributes(k.kind, 0, 0, 0)
-                    parts = KeyToCard.ecParts(KeyToCard.cv25519Secret(m.priv, native = cv25519Native))
-                }
+                KeyToCard.Kind.ED25519 -> KeyToCard.ecParts(KeyToCard.ed25519Seed(m.priv))
+                KeyToCard.Kind.CV25519 -> KeyToCard.ecParts(KeyToCard.cv25519Secret(m.priv, native = cv25519Native))
                 // 4.8.0 (4l, #109): the curve goes into the attributes, the
                 // field-length scalar into tag 92.
-                KeyToCard.Kind.EC_SIGN, KeyToCard.Kind.EC_DECRYPT -> {
-                    attrs = KeyToCard.attributes(k.kind, 0, 0, 0, k.curveOid)
-                    parts = KeyToCard.ecParts(KeyToCard.weierstrassSecret(m.pub, m.priv))
+                KeyToCard.Kind.EC_SIGN, KeyToCard.Kind.EC_DECRYPT ->
+                    KeyToCard.ecParts(KeyToCard.weierstrassSecret(m.pub, m.priv))
+            }
+            if (plan is KeyToCard.AttributePlan.Write) {
+                try {
+                    session.setAlgorithmAttributes(m.slot, attrs)
+                } catch (e: OpenPgpCardException.CardStatus) {
+                    // 6A80 (wrong data), 6A81, 6A83 or 6D00 (not supported) and
+                    // the like: the card cannot hold this key in this slot.
+                    throw OpenPgpCardException.CardRefused(
+                        "%s: PUT DATA %04X, status %04X".format(slotName, attributesTag(m.slot), e.sw), e
+                    )
                 }
             }
+            ehl = KeyToCard.extendedHeaderList(m.slot, parts)
             try {
-                // Cards whose attributes cannot change refuse even an unchanged
-                // write, so the slot is only written when it differs.
-                if (!KeyToCard.sameAttributes(current, attrs)) session.setAlgorithmAttributes(m.slot, attrs)
-                ehl = KeyToCard.extendedHeaderList(m.slot, parts)
                 session.importPrivateKey(ehl)
             } catch (e: OpenPgpCardException.CardStatus) {
-                // 6A80 (wrong data), 6A81 / 6D00 (not supported) and the like:
-                // the card cannot hold this key in this slot.
-                throw OpenPgpCardException.Malformed(UNSUPPORTED_MESSAGE, e)
+                val refused = "%s: key import, status %04X".format(slotName, e.sw)
+                val retry = KeyToCard.rsaModulusRetryFormat(k.kind, plan, attrs, e.sw)
+                    ?: throw OpenPgpCardException.CardRefused(refused, e)
+                // 4.8.0 (RC5, found on a Token2): a slot this move turned into
+                // RSA gets import format 00 (e, p, q), as gpg would write, but a
+                // JavaCard applet that cannot work out n from p and q refuses
+                // that import (6984). Write the slot once more as format 03,
+                // which carries the CRT values and the modulus, and import again.
+                // A card that took format 00 never gets here.
+                KeyToCard.wipe(ehl)
+                KeyToCard.wipe(parts)
+                val (re, rp, rq, rd) = KeyToCard.rsaSecret(m.pub, m.priv)
+                val retryAttrs = KeyToCard.attributes(
+                    KeyToCard.Kind.RSA, k.rsaBits, KeyToCard.rsaExponentBitsOf(attrs) ?: 17, retry
+                )
+                parts = KeyToCard.rsaParts(re, rp, rq, rd, k.rsaBits, KeyToCard.rsaExponentBitsOf(retryAttrs) ?: 17, retry)
+                try {
+                    session.setAlgorithmAttributes(m.slot, retryAttrs)
+                } catch (e2: OpenPgpCardException.CardStatus) {
+                    throw OpenPgpCardException.CardRefused(
+                        "%s, then PUT DATA %04X, status %04X".format(refused, attributesTag(m.slot), e2.sw), e2
+                    )
+                }
+                ehl = KeyToCard.extendedHeaderList(m.slot, parts)
+                try {
+                    session.importPrivateKey(ehl)
+                } catch (e2: OpenPgpCardException.CardStatus) {
+                    throw OpenPgpCardException.CardRefused(
+                        "%s, then format %02X import, status %04X".format(refused, retry, e2.sw), e2
+                    )
+                }
             }
         } catch (e: IllegalArgumentException) {
             // A value longer than the slot allows (KeyToCard.fixed).
@@ -183,6 +264,13 @@ object KeyToCardService {
         }
         session.writeFingerprint(m.slot, m.pub.fingerprint)
         session.writeGenerationTime(m.slot, m.pub.creationTime.time / 1000L)
+    }
+
+    /** The algorithm attributes DO of [slot], C1 to C3, for the error detail. */
+    private fun attributesTag(slot: CardSlot): Int = when (slot) {
+        CardSlot.SIGNATURE -> OpenPgpCard.DO_ALGORITHM_ATTRIBUTES_SIG
+        CardSlot.DECRYPTION -> OpenPgpCard.DO_ALGORITHM_ATTRIBUTES_DEC
+        CardSlot.AUTHENTICATION -> OpenPgpCard.DO_ALGORITHM_ATTRIBUTES_AUTH
     }
 
     // ── Using one slot ──────────────────────────────────────────────────

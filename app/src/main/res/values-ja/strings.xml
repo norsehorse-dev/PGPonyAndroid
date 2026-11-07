@@ -3027,4 +3027,25 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="err_card_primary_missing">主鍵がこのセキュリティキーの署名スロットにないため、このセキュリティキーではこの変更を行えません</string>
     <string name="key_detail_add_subkey_card_note">新しいサブキーはこのスマートフォン上で作成されます。この鍵はセキュリティキーで署名と復号を行うため、鍵を共有する前に「セキュリティキーに移動」で新しいサブキーをセキュリティキーに移してください。それまでは、新しい暗号化サブキー宛てに暗号化されたメッセージを開けません。</string>
     <string name="key_detail_add_subkey_card_new_passphrase_hint">新しいサブキーの秘密鍵はこのスマートフォンに残りますが、ここにあるこの鍵の秘密鍵にはまだどれもパスフレーズが設定されていません。保護するためのパスフレーズを選んでください。</string>
+    <!-- 4.8.0 RC5 (#106) -->
+    <string name="verify_file_multi_hint">署名とそのファイルをまとめて選ぶことも、それぞれ複数選ぶこともできます。各署名は名前でファイルと照合されます。</string>
+    <string name="verify_pair_signature_format">署名: %1$s</string>
+    <string name="verify_pair_file_not_picked">この署名に対応するファイルが選ばれていません。</string>
+    <string name="verify_pair_several_files">この署名の名前に一致するファイルが複数選ばれています。</string>
+    <string name="verify_pair_no_signature">未検証: このファイルの署名が選ばれていません。</string>
+    <!-- 4.8.0 RC5 (#103) -->
+    <string name="process_text_encrypt_label">PGPony で暗号化</string>
+    <string name="process_text_sign_label">PGPony で署名</string>
+    <string name="process_text_input_label">選択したテキスト</string>
+    <string name="process_text_result_not_replaced">選択した場所ではこのテキストを置き換えられないため、ここに結果を表示します。コピーまたは共有してください。</string>
+    <!-- 4.8.0 RC5 (#104) -->
+    <string name="settings_compress_large_title">大きなファイルを圧縮</string>
+    <string name="settings_compress_large_subtitle">16 MB を超えるファイルも圧縮します。時間がかかり、効果はファイルによって異なります。</string>
+    <!-- 4.8.0 RC5 (4m) -->
+    <string name="keyring_reorder_menu">鍵を並べ替え</string>
+    <string name="keyring_reorder_title">鍵を並べ替え</string>
+    <!-- 4.8.0 RC5 (#72, #67) -->
+    <string name="share_target_action_sign_file_subtitle">分離署名（.asc または .sig）を作成します。ファイル自体は変更されません。</string>
+    <string name="share_target_sign_result_subtitle">署名をファイルと一緒に保管すると、あなたからのもので変更されていないことを他の人が確認できます。</string>
+    <string name="share_target_action_restore_subtitle">鍵束のバックアップです。「復元」を開いて、リカバリーコードを入力してください。</string>
 </resources>

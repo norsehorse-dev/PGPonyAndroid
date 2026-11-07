@@ -146,9 +146,22 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
 
 - #103: encrypt or sign selected text from the text selection menu (ACTION_PROCESS_TEXT), replacing the
   selection in place when the field is editable and the result can be returned, as OpenKeychain does.
+  Done in RC5: "Encrypt with PGPony" and "Sign with PGPony" in the selection menu (two aliases of
+  ProcessTextActivity). Encrypt has the recipient list and "Also sign this message" with Sign as; Sign makes a
+  cleartext signature with Sign as, the passphrase when the key has one, or PIN and tap for a card. An editable
+  field gets the result back; a read-only one shows it with Copy, Save and Share. A selection holding a PGP
+  block opens the Quick Action, which decrypts, verifies or imports it. App lock and the empty-keyring card as
+  in the Quick Action.
 - #72 follow-up: sign a single shared file from Quick Actions (detached .sig, or encrypt and sign). Several
   files already have Sign only on the package screen.
+  Done in RC5: a single shared file gets Sign a file next to Encrypt: Sign as, .asc or .sig (named
+  file.ext.asc or file.ext.sig, as the Sign a file sheet names it), streamed from the file, saved or shared from
+  the result. Encrypt gains a Sign as row, None by default, with the Encrypt screen's ML-DSA to v4 prompt.
+  Software keys only, as on the Sign a file sheet; the typed passphrase is used once and the in-app cache applies.
 - #67 follow-up: restore a PGPony backup shared to Quick Actions (recognize the backup file and open Restore).
+  Done in RC5: a backup is recognized by its armor headers (Comment: PGPony Backup, or OpenKeychain's
+  Passphrase-Format; the .pgpony name only on an armored message) and gets Restore, which opens the main app's
+  Restore with the file (IntentAction.RestoreBackup). A backup shared with other files keeps today's behaviour.
 - Keyboard on the other screens: 4.7.2 closes it on a tap away from a text field on Encrypt and Decrypt
   (PLANNING_4.7.2.md item 1). Extend dismissKeyboardOnTap and keepsKeyboard to Settings, the Key Details sheets,
   Import and Pair.
@@ -156,7 +169,8 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
   (COMPRESSION_LIMIT) and a larger one is not; nothing is padded. Narrowed with the reporter (Oct 23, a CSV over
   50 MB): one opt-in switch in Settings, off by default, that lifts the 16 MB limit so every file is compressed
   with ZLIB. The Encrypt progress already covers the longer run. Other methods (ZIP, BZip2) and padding are not
-  planned unless someone asks for them.
+  planned unless someone asks for them. Done in RC5: Settings > Compress large files (off by default), decided
+  in CompressionPolicy for the streamed file encrypt.
   - Oct 27, another user: asked for zstd or xz, and to avoid bzip2 on mobile. OpenPGP defines only ZIP, ZLIB and
     BZip2, so zstd and xz would not open elsewhere. Also asked about multiple cores: compression is single-threaded
     today. Possible follow-up: compress large files in parallel blocks joined into one standard ZLIB stream (the
@@ -174,7 +188,7 @@ an export passphrase. Backup asks for the biometric check first; cancelling it s
   file by dropping .asc or .sig. The system picker grants access to the picked document only, never its folder,
   so the sibling cannot be checked directly. Planned instead: the Verify picker takes several files
   (OpenMultipleDocuments) and pairs each signature with its file by name; a lone signature still asks for the
-  file. Same pairing serves the 4.7.0 item 38 left-out (several signatures with their files, section 6).
+  file. Same pairing serves the 4.7.0 item 38 left-out (several signatures with their files, section 6). Done in RC5.
 - #108: ADSK (additional decryption subkeys, GnuPG 2.4.1 and later).
   - Encrypt: findEncryptionKey picks one encryption subkey per recipient (the newest valid one, or the one chosen
     in the picker), so a recipient's ADSK is dropped. Encrypt to every valid encryption subkey of each recipient
@@ -412,6 +426,7 @@ working like select mode, with Cancel and Done for the order changes. Plan:
 - Select mode and reorder mode don't mix: entering one leaves the other.
 - Strings for the menu item and the mode's title; Cancel and Done reuse the existing ones where they read right.
 Desktop has no drag reorder, so nothing to mirror there; iOS checks its own Keyring when it takes 4.8.0.
+Done in RC5, with the RC2 setting kept (K6).
 
 ## 4n. Recipient groups, and the picker's order (Nov 4)
 
@@ -456,6 +471,50 @@ A tester confirmed the 4.7.0 fixes for #82, #87, #89, #91 and #92 and asked thre
 Desktop takes #88 and #90 from the sync when it mirrors RC4; #78's test is Android only.
 
 Done in RC4.
+- Nov 6, #88 follow-up: RC4 labelled the lookup cards only, so the same key read Unknown once imported (Keyring,
+  Key Details, its Subkeys list, the import preview and the encryption key picker), since those show the stored
+  KeyAlgorithm. KeyAlgorithmLabel now labels a stored key from its armored public key when KeyAlgorithm is UNKNOWN
+  (badge: the primary, "DSA 1024"; Details: "DSA 1024 + ElGamal 4096"). In RC5.
+
+
+## 4p. Move to security key on a YubiKey NEO (a tester, Nov 5)
+
+Found: a tester moved a PGPony-made RSA 2048 key (subkeys S, E and A into the three slots, Replace on) to a freshly
+reset YubiKey NEO. iOS failed at the write with the "cannot hold" message and PGPony Desktop with status 6A83. The
+same key, exported and moved with gpg's keytocard, lands on the NEO fine, so the bug is ours. The NEO (Yubico's
+ykneo-openpgp applet) is an OpenPGP card 2.0 with fixed RSA 2048 attributes (01 0800 0011 03: e 17 bits, import
+format 03, CRT with modulus), a C0 whose first octet is F8 (bit 0x04, "algorithm attributes changeable", clear), and
+no PUT DATA for C1 to C3 at all: anything it does not know is 6A83. gpg (rsa_writekey and change_keyattr in
+scd/app-openpgp.c) only changes an RSA slot's attributes when the key's modulus size differs and C0 says they can
+change; otherwise it imports with the slot's own e length and format. PGPony wrote C1 to C3 whenever the bytes
+differed from what it built (KeyToCard.sameAttributes), which on a NEO is 6A83. Android has the same code.
+
+The change, matching PGPony iOS 8.4.1 build 1 (KeyToCard.attributePlan, plan section 3a):
+- KeyToCard.attributePlan decides Keep, Write or Refuse. RSA: Keep when the slot is RSA of the key's modulus size
+  with an e field at least as wide as the key's, built from the slot's own e length and format (00 when the slot
+  reports five octets); otherwise Write with the key's size, the widest of the slot's e, the key's e and 17, and the
+  slot's format (or 00). Ed25519, Cv25519, ECDSA and ECDH: Keep when sameAttributes, else Write. Anything that needs
+  a write is Refuse when C0 says the attributes cannot change; no C0 keeps the old behaviour (try the write).
+- ApplicationRelatedData reads the C0 flag (attributesChangeable). The move reads the Application Related Data
+  before any PIN, every time (it used to only when Replace was off), and plans every slot there, so a key the card
+  cannot take is refused before any PIN is sent and before any slot is written.
+- KeyToCardService.write builds the RSA parts from the plan's attributes (their e length and format) and sends PUT
+  DATA C1 to C3 only for Write.
+- Errors: OpenPgpCardException.CardRefused carries the card's answer in protocol terms ("slot B6: key import, status
+  6A80", "slot B8: PUT DATA 00C2, status 6A83", or "slot B6: attributes 010800001103, the card cannot change them").
+  The move screen shows the localized "cannot hold" message with that detail after it, untranslated. No new strings.
+- Tests: KeyToCardAttributePlanTest (the plan on the NEO's attributes, five-octet attributes, 4096 on the NEO with C0
+  false, true and absent, Ed25519, Cv25519 and ECDSA into an RSA-only slot, the C0 flag, the format 03 import parts
+  of RSA 2048 and 4096 against Bouncy Castle's CRT values, and a write against a fake NEO: a kept slot gets no PUT
+  DATA C1 to C3, a refused attribute write and a refused import name the slot, the command and the status).
+
+Device test: a NEO is not at hand, so the tester's NEO is the real check. On another card: with a slot already at
+RSA 2048 (a YubiKey 5 after an RSA 2048 move or `key-attr`), move an RSA 2048 key; the plan is Keep, so no PUT DATA
+C1 to C3 is sent (the fake-NEO test covers the commands) and the move must pass its check as before. Then the Write
+path: the same card with its slots at Ed25519/Cv25519, move the RSA key (the attributes are written first).
+
+Done in RC5. Desktop mirrors it (done separately), along with its Read card treating 6A83 like 6A88 on the optional
+reads.
 
 
 ## 5. Contributor PRs waiting on a decision
@@ -490,7 +549,8 @@ Done in RC4.
 - K5. #109: generate brainpool and secp256k1 ECDSA keys in 4.8.0 (item 4l), or leave generation as it is? Answered
   Nov 4: yes, brainpoolP256r1, brainpoolP384r1, brainpoolP512r1 and secp256k1, v4 only, in RC4.
 - K6. Item 4m: keep the drag setting next to reorder mode, or drop it so the handles only show in reorder mode?
-  Recommendation: keep it, since it shipped in RC2 and some people want the handles always there. Open.
+  Recommendation: keep it, since it shipped in RC2 and some people want the handles always there. Answered
+  Nov 5: keep the setting.
 
 
 ## 8. Status of this document
@@ -548,6 +608,24 @@ RC5, new ways in:
 - #103 (text selection menu), #72 (sign one shared file), #67 (restore a shared backup), #106 (the Verify picker pairs
   signatures with their files, which also covers the 4.7.0 item 38 left-out), #104 (the ZLIB switch), and 4m
   (reorder mode on the Keyring, added Nov 4).
+- 4p (added Nov 5): Move to security key on a YubiKey NEO.
+- #88 follow-up (added Nov 6): the algorithm label on stored keys, not only the lookup cards.
+- 4p follow-up (added Nov 6, found in RC5 device testing on a Token2): moving an RSA key into a slot that held
+  Ed25519/Cv25519 writes the slot as RSA format 00 (e, p, q), the same as RC4, and the Token2 refused the import
+  with 6984 because it cannot work out n. A written RSA slot whose import is refused with 6984 or 6A80 is written
+  again as format 03 (CRT values and the modulus) and imported once more. Kept slots are never retried.
+- File decrypt (added Nov 6, found in RC5 device testing): a file decrypted on the buffered path (4 MB or less) also
+  filled the message box with its content read as text, so a binary file showed garbage behind and after the result
+  sheet. The message box stays empty for a file, as on the streamed path; the result sheet carries Save and Share.
+- 4q (added Nov 6, a user by email, 4.7.3): Thunderbird could not open mail encrypted to a passphrase-protected
+  composite (ML-KEM) key. The provider decrypts through decryptStream, which had no mapping for a locked composite
+  key, so the mail app showed "Decryption failed: composite secret key is passphrase-protected" instead of PGPony's
+  passphrase prompt. Sending (signing) and drafts did prompt. decryptStream and decrypt now map a locked composite
+  key in all four composite formats to PassphraseRequired (InvalidPassphrase when a passphrase was given), so the
+  provider returns its passphrase intent. The buffered decrypt had this for one format only since #26.
+  A wrong passphrase on such a key fails inside the ML-KEM unlock rather than as InvalidPassphrase, so the provider
+  now checks the matched key with SecretKeyCheck when a decrypt with a passphrase fails, and asks again when the
+  passphrase does not unlock it (found in RC5 device testing).
 
 RC6: #95 whole, with #100's slower playback.
 

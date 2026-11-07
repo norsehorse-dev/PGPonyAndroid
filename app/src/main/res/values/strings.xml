@@ -3148,4 +3148,25 @@
     <string name="err_card_primary_missing">The primary key is not in this security key\'s signature slot, so this change cannot be made with it</string>
     <string name="key_detail_add_subkey_card_note">The new subkey is made on this phone. This key signs and decrypts with the security key, so move the new subkey there with Move to security key before you share the key. Until then, messages encrypted to a new encryption subkey cannot be opened.</string>
     <string name="key_detail_add_subkey_card_new_passphrase_hint">The new subkey\'s secret stays on this phone, and no secret of this key here has a passphrase yet. Choose one to protect it.</string>
+    <!-- 4.8.0 RC5 (#106) -->
+    <string name="verify_file_multi_hint">You can pick the signature and its file together, or several of each. Each signature is matched to its file by name.</string>
+    <string name="verify_pair_signature_format">Signature: %1$s</string>
+    <string name="verify_pair_file_not_picked">The file this signature belongs to was not picked.</string>
+    <string name="verify_pair_several_files">More than one picked file matches this signature\'s name.</string>
+    <string name="verify_pair_no_signature">Not verified: no signature for this file was picked.</string>
+    <!-- 4.8.0 RC5 (#103) -->
+    <string name="process_text_encrypt_label">Encrypt with PGPony</string>
+    <string name="process_text_sign_label">Sign with PGPony</string>
+    <string name="process_text_input_label">Selected text</string>
+    <string name="process_text_result_not_replaced">This text can\'t be replaced where you selected it, so here is the result to copy or share.</string>
+    <!-- 4.8.0 RC5 (#104) -->
+    <string name="settings_compress_large_title">Compress large files</string>
+    <string name="settings_compress_large_subtitle">Compress files over 16 MB too. Slower, and the gain depends on the file.</string>
+    <!-- 4.8.0 RC5 (4m) -->
+    <string name="keyring_reorder_menu">Reorder keys</string>
+    <string name="keyring_reorder_title">Reorder keys</string>
+    <!-- 4.8.0 RC5 (#72, #67) -->
+    <string name="share_target_action_sign_file_subtitle">Make a detached signature (.asc or .sig). The file itself stays as it is.</string>
+    <string name="share_target_sign_result_subtitle">Keep the signature with the file, so others can check that it came from you and was not changed.</string>
+    <string name="share_target_action_restore_subtitle">This is a keyring backup. Open Restore and enter its recovery code.</string>
 </resources>

@@ -38,6 +38,8 @@
 //   Decrypt: passphrase prompt  ShareTargetPhase.NeedPassphrase
 //   Decrypt: processing         ShareTargetPhase.Processing
 //   Decrypt: result             ShareTargetPhase.DecryptResult
+//   Sign: key, format, pass     ShareTargetPhase.PickSigner     (4.8.0, #72)
+//   Sign: result                ShareTargetPhase.SignResult     (4.8.0, #72)
 //   Error                       ShareTargetPhase.Error
 //
 // All transitions are unidirectional from the user's POV (back button
@@ -55,6 +57,8 @@ import com.pgpony.android.R
 import com.pgpony.android.crypto.PGPCryptoError
 import com.pgpony.android.crypto.PGPCryptoService
 import com.pgpony.android.crypto.SignerStatus
+import com.pgpony.android.crypto.SigningError
+import com.pgpony.android.crypto.SigningService
 import com.pgpony.android.crypto.pqc.CompositeSignerGate
 import com.pgpony.android.data.KeyDeduplicationService
 import com.pgpony.android.ui.util.ScratchFiles
@@ -89,6 +93,11 @@ enum class ShareTargetPhase {
     // written to a cache file and offered via the share sheet, instead of
     // dumping raw bytes as text.
     DecryptFileResult,
+    // 4.8.0 (#72): a detached signature over a shared file. PickSigner holds
+    // the Sign as key, the format (.asc or .sig) and the passphrase;
+    // SignResult offers the signature to save or share.
+    PickSigner,
+    SignResult,
     Error,
 }
 
@@ -151,6 +160,24 @@ data class ShareTargetUiState(
     /** 4.6.0 (item 15): signed, by a key that is not in the keyring. */
     val signatureFromUnknownKey: Boolean = false,
 
+    // 4.8.0 (#72): signing a shared file, on its own or while encrypting it.
+    /** Software key pairs that can sign here (ShareFileActions.signers). */
+    val availableSigners: List<PGPKeyEntity> = emptyList(),
+    /** The pinned default signer (pgpony_prefs), empty when none. */
+    val defaultSignerFingerprint: String = "",
+    /** The Sign as key. On Encrypt, null (the default) encrypts unsigned. */
+    val signingKey: PGPKeyEntity? = null,
+    /** .asc (armored, the Sign a file sheet's default) or .sig (binary). */
+    val signArmor: Boolean = true,
+    /** The signing passphrase, good for one attempt: cleared at Processing. */
+    val signPassphrase: String = "",
+    /** 4.6.0 (item 14), as on the Encrypt screen: a composite (ML-DSA)
+     *  signature would go to a v4 recipient. Ask before signing. */
+    val showPqcV4SignPrompt: Boolean = false,
+    /** The detached signature (SignResult); a few hundred bytes. */
+    val signatureBytes: ByteArray? = null,
+    val signatureFileName: String? = null,
+
     // Status
     val errorMessage: String? = null,
 )
@@ -186,10 +213,14 @@ class ShareTargetViewModel(
             val preselect = com.pgpony.android.ui.settings.DefaultRecipientPrefs
                 .preselectFingerprint(prefs)
                 ?.takeIf { fp -> keys.any { it.fingerprint == fp } }
+            // 4.8.0 (#72): the same default signer the Encrypt screen uses.
+            val defaultSignerFpr = prefs.getString("pgpony_default_signer_fpr", "") ?: ""
             _state.update {
                 it.copy(
                     availableRecipients = keys,
                     availableKeyPairs = keyPairs,
+                    availableSigners = ShareFileActions.signers(keyPairs),
+                    defaultSignerFingerprint = defaultSignerFpr,
                     cardDecryptKeyFingerprint = cardMatch?.fingerprint,
                     cardDecryptKeyName = cardMatch?.userID,
                     selectedRecipients = if (it.selectedRecipients.isEmpty() && preselect != null)
@@ -260,9 +291,65 @@ class ShareTargetViewModel(
             it.copy(
                 phase = ShareTargetPhase.PickRecipients,
                 errorMessage = null,
+                // 4.8.0 (#72): Encrypt starts unsigned, as before; Sign as
+                // on the recipient screen adds a signature.
+                signingKey = null,
+                signPassphrase = "",
+                showPqcV4SignPrompt = false,
+            )
+        }
+        pendingSignPassphrase = null
+        pqcV4SignAnswer = null
+    }
+
+    /** 4.8.0 (#72): Sign the shared file, starting with the default signer. */
+    fun beginSign() {
+        _state.update {
+            it.copy(
+                phase = ShareTargetPhase.PickSigner,
+                errorMessage = null,
+                signingKey = ShareFileActions.defaultSigner(it.availableSigners, it.defaultSignerFingerprint),
+                signPassphrase = "",
             )
         }
     }
+
+    // ── 4.8.0 (#72): Sign as, format, signing passphrase ───────────────
+
+    /** The Sign as key; null signs nothing (Encrypt only). */
+    fun selectSigner(key: PGPKeyEntity?) {
+        pqcV4SignAnswer = null
+        _state.update { it.copy(signingKey = key, signPassphrase = "", errorMessage = null) }
+    }
+
+    fun setSignArmor(armor: Boolean) {
+        _state.update { it.copy(signArmor = armor) }
+    }
+
+    fun updateSignPassphrase(s: String) {
+        _state.update { it.copy(signPassphrase = s) }
+    }
+
+    /** The 4.6.0 (item 14) prompt was dismissed: nothing is encrypted. */
+    fun dismissPqcV4SignPrompt() {
+        pendingSignPassphrase = null
+        pqcV4SignAnswer = null
+        _state.update { it.copy(showPqcV4SignPrompt = false) }
+    }
+
+    /** The prompt's answer: sign anyway, or encrypt without the signature. */
+    fun answerPqcV4SignPrompt(signAnyway: Boolean) {
+        _state.update { it.copy(showPqcV4SignPrompt = false) }
+        pqcV4SignAnswer = signAnyway
+        performEncrypt(pqcDecision = signAnyway)
+    }
+
+    /**
+     * The prompt's answer, kept until the signer, the recipients or the
+     * action change, so a run that stops for the passphrase does not ask
+     * the same question again when Encrypt is tapped once more.
+     */
+    private var pqcV4SignAnswer: Boolean? = null
 
     fun beginDecrypt() {
         // HW Phase 3 — if the message is encrypted to a card key, the
@@ -308,6 +395,7 @@ class ShareTargetViewModel(
             if (fingerprint in next) next.remove(fingerprint) else next.add(fingerprint)
             current.copy(selectedRecipients = next)
         }
+        pqcV4SignAnswer = null
     }
 
     // ── Decrypt key picker ─────────────────────────────────────────────
@@ -413,7 +501,7 @@ class ShareTargetViewModel(
      * path: the Quick Action's file result is a .gpg the user shares on,
      * and armoring a large file inflates it by a third for nothing.
      */
-    private fun performEncryptStreaming(uri: android.net.Uri, sourceFilename: String?) {
+    private fun performEncryptStreaming(uri: android.net.Uri, sourceFilename: String?, pqcDecision: Boolean?) {
         val current = _state.value
         if (current.selectedRecipients.isEmpty()) {
             _state.update {
@@ -426,7 +514,12 @@ class ShareTargetViewModel(
             }
             return
         }
-        _state.update { it.copy(phase = ShareTargetPhase.Processing, errorMessage = null) }
+        signerBlock(current.signingKey)?.let { msg ->
+            _state.update { it.copy(errorMessage = msg) }
+            return
+        }
+        // 4.8.0 (item 4d, #72): a typed signing passphrase is good for this one attempt (`current` holds it).
+        _state.update { it.copy(phase = ShareTargetPhase.Processing, errorMessage = null, signPassphrase = "") }
         viewModelScope.launch {
             try {
                 val recipients = loadShareRecipients(current)
@@ -434,6 +527,10 @@ class ShareTargetViewModel(
                     _state.update { it.copy(phase = ShareTargetPhase.Error, errorMessage = msg) }
                     return@launch
                 }
+                // 4.8.0 (#72): Sign as. Paused means the 4.6.0 (item 14) prompt is up.
+                val signing = prepareEncryptSigning(current, recipients, pqcDecision)
+                if (signing is EncryptSigning.Paused) return@launch
+                val signer = signing as? EncryptSigning.Signer
                 // 3.1.0 Phase 1 (C2) — .gpg for binary output.
                 val outName = "${sourceFilename ?: "shared_file"}.gpg"
                 val out = withContext(Dispatchers.IO) {
@@ -446,16 +543,23 @@ class ShareTargetViewModel(
                                 input = source,
                                 output = sink,
                                 recipientPublicKeys = recipients.rings,
-                                signingSecretKey = null,
-                                passphrase = null,
+                                signingSecretKey = signer?.ring,
+                                passphrase = signer?.passphrase,
                                 filename = sourceFilename,
                                 armor = false,
                                 v4Algo35Recipients = recipients.v4Algo35,
+                                compositeSignSuite = signer?.composite?.signingSuite,
+                                compositeSignSecret = signer?.compositeSecret,
+                                compositeSignerFingerprint = signer?.composite?.signingFingerprint,
+                                // The prompt above has been answered: "Send
+                                // unsigned" left no signer at all.
+                                compositeSignInSeipdV1 = true,
                             )
                         }
                     }
                     dest
                 }
+                signer?.let { rememberSignPassphrase(it) }
                 _state.update {
                     it.copy(
                         phase = ShareTargetPhase.EncryptFileResult,
@@ -466,6 +570,7 @@ class ShareTargetViewModel(
                 }
             } catch (e: Exception) {
                 ScratchFiles.clearScope(PGPonyApp.instance, ScratchFiles.SCOPE_QUICK)
+                if (handleSignPassphraseError(e, current, ShareTargetPhase.PickRecipients)) return@launch
                 _state.update {
                     it.copy(
                         phase = ShareTargetPhase.Error,
@@ -583,7 +688,11 @@ class ShareTargetViewModel(
         }
     }
 
-    fun performEncrypt() {
+    /**
+     * [pqcDecision] is the answer to the 4.6.0 (item 14) prompt (4.8.0, #72):
+     * null before it is asked, true to sign anyway, false to send unsigned.
+     */
+    fun performEncrypt(pqcDecision: Boolean? = pqcV4SignAnswer) {
         val current = _state.value
 
         // 4.0.4 — a shared file too large to buffer never had its bytes
@@ -591,7 +700,7 @@ class ShareTargetViewModel(
         // assembly below (issue #6).
         val largeIn = current.content as? ShareIntentContent.PgpFile
         if (largeIn != null && largeIn.data == null && largeIn.uri != null) {
-            performEncryptStreaming(largeIn.uri, largeIn.filename)
+            performEncryptStreaming(largeIn.uri, largeIn.filename, pqcDecision)
             return
         }
 
@@ -658,8 +767,13 @@ class ShareTargetViewModel(
             }
             return
         }
+        signerBlock(current.signingKey)?.let { msg ->
+            _state.update { it.copy(errorMessage = msg) }
+            return
+        }
 
-        _state.update { it.copy(phase = ShareTargetPhase.Processing, errorMessage = null) }
+        // 4.8.0 (item 4d, #72): a typed signing passphrase is good for this one attempt (`current` holds it).
+        _state.update { it.copy(phase = ShareTargetPhase.Processing, errorMessage = null, signPassphrase = "") }
 
         viewModelScope.launch {
             try {
@@ -668,18 +782,29 @@ class ShareTargetViewModel(
                     _state.update { it.copy(phase = ShareTargetPhase.Error, errorMessage = msg) }
                     return@launch
                 }
+                // 4.8.0 (#72): Sign as. Paused means the 4.6.0 (item 14) prompt is up.
+                val signing = prepareEncryptSigning(current, recipients, pqcDecision)
+                if (signing is EncryptSigning.Paused) return@launch
+                val signer = signing as? EncryptSigning.Signer
                 val cipher = withContext(Dispatchers.Default) {
                     PGPCryptoService.shared.encrypt(
                         data = plaintextBytes,
                         recipientPublicKeys = recipients.rings,
-                        signingSecretKey = null,
-                        passphrase = null,
+                        signingSecretKey = signer?.ring,
+                        passphrase = signer?.passphrase,
                         filename = literalFilename,
                         // Files → binary .pgp (smaller, standard). Text → armored.
                         armor = !produceFileResult,
                         v4Algo35Recipients = recipients.v4Algo35,
+                        compositeSignSuite = signer?.composite?.signingSuite,
+                        compositeSignSecret = signer?.compositeSecret,
+                        compositeSignerFingerprint = signer?.composite?.signingFingerprint,
+                        // The prompt above has been answered: "Send unsigned"
+                        // left no signer at all.
+                        compositeSignInSeipdV1 = true,
                     )
                 }
+                signer?.let { rememberSignPassphrase(it) }
                 if (produceFileResult) {
                     _state.update {
                         it.copy(
@@ -697,11 +822,229 @@ class ShareTargetViewModel(
                     }
                 }
             } catch (e: Throwable) {
+                if (handleSignPassphraseError(e, current, ShareTargetPhase.PickRecipients)) return@launch
                 _state.update {
                     it.copy(
                         phase = ShareTargetPhase.Error,
                         errorMessage = PGPonyApp.instance.getString(
                             R.string.share_target_error_generic_format,
+                            ErrorText.detail(e.message) ?: e.javaClass.simpleName,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
+    // ── 4.8.0 (#72): signing ───────────────────────────────────────────
+
+    /** The typed signing passphrase, kept only while the 4.6.0 (item 14)
+     *  prompt is up, so answering it does not ask for it again. */
+    private var pendingSignPassphrase: String? = null
+
+    /** A signing key's material, loaded the way the Sign a file sheet loads it. */
+    private sealed class SignerMaterial {
+        class Classical(val ring: org.bouncycastle.openpgp.PGPSecretKeyRing) : SignerMaterial()
+        class Composite(
+            val info: com.pgpony.android.crypto.pqc.CompositeKeyFacade.Info,
+            val secret: ByteArray,
+        ) : SignerMaterial()
+    }
+
+    /** What signs an Encrypt: nobody, a key, or nothing yet (the prompt is up). */
+    private sealed class EncryptSigning {
+        data object None : EncryptSigning()
+        data object Paused : EncryptSigning()
+        class Signer(
+            val fingerprint: String,
+            val passphrase: String?,
+            val ring: org.bouncycastle.openpgp.PGPSecretKeyRing?,
+            val composite: com.pgpony.android.crypto.pqc.CompositeKeyFacade.Info?,
+            val compositeSecret: ByteArray?,
+        ) : EncryptSigning()
+    }
+
+    /**
+     * The secret material for [key]. A composite ML-DSA key is not a
+     * BouncyCastle ring and is unlocked here (a locked one throws
+     * PassphraseRequired, a wrong passphrase InvalidPassphrase, as the Sign
+     * screen maps them); a classical ring is unlocked by the signer itself.
+     */
+    private fun loadSigner(key: PGPKeyEntity, passphrase: String?): SignerMaterial {
+        if (key.algorithm.isCompositeSign) {
+            val info = try {
+                repository.loadCompositeKeyInfo(key.fingerprint, passphrase?.toCharArray())
+            } catch (e: Exception) {
+                throw if (passphrase.isNullOrEmpty()) SigningError.PassphraseRequired() else SigningError.InvalidPassphrase()
+            } ?: throw SigningError.NoSigningKey()
+            val secret = info.signingSecret ?: throw SigningError.PassphraseRequired()
+            return SignerMaterial.Composite(info, secret)
+        }
+        val ring = repository.loadSecretKeyRing(key.fingerprint) ?: throw SigningError.NoSigningKey()
+        return SignerMaterial.Classical(ring)
+    }
+
+    /** The typed passphrase for this attempt, else the one kept for the
+     *  prompt, else the in-app cache (4.3.0 RC4 §3, #15). */
+    private fun signPassphraseFor(current: ShareTargetUiState, key: PGPKeyEntity): String? =
+        current.signPassphrase.ifEmpty { null }
+            ?: pendingSignPassphrase
+            ?: com.pgpony.android.session.InAppPassphraseCache.get(key.fingerprint)
+
+    /**
+     * The Sign as key for an Encrypt, ready to sign. A composite signature
+     * (an ML-DSA key, or a classical key whose signing subkey is ML-DSA) in a
+     * message a v4 recipient forces into SEIPDv1 is asked about first, as on
+     * the Encrypt screen (4.6.0 item 14): [pqcDecision] null puts the prompt
+     * up and pauses, false encrypts without the signature, true signs.
+     */
+    private suspend fun prepareEncryptSigning(
+        current: ShareTargetUiState,
+        recipients: ShareRecipients.Loaded<org.bouncycastle.openpgp.PGPPublicKeyRing, com.pgpony.android.crypto.pqc.V4Algo35Recipient>,
+        pqcDecision: Boolean?,
+    ): EncryptSigning {
+        val key = current.signingKey ?: return EncryptSigning.None
+        val pass = signPassphraseFor(current, key)
+        pendingSignPassphrase = null
+        val material = withContext(Dispatchers.IO) { loadSigner(key, pass) }
+        val composite = when (material) {
+            is SignerMaterial.Composite -> true
+            is SignerMaterial.Classical -> withContext(Dispatchers.Default) {
+                PGPCryptoService.shared.picksCompositeSubkey(material.ring)
+            }
+        }
+        val pqcInV1 = composite && PGPCryptoService.shared.compositeSignatureInSeipdV1(
+            recipients.rings, emptyMap(), recipients.v4Algo35
+        )
+        if (pqcInV1 && pqcDecision == null) {
+            pendingSignPassphrase = pass
+            _state.update { it.copy(phase = ShareTargetPhase.PickRecipients, showPqcV4SignPrompt = true) }
+            return EncryptSigning.Paused
+        }
+        if (pqcInV1 && pqcDecision == false) return EncryptSigning.None
+        return when (material) {
+            is SignerMaterial.Composite -> EncryptSigning.Signer(key.fingerprint, pass, null, material.info, material.secret)
+            is SignerMaterial.Classical -> EncryptSigning.Signer(key.fingerprint, pass, material.ring, null, null)
+        }
+    }
+
+    /** §3 (#15): a passphrase that worked is kept for the session. */
+    private fun rememberSignPassphrase(signer: EncryptSigning.Signer) {
+        val pass = signer.passphrase
+        if (!pass.isNullOrEmpty()) com.pgpony.android.session.InAppPassphraseCache.put(signer.fingerprint, pass)
+    }
+
+    /**
+     * A missing or wrong signing passphrase sends the user back to [phase]
+     * to enter it, with the Sign a file sheet's message, and a wrong one is
+     * dropped from the cache so it is not tried again. False for any other
+     * error, which the caller reports as before.
+     */
+    private fun handleSignPassphraseError(e: Throwable, current: ShareTargetUiState, phase: ShareTargetPhase): Boolean {
+        val key = current.signingKey ?: return false
+        val messageRes = when (e) {
+            is SigningError.PassphraseRequired, is PGPCryptoError.PassphraseRequired ->
+                R.string.sign_file_error_passphrase_required
+            is SigningError.InvalidPassphrase, is PGPCryptoError.InvalidPassphrase -> {
+                com.pgpony.android.session.InAppPassphraseCache.clear(key.fingerprint)
+                R.string.encdec_error_incorrect_passphrase
+            }
+            else -> return false
+        }
+        _state.update { it.copy(phase = phase, errorMessage = PGPonyApp.instance.getString(messageRes)) }
+        return true
+    }
+
+    /** Why [key] must not sign, or null: the Encrypt screen's expired-key
+     *  rule (expiredKeyBlock), with the same Allow expired keys setting. */
+    private fun signerBlock(key: PGPKeyEntity?): String? {
+        if (key == null || !key.isExpired) return null
+        val allowExpired = PGPonyApp.instance.getSharedPreferences(
+            "pgpony_prefs", android.content.Context.MODE_PRIVATE
+        ).getBoolean("allow_expired_keys", false)
+        return if (allowExpired) null
+        else PGPonyApp.instance.getString(R.string.encrypt_expired_signing_blocked)
+    }
+
+    /** The shared file as a stream: its bytes when they were read, else its URI. */
+    private fun openSharedFile(file: ShareIntentContent.PgpFile): java.io.InputStream {
+        file.data?.let { return java.io.ByteArrayInputStream(it) }
+        val uri = file.uri
+            ?: throw java.io.IOException(PGPonyApp.instance.getString(R.string.share_target_error_open_shared_file))
+        return PGPonyApp.instance.contentResolver.openInputStream(uri)
+            ?: throw java.io.IOException(PGPonyApp.instance.getString(R.string.share_target_error_open_shared_file))
+    }
+
+    /**
+     * 4.8.0 (#72): a detached signature over the shared file, made as the
+     * Sign a file sheet makes it (runSignFile): .asc or .sig, the file
+     * hashed as it streams so a large file is never read into memory, and a
+     * composite ML-DSA key through CompositeDocumentSigner. The signature is
+     * small and kept in memory for Save and Share. The passphrase follows the
+     * in-app rules: typed for this one attempt, else the in-app cache, kept
+     * after it works and dropped when it is wrong.
+     */
+    fun performSign() {
+        val current = _state.value
+        val file = current.content as? ShareIntentContent.PgpFile
+        if (file == null || (file.data == null && file.uri == null)) {
+            _state.update {
+                it.copy(
+                    phase = ShareTargetPhase.Error,
+                    errorMessage = PGPonyApp.instance.getString(R.string.share_target_error_no_input),
+                )
+            }
+            return
+        }
+        val key = current.signingKey
+        if (key == null) {
+            _state.update { it.copy(errorMessage = PGPonyApp.instance.getString(R.string.sign_file_error_pick_key)) }
+            return
+        }
+        signerBlock(key)?.let { msg ->
+            _state.update { it.copy(errorMessage = msg) }
+            return
+        }
+        // 4.8.0 (item 4d): the typed passphrase is good for this one attempt (`current` holds it).
+        _state.update { it.copy(phase = ShareTargetPhase.Processing, errorMessage = null, signPassphrase = "") }
+        viewModelScope.launch {
+            val pass = signPassphraseFor(current, key)
+            try {
+                val armor = current.signArmor
+                val sig = withContext(Dispatchers.IO) {
+                    val material = loadSigner(key, pass)
+                    openSharedFile(file).use { input ->
+                        when (material) {
+                            is SignerMaterial.Composite ->
+                                com.pgpony.android.crypto.pqc.CompositeDocumentSigner.signDetachedStream(
+                                    material.info.signingSuite, material.secret,
+                                    material.info.signingFingerprint, input, armor = armor
+                                )
+                            is SignerMaterial.Classical ->
+                                SigningService.shared.signDetachedStream(
+                                    input = input,
+                                    secretKeyRing = material.ring,
+                                    passphrase = pass,
+                                    armor = armor,
+                                )
+                        }
+                    }
+                }
+                if (!pass.isNullOrEmpty()) com.pgpony.android.session.InAppPassphraseCache.put(key.fingerprint, pass)
+                _state.update {
+                    it.copy(
+                        phase = ShareTargetPhase.SignResult,
+                        signatureBytes = sig,
+                        signatureFileName = ShareFileActions.signatureName(file.filename, armor),
+                    )
+                }
+            } catch (e: Exception) {
+                if (handleSignPassphraseError(e, current, ShareTargetPhase.PickSigner)) return@launch
+                _state.update {
+                    it.copy(
+                        phase = ShareTargetPhase.Error,
+                        errorMessage = PGPonyApp.instance.getString(
+                            R.string.sign_file_error_failed_format,
                             ErrorText.detail(e.message) ?: e.javaClass.simpleName,
                         ),
                     )
@@ -1128,6 +1471,7 @@ class ShareTargetViewModel(
         name.removeSuffix(".pgp").removeSuffix(".gpg").removeSuffix(".asc")
 
     fun goBackToActionPicker() {
+        pqcV4SignAnswer = null
         _state.update {
             it.copy(
                 phase = ShareTargetPhase.PickAction,
@@ -1148,8 +1492,15 @@ class ShareTargetViewModel(
                 decryptedFileBytes = null,
                 mimeAttachmentNote = null,
                 decryptedFileName = null,
+                // 4.8.0 (#72)
+                signingKey = null,
+                signPassphrase = "",
+                showPqcV4SignPrompt = false,
+                signatureBytes = null,
+                signatureFileName = null,
             )
         }
+        pendingSignPassphrase = null
     }
 
     fun clearError() {

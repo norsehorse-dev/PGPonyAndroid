@@ -3101,4 +3101,25 @@
     <string name="err_card_primary_missing">主钥不在此硬件密钥的签名槽位中，因此无法用它进行此更改</string>
     <string name="key_detail_add_subkey_card_note">新子钥在此手机上生成。此密钥通过硬件密钥签名和解密，因此请在共享此密钥之前，使用「移至硬件密钥」将新子钥移到硬件密钥上。在此之前，加密给新加密子钥的消息将无法打开。</string>
     <string name="key_detail_add_subkey_card_new_passphrase_hint">新子钥的私钥保留在此手机上，而此密钥在这里的私钥都还没有设置口令。请设置一个口令来保护它。</string>
+    <!-- 4.8.0 RC5 (#106) -->
+    <string name="verify_file_multi_hint">你可以同时选择签名及其文件，也可以各选多个。每个签名会按名称与其文件匹配。</string>
+    <string name="verify_pair_signature_format">签名：%1$s</string>
+    <string name="verify_pair_file_not_picked">未选择此签名对应的文件。</string>
+    <string name="verify_pair_several_files">有多个所选文件与此签名的名称匹配。</string>
+    <string name="verify_pair_no_signature">未验证：未选择此文件的签名。</string>
+    <!-- 4.8.0 RC5 (#103) -->
+    <string name="process_text_encrypt_label">使用 PGPony 加密</string>
+    <string name="process_text_sign_label">使用 PGPony 签名</string>
+    <string name="process_text_input_label">所选文本</string>
+    <string name="process_text_result_not_replaced">无法在你选择的位置替换此文本，因此结果显示在这里，供你复制或共享。</string>
+    <!-- 4.8.0 RC5 (#104) -->
+    <string name="settings_compress_large_title">压缩大文件</string>
+    <string name="settings_compress_large_subtitle">也压缩超过 16 MB 的文件。速度较慢，效果取决于文件。</string>
+    <!-- 4.8.0 RC5 (4m) -->
+    <string name="keyring_reorder_menu">重新排序密钥</string>
+    <string name="keyring_reorder_title">重新排序密钥</string>
+    <!-- 4.8.0 RC5 (#72, #67) -->
+    <string name="share_target_action_sign_file_subtitle">生成分离签名（.asc 或 .sig）。文件本身保持不变。</string>
+    <string name="share_target_sign_result_subtitle">请将签名与文件放在一起，以便其他人确认文件来自你且未被更改。</string>
+    <string name="share_target_action_restore_subtitle">这是密钥环备份。请打开「恢复」并输入它的恢复代码。</string>
 </resources>

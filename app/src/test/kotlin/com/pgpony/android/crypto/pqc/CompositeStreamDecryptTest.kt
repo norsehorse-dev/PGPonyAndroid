@@ -238,4 +238,32 @@ class CompositeStreamDecryptTest {
         assertNull(CompositeDecryptor.recoverSessionKey(esk, listOf(sec(k.privateKeyData))))
         assertNull(CompositeLibrePGPDecryptor.recoverSessionKey(esk, listOf(sec(k.privateKeyData))))
     }
+
+    // 4.8.0 RC5: the OpenPGP provider decrypts through the stream. A locked
+    // composite key has to come out as PassphraseRequired there, as it does in
+    // the buffered decrypt, or Thunderbird shows "Decryption failed: composite
+    // secret key is passphrase-protected" and never offers the prompt.
+    private fun lockedKeyAsks(algo: KeyAlgorithm) {
+        val pass = "correct horse battery staple"
+        val k = newKey(algo, pass)
+        val plaintext = "locked composite".toByteArray()
+        val ct = svc.encrypt(data = plaintext, recipientPublicKeys = listOf(pub(k.publicKeyData)), armor = true)
+        val rings = listOf(sec(k.privateKeyData))
+        try {
+            decryptStreamed(ct, rings, passphrase = null)
+            org.junit.Assert.fail("$algo: a locked key decrypted without a passphrase")
+        } catch (e: com.pgpony.android.crypto.PGPCryptoError.PassphraseRequired) {
+            // expected
+        }
+        val (recovered, _) = decryptStreamed(ct, rings, passphrase = pass)
+        assertArrayEquals(plaintext, recovered)
+    }
+
+    @Test
+    fun `a locked v6 composite key asks for the passphrase through the stream`() =
+        lockedKeyAsks(KeyAlgorithm.MLKEM768_X25519_V6)
+
+    @Test
+    fun `a locked LibrePGP composite key asks for the passphrase through the stream`() =
+        lockedKeyAsks(KeyAlgorithm.MLKEM768_X25519_LIBREPGP)
 }

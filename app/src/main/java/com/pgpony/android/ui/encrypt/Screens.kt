@@ -3600,8 +3600,30 @@ private fun DecryptVerifyBody(state: DecryptUiState, viewModel: EncryptDecryptVi
     // 4.6.3 (4.7.0 item 19 B): the signature read leaves the main thread.
     val pickScope = rememberCoroutineScope()
 
+    // 4.8.0 (#106): both pickers take several files. The picker grants access
+    // to the picked documents only, never their folder, so a signature's file
+    // cannot be found beside it; picking both (or several of each) in one trip
+    // lets the ViewModel sort and match them by name. One picked file keeps the
+    // two-slot flow below exactly as before.
     val pickInto: (isSignature: Boolean) -> Unit = { isSignature ->
-        activity?.startDocumentPicker(arrayOf("*/*")) { uri ->
+        activity?.startMultiDocumentPicker(arrayOf("*/*")) { uris ->
+            if (uris.size >= 2) {
+                val picked = uris.map { u ->
+                    val (name, size) = try {
+                        queryDocumentMetadata(context, u)
+                    } catch (_: Exception) {
+                        Pair(null, null)
+                    }
+                    PickedVerifyFile(
+                        name = name ?: u.lastPathSegment?.substringAfterLast('/') ?: "file",
+                        uri = u,
+                        size = size,
+                    )
+                }
+                viewModel.startVerifyPairs(picked)
+                return@startMultiDocumentPicker
+            }
+            val uri = uris.firstOrNull()
             if (uri != null) {
                 val (name, _) = queryDocumentMetadata(context, uri)
                 val fallback = uri.lastPathSegment?.substringAfterLast('/')
@@ -3650,6 +3672,12 @@ private fun DecryptVerifyBody(state: DecryptUiState, viewModel: EncryptDecryptVi
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // 4.8.0 (#106): say that both can be picked in one trip.
+            Text(
+                stringResource(R.string.verify_file_multi_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
 
             VerifyFilePickRow(
                 label = stringResource(R.string.verify_file_pick_signed_label),
@@ -3669,6 +3697,24 @@ private fun DecryptVerifyBody(state: DecryptUiState, viewModel: EncryptDecryptVi
                 )
             }
 
+            // 4.8.0 (#106): one row per signature (and per picked file no
+            // signature went with) from a multi-file pick.
+            state.verifyPairs.forEachIndexed { index, row ->
+                VerifyPairCard(
+                    row = row,
+                    onPickFile = {
+                        activity?.startDocumentPicker(arrayOf("*/*")) { uri ->
+                            if (uri != null) {
+                                val (name, _) = queryDocumentMetadata(context, uri)
+                                val fallback = uri.lastPathSegment?.substringAfterLast('/')
+                                viewModel.setVerifyPairFile(index, name ?: fallback ?: "file", uri)
+                            }
+                        }
+                    },
+                    onTapUnknownSigner = { unknown -> viewModel.lookupSignerFor(unknown) },
+                )
+            }
+
             // RC3 §J (#16): surfaces reportVerifyFileTooLarge — this body
             // had no error display at all before (the sheet it was
             // promoted from didn't need one; the crash IS the reason one
@@ -3681,20 +3727,104 @@ private fun DecryptVerifyBody(state: DecryptUiState, viewModel: EncryptDecryptVi
                 )
             }
 
+            // 4.8.0 (#106): with multi-file rows, Verify checks those rows again.
+            val pairsBusy = state.verifyPairs.any { it.running }
+            val busy = state.verifyFileProcessing || pairsBusy
             Button(
                 onClick = { viewModel.runVerifyFile() },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !state.verifyFileProcessing &&
-                    state.verifyFileSignedUri != null &&
-                    state.verifyFileSigBytes != null,
+                enabled = !busy && (
+                    state.verifyPairs.any { it.ready } ||
+                        (state.verifyFileSignedUri != null && state.verifyFileSigBytes != null)
+                    ),
             ) {
-                if (state.verifyFileProcessing) {
+                if (busy) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 Text(stringResource(R.string.verify_file_verify_button))
             }
         }
+}
+
+/**
+ * 4.8.0 (#106): one row of a multi-file Verify, in the batch rows' style: the
+ * file, the signature that went with it, and the result banner. A signature
+ * whose file was not picked (or not told apart) gets "Choose original file"
+ * for that one signature, as the two-slot flow asks for it.
+ */
+@Composable
+private fun VerifyPairCard(
+    row: VerifyPairRow,
+    onPickFile: () -> Unit,
+    onTapUnknownSigner: (com.pgpony.android.crypto.VerificationResult.UnknownSigner) -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        row.dataName ?: row.signatureName ?: "",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    val sigName = row.signatureName
+                    if (row.dataName != null && sigName != null) {
+                        Text(
+                            stringResource(R.string.verify_pair_signature_format, sigName),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (row.running) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                }
+            }
+            val problem = row.problem
+            if (problem != null && !row.running && row.result == null) {
+                Text(
+                    stringResource(
+                        when (problem) {
+                            VerifyPairProblem.FILE_NOT_PICKED -> R.string.verify_pair_file_not_picked
+                            VerifyPairProblem.SEVERAL_FILES_MATCH -> R.string.verify_pair_several_files
+                            VerifyPairProblem.NO_SIGNATURE -> R.string.verify_pair_no_signature
+                        }
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (problem != VerifyPairProblem.NO_SIGNATURE) {
+                    VerifyFilePickRow(
+                        label = stringResource(R.string.verify_file_pick_signed_label),
+                        filename = null,
+                        onPick = onPickFile,
+                    )
+                }
+            }
+            row.result?.let { result ->
+                VerificationBanner(
+                    result = result,
+                    onTapUnknownSigner = {
+                        (result as? com.pgpony.android.crypto.VerificationResult.UnknownSigner)
+                            ?.let(onTapUnknownSigner)
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable

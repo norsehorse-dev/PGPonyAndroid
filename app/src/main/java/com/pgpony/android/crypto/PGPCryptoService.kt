@@ -2399,7 +2399,13 @@ class PGPCryptoService private constructor() {
         } catch (e: com.pgpony.android.crypto.pqc.CompositeSecretKeyMaterial.ProtectedKeyException) {
             // #26 (RC4): a locked composite key surfaces as "passphrase required"
             // so the Decrypt screen prompts, not as a generic failure.
-            throw PGPCryptoError.PassphraseRequired()
+            throw lockedCompositeKey(e, passphrase) ?: PGPCryptoError.PassphraseRequired()
+        } catch (e: com.pgpony.android.crypto.pqc.CompositeSecretProtection.ProtectedKeyException) {
+            throw lockedCompositeKey(e, passphrase) ?: PGPCryptoError.DecryptionFailed(e.message ?: "Unknown error")
+        } catch (e: com.pgpony.android.crypto.pqc.CompositeLibrePGPKeyMaterial.ProtectedKeyException) {
+            throw lockedCompositeKey(e, passphrase) ?: PGPCryptoError.DecryptionFailed(e.message ?: "Unknown error")
+        } catch (e: com.pgpony.android.crypto.pqc.V4Algo35Protection.ProtectedKeyException) {
+            throw lockedCompositeKey(e, passphrase) ?: PGPCryptoError.DecryptionFailed(e.message ?: "Unknown error")
         } catch (e: PGPCryptoError) {
             // A symmetric decrypt with a wrong passphrase produces garbage that
             // typically fails deep in content parsing — e.g. "No literal data
@@ -2685,10 +2691,31 @@ class PGPCryptoService private constructor() {
             throw PGPCryptoError.DecryptionFailed(msg)
         } catch (e: Exception) {
             argon2PolicyCause(e)?.let { throw it } // 4.6.0 (item 17.5)
+            // 4.8.0 RC5: the OpenPGP provider (Thunderbird, FairEmail) decrypts
+            // here. A locked composite key used to end as a plain "Decryption
+            // failed: composite secret key is passphrase-protected", so the mail
+            // app showed an error instead of PGPony's passphrase prompt.
+            lockedCompositeKey(e, passphrase)?.let { throw it }
             if (usedSymmetric) throw PGPCryptoError.InvalidPassphrase()
             if (looksIncomplete(e)) throw PGPCryptoError.MessageIncomplete()
             throw PGPCryptoError.DecryptionFailed(e.message ?: "Unknown error")
         }
+    }
+
+    /**
+     * 4.8.0 RC5: a composite secret key that could not be opened, in any of
+     * the four composite formats, as [PGPCryptoError.PassphraseRequired] when
+     * no passphrase was given and [PGPCryptoError.InvalidPassphrase] when one
+     * was, so every caller prompts. Null for anything else, including an S2K
+     * usage PGPony cannot read (asking again would not help).
+     */
+    private fun lockedCompositeKey(e: Exception, passphrase: String?): PGPCryptoError? {
+        val locked = e is com.pgpony.android.crypto.pqc.CompositeSecretKeyMaterial.ProtectedKeyException ||
+            e is com.pgpony.android.crypto.pqc.CompositeSecretProtection.ProtectedKeyException ||
+            e is com.pgpony.android.crypto.pqc.CompositeLibrePGPKeyMaterial.ProtectedKeyException ||
+            e is com.pgpony.android.crypto.pqc.V4Algo35Protection.ProtectedKeyException
+        if (!locked || e.message.orEmpty().contains("unsupported", ignoreCase = true)) return null
+        return if (passphrase.isNullOrEmpty()) PGPCryptoError.PassphraseRequired() else PGPCryptoError.InvalidPassphrase()
     }
 
     /** 4.1.2: fill [limit] bytes (or to EOF) from [s] without reading
@@ -3436,7 +3463,7 @@ class PGPCryptoService private constructor() {
                 isPostQuantum = com.pgpony.android.crypto.pqc.CompositeSuite.ietfFor(pub.algorithm) != null ||
                     pub.algorithm == com.pgpony.android.crypto.pqc.CompositeKemLibrePGP.ALGORITHM_ID,
                 // 4.8.0 (4l, #109): an ECDH subkey on brainpool or secp256k1 names its curve.
-                algorithmLabel = EcCurveOid.ecdhLabel(pub) ?: detectAlgorithm(pub).displayName
+                algorithmLabel = EcCurveOid.ecdhLabel(pub) ?: KeyAlgorithmLabel.packet(pub, detectAlgorithm(pub), short = false)
             )
         }
 
@@ -3718,7 +3745,7 @@ class PGPCryptoService private constructor() {
                 keyId = pub.keyID,
                 keyIdHex = String.format("%016X", pub.keyID),
                 isPrimary = pub.isMasterKey,
-                algorithmLabel = detectAlgorithm(pub).displayName,
+                algorithmLabel = KeyAlgorithmLabel.packet(pub, detectAlgorithm(pub), short = false),
                 fingerprint = org.bouncycastle.util.encoders.Hex.toHexString(pub.fingerprint).uppercase(),
                 createdAt = pub.creationTime.time
             )

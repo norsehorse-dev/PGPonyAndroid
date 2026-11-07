@@ -3164,4 +3164,25 @@
     <string name="err_card_primary_missing">Основного ключа нет в слоте подписи этого ключа безопасности, поэтому с помощью этого ключа безопасности нельзя внести это изменение</string>
     <string name="key_detail_add_subkey_card_note">Новый подключ создаётся на этом телефоне. Этот ключ подписывает и расшифровывает с помощью ключа безопасности, поэтому перенесите туда новый подключ через «Перенести на ключ безопасности», прежде чем делиться ключом. До тех пор сообщения, зашифрованные для нового подключа шифрования, открыть нельзя.</string>
     <string name="key_detail_add_subkey_card_new_passphrase_hint">Закрытый ключ нового подключа остаётся на этом телефоне, а ни один закрытый ключ этого ключа здесь пока не защищён парольной фразой. Задайте её, чтобы защитить его.</string>
+    <!-- 4.8.0 RC5 (#106) -->
+    <string name="verify_file_multi_hint">Можно выбрать подпись и её файл вместе или сразу несколько подписей и файлов. Каждая подпись сопоставляется со своим файлом по имени.</string>
+    <string name="verify_pair_signature_format">Подпись: %1$s</string>
+    <string name="verify_pair_file_not_picked">Файл, к которому относится эта подпись, не выбран.</string>
+    <string name="verify_pair_several_files">Имени этой подписи соответствует больше одного выбранного файла.</string>
+    <string name="verify_pair_no_signature">Не проверено: подпись для этого файла не выбрана.</string>
+    <!-- 4.8.0 RC5 (#103) -->
+    <string name="process_text_encrypt_label">Зашифровать в PGPony</string>
+    <string name="process_text_sign_label">Подписать в PGPony</string>
+    <string name="process_text_input_label">Выделенный текст</string>
+    <string name="process_text_result_not_replaced">Этот текст нельзя заменить там, где вы его выделили, поэтому результат показан здесь: скопируйте его или поделитесь им.</string>
+    <!-- 4.8.0 RC5 (#104) -->
+    <string name="settings_compress_large_title">Сжимать большие файлы</string>
+    <string name="settings_compress_large_subtitle">Сжимать и файлы больше 16 МБ. Это медленнее, а выигрыш зависит от файла.</string>
+    <!-- 4.8.0 RC5 (4m) -->
+    <string name="keyring_reorder_menu">Изменить порядок ключей</string>
+    <string name="keyring_reorder_title">Изменить порядок ключей</string>
+    <!-- 4.8.0 RC5 (#72, #67) -->
+    <string name="share_target_action_sign_file_subtitle">Создать отсоединённую подпись (.asc или .sig). Сам файл не изменится.</string>
+    <string name="share_target_sign_result_subtitle">Храните подпись вместе с файлом, чтобы другие могли проверить, что он от вас и не был изменён.</string>
+    <string name="share_target_action_restore_subtitle">Это резервная копия связки ключей. Откройте «Восстановить» и введите её код восстановления.</string>
 </resources>

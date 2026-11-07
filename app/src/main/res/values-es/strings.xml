@@ -3064,4 +3064,25 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="err_card_primary_missing">La clave principal no está en la ranura de firma de esta llave de seguridad, así que no se puede hacer este cambio con ella</string>
     <string name="key_detail_add_subkey_card_note">La nueva subclave se crea en este teléfono. Esta clave firma y descifra con la llave de seguridad, así que mueve allí la nueva subclave con Mover a una llave de seguridad antes de compartir la clave. Hasta entonces, los mensajes cifrados para una nueva subclave de cifrado no se pueden abrir.</string>
     <string name="key_detail_add_subkey_card_new_passphrase_hint">El secreto de la nueva subclave se queda en este teléfono, y ningún secreto de esta clave tiene aquí todavía frase de contraseña. Elige una para protegerlo.</string>
+    <!-- 4.8.0 RC5 (#106) -->
+    <string name="verify_file_multi_hint">Puedes elegir la firma y su archivo a la vez, o varios de cada uno. Cada firma se empareja con su archivo por el nombre.</string>
+    <string name="verify_pair_signature_format">Firma: %1$s</string>
+    <string name="verify_pair_file_not_picked">No se eligió el archivo al que pertenece esta firma.</string>
+    <string name="verify_pair_several_files">Más de un archivo elegido coincide con el nombre de esta firma.</string>
+    <string name="verify_pair_no_signature">Sin verificar: no se eligió ninguna firma para este archivo.</string>
+    <!-- 4.8.0 RC5 (#103) -->
+    <string name="process_text_encrypt_label">Cifrar con PGPony</string>
+    <string name="process_text_sign_label">Firmar con PGPony</string>
+    <string name="process_text_input_label">Texto seleccionado</string>
+    <string name="process_text_result_not_replaced">Este texto no se puede reemplazar donde lo seleccionaste, así que aquí tienes el resultado para copiarlo o compartirlo.</string>
+    <!-- 4.8.0 RC5 (#104) -->
+    <string name="settings_compress_large_title">Comprimir archivos grandes</string>
+    <string name="settings_compress_large_subtitle">Comprime también los archivos de más de 16 MB. Es más lento, y el ahorro depende del archivo.</string>
+    <!-- 4.8.0 RC5 (4m) -->
+    <string name="keyring_reorder_menu">Reordenar claves</string>
+    <string name="keyring_reorder_title">Reordenar claves</string>
+    <!-- 4.8.0 RC5 (#72, #67) -->
+    <string name="share_target_action_sign_file_subtitle">Crea una firma separada (.asc o .sig). El archivo en sí no se modifica.</string>
+    <string name="share_target_sign_result_subtitle">Guarda la firma junto al archivo para que otros puedan comprobar que viene de ti y que no se modificó.</string>
+    <string name="share_target_action_restore_subtitle">Es una copia de seguridad del llavero. Abre \"Restaurar\" e introduce su código de recuperación.</string>
 </resources>

@@ -60,6 +60,29 @@ import androidx.compose.ui.semantics.Role
 private const val FAB_IDLE_TIMEOUT_MS = 2500L
 private const val FAB_FADE_MS = 250
 
+// 4.8.0 (4m): saves KeyringModes across rotation and process death, as the
+// 4.7.0 select mode was. Flags and plain string lists only, since a Bundle
+// holds those. Kept here, not in KeyringModes, so that class stays plain
+// Kotlin for the JVM tests.
+private val KeyringModesSaver = androidx.compose.runtime.saveable.listSaver<KeyringModes, Any>(
+    save = { m ->
+        listOf(
+            m.selection != null,
+            ArrayList(m.selection.orEmpty()),
+            m.reorderDraft != null,
+            ArrayList(m.reorderDraft.orEmpty()),
+            m.reorderChanged
+        )
+    },
+    restore = { l ->
+        @Suppress("UNCHECKED_CAST")
+        val selection = if (l[0] as Boolean) l[1] as List<String> else null
+        @Suppress("UNCHECKED_CAST")
+        val draft = if (l[2] as Boolean) l[3] as List<String> else null
+        KeyringModes(selection = selection, reorderDraft = draft, reorderChanged = l[4] as Boolean)
+    }
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KeyringScreen(
@@ -82,22 +105,31 @@ fun KeyringScreen(
     // 4.6.0 (item 20): the key whose shared identity is being listed.
     var identityDialogFor by remember { mutableStateOf<PGPKeyEntity?>(null) }
     // 4.7.0 (item 63, #93): select keys and export their public keys as one
-    // .asc file. null when not selecting.
-    var selection by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<List<String>?>(null) }
+    // .asc file. 4.8.0 (4m): select mode and reorder mode share one state,
+    // KeyringModes, so entering either leaves the other.
+    var modes by androidx.compose.runtime.saveable.rememberSaveable(stateSaver = KeyringModesSaver) {
+        mutableStateOf(KeyringModes())
+    }
+    // null when not selecting.
+    val selection = modes.selection
+    val reordering = modes.reordering
     var exportArmored by remember { mutableStateOf<String?>(null) }
     val selectContext = androidx.compose.ui.platform.LocalContext.current
     val selectScope = rememberCoroutineScope()
-    androidx.activity.compose.BackHandler(enabled = selection != null) { selection = null }
-    val toggleSelect: (String) -> Unit = { fp ->
-        val cur = selection.orEmpty()
-        selection = if (fp in cur) cur - fp else cur + fp
-    }
+    androidx.activity.compose.BackHandler(enabled = selection != null) { modes = modes.endSelect() }
+    // 4.8.0 (4m): Back in reorder mode is Cancel: the order from before stands.
+    androidx.activity.compose.BackHandler(enabled = reordering) { modes = modes.cancelReorder() }
+    val toggleSelect: (String) -> Unit = { fp -> modes = modes.toggle(fp) }
     // 4.8.0 (#93): a long press on a key starts select mode with that key ticked.
+    // 4.8.0 (4m): not in reorder mode, where a long press is easily a missed
+    // grab of the handle and would throw the unsaved order away.
     val selectHaptics = com.pgpony.android.ui.util.rememberHaptics()
     val longPressSelect: (String) -> Unit = { fp ->
-        if (selection == null) {
+        if (modes.reordering) {
+            // Nothing: reorder mode moves keys by their handles only.
+        } else if (modes.selection == null) {
             selectHaptics.tap()
-            selection = listOf(fp)
+            modes = modes.startSelect(fp)
         } else toggleSelect(fp)
     }
 
@@ -151,19 +183,34 @@ fun KeyringScreen(
                 title = {
                     val picked = selection
                     if (picked != null) Text(pluralStringResource(R.plurals.keyring_selected_count, picked.size, picked.size))
+                    else if (reordering) Text(stringResource(R.string.keyring_reorder_title))
                     else Text(stringResource(R.string.keyring_title))
                 },
                 navigationIcon = {
                     if (selection != null) {
-                        IconButton(onClick = { selection = null }) {
+                        IconButton(onClick = { modes = modes.endSelect() }) {
                             Icon(Icons.Filled.Close, stringResource(R.string.keyring_select_done_cd))
+                        }
+                    } else if (reordering) {
+                        // 4.8.0 (4m): Cancel drops the draft; nothing was saved.
+                        IconButton(onClick = { modes = modes.cancelReorder() }) {
+                            Icon(Icons.Filled.Close, stringResource(R.string.common_button_cancel))
                         }
                     }
                 },
                 actions = {
                   val picked = selection
-                  if (picked != null) {
-                    IconButton(onClick = { selection = state.allKeys.map { it.fingerprint } }) {
+                  if (reordering) {
+                    // 4.8.0 (4m): Done saves the draft, the only point that does.
+                    TextButton(onClick = {
+                        val (next, order) = modes.finishReorder()
+                        modes = next
+                        if (order != null) viewModel.commitManualOrder(order)
+                    }) {
+                        Text(stringResource(R.string.common_button_done))
+                    }
+                  } else if (picked != null) {
+                    IconButton(onClick = { modes = modes.selectAll(state.allKeys.map { it.fingerprint }) }) {
                         Icon(Icons.Filled.SelectAll, stringResource(R.string.keyring_select_all_cd))
                     }
                     IconButton(
@@ -227,7 +274,19 @@ fun KeyringScreen(
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.keyring_select_menu)) },
                                 leadingIcon = { Icon(Icons.Filled.Checklist, contentDescription = null) },
-                                onClick = { moreMenuOpen = false; selection = emptyList() }
+                                onClick = { moreMenuOpen = false; modes = modes.startSelect() }
+                            )
+                        }
+                        // 4.8.0 (4m): drag handles for a while, with Cancel and
+                        // Done, whether or not Settings keeps them always on.
+                        if (state.allKeys.size > 1) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.keyring_reorder_menu)) },
+                                leadingIcon = { Icon(Icons.Filled.DragHandle, contentDescription = null) },
+                                onClick = {
+                                    moreMenuOpen = false
+                                    modes = modes.startReorder(viewModel.reorderStartOrder())
+                                }
                             )
                         }
                     }
@@ -351,9 +410,20 @@ fun KeyringScreen(
                 val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
                     val f = from.key as? String
                     val t = to.key as? String
-                    if (f != null && t != null) viewModel.moveManual(f, t)
+                    if (f != null && t != null) {
+                        // 4.8.0 (4m): in reorder mode a drag moves the draft;
+                        // otherwise (Settings handles) it saves at once, as in RC2.
+                        if (modes.reordering) {
+                            viewModel.resolveMove(f, t)?.let { (a, b) -> modes = modes.move(a, b) }
+                        } else viewModel.moveManual(f, t)
+                    }
                 }
-                val manualMode = state.sortMode == SortMode.MANUAL
+                // 4.8.0 (4m): reorder mode lists the draft in Custom order, without
+                // touching the saved order or sort until Done.
+                val draft = modes.reorderDraft
+                val shown = if (draft != null) state.copy(manualOrder = draft, sortMode = SortMode.MANUAL) else state
+                val manualMode = shown.sortMode == SortMode.MANUAL
+                val dragEnabled = reordering || state.dragReorderEnabled
                 // Colours read here rather than inside keySection: a
                 // LazyListScope builder is not a composable and cannot
                 // reach MaterialTheme.
@@ -416,7 +486,7 @@ fun KeyringScreen(
                     // list, the heading and the colour; a third copy is not
                     // how you want to discover that.
                     keySection(
-                        keys = state.myKeys,
+                        keys = shown.myKeys,
                         titleRes = R.string.keyring_section_my_keys,
                         titleColor = mineColor,
                         topPadding = 8.dp,
@@ -424,7 +494,8 @@ fun KeyringScreen(
                         onToggleCollapse = { viewModel.toggleSection("MINE") },
                         reorderableState = reorderableState,
                         manualMode = manualMode,
-                        dragEnabled = state.dragReorderEnabled,
+                        dragEnabled = dragEnabled,
+                        reordering = reordering,
                         onLongPress = longPressSelect,
                         onKeyClick = onKeyClick,
                         identityCounts = identityCounts,
@@ -433,7 +504,7 @@ fun KeyringScreen(
                         onToggleSelect = toggleSelect,
                     )
                     keySection(
-                        keys = state.contactKeys,
+                        keys = shown.contactKeys,
                         titleRes = R.string.keyring_section_contacts,
                         titleColor = contactColor,
                         topPadding = 16.dp,
@@ -441,7 +512,8 @@ fun KeyringScreen(
                         onToggleCollapse = { viewModel.toggleSection("CONTACT") },
                         reorderableState = reorderableState,
                         manualMode = manualMode,
-                        dragEnabled = state.dragReorderEnabled,
+                        dragEnabled = dragEnabled,
+                        reordering = reordering,
                         onLongPress = longPressSelect,
                         onKeyClick = onKeyClick,
                         identityCounts = identityCounts,
@@ -450,7 +522,7 @@ fun KeyringScreen(
                         onToggleSelect = toggleSelect,
                     )
                     keySection(
-                        keys = state.publicKeys,
+                        keys = shown.publicKeys,
                         titleRes = R.string.keyring_section_public_keys,
                         titleColor = publicColor,
                         topPadding = 16.dp,
@@ -458,7 +530,8 @@ fun KeyringScreen(
                         onToggleCollapse = { viewModel.toggleSection("PUBLIC") },
                         reorderableState = reorderableState,
                         manualMode = manualMode,
-                        dragEnabled = state.dragReorderEnabled,
+                        dragEnabled = dragEnabled,
+                        reordering = reordering,
                         onLongPress = longPressSelect,
                         onKeyClick = onKeyClick,
                         identityCounts = identityCounts,
@@ -570,7 +643,7 @@ fun KeyringScreen(
                             )
                             Text(
                                 listOfNotNull(
-                                    k.algorithm.shortName,
+                                    com.pgpony.android.crypto.KeyAlgorithmLabel.badge(k.algorithm, k.fingerprint, k.armoredPublicKey),
                                     stringResource(R.string.keyring_same_identity_created_format,
                                         java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(k.createdAt))),
                                     if (k.isRevoked) stringResource(R.string.key_card_revoked_badge) else null,
@@ -791,6 +864,9 @@ private fun LazyListScope.keySection(
     dragEnabled: Boolean = true,
     // 4.8.0 (#93): a long press on a key.
     onLongPress: (String) -> Unit = {},
+    // 4.8.0 (4m): in reorder mode a tap does nothing, so the unsaved order
+    // is not left behind for Key Details.
+    reordering: Boolean = false,
 ) {
     if (keys.isEmpty()) return
     // #45: header shows the count and toggles the section. A collapsed
@@ -823,7 +899,10 @@ private fun LazyListScope.keySection(
         ReorderableItem(reorderableState, key = key.id) { _ ->
             KeyCard(
                 key = key,
-                onClick = { if (selection != null) onToggleSelect(key.fingerprint) else onKeyClick(key.fingerprint) },
+                onClick = {
+                    if (selection != null) onToggleSelect(key.fingerprint)
+                    else if (!reordering) onKeyClick(key.fingerprint)
+                },
                 onLongClick = { onLongPress(key.fingerprint) },
                 sameIdentityCount = identityCounts[key.identityKey] ?: 1,
                 onSameIdentityClick = { onIdentityClick(key) },

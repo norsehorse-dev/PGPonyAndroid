@@ -3062,4 +3062,25 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="err_card_primary_missing">La clé principale n\'est pas dans l\'emplacement de signature de cette clé de sécurité : cette modification ne peut donc pas être effectuée avec celle-ci</string>
     <string name="key_detail_add_subkey_card_note">La nouvelle sous-clé est créée sur ce téléphone. Cette clé signe et déchiffre avec la clé de sécurité : déplacez donc la nouvelle sous-clé vers celle-ci avec Déplacer vers une clé de sécurité avant de partager la clé. D\'ici là, les messages chiffrés pour une nouvelle sous-clé de chiffrement ne peuvent pas être ouverts.</string>
     <string name="key_detail_add_subkey_card_new_passphrase_hint">Le secret de la nouvelle sous-clé reste sur ce téléphone, et aucun secret de cette clé n\'a encore de phrase secrète ici. Choisissez-en une pour le protéger.</string>
+    <!-- 4.8.0 RC5 (#106) -->
+    <string name="verify_file_multi_hint">Vous pouvez choisir la signature et son fichier ensemble, ou plusieurs de chaque. Chaque signature est associée à son fichier par son nom.</string>
+    <string name="verify_pair_signature_format">Signature : %1$s</string>
+    <string name="verify_pair_file_not_picked">Le fichier de cette signature n\'a pas été choisi.</string>
+    <string name="verify_pair_several_files">Plusieurs fichiers choisis correspondent au nom de cette signature.</string>
+    <string name="verify_pair_no_signature">Non vérifié : aucune signature n\'a été choisie pour ce fichier.</string>
+    <!-- 4.8.0 RC5 (#103) -->
+    <string name="process_text_encrypt_label">Chiffrer avec PGPony</string>
+    <string name="process_text_sign_label">Signer avec PGPony</string>
+    <string name="process_text_input_label">Texte sélectionné</string>
+    <string name="process_text_result_not_replaced">Ce texte ne peut pas être remplacé là où vous l\'avez sélectionné : voici donc le résultat à copier ou partager.</string>
+    <!-- 4.8.0 RC5 (#104) -->
+    <string name="settings_compress_large_title">Compresser les fichiers volumineux</string>
+    <string name="settings_compress_large_subtitle">Compresse aussi les fichiers de plus de 16 Mo. Plus lent, et le gain dépend du fichier.</string>
+    <!-- 4.8.0 RC5 (4m) -->
+    <string name="keyring_reorder_menu">Réorganiser les clés</string>
+    <string name="keyring_reorder_title">Réorganiser les clés</string>
+    <!-- 4.8.0 RC5 (#72, #67) -->
+    <string name="share_target_action_sign_file_subtitle">Créer une signature détachée (.asc ou .sig). Le fichier lui-même reste inchangé.</string>
+    <string name="share_target_sign_result_subtitle">Gardez la signature avec le fichier, pour que d\'autres puissent vérifier qu\'il vient de vous et n\'a pas été modifié.</string>
+    <string name="share_target_action_restore_subtitle">Ceci est une sauvegarde de trousseau. Ouvrez « Restaurer » et saisissez son code de récupération.</string>
 </resources>

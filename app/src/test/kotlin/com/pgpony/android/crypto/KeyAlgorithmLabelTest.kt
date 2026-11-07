@@ -21,6 +21,8 @@ import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator
 import org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder
 import org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider
 import org.bouncycastle.openpgp.operator.bc.BcPGPKeyPair
+import org.bouncycastle.bcpg.ArmoredOutputStream
+import java.io.ByteArrayOutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.security.SecureRandom
@@ -92,6 +94,31 @@ class KeyAlgorithmLabelTest {
         assertEquals(KeyAlgorithm.ED25519_CV25519.displayName, KeyAlgorithmLabel.lookupCard(preview.algorithm, ring))
         // The fallback path reads the same key from its packets.
         assertEquals("Ed25519 + X25519", KeyAlgorithmLabel.lookupCard(KeyAlgorithm.UNKNOWN, ring))
+    }
+
+    private fun armor(ring: PGPPublicKeyRing): String {
+        val out = ByteArrayOutputStream()
+        ArmoredOutputStream(out).use { ring.encode(it) }
+        return out.toString(Charsets.US_ASCII.name())
+    }
+
+    @Test
+    fun `a stored DSA and ElGamal key is labelled from its armor on the Keyring and in Key Details (#88)`() {
+        val ring = dsaElGamalRing()
+        val fp = org.bouncycastle.util.encoders.Hex.toHexString(ring.publicKey.fingerprint)
+        val armored = armor(ring)
+        assertEquals("DSA 1024", KeyAlgorithmLabel.badge(KeyAlgorithm.UNKNOWN, fp, armored))
+        assertEquals("DSA 1024 + ElGamal 1024", KeyAlgorithmLabel.full(KeyAlgorithm.UNKNOWN, fp, armored))
+        val sub = ring.publicKeys.asSequence().first { !it.isMasterKey }
+        assertEquals("ElGamal 1024", KeyAlgorithmLabel.packet(sub, KeyAlgorithm.UNKNOWN, short = true))
+    }
+
+    @Test
+    fun `a modeled or unreadable stored key keeps KeyAlgorithm's names`() {
+        assertEquals(KeyAlgorithm.RSA_4096.shortName, KeyAlgorithmLabel.badge(KeyAlgorithm.RSA_4096, "00", null))
+        assertEquals(KeyAlgorithm.RSA_4096.displayName, KeyAlgorithmLabel.full(KeyAlgorithm.RSA_4096, "00", null))
+        assertEquals("Unknown", KeyAlgorithmLabel.badge(KeyAlgorithm.UNKNOWN, "11", null))
+        assertEquals("Unknown", KeyAlgorithmLabel.full(KeyAlgorithm.UNKNOWN, "22", "not a key"))
     }
 
     @Test

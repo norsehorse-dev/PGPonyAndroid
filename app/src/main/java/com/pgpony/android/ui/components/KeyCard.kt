@@ -154,7 +154,7 @@ fun KeyCard(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // Algorithm badge
-                    AlgorithmBadge(key.algorithm.shortName)
+                    AlgorithmBadge(com.pgpony.android.crypto.KeyAlgorithmLabel.badge(key.algorithm, key.fingerprint, key.armoredPublicKey))
                     Spacer(modifier = Modifier.width(6.dp))
                     // Short fingerprint
                     Text(
