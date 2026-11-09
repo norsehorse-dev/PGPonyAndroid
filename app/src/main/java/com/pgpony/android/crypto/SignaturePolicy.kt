@@ -74,9 +74,21 @@ object SignaturePolicy {
     fun isWeakCertificationDigest(hashAlg: Int, createdMs: Long?): Boolean =
         hashAlg in LEGACY && !isAcceptableCertificationDigest(hashAlg, createdMs)
 
+    /**
+     * 4.8.0 RC8 (#115): the SHA-2 or SHA-3 family, whatever the date. A
+     * certification that raises a key to Verified must use one of these:
+     * SHA-1 and RIPEMD-160 still load an older key before the cutoff, but
+     * never make it look verified (the 4.7.0 item 27 rule, kept for
+     * third-party certifications too).
+     */
+    fun isStrongDigest(hashAlg: Int): Boolean = hashAlg in STRONG
+
     /** True when [created] lies more than the skew allowance ahead of [now]. */
     fun isFromTheFuture(created: Date, now: Date = Date()): Boolean =
         created.time > now.time + FUTURE_SKEW_MS
+
+    /** 4.8.0 RC8 (#115): the first time (epoch ms) [created] is no longer from the future. */
+    fun notFromTheFutureAtMs(created: Date): Long = created.time - FUTURE_SKEW_MS
 
     /**
      * Full verify-time gate for a data signature that has already passed its

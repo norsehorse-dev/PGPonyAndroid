@@ -103,7 +103,9 @@ fun KeyringScreen(
     onOpenExchange: (ImportMethod) -> Unit = {},
     // 4.8.0 RC6 (tabs): Contacts left the bottom bar; it opens from this
     // screen's top bar instead.
-    onOpenContacts: () -> Unit = {}
+    onOpenContacts: () -> Unit = {},
+    // 4.8.0 RC8 (item 4n): Keyring > Groups.
+    onOpenGroups: () -> Unit = {}
 ) {
     val state by viewModel.state.collectAsState()
     // 4.6.0 (item 20): the key whose shared identity is being listed.
@@ -270,6 +272,12 @@ fun KeyringScreen(
                         expanded = moreMenuOpen,
                         onDismissRequest = { moreMenuOpen = false }
                     ) {
+                        // 4.8.0 RC8 (item 4n): recipient groups.
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.groups_title)) },
+                            leadingIcon = { Icon(Icons.Filled.Groups, contentDescription = null) },
+                            onClick = { moreMenuOpen = false; onOpenGroups() }
+                        )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.settings_recycle_bin_title)) },
                             leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },

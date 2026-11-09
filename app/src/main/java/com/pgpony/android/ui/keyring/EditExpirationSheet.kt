@@ -31,6 +31,8 @@ import com.pgpony.android.crypto.KeyExpirationService
 import com.pgpony.android.ui.components.PassphraseVisibilityToggle
 import com.pgpony.android.ui.util.dismissKeyboardOnTap
 import com.pgpony.android.ui.util.keepsKeyboard
+import com.pgpony.android.provider.rememberProviderAutoFocus
+import androidx.compose.ui.focus.focusRequester
 import org.bouncycastle.bcpg.HashAlgorithmTags
 import java.text.DateFormat
 import java.util.Date
@@ -48,6 +50,9 @@ fun EditExpirationSheet(
     /** Offer "Also set it on subkeys that are still valid" (primary only, and
      *  only when the key has any). */
     offerCurrentSubkeys: Boolean = false,
+    /** 4.8.0 RC8 (#86): the key's secret is passphrase-protected, so the
+     *  passphrase field takes focus when the sheet opens. A card PIN always does. */
+    passphraseProtected: Boolean = false,
     onApplySoftware: (expiresAtEpochSeconds: Long?, passphrase: String?, alsoCurrentSubkeys: Boolean) -> Unit,
     onApplyCard: (expiresAtEpochSeconds: Long?, pin: String, alsoCurrentSubkeys: Boolean) -> Unit,
     onDismiss: () -> Unit,
@@ -74,6 +79,28 @@ fun EditExpirationSheet(
 
     val hasValidChoice = selectedPreset != null || customMillis != null
     val canApply = !isProcessing && hasValidChoice && (!isCardBacked || pin.isNotEmpty())
+
+    // 4.8.0 RC8 (#86): Save, shared by its button and the keyboard's Done
+    // key. It opens the confirmation dialog; nothing is signed before that.
+    val submit: () -> Unit = {
+        val expiry = computeExpiresAtEpochSeconds()
+        val also = subkeyLabel == null && offerCurrentSubkeys && alsoCurrentSubkeys
+        if (isCardBacked) onApplyCard(expiry, pin, also)
+        else {
+            // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
+            val entered = passphrase
+            passphrase = ""
+            onApplySoftware(expiry, entered.ifBlank { null }, also)
+        }
+    }
+    // 4.8.0 RC8 (#86): Done saves only when something was typed in the field.
+    val imeOptions = androidx.compose.foundation.text.KeyboardOptions(
+        keyboardType = KeyboardType.Password,
+        imeAction = androidx.compose.ui.text.input.ImeAction.Done
+    )
+    val imeDone = androidx.compose.foundation.text.KeyboardActions(onDone = {
+        if (canApply && (if (isCardBacked) pin else passphrase).isNotEmpty()) submit()
+    })
 
     ModalBottomSheet(
         onDismissRequest = { if (!isProcessing) onDismiss() },
@@ -151,16 +178,28 @@ fun EditExpirationSheet(
                 }
             }
 
+            // 4.8.0 RC8 (#86): the PIN or passphrase field takes focus and the
+            // keyboard opens when the sheet appears (the #59 helper). Called in
+            // the sheet's content so it reaches the sheet window's keyboard. A
+            // preset is already picked, so the field is what is left to fill in.
+            // A key with no passphrase leaves the keyboard closed, so it does not
+            // cover the presets for a field that stays empty.
+            val fieldFocus = if (isCardBacked || passphraseProtected) {
+                rememberProviderAutoFocus()
+            } else {
+                remember { androidx.compose.ui.focus.FocusRequester() }
+            }
             if (isCardBacked) {
                 OutlinedTextField(
                     value = pin,
                     onValueChange = { pin = it },
                     label = { Text(stringResource(R.string.card_decrypt_pin_label)) },
                     visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
+                    keyboardOptions = imeOptions,
+                    keyboardActions = imeDone,
                     singleLine = true,
                     enabled = !isProcessing,
-                    modifier = Modifier.keepsKeyboard().fillMaxWidth()
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth().focusRequester(fieldFocus)
                 )
                 Text(
                     text = stringResource(R.string.key_detail_expiry_card_hint),
@@ -174,10 +213,11 @@ fun EditExpirationSheet(
                     label = { Text(stringResource(R.string.key_detail_expiry_passphrase_label)) },
                     visualTransformation = if (passphraseShown) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = { PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
+                    keyboardOptions = imeOptions,
+                    keyboardActions = imeDone,
                     singleLine = true,
                     enabled = !isProcessing,
-                    modifier = Modifier.keepsKeyboard().fillMaxWidth()
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth().focusRequester(fieldFocus)
                 )
             }
 
@@ -199,17 +239,7 @@ fun EditExpirationSheet(
                     modifier = Modifier.weight(1f)
                 ) { Text(stringResource(R.string.common_button_cancel)) }
                 Button(
-                    onClick = {
-                        val expiry = computeExpiresAtEpochSeconds()
-                        val also = subkeyLabel == null && offerCurrentSubkeys && alsoCurrentSubkeys
-                        if (isCardBacked) onApplyCard(expiry, pin, also)
-                        else {
-                            // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
-                            val entered = passphrase
-                            passphrase = ""
-                            onApplySoftware(expiry, entered.ifBlank { null }, also)
-                        }
-                    },
+                    onClick = submit,
                     enabled = canApply,
                     modifier = Modifier.weight(1f)
                 ) {

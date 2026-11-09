@@ -484,6 +484,8 @@ class SecureKeyStore(context: Context) {
         // that is not a certificate, is stored as given.
         val clean = runCatching { com.pgpony.android.crypto.CertificateBindings.sanitized(data) }.getOrDefault(data)
         writeBlob(fp, pubName(fp), clean)
+        // 4.8.0 RC8 (#115): its certifications may have changed.
+        CertifiedTrust.invalidate(fp)
     }
 
     fun storePrivateKey(fingerprint: String, data: ByteArray) {
@@ -513,14 +515,30 @@ class SecureKeyStore(context: Context) {
         val fp = fingerprint.lowercase()
         if (data.isEmpty()) {
             synchronized(lock) { blobFile(localCertName(fp)).delete() }
-            return
+        } else {
+            writeBlob(fp, localCertName(fp), data)
         }
-        writeBlob(fp, localCertName(fp), data)
+        // 4.8.0 RC8 (#115): a local certification can raise the key's trust.
+        CertifiedTrust.invalidate(fp)
     }
 
     fun loadLocalCertifications(fingerprint: String): ByteArray? {
         val fp = fingerprint.lowercase()
         return readBlob(fp, localCertName(fp))
+    }
+
+    /**
+     * 4.8.0 RC8 (#115): the modified time and size of [fingerprint]'s
+     * certificate and local-certification blobs. Every process sees the
+     * files, so the OpenPGP provider's process notices a certification made
+     * or withdrawn in the app (and the other way round) without a message
+     * between them. Changes whenever either file is rewritten or removed.
+     */
+    fun blobStamp(fingerprint: String): String {
+        val fp = fingerprint.lowercase()
+        val pub = blobFile(pubName(fp))
+        val local = blobFile(localCertName(fp))
+        return "${pub.lastModified()}:${pub.length()}:${local.lastModified()}:${local.length()}"
     }
 
     fun deleteKeys(fingerprint: String) {
@@ -536,6 +554,8 @@ class SecureKeyStore(context: Context) {
                 } catch (_: Exception) { }
             }
         }
+        // 4.8.0 RC8 (#115): drop any trust worked out from this key's certificate.
+        CertifiedTrust.invalidate(fingerprint)
     }
 
     /**

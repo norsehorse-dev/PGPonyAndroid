@@ -503,6 +503,9 @@ class KeyDetailViewModel(
             val loaded = repo.getByFingerprint(fingerprint)
                 ?.let { repo.reconcilePrimaryExpiry(it) }
                 ?.let { repo.reconcileShownUserId(it) } // 4.7.0 (item 52)
+            // 4.8.0 RC8 (#115): a public key opened here may not have been
+            // through a keyring read yet; work out its certified trust now.
+            loaded?.let { refreshDerivedTrust(it.fingerprint) }
             _state.value = _state.value.copy(
                 key = loaded,
                 isLoading = false,
@@ -744,12 +747,20 @@ class KeyDetailViewModel(
                     return@launch
                 }
                 // Keep sending compatible until the other clients can receive PGPONY2.
-                val store = withContext(Dispatchers.Default) { QrFrameStore.create(armored, policy) }
+                // 4.8.0 RC8 (#100): Long QR codes raises the part limit to 512.
+                val longCodes = PGPonyApp.instance
+                    .getSharedPreferences("pgpony_prefs", android.content.Context.MODE_PRIVATE)
+                    .getBoolean(QrPartLimit.PREF_KEY, false)
+                val store = withContext(Dispatchers.Default) {
+                    QrFrameStore.create(armored, policy, QrPartLimit.maxFrames(longCodes))
+                }
                 if (generation != qrGeneration || !_state.value.showQRSheet) return@launch
+                // 4.8.0 RC8 (#100): the message says how many parts the key would need.
+                val tooLarge = if (store == null) qrTooLargeMessage(QrPartLimit.tooLarge(armored, longCodes)) else null
                 _state.value = _state.value.copy(qrStore = store,
                     showQRSheet = store != null,
-                    qrError = if (store == null) PGPonyApp.instance.getString(R.string.qr_too_large) else null,
-                    errorMessage = if (store == null) PGPonyApp.instance.getString(R.string.qr_too_large) else null)
+                    qrError = tooLarge,
+                    errorMessage = tooLarge)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -758,6 +769,21 @@ class KeyDetailViewModel(
                         ErrorText.detail(error.message) ?: ""))
             }
         }
+    }
+
+    /** 4.8.0 RC8 (#100): the too-large message with the part count, and the setting when it would help. */
+    private fun qrTooLargeMessage(info: QrPartLimit.TooLarge): String {
+        val res = PGPonyApp.instance.resources
+        // The part count (and the setting) sits between "too large" and the
+        // Share or Copy advice, so the advice comes last.
+        val parts = buildString {
+            append(res.getQuantityString(R.plurals.qr_too_large_parts, info.partsNeeded, info.partsNeeded, info.limit))
+            if (info.longCodesWouldFit) {
+                append(' ')
+                append(res.getString(R.string.qr_too_large_long_hint, QrChunking.MAX_FRAMES_LONG))
+            }
+        }
+        return res.getString(R.string.qr_too_large_with_parts, parts)
     }
 
     fun hideQR() {
@@ -1327,7 +1353,10 @@ class KeyDetailViewModel(
         viewModelScope.launch {
             _state.value = _state.value.copy(isRefreshingFromKeyServer = true)
             val app = PGPonyApp.instance
-            when (val result = keyRefresh.refresh(key.fingerprint)) {
+            val result = keyRefresh.refresh(key.fingerprint)
+            // 4.8.0 RC8 (#115): a merge can bring or drop certifications.
+            refreshDerivedTrust(key.fingerprint)
+            when (result) {
                 is KeyRefreshResult.UpToDate -> _state.value = _state.value.copy(
                     key = result.entity,
                     userIds = deriveUserIds(result.entity),
@@ -1718,7 +1747,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                 val imported = repo.importArmoredKey(armoredKey)
                 _state.value = _state.value.copy(
                     certifierLookup = com.pgpony.android.ui.decrypt.SignerLookupState.ImportSuccess(imported.userID),
-                    certifications = runCatching { repo.certificationsOf(key.fingerprint) }.getOrNull() ?: _state.value.certifications
+                    certifications = runCatching { certificationsWithTrust(key.fingerprint) }.getOrNull() ?: _state.value.certifications
                 )
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
@@ -2389,7 +2418,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                 val reloaded = repo.getByFingerprint(key.fingerprint)
                 _state.value = _state.value.copy(
                     key = reloaded ?: key,
-                    certifications = runCatching { repo.certificationsOf(key.fingerprint) }.getOrDefault(_state.value.certifications),
+                    certifications = runCatching { certificationsWithTrust(key.fingerprint) }.getOrDefault(_state.value.certifications),
                     certifyInFlight = false,
                     showCertifySheet = false,
                     certifyDoneExportable = exportable
@@ -2580,7 +2609,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                 val reloaded = repo.getByFingerprint(key.fingerprint)
                 _state.value = _state.value.copy(
                     key = reloaded ?: key,
-                    certifications = runCatching { repo.certificationsOf(key.fingerprint) }.getOrDefault(_state.value.certifications),
+                    certifications = runCatching { certificationsWithTrust(key.fingerprint) }.getOrDefault(_state.value.certifications),
                     certifyInFlight = false,
                     showCertifySheet = false,
                     certifyDoneExportable = exportable
@@ -2607,7 +2636,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                 val reloaded = repo.getByFingerprint(key.fingerprint)
                 _state.value = _state.value.copy(
                     key = reloaded ?: key,
-                    certifications = runCatching { repo.certificationsOf(key.fingerprint) }.getOrDefault(_state.value.certifications),
+                    certifications = runCatching { certificationsWithTrust(key.fingerprint) }.getOrDefault(_state.value.certifications),
                     certRevokeInFlight = false,
                     certRevokeRequest = null
                 )
@@ -2633,6 +2662,27 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
 
     fun dismissCertifyDone() {
         _state.value = _state.value.copy(certifyDoneExportable = null)
+    }
+
+    // ── 4.8.0 RC8 (#115): trust worked out from certifications ──────────
+
+    /** Bring [fingerprint]'s certified trust up to date now (Key Details is
+     *  often opened without a keyring read, and the line under Trust Level
+     *  must follow a certification made or withdrawn here). */
+    private suspend fun refreshDerivedTrust(fingerprint: String) {
+        try {
+            repo.ensureCertifiedTrust(listOf(fingerprint))
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // The trust row keeps the stored level; the next load tries again.
+        }
+    }
+
+    /** This key's certifications, after its certified trust is brought up to date. */
+    private suspend fun certificationsWithTrust(fingerprint: String): List<com.pgpony.android.data.repository.KeyRepository.CertificationRow> {
+        refreshDerivedTrust(fingerprint)
+        return repo.certificationsOf(fingerprint)
     }
 
     /** From the done dialog: the key was just certified, so mark it Verified. */
@@ -2663,7 +2713,7 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
                 val reloaded = repo.getByFingerprint(key.fingerprint)
                 _state.value = _state.value.copy(
                     key = reloaded ?: key,
-                    certifications = runCatching { repo.certificationsOf(key.fingerprint) }.getOrDefault(_state.value.certifications),
+                    certifications = runCatching { certificationsWithTrust(key.fingerprint) }.getOrDefault(_state.value.certifications),
                     certRevokeInFlight = false,
                     certRevokeRequest = null
                 )

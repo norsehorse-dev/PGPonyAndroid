@@ -381,6 +381,10 @@ class PGPCryptoService private constructor() {
                     it.generateSecretKeyRing() to it.generatePublicKeyRing()
                 }
             // 4.8.0 (4l, #109): v4 ECDSA + ECDH on brainpool or secp256k1.
+            // 4.8.0 RC8 (#109): and on NIST P-256, P-384 or P-521.
+            KeyAlgorithm.ECDSA_NIST_P256,
+            KeyAlgorithm.ECDSA_NIST_P384,
+            KeyAlgorithm.ECDSA_NIST_P521,
             KeyAlgorithm.ECDSA_BRAINPOOL_P256,
             KeyAlgorithm.ECDSA_BRAINPOOL_P384,
             KeyAlgorithm.ECDSA_BRAINPOOL_P512,
@@ -612,7 +616,8 @@ class PGPCryptoService private constructor() {
 
     /**
      * 4.8.0 (4l, #109): a v4 key on brainpoolP256r1, brainpoolP384r1,
-     * brainpoolP512r1 or secp256k1, in the shape gpg makes for these curves:
+     * brainpoolP512r1 or secp256k1, in the shape gpg makes for these curves
+     * (4.8.0 RC8, #109: and on NIST P-256, P-384 or P-521):
      *
      *   - ECDSA (algo 19) primary, certify + sign
      *   - ECDH (algo 18) encryption subkey on the same curve, with the RFC 6637

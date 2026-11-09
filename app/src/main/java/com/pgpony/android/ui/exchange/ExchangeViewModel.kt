@@ -46,6 +46,8 @@ data class ExchangeUiState(
     /** 4.7.0 RC7 (item 69, #100): the selected key does not fit in a QR code.
      *  Shown inline on Show Key, not as a snackbar on every visit. */
     val qrTooLarge: Boolean = false,
+    /** 4.8.0 RC8 (#100): for the too-large message, the parts the key would need. */
+    val qrTooLargeInfo: QrPartLimit.TooLarge? = null,
     // Key server
     val searchQuery: String = "",
     val searchResult: String? = null,
@@ -124,7 +126,7 @@ class ExchangeViewModel(
         val generation = ++qrGeneration
         val policy = _state.value.qrPolicy
         _state.value.qrStore?.clear()
-        _state.value = _state.value.copy(qrStore = null, qrError = null, qrTooLarge = false)
+        _state.value = _state.value.copy(qrStore = null, qrError = null, qrTooLarge = false, qrTooLargeInfo = null)
         qrJob = viewModelScope.launch {
             try {
                 // 4.8.0 RC6 (#95): a key that will not export says so in place of
@@ -145,13 +147,21 @@ class ExchangeViewModel(
                 if (generation != qrGeneration) return@launch
                 _state.value = _state.value.copy(armoredPublicKey = armored)
                 // Keep sending compatible until the other clients can receive PGPONY2.
-                val store = withContext(Dispatchers.Default) { QrFrameStore.create(armored, policy) }
+                // 4.8.0 RC8 (#100): Long QR codes raises the part limit to 512.
+                val longCodes = PGPonyApp.instance
+                    .getSharedPreferences("pgpony_prefs", android.content.Context.MODE_PRIVATE)
+                    .getBoolean(QrPartLimit.PREF_KEY, false)
+                val store = withContext(Dispatchers.Default) {
+                    QrFrameStore.create(armored, policy, QrPartLimit.maxFrames(longCodes))
+                }
                 // Cancellation is cooperative; a finished old encoder must not replace a newer selection.
                 if (generation != qrGeneration) return@launch
                 // 4.7.0 RC7 (item 69, #100): a key too large for a QR code is said
                 // in place of the code, with no pop-up, and the key's name,
                 // fingerprint and buttons stay on screen.
-                _state.value = _state.value.copy(qrStore = store, qrTooLarge = store == null)
+                // 4.8.0 RC8 (#100): with the part count it would need.
+                _state.value = _state.value.copy(qrStore = store, qrTooLarge = store == null,
+                    qrTooLargeInfo = if (store == null) QrPartLimit.tooLarge(armored, longCodes) else null)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {

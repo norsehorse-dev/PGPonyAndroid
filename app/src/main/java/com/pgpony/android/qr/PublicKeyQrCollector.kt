@@ -6,7 +6,18 @@ import com.pgpony.android.qr.v2.EnhancedQrResult
 
 sealed interface PublicKeyQrResult {
     data class Complete(val text: String) : PublicKeyQrResult
-    data class Progress(val have: Int, val required: Int, val enhanced: Boolean, val restarted: Boolean) : PublicKeyQrResult
+    /**
+     * 4.8.0 RC8 (#100): [missing] lists the part numbers (from 1) still to come
+     * for a PGPONY1 code. It is empty for PGPONY2, where any [required] of the
+     * parts complete the key, so no particular part is missing.
+     */
+    data class Progress(
+        val have: Int,
+        val required: Int,
+        val enhanced: Boolean,
+        val restarted: Boolean,
+        val missing: List<Int> = emptyList(),
+    ) : PublicKeyQrResult
     data object Duplicate : PublicKeyQrResult
     data object Malformed : PublicKeyQrResult
     data object Unsupported : PublicKeyQrResult
@@ -49,8 +60,10 @@ class PublicKeyQrCollector(private val acceptOtherText: Boolean = false) {
             if (transport != 1) { enhanced.reset(); enhancedHave = 0; transport = 1 }
             return when (val outcome = compatible.offer(text)) {
                 is QrChunking.Outcome.Complete -> PublicKeyQrResult.Complete(outcome.text)
-                is QrChunking.Outcome.Progress -> PublicKeyQrResult.Progress(outcome.have, outcome.total, false, switched)
-                is QrChunking.Outcome.Restarted -> PublicKeyQrResult.Progress(outcome.have, outcome.total, false, true)
+                is QrChunking.Outcome.Progress ->
+                    PublicKeyQrResult.Progress(outcome.have, outcome.total, false, switched, compatible.missing())
+                is QrChunking.Outcome.Restarted ->
+                    PublicKeyQrResult.Progress(outcome.have, outcome.total, false, true, compatible.missing())
                 is QrChunking.Outcome.Duplicate -> PublicKeyQrResult.Duplicate
                 else -> PublicKeyQrResult.Malformed
             }

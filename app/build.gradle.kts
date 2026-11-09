@@ -19,6 +19,63 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
+// 4.8.0 RC8 (#114): the commit the build was made from, shown on Settings >
+// About so a tester can tell which RC is installed. It is HEAD's full hash and
+// nothing else: no dirty marker, no date, no branch name. Two clean clones of
+// a tag (tools/verify_repro.sh) and F-Droid's checkout of the same tag resolve
+// the same HEAD, so the APK stays reproducible. providers.exec keeps it
+// configuration-cache safe. Only a 40 or 64 character lowercase hex string is
+// accepted, so stray output never reaches the APK.
+//
+// A rebuilder can run as another user than the checkout's owner (a bind-mounted
+// tree in a container), and git 2.35.2 and later then refuse the repository
+// ("dubious ownership"). The command passes safe.directory=* for that, and when
+// git still says nothing usable (an older git that ignores -c for this key, or
+// no git at all), the hash is read from the files: .git/HEAD, or the gitdir:
+// file of a worktree, then the loose ref and packed-refs. Only when both ways
+// fail is the value empty, and About shows the version alone.
+val gitHashPattern = Regex("[0-9a-f]{40}|[0-9a-f]{64}")
+
+fun gitFileText(file: File): String? = runCatching {
+    providers.fileContents(rootProject.layout.projectDirectory.file(file.absolutePath)).asText.orNull
+}.getOrNull()
+
+fun gitCommitFromFiles(): String {
+    val dotGit = File(rootDir, ".git")
+    val gitDir = when {
+        dotGit.isDirectory -> dotGit
+        dotGit.isFile -> gitFileText(dotGit)?.lineSequence()?.firstOrNull { it.startsWith("gitdir:") }
+            ?.removePrefix("gitdir:")?.trim()?.let { path ->
+                File(path).let { if (it.isAbsolute) it else File(rootDir, path) }
+            } ?: return ""
+        else -> return ""
+    }
+    // A worktree keeps branch refs in the main repository, named by commondir.
+    val commonDir = gitFileText(File(gitDir, "commondir"))?.trim()?.takeIf { it.isNotEmpty() }
+        ?.let { path -> File(path).let { if (it.isAbsolute) it else File(gitDir, path) } } ?: gitDir
+    val head = gitFileText(File(gitDir, "HEAD"))?.trim() ?: return ""
+    if (gitHashPattern.matches(head)) return head
+    val ref = head.removePrefix("ref:").trim().takeIf { head.startsWith("ref:") && it.isNotEmpty() } ?: return ""
+    for (dir in listOf(gitDir, commonDir)) {
+        gitFileText(File(dir, ref))?.trim()?.let { if (gitHashPattern.matches(it)) return it }
+    }
+    return gitFileText(File(commonDir, "packed-refs"))?.lineSequence()
+        ?.filter { !it.startsWith("#") && !it.startsWith("^") }
+        ?.map { it.trim().split(' ', limit = 2) }
+        ?.firstOrNull { it.size == 2 && it[1] == ref && gitHashPattern.matches(it[0]) }
+        ?.get(0) ?: ""
+}
+
+val gitCommit: String = runCatching {
+    providers.exec {
+        commandLine("git", "-c", "safe.directory=*", "rev-parse", "--verify", "HEAD")
+        workingDir(rootDir)
+        isIgnoreExitValue = true
+    }.standardOutput.asText.get().trim()
+}.getOrDefault("").takeIf { gitHashPattern.matches(it) }
+    ?: runCatching { gitCommitFromFiles() }.getOrDefault("").takeIf { gitHashPattern.matches(it) }
+    ?: ""
+
 android {
     namespace = "com.pgpony.android"
     compileSdk = 36
@@ -267,6 +324,8 @@ android {
         // canonical text in inline text signatures. versionCode 480.
         versionCode = 480
         versionName = "4.8.0"
+        // 4.8.0 RC8 (#114): see gitCommit above.
+        buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

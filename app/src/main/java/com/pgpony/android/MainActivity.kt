@@ -1314,6 +1314,10 @@ fun PGPonyMainScreen(
                         onScanCard = { navController.navigate("card_scan") },
                         onOpenRecycleBin = { navController.navigate("recently_deleted") },
                         onOpenPair = { navController.navigate("pair") },
+                        // 4.8.0 RC8 (item 4n): recipient groups, from the More menu.
+                        onOpenGroups = {
+                            navController.navigate(NavRoutes.GROUPS) { launchSingleTop = true }
+                        },
                         // 4.8.0 RC6 (tabs): Contacts left the bottom bar and opens
                         // from the Keyring's top bar as a pushed page.
                         onOpenContacts = {
@@ -1525,6 +1529,11 @@ fun PGPonyMainScreen(
                             }
                         }
                     )
+                }
+                // 4.8.0 RC8 (item 4n): Keyring > Groups. Its own view model;
+                // Back (arrow or system) pops to the Keyring.
+                composable(NavRoutes.GROUPS) {
+                    com.pgpony.android.ui.groups.GroupsScreen(onBack = { navController.popBackStack() })
                 }
                 // §5.6.1 (#36 part 1): key recycle bin. Reuses the shared
                 // KeyringViewModel for its repo-backed list + actions.

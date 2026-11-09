@@ -35,16 +35,22 @@ class QrFrameStore private constructor(
     companion object {
         // PGPONY2 currently uses at most 160 frames of fewer than 900 characters.
         // These bounds also accommodate the compatible transport and raw symbols.
-        private const val MAX_STORED_FRAMES = 256
+        // 4.8.0 RC8 (#100): 512 frames, for a Long QR codes sequence.
+        private const val MAX_STORED_FRAMES = QrChunking.MAX_FRAMES_LONG
         private const val MAX_FRAME_CHARS = 4_096
-        private const val MAX_STORED_CHARS = 256 * 4_096
+        private const val MAX_STORED_CHARS = MAX_STORED_FRAMES * 4_096
         private const val MAX_RENDER_PIXELS = 4_096
 
         // 4.8.0 RC6 (#95): a key that fits in one code always uses BASELINE. A higher
         // error correction level there only forces a denser version with smaller dots,
         // the opposite of what Larger dots is for.
-        fun create(text: String, policy: QrEncodingPolicy = QrEncodingPolicy.BASELINE): QrFrameStore? =
-            QrChunking.split(text, policy)?.let {
+        // 4.8.0 RC8 (#100): [maxFrames] is the sender's part limit (Long QR codes).
+        fun create(
+            text: String,
+            policy: QrEncodingPolicy = QrEncodingPolicy.BASELINE,
+            maxFrames: Int = QrChunking.MAX_FRAMES,
+        ): QrFrameStore? =
+            QrChunking.split(text, policy, maxFrames)?.let {
                 fromFrames(it, if (it.size == 1) QrEncodingPolicy.BASELINE else policy)
             }
 

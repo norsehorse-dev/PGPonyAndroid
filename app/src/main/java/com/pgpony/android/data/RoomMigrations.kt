@@ -226,6 +226,19 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
     }
 }
 
+/**
+ * 4.8.0 RC8 (item 4n): the recipient group tables. Two brand-new tables and an
+ * index, nothing on pgp_keys changes, so existing rows are untouched. The SQL
+ * lives in RecipientGroupSchema and mirrors what Room generates from
+ * RecipientGroupEntity and RecipientGroupMemberEntity, so the runtime schema
+ * check under exportSchema = false passes.
+ */
+val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        com.pgpony.android.data.groups.RecipientGroupSchema.MIGRATION_13_14.forEach { db.execSQL(it) }
+    }
+}
+
 internal fun collapseDuplicateKeyRows(db: SupportSQLiteDatabase): Int {
     val rows = ArrayList<Map<String, Any?>>()
     db.query("SELECT * FROM `pgp_keys`").use { c ->

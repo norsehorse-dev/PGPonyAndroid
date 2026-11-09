@@ -33,6 +33,14 @@ class NavTabsTest {
     }
 
     @Test
+    fun `groups is a pushed page under the Keyring`() {
+        assertEquals("groups", NavRoutes.GROUPS)
+        assertTrue(NavRoutes.GROUPS in keyringOwnedRoutes)
+        assertTrue(isSubScreenOfTab(NavRoutes.GROUPS, NavRoutes.KEYRING))
+        assertFalse(NavRoutes.GROUPS in bottomNavRoutes)
+    }
+
+    @Test
     fun `contacts is not a sub-screen of the other tabs`() {
         for (tab in bottomNavRoutes - NavRoutes.KEYRING) {
             assertFalse(tab, isSubScreenOfTab(NavRoutes.CONTACTS, tab))

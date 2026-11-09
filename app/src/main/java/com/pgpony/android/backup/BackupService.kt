@@ -16,6 +16,12 @@
 // (SshKeyBackup); old versions and iOS skip them, and old backups restore as
 // before. A backup with only SSH keys is allowed.
 //
+// 4.8.0 RC8 (item 4n): recipient groups travel as one additive
+// recipient-groups.json entry (RecipientGroupBackup), the same way. A restore
+// merges them by name after the keys are in. The full-backup pairing transfer
+// sends this same backup, so it carries groups too; public-key and key-pair
+// pairing items do not.
+//
 // Restore is a MERGE: each key runs through the existing
 // KeyRepository.importArmoredKeyDetailed, so a held secret is never
 // overwritten and a public-only key is upgraded in place. Hardware/card
@@ -28,6 +34,8 @@ import com.pgpony.android.PGPonyApp
 import com.pgpony.android.crypto.PGPCryptoError
 import com.pgpony.android.crypto.PGPCryptoService
 import com.pgpony.android.data.TrustLevel
+import com.pgpony.android.data.groups.RecipientGroupStore
+import com.pgpony.android.data.groups.RecipientGroups
 import com.pgpony.android.data.ssh.SshKeyBackupSet
 import com.pgpony.android.data.ssh.SshKeyStore
 import com.pgpony.android.data.repository.ImportResolution
@@ -68,7 +76,12 @@ data class MergeReport(
     /** 4.8.0 RC7 (item 1): SSH-only keys already on the device. */
     val sshUnchanged: List<RestoredKey> = emptyList(),
     /** 4.8.0 RC7 (item 1): SSH key files in the backup that could not be read. */
-    val sshFailed: List<RestoredKey> = emptyList()
+    val sshFailed: List<RestoredKey> = emptyList(),
+    /** 4.8.0 RC8 (item 4n): names of recipient groups the backup added. */
+    val groupsAdded: List<String> = emptyList(),
+    /** 4.8.0 RC8 (item 4n): names of groups already here that the backup gave
+     *  more members (same name, members joined). */
+    val groupsMerged: List<String> = emptyList()
 ) {
     val totalRestored: Int get() = added.size + upgraded.size + updated.size + sshAdded.size
 }
@@ -98,7 +111,10 @@ class BackupService(
     private val crypto: PGPCryptoService = PGPCryptoService.shared,
     // 4.8.0 RC7 (item 1): the SSH-only keys to back up and restore into; null
     // leaves them out (no app instance, as in JVM tests).
-    private val sshKeys: SshKeyStore? = runCatching { PGPonyApp.instance.sshKeyStore }.getOrNull()
+    private val sshKeys: SshKeyStore? = runCatching { PGPonyApp.instance.sshKeyStore }.getOrNull(),
+    // 4.8.0 RC8 (item 4n): recipient groups to back up and merge into; null
+    // leaves them out, as for sshKeys.
+    private val groups: RecipientGroupStore? = runCatching { PGPonyApp.instance.recipientGroups }.getOrNull()
 ) {
 
     companion object {
@@ -144,6 +160,8 @@ class BackupService(
         val metaKeys = JSONArray()
         // §4.3: fingerprints whose secret material this backup captured.
         val backedUpFps = ArrayList<String>()
+        // 4.8.0 RC8 (item 4n): every key written to this backup, for the groups.
+        val exportedFps = ArrayList<String>()
 
         for (e in keys) {
             val fp = e.fingerprint.lowercase()
@@ -160,6 +178,7 @@ class BackupService(
             entries.add(
                 UstarArchive.Entry("$KEYS_DIR$fp.asc", armored.toByteArray(Charsets.UTF_8))
             )
+            exportedFps.add(fp)
             metaKeys.put(JSONObject().apply {
                 put("fingerprint", fp)
                 put("userID", e.userID)
@@ -188,6 +207,11 @@ class BackupService(
         ordered.addAll(entries)
         // 4.8.0 RC7 (item 1): additive, after the OpenPGP keys.
         ordered.addAll(SshKeyBackup.entries(sshItems))
+        // 4.8.0 RC8 (item 4n): additive too. Only members whose key is in this
+        // backup; a failure to read the groups never stops the key backup.
+        groups?.let { store ->
+            runCatching { withContext(Dispatchers.IO) { store.all() } }.getOrNull()
+        }?.let { RecipientGroupBackup.entry(it, exportedFps) }?.let { ordered.add(it) }
         runCatching { settingsJson() }.getOrNull()?.let {
             ordered.add(UstarArchive.Entry(SETTINGS_NAME, it.toByteArray(Charsets.UTF_8)))
         }
@@ -326,8 +350,23 @@ class BackupService(
         val sshFailedAll = sshReport?.failed
             ?: if (sshItems.isNotEmpty() && sshKeys != null) sshItems.map { it.label.ifBlank { it.fingerprint } } else emptyList()
 
+        // 4.8.0 RC8 (item 4n): groups merge by name once the keys are in, so a
+        // member counts when its key is in the keyring now, live or in Recently
+        // Deleted. A backup without the entry (every backup before RC8) has none.
+        val backupGroups = RecipientGroupBackup.groups(entries)
+        val groupStore = groups
+        val groupReport = if (backupGroups.isNotEmpty() && groupStore != null) {
+            runCatching {
+                val known = (repo.getAllKeys() + repo.getDeletedKeys())
+                    .map { RecipientGroups.normalize(it.fingerprint) }.toSet()
+                withContext(Dispatchers.IO) { groupStore.mergeFromBackup(backupGroups) { it in known } }
+            }.getOrNull()
+        } else null
+
         return MergeReport(added, upgraded, updated, unchanged, failed,
             settingsApplied = false, pendingSettings = pendingSettings,
+            groupsAdded = groupReport?.added.orEmpty(),
+            groupsMerged = groupReport?.merged.orEmpty(),
             sshAdded = sshReport?.added.orEmpty().map { RestoredKey(it.id, it.label.ifBlank { it.fingerprint }) },
             sshUnchanged = sshReport?.unchanged.orEmpty().map { RestoredKey(it.id, it.label.ifBlank { it.fingerprint }) },
             sshFailed = sshFailedAll.map { RestoredKey(it, it) })

@@ -63,6 +63,7 @@ import com.pgpony.android.crypto.pqc.CompositeSignerGate
 import com.pgpony.android.data.KeyDeduplicationService
 import com.pgpony.android.ui.util.ScratchFiles
 import com.pgpony.android.data.PGPKeyEntity
+import com.pgpony.android.data.groups.inPickerOrder
 import com.pgpony.android.data.repository.KeyRepository
 import com.pgpony.android.i18n.ErrorText
 import com.pgpony.android.intent.ShareIntentContent
@@ -217,7 +218,9 @@ class ShareTargetViewModel(
             val defaultSignerFpr = prefs.getString("pgpony_default_signer_fpr", "") ?: ""
             _state.update {
                 it.copy(
-                    availableRecipients = keys,
+                    // 4.8.0 RC8 (item 4n): the Encrypt picker's order, your own
+                    // keys first, then everyone else A to Z.
+                    availableRecipients = keys.inPickerOrder(),
                     availableKeyPairs = keyPairs,
                     availableSigners = ShareFileActions.signers(keyPairs),
                     defaultSignerFingerprint = defaultSignerFpr,

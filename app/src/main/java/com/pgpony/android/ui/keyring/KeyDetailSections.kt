@@ -45,6 +45,8 @@ import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudUpload
@@ -566,7 +568,20 @@ fun DetailsSection(
         }
         DetailRow(label = stringResource(R.string.key_detail_detail_created), value = formatDate(key.createdAt))
         ExpiresRow(key = key, onEditExpiry = onEditExpiry)
-        TrustLevelRow(trust = key.trustLevel, onClick = onTrustTap)
+        // 4.8.0 RC8 (#115): the shown level, and which of your keys raised it
+        // when a certification did, so it reads apart from a Verified set by hand.
+        // A certification covers one User ID, so name them when not all are.
+        val verification = com.pgpony.android.data.CertifiedTrust.verificationFor(key)
+        val certifiedLine = verification?.let { v ->
+            val only = v.onlyUserIds
+            if (only == null) stringResource(R.string.key_detail_trust_certified_by, v.certifierLabel)
+            else stringResource(R.string.key_detail_trust_certified_by_uids, v.certifierLabel, only.joinToString(", "))
+        }
+        TrustLevelRow(
+            trust = com.pgpony.android.data.CertifiedTrust.effective(key),
+            certifiedLine = certifiedLine,
+            onClick = onTrustTap
+        )
         if (key.isSynced) {
             DetailRow(label = stringResource(R.string.key_detail_detail_drive_backup), value = stringResource(R.string.key_detail_detail_drive_backup_enabled), icon = Icons.Filled.CloudDone)
         }
@@ -662,7 +677,7 @@ private fun ExpiresRow(key: PGPKeyEntity, onEditExpiry: (() -> Unit)? = null) {
 }
 
 @Composable
-private fun TrustLevelRow(trust: TrustLevel, onClick: () -> Unit) {
+private fun TrustLevelRow(trust: TrustLevel, certifiedLine: String? = null, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -670,12 +685,21 @@ private fun TrustLevelRow(trust: TrustLevel, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = stringResource(R.string.key_detail_trust_level_label),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.key_detail_trust_level_label),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            // 4.8.0 RC8 (#115): Verified because your own Ultimate key certified it.
+            if (certifiedLine != null) {
+                Text(
+                    text = certifiedLine,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1940,6 +1964,71 @@ fun SigningDefaultsSection(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+// ── 4.8.0 RC8 (item 4n): recipient groups ──────────────────────────────
+//
+// The groups this key is in, each with a remove button, and Add to group
+// (an existing group, or a new one holding this key). State and changes come
+// from ui/groups/KeyGroupsItem, which owns the GroupsViewModel.
+@Composable
+fun KeyGroupsSection(
+    memberOf: List<com.pgpony.android.data.groups.RecipientGroup>,
+    otherGroups: List<com.pgpony.android.data.groups.RecipientGroup>,
+    onAdd: (com.pgpony.android.data.groups.RecipientGroup) -> Unit,
+    onRemove: (com.pgpony.android.data.groups.RecipientGroup) -> Unit,
+    onNewGroup: () -> Unit
+) {
+    SectionGroup(title = stringResource(R.string.key_detail_section_groups)) {
+        if (memberOf.isEmpty()) {
+            Text(
+                text = stringResource(R.string.key_detail_groups_none),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+            )
+        } else {
+            memberOf.forEach { group ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = group.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = { onRemove(group) }) {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = stringResource(R.string.key_detail_groups_remove_cd, group.name),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+        var menuOpen by remember { mutableStateOf(false) }
+        Box {
+            ActionRow(
+                icon = Icons.Filled.GroupAdd,
+                label = stringResource(R.string.key_detail_groups_add),
+                onClick = { menuOpen = true }
+            )
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                otherGroups.forEach { group ->
+                    DropdownMenuItem(
+                        text = { Text(group.name) },
+                        onClick = { menuOpen = false; onAdd(group) }
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.key_detail_groups_new)) },
+                    onClick = { menuOpen = false; onNewGroup() }
+                )
             }
         }
     }

@@ -515,6 +515,9 @@ fun SettingsScreen(
             // ── §5.5.1 (board t/1): default sharing method ──────────────
             SectionHeader(stringResource(R.string.settings_section_sharing))
             DefaultShareFormatSection()
+            // 4.8.0 RC8 (#100): a key too large for 32 QR parts can be shown in up to 512.
+            Spacer(modifier = Modifier.height(8.dp))
+            LongQrCodesToggle()
             Spacer(modifier = Modifier.height(16.dp))
             // ── PGP Output Section: customizable armor comment ─────────
             //
@@ -1026,7 +1029,8 @@ fun SettingsScreen(
                 icon = Icons.Filled.Email,
                 iconTint = Color(0xFF8B5CF6),
                 onClick = {
-                    val opened = FeedbackIntent.launch(context, BuildConfig.VERSION_NAME)
+                    // 4.8.0 RC8 (#114): the version text carries the commit too.
+                    val opened = FeedbackIntent.launch(context, com.pgpony.android.BuildCommit.versionLabel(BuildConfig.VERSION_NAME, BuildConfig.GIT_COMMIT))
                     if (!opened) {
                         viewModel.showError(
                             context.getString(R.string.settings_support_feedback_no_email_error, FeedbackIntent.FEEDBACK_EMAIL)
@@ -1104,6 +1108,8 @@ fun SettingsScreen(
                 Triple(R.string.settings_more_passpony_title, R.string.settings_more_passpony_subtitle, "https://passpony.app"),
                 Triple(R.string.settings_more_relaypony_title, R.string.settings_more_relaypony_subtitle, "https://relaypony.app"),
                 Triple(R.string.settings_more_scrubpony_title, R.string.settings_more_scrubpony_subtitle, "https://scrubpony.app"),
+                Triple(R.string.settings_more_tappony_title, R.string.settings_more_tappony_subtitle, "https://tappony.app"),
+                Triple(R.string.settings_more_hashpony_title, R.string.settings_more_hashpony_subtitle, "https://hashpony.app"),
             ).forEach { (titleRes, subtitleRes, url) ->
                 SettingsAction(
                     title = stringResource(titleRes),
@@ -1179,9 +1185,13 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(16.dp))
             // ── About Section ──────────────────────────────────────────
             SectionHeader(stringResource(R.string.settings_section_about))
+            // 4.8.0 RC8 (#114): the version, then the build's short commit hash
+            // when the build had git, so a tester can tell which RC is installed.
+            val shortCommit = com.pgpony.android.BuildCommit.short(BuildConfig.GIT_COMMIT)
             SettingsRow(
                 title = stringResource(R.string.settings_about_version_label),
-                value = BuildConfig.VERSION_NAME,
+                value = if (shortCommit.isEmpty()) BuildConfig.VERSION_NAME
+                    else stringResource(R.string.settings_about_version_commit_format, BuildConfig.VERSION_NAME, shortCommit),
                 icon = Icons.Filled.Info,
                 iconTint = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -2225,6 +2235,38 @@ private fun SignByDefaultToggle() {
         onCheckedChange = {
             enabled = it
             prefs.edit().putBoolean("sign_by_default", it).apply()
+        }
+    )
+}
+
+// ── 4.8.0 RC8 (#100): Long QR codes ────────────────────────────────────
+//
+// Off by default. On, Show Key and Key Details split a key that does not fit
+// in 32 QR parts into up to 512. A key that fits in 32 is sent as before, so
+// iOS and Desktop (which stop at 32) still read it; only the longer codes need
+// PGPony Android 4.8.0 or later on the scanning phone. Read by QrPartLimit.
+@Composable
+private fun LongQrCodesToggle() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember {
+        context.getSharedPreferences("pgpony_prefs", android.content.Context.MODE_PRIVATE)
+    }
+    var enabled by remember {
+        mutableStateOf(prefs.getBoolean(com.pgpony.android.qr.QrPartLimit.PREF_KEY, false))
+    }
+    SettingsToggle(
+        title = stringResource(R.string.settings_qr_long_codes_title),
+        subtitle = stringResource(
+            R.string.settings_qr_long_codes_subtitle,
+            com.pgpony.android.qr.QrChunking.MAX_FRAMES_LONG,
+            com.pgpony.android.qr.QrChunking.MAX_FRAMES
+        ),
+        icon = Icons.Filled.QrCode,
+        iconTint = MaterialTheme.colorScheme.primary,
+        checked = enabled,
+        onCheckedChange = {
+            enabled = it
+            prefs.edit().putBoolean(com.pgpony.android.qr.QrPartLimit.PREF_KEY, it).apply()
         }
     )
 }

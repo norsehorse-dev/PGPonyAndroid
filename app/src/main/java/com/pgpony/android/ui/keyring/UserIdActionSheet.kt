@@ -24,6 +24,8 @@ import com.pgpony.android.R
 import com.pgpony.android.ui.components.PassphraseVisibilityToggle
 import com.pgpony.android.ui.util.dismissKeyboardOnTap
 import com.pgpony.android.ui.util.keepsKeyboard
+import com.pgpony.android.provider.rememberProviderAutoFocus
+import androidx.compose.ui.focus.focusRequester
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,7 +84,17 @@ fun UserIdActionSheet(
 
             // Remove is structural (no signing), so it needs no passphrase.
             val onCard = cardPin && request.kind != UserIdActionRequest.Kind.REMOVE
+            // 4.8.0 RC8 (#86): Apply, shared by its button and the keyboard's Done key.
+            val submit: () -> Unit = {
+                // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
+                val entered = passphrase
+                passphrase = ""
+                onApply(entered.ifBlank { null })
+            }
             if (request.kind != UserIdActionRequest.Kind.REMOVE) {
+                // 4.8.0 RC8 (#86): the field takes focus and the keyboard opens
+                // when the sheet appears, and Done applies once something is typed.
+                val fieldFocus = rememberProviderAutoFocus()
                 OutlinedTextField(
                     value = passphrase,
                     onValueChange = { passphrase = it },
@@ -97,10 +109,16 @@ fun UserIdActionSheet(
                     // 4.8.0 (item 4d): show or hide for a passphrase only, never a card PIN.
                     visualTransformation = if (passphraseShown && !onCard) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = if (onCard) null else ({ PassphraseVisibilityToggle(passphraseShown) { passphraseShown = !passphraseShown } }),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                    ),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = {
+                        if (!isProcessing && passphrase.isNotEmpty()) submit()
+                    }),
                     singleLine = true,
                     enabled = !isProcessing,
-                    modifier = Modifier.keepsKeyboard().fillMaxWidth()
+                    modifier = Modifier.keepsKeyboard().fillMaxWidth().focusRequester(fieldFocus)
                 )
             }
             if (onCard) {
@@ -131,12 +149,7 @@ fun UserIdActionSheet(
                     modifier = Modifier.weight(1f)
                 ) { Text(stringResource(R.string.common_button_cancel)) }
                 Button(
-                    onClick = {
-                        // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
-                        val entered = passphrase
-                        passphrase = ""
-                        onApply(entered.ifBlank { null })
-                    },
+                    onClick = submit,
                     enabled = !isProcessing && (!onCard || passphrase.isNotEmpty()),
                     modifier = Modifier.weight(1f)
                 ) {

@@ -489,7 +489,8 @@ class ProviderCardOpActivity : ComponentActivity() {
             OpenPgpApi.ACTION_DECRYPT_VERIFY, OpenPgpApi.ACTION_DECRYPT_METADATA -> {
                 val pubRing = ringForSlot(ard.decFingerprint)
                 val verificationKeys = runBlocking {
-                    repo.getAllKeys().mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
+                    // 4.8.0 RC8 (#115): the plain read, no trust refresh while the card is on the phone.
+                    repo.getAllKeysPlain().mapNotNull { repo.loadPublicKeyRing(it.fingerprint) }
                 }
                 val result = CardDecryptService.shared.decryptBytes(
                     session = session,

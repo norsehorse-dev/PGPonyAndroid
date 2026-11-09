@@ -95,7 +95,8 @@ fun CardSignScreen(onBack: () -> Unit) {
             // reader thread, never the main thread.
             val repo = PGPonyApp.instance.keyRepository
             val entity = kotlinx.coroutines.runBlocking {
-                repo.getAllKeys().firstOrNull {
+                // 4.8.0 RC8 (#115): the plain read, no trust refresh while the card is on the phone.
+                repo.getAllKeysPlain().firstOrNull {
                     it.cardSigFingerprint.equals(fp, ignoreCase = true) ||
                         it.fingerprint.equals(fp, ignoreCase = true)
                 }

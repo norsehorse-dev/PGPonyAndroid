@@ -1953,6 +1953,8 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="export_private_gpg_compat_caption">Gibt den zusammengesetzten Schlüssel so aus, wie GnuPG (GPG4WIN) es erwartet, damit er dort importiert werden kann. Für andere Apps ausgeschaltet lassen.</string>
     <string name="keyring_more_cd">Mehr</string>
     <string name="settings_more_scrubpony_subtitle">Entfernt identifizierende Metadaten aus Bildern. Keine Pixel werden verändert.</string>
+    <string name="settings_more_tappony_subtitle">Halte dein Telefon an ein NFC-Tag und sende seine ID und seinen Inhalt an deinen eigenen Server. Kein Konto, keine Cloud.</string>
+    <string name="settings_more_hashpony_subtitle">Dateien hashen und prüfen wie mit sha256sum, mit Prüfsummendateien, Ordnerprüfungen und allen gängigen Algorithmen.</string>
     <string name="settings_key_default_choose">Standardschlüssel wählen</string>
     <string name="kd_avatar_hint_encrypt">Tipp: Tippe auf das Avatar, um an diesen Schlüssel zu verschlüsseln</string>
     <string name="kd_avatar_hint_decrypt">Tipp: Tippe auf das Avatar, um mit diesem Schlüssel zu entschlüsseln</string>
@@ -3126,4 +3128,71 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
         <item quantity="one">%1$d SSH-Schlüssel konnte nicht gelesen werden und ist nicht in diesem Backup enthalten.</item>
         <item quantity="other">%1$d SSH-Schlüssel konnten nicht gelesen werden und sind nicht in diesem Backup enthalten.</item>
     </plurals>
+    <!-- 4.8.0 RC8 (#115) -->
+    <string name="key_detail_trust_certified_by">Verifiziert durch deinen Schlüssel %1$s</string>
+    <string name="key_detail_trust_certified_by_uids">Verifiziert durch deinen Schlüssel %1$s für %2$s</string>
+    <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
+    <string name="groups_title">Gruppen</string>
+    <string name="groups_new">Neue Gruppe</string>
+    <string name="groups_empty">Noch keine Gruppen. Eine Gruppe ist eine benannte Sammlung von Schlüsseln, die du im Tab „Verschlüsseln“ in einem Schritt als Empfänger hinzufügen kannst.</string>
+    <string name="groups_load_failed">Die Gruppen konnten nicht gelesen werden.</string>
+    <string name="groups_error_save">Die Änderung an der Gruppe konnte nicht gespeichert werden.</string>
+    <plurals name="groups_member_count">
+        <item quantity="one">%1$d Schlüssel</item>
+        <item quantity="other">%1$d Schlüssel</item>
+    </plurals>
+    <plurals name="groups_member_deleted_count">
+        <item quantity="one">%1$d in Zuletzt gelöscht</item>
+        <item quantity="other">%1$d in Zuletzt gelöscht</item>
+    </plurals>
+    <string name="groups_name_label">Gruppenname</string>
+    <string name="groups_name_blank">Gib einen Namen ein.</string>
+    <string name="groups_name_too_long">Verwende höchstens %1$d Zeichen.</string>
+    <string name="groups_name_taken">Es gibt bereits eine Gruppe mit diesem Namen.</string>
+    <string name="groups_rename">Umbenennen</string>
+    <string name="groups_rename_title">Gruppe umbenennen</string>
+    <string name="groups_edit_keys">Schlüssel bearbeiten</string>
+    <string name="groups_edit_keys_title">Schlüssel in %1$s</string>
+    <string name="groups_editor_no_keys">In deinem Schlüsselbund sind noch keine Schlüssel.</string>
+    <string name="groups_delete_title">Diese Gruppe löschen?</string>
+    <string name="groups_delete_body">%1$s wird gelöscht. Die Schlüssel darin bleiben in deinem Schlüsselbund.</string>
+    <string name="groups_keys_heading">Schlüssel</string>
+    <string name="groups_save_as_group">Als Gruppe speichern</string>
+    <plurals name="groups_pick_added">
+        <item quantity="one">%1$d Schlüssel aus %2$s hinzugefügt.</item>
+        <item quantity="other">%1$d Schlüssel aus %2$s hinzugefügt.</item>
+    </plurals>
+    <string name="groups_pick_none">Derzeit kann kein Schlüssel aus %1$s verwendet werden.</string>
+    <string name="groups_pick_left_out">Ausgelassen: %1$s</string>
+    <string name="groups_left_out_revoked">%1$s (widerrufen)</string>
+    <string name="groups_left_out_expired">%1$s (abgelaufen)</string>
+    <string name="groups_left_out_no_certificate">%1$s (noch kein öffentlicher Schlüssel)</string>
+    <string name="groups_left_out_deleted">%1$s (in Zuletzt gelöscht)</string>
+    <string name="groups_left_out_missing">%1$s (nicht in deinem Schlüsselbund)</string>
+    <string name="groups_status_revoked">Widerrufen</string>
+    <string name="groups_status_expired">Abgelaufen</string>
+    <string name="groups_status_no_certificate">Noch kein öffentlicher Schlüssel</string>
+    <string name="groups_status_deleted">In Zuletzt gelöscht</string>
+    <string name="groups_status_missing">Nicht in deinem Schlüsselbund</string>
+    <string name="key_detail_section_groups">Gruppen</string>
+    <string name="key_detail_groups_none">Dieser Schlüssel ist in keiner Gruppe.</string>
+    <string name="key_detail_groups_add">Zu Gruppe hinzufügen</string>
+    <string name="key_detail_groups_new">Neue Gruppe mit diesem Schlüssel</string>
+    <string name="key_detail_groups_remove_cd">Aus %1$s entfernen</string>
+    <string name="restore_groups_added">Gruppen hinzugefügt</string>
+    <string name="restore_groups_merged">Gruppen mit neuen Schlüsseln</string>
+    <!-- 4.8.0 RC8 (#100) -->
+    <plurals name="qr_scan_missing_parts">
+        <item quantity="one">Es fehlt noch Teil %1$s.</item>
+        <item quantity="other">Es fehlen noch die Teile %1$s.</item>
+    </plurals>
+    <plurals name="qr_too_large_parts">
+        <item quantity="one">Ein QR-Code für diesen Schlüssel würde %1$d Teil benötigen. Das Limit liegt bei %2$d.</item>
+        <item quantity="other">Ein QR-Code für diesen Schlüssel würde %1$d Teile benötigen. Das Limit liegt bei %2$d.</item>
+    </plurals>
+    <string name="qr_too_large_long_hint">Aktiviere „Lange QR-Codes“ in den Einstellungen, um ihn in bis zu %1$d Teilen anzuzeigen. Solche Codes kann nur PGPony Android 4.8.0 oder neuer scannen.</string>
+    <!-- %1$s is the qr_too_large_parts sentence, followed by qr_too_large_long_hint when it applies. -->
+    <string name="qr_too_large_with_parts">Dieser Schlüssel ist zu groß für einen QR-Code. %1$s Nutze stattdessen Teilen oder Kopieren.</string>
+    <string name="settings_qr_long_codes_title">Lange QR-Codes</string>
+    <string name="settings_qr_long_codes_subtitle">Zeigt einen Schlüssel, der nicht in %2$d QR-Teile passt, in bis zu %1$d Teilen an. Codes mit mehr als %2$d Teilen lassen sich nur mit PGPony Android 4.8.0 oder neuer scannen.</string>
 </resources>

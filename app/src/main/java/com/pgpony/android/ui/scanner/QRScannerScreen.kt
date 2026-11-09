@@ -28,6 +28,12 @@ import com.pgpony.android.qr.PublicKeyQrCollector
 import com.pgpony.android.qr.PublicKeyQrResult
 import com.pgpony.android.qr.QrPreviewTiming
 import com.pgpony.android.qr.QrCollectionProcessor
+import com.pgpony.android.qr.QrMissingParts
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import com.pgpony.android.ui.util.rememberHaptics
 
 internal val LocalQrScanMetrics = staticCompositionLocalOf { QrScanMetrics.None }
@@ -58,6 +64,10 @@ fun QRScannerScreen(
     // Partial public-key frames survive duplicate decodes and camera lifecycle pauses.
     val frameCollector = remember(acceptOtherText) { PublicKeyQrCollector(acceptOtherText) }
     var scanProgress by remember { mutableStateOf<String?>(null) }
+    // 4.8.0 RC8 (#100): the parts of a PGPONY1 code still to come, and its part
+    // count, for the missing-parts line and strip. Zero parts hides both.
+    var partsTotal by remember { mutableIntStateOf(0) }
+    var partsMissing by remember { mutableStateOf<List<Int>>(emptyList()) }
     val collectionScope = rememberCoroutineScope()
     val collectionProcessor = remember(session, frameCollector, collectionScope) {
         QrCollectionProcessor(session, collectionScope, collect = frameCollector::offer)
@@ -135,6 +145,8 @@ fun QRScannerScreen(
                             is PublicKeyQrResult.Complete -> {
                                 if (session.tryComplete(token)) {
                                     scanProgress = null
+                                    partsTotal = 0
+                                    partsMissing = emptyList()
                                     if (!firstPartReceived) {
                                         firstPartReceived = true
                                         metrics.milestone(session.id, ScanMilestone.FIRST_PART, System.nanoTime())
@@ -163,6 +175,15 @@ fun QRScannerScreen(
                                 } else context.getString(
                                     if (outcome.enhanced) R.string.qr_enhanced_progress_format else R.string.qr_scan_progress_format,
                                     outcome.have, outcome.required)
+                                // 4.8.0 RC8 (#100): a PGPONY1 code names its missing parts;
+                                // PGPONY2 completes from any of its parts, so it has none.
+                                if (outcome.enhanced) {
+                                    partsTotal = 0
+                                    partsMissing = emptyList()
+                                } else {
+                                    partsTotal = outcome.required
+                                    partsMissing = outcome.missing
+                                }
                                 true
                             }
                             PublicKeyQrResult.Duplicate -> {
@@ -213,6 +234,22 @@ fun QRScannerScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.White
                         )
+                        // 4.8.0 RC8 (#100): which parts are still missing.
+                        if (partsTotal > 1 && partsMissing.isNotEmpty()) {
+                            QrMissingParts.toList(partsMissing)?.let { listed ->
+                                Text(
+                                    pluralStringResource(
+                                        R.plurals.qr_scan_missing_parts, listed.size,
+                                        listed.joinToString(", ")
+                                    ),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White
+                                )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            MissingPartsStrip(total = partsTotal, missing = partsMissing)
+                            Spacer(Modifier.height(8.dp))
+                        }
                         Text(stringResource(R.string.qr_focus_hint),
                             style = MaterialTheme.typography.bodySmall, color = Color.White)
                     }
@@ -230,6 +267,39 @@ fun QRScannerScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * 4.8.0 RC8 (#100): one cell per part, solid once received and faint while
+ * missing. It wraps into rows (32 per row for a normal code, 64 for a long
+ * one) so 512 parts make a short block. The line above it lists the missing
+ * numbers once few are left, so the strip is hidden from TalkBack.
+ */
+@Composable
+private fun MissingPartsStrip(total: Int, missing: List<Int>) {
+    val columns = QrMissingParts.columns(total)
+    val rows = QrMissingParts.rows(total)
+    val missingSet = remember(missing) { missing.toHashSet() }
+    val long = columns > 32
+    val cellGap = if (long) 1.dp else 2.dp
+    val rowHeight = if (long) 4.dp else 12.dp
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .height(rowHeight * rows + cellGap * (rows - 1))
+            .clearAndSetSemantics {}
+    ) {
+        val gap = cellGap.toPx()
+        val cellWidth = (size.width - gap * (columns - 1)) / columns
+        val cellHeight = rowHeight.toPx()
+        val cell = Size(cellWidth, cellHeight)
+        for (part in 1..total) {
+            val index = part - 1
+            val topLeft = Offset((index % columns) * (cellWidth + gap), (index / columns) * (cellHeight + gap))
+            drawRect(if (part in missingSet) Color.White.copy(alpha = 0.3f) else Color.White, topLeft, cell)
         }
     }
 }

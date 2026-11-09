@@ -59,6 +59,7 @@ import com.pgpony.android.ui.settings.DefaultRecipientPrefs
 import com.pgpony.android.crypto.VerificationResult
 import com.pgpony.android.crypto.VerifyService
 import com.pgpony.android.data.PGPKeyEntity
+import com.pgpony.android.data.groups.inPickerOrder
 import com.pgpony.android.data.repository.KeyRepository
 import com.pgpony.android.network.KeyServerRepository
 import com.pgpony.android.crypto.mime.MimeBuilder
@@ -139,6 +140,14 @@ enum class DecryptMode(val displayName: String) {
  *  makes the whole message recoverable by a future quantum attacker. */
 data class PqMixedWarning(val classicalRecipientNames: List<String>)
 
+/** 4.8.0 RC8 (item 4n): what the last group pick did, shown in the picker sheet.
+ *  [added] counts the group's keys that are now recipients. */
+data class GroupPickNote(
+    val groupName: String,
+    val added: Int,
+    val leftOut: List<com.pgpony.android.data.groups.LeftOutMember>
+)
+
 data class EncryptUiState(
     val inputText: String = "",
     val outputText: String = "",
@@ -151,6 +160,10 @@ data class EncryptUiState(
     val recipientSubkeyChoices: Map<String, Long> = emptyMap(),
     val recipientSubkeyOptions: Map<String, List<com.pgpony.android.crypto.EncryptionKeyOption>> = emptyMap(),
     val availableRecipients: List<PGPKeyEntity> = emptyList(),
+    // 4.8.0 RC8 (item 4n): the recipient groups, shown at the top of the
+    // picker sheet, and the note from the last group pick.
+    val recipientGroups: List<com.pgpony.android.data.groups.RecipientGroup> = emptyList(),
+    val groupPickNote: GroupPickNote? = null,
     val signingKey: PGPKeyEntity? = null,
     // §4.5 (#22): signing-subkey choices for the chosen signer (first entry
     // is the automatic pick); selectedSigningKeyId is the user's choice,
@@ -710,9 +723,11 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             // it reappears here automatically. Normal (non-card) keys
             // always have armoredPublicKey, so this only affects unpaired
             // cards.
+            // 4.8.0 RC8 (item 4n): in the picker's order, your own keys first,
+            // then everyone else A to Z, instead of the query's newest first.
             val unrevokedRecipients = allKeys.filter {
                 !it.isRevoked && (!it.isCardBacked || it.armoredPublicKey != null)
-            }
+            }.inPickerOrder()
             val unrevokedKeyPairs = keyPairs.filter { !it.isRevoked }
 
             // HW Phase 2b-step2 — card-backed keys that are paired (have a
@@ -765,8 +780,10 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 if (kept.any { it.fingerprint == explicitKey.fingerprint }) kept else kept + explicitKey
             } else preselectedRecipients
 
+            val groups = loadRecipientGroups()
             _encryptState.value = _encryptState.value.copy(
                 availableRecipients = unrevokedRecipients,
+                recipientGroups = groups,
                 availableSigningKeys = signableKeys,
                 selectedRecipients = finalRecipients,
                 // If the currently-selected signing key was just revoked
@@ -919,6 +936,96 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
 
     fun clearRecipients() {
         _encryptState.value = _encryptState.value.copy(selectedRecipients = emptyList(), pqMixedWarning = null)
+    }
+
+    // ── 4.8.0 RC8 (item 4n): recipient groups ──────────────────────────
+
+    private suspend fun loadRecipientGroups(): List<com.pgpony.android.data.groups.RecipientGroup> =
+        withContext(Dispatchers.IO) {
+            runCatching { PGPonyApp.instance.recipientGroups.all() }.getOrDefault(emptyList())
+        }
+
+    /** Read the groups again (the picker sheet opens; a group may have changed elsewhere). */
+    fun refreshRecipientGroups() {
+        viewModelScope.launch {
+            _encryptState.value = _encryptState.value.copy(recipientGroups = loadRecipientGroups())
+        }
+    }
+
+    /**
+     * Adds [group]'s usable keys to the recipients, next to the ones already
+     * chosen, and notes the members it left out (revoked, expired, a security
+     * key without its certificate, in Recently Deleted). A Don't use key is
+     * added, since the picker offers it too; encrypting asks first, as for any
+     * Don't use recipient.
+     */
+    fun pickGroup(group: com.pgpony.android.data.groups.RecipientGroup) {
+        viewModelScope.launch {
+            // The facts, the order and the keys all come from one fresh read, so
+            // a key imported and added to the group after this screen loaded is
+            // in the pool too. The same read refreshes the picker's list, with
+            // loadKeys' recipient rule (not revoked, a card only with its
+            // certificate).
+            val (pick, fresh) = withContext(Dispatchers.IO) {
+                val live = repo.getAllKeys()
+                val facts = com.pgpony.android.data.groups.groupMemberFacts(live, repo.getDeletedKeys())
+                val available = live.filter {
+                    !it.isRevoked && (!it.isCardBacked || it.armoredPublicKey != null)
+                }.inPickerOrder()
+                com.pgpony.android.data.groups.RecipientGroups.resolve(group, facts, available.map { it.fingerprint }) to available
+            }
+            val pool = fresh.associateBy { com.pgpony.android.data.groups.RecipientGroups.normalize(it.fingerprint) }
+            val keys = pick.usable.mapNotNull { pool[it] }
+            // Never claim a key that did not land: anything usable but missing
+            // from the pool is named as left out.
+            val missed = pick.usable.filter { it !in pool }.map {
+                com.pgpony.android.data.groups.LeftOutMember(
+                    it, com.pgpony.android.data.groups.RecipientGroups.shortFingerprint(it),
+                    com.pgpony.android.data.groups.LeftOutReason.NOT_IN_KEYRING
+                )
+            }
+            val current = _encryptState.value.selectedRecipients
+            val have = current.map { com.pgpony.android.data.groups.RecipientGroups.normalize(it.fingerprint) }.toSet()
+            val next = current + keys.filter {
+                com.pgpony.android.data.groups.RecipientGroups.normalize(it.fingerprint) !in have
+            }
+            _encryptState.value = _encryptState.value.copy(
+                availableRecipients = fresh,
+                selectedRecipients = next,
+                groupPickNote = GroupPickNote(group.name, keys.size, pick.leftOut + missed)
+            )
+            recomputePqWarning()
+        }
+    }
+
+    fun clearGroupPickNote() {
+        _encryptState.value = _encryptState.value.copy(groupPickNote = null)
+    }
+
+    /**
+     * Saves the chosen recipients as a new group named [name]. Returns null
+     * when it was saved, or why the name was refused. Any other failure (the
+     * database) is thrown as [com.pgpony.android.data.groups.GroupSaveException],
+     * which GroupNameDialog shows as the save error; cancellation passes through.
+     */
+    suspend fun saveRecipientsAsGroup(name: String): com.pgpony.android.data.groups.GroupNameProblem? {
+        val fingerprints = _encryptState.value.selectedRecipients.map { it.fingerprint }
+        val problem = withContext(Dispatchers.IO) {
+            try {
+                PGPonyApp.instance.recipientGroups.create(name, fingerprints)
+                null
+            } catch (e: com.pgpony.android.data.groups.GroupNameException) {
+                e.problem
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                throw com.pgpony.android.data.groups.GroupSaveException(e)
+            }
+        }
+        if (problem == null) {
+            _encryptState.value = _encryptState.value.copy(recipientGroups = loadRecipientGroups())
+        }
+        return problem
     }
 
     fun setAsciiArmor(value: Boolean) {
@@ -3869,7 +3976,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             graded,
             signerName = entity?.userName?.ifBlank { null },
             signerEmail = entity?.userEmail?.ifBlank { null },
-            signerTrust = entity?.trustLevel,
+            signerTrust = entity?.let { com.pgpony.android.data.CertifiedTrust.effective(it) },
             signedContent = signedContent
         )
         return when (mapped) {
@@ -4307,9 +4414,12 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         val fp = r.signerFingerprint
         if (fp.isBlank()) return r
         val trust = withContext(Dispatchers.IO) {
+            // 4.8.0 RC8 (#115): the banner is not redrawn later, so check this key's
+            // certified trust now rather than wait for the background refresh.
+            repo.ensureCertifiedTrust(listOf(fp))
             repo.getAllKeys()
                 .firstOrNull { it.fingerprint.equals(fp, ignoreCase = true) }
-                ?.trustLevel
+                ?.let { com.pgpony.android.data.CertifiedTrust.effective(it) }
         }
         return r.copy(signerTrust = trust)
     }
@@ -4389,12 +4499,14 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             )
             SignerStatus.VERIFIED -> {
                 val signer = resolveSignerByFingerprint(signerPrimaryFingerprint, signingKeyFingerprint)
+                // 4.8.0 RC8 (#115): as in withSignerTrust, check now.
+                signer?.let { repo.ensureCertifiedTrust(listOf(it.fingerprint)) }
                 VerificationResult.Verified(
                     signerKeyID = keyId ?: "",
                     signerFingerprint = signer?.fingerprint ?: signerPrimaryFingerprint ?: "",
                     signerName = signer?.userName?.ifBlank { null },
                     signerEmail = signer?.userEmail?.ifBlank { null },
-                    signerTrust = signer?.trustLevel,
+                    signerTrust = signer?.let { com.pgpony.android.data.CertifiedTrust.effective(it) },
                     signedContent = null,
                     signingKeyFingerprint = signingKeyFingerprint,
                     signerWeakKey = signerWeakKey

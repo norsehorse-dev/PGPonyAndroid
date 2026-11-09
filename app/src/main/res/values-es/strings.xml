@@ -1953,6 +1953,8 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="export_private_gpg_compat_caption">Emite la clave compuesta tal como la espera GnuPG (GPG4WIN), para que pueda importarse allí. Déjalo desactivado para otras apps.</string>
     <string name="keyring_more_cd">Más</string>
     <string name="settings_more_scrubpony_subtitle">Elimina los metadatos identificativos de las imágenes. No se mueve ningún píxel.</string>
+    <string name="settings_more_tappony_subtitle">Acerca una etiqueta NFC y envía su ID y su contenido a tu propio servidor. Sin cuenta, sin nube.</string>
+    <string name="settings_more_hashpony_subtitle">Calcula y verifica hashes de archivos como sha256sum, con archivos de sumas de comprobación, verificación de carpetas y todos los algoritmos habituales.</string>
     <string name="settings_key_default_choose">Elegir una clave predeterminada</string>
     <string name="kd_avatar_hint_encrypt">Consejo: toca el avatar para cifrar a esta clave</string>
     <string name="kd_avatar_hint_decrypt">Consejo: toca el avatar para descifrar con esta clave</string>
@@ -3140,4 +3142,76 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
         <item quantity="many">%1$d claves SSH no se pudieron leer y no están en esta copia de seguridad.</item>
         <item quantity="other">%1$d claves SSH no se pudieron leer y no están en esta copia de seguridad.</item>
     </plurals>
+    <!-- 4.8.0 RC8 (#115) -->
+    <string name="key_detail_trust_certified_by">Verificada por tu clave %1$s</string>
+    <string name="key_detail_trust_certified_by_uids">Verificada por tu clave %1$s para %2$s</string>
+    <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
+    <string name="groups_title">Grupos</string>
+    <string name="groups_new">Nuevo grupo</string>
+    <string name="groups_empty">Aún no hay grupos. Un grupo es un conjunto de claves con nombre que puedes añadir como destinatarios en un solo paso en la pestaña Cifrar.</string>
+    <string name="groups_load_failed">No se pudieron leer los grupos.</string>
+    <string name="groups_error_save">No se pudo guardar el cambio en el grupo.</string>
+    <plurals name="groups_member_count">
+        <item quantity="one">%1$d clave</item>
+        <item quantity="many">%1$d claves</item>
+        <item quantity="other">%1$d claves</item>
+    </plurals>
+    <plurals name="groups_member_deleted_count">
+        <item quantity="one">%1$d en Eliminados recientemente</item>
+        <item quantity="many">%1$d en Eliminados recientemente</item>
+        <item quantity="other">%1$d en Eliminados recientemente</item>
+    </plurals>
+    <string name="groups_name_label">Nombre del grupo</string>
+    <string name="groups_name_blank">Escribe un nombre.</string>
+    <string name="groups_name_too_long">Usa como máximo %1$d caracteres.</string>
+    <string name="groups_name_taken">Ya existe un grupo con este nombre.</string>
+    <string name="groups_rename">Cambiar nombre</string>
+    <string name="groups_rename_title">Cambiar nombre del grupo</string>
+    <string name="groups_edit_keys">Editar claves</string>
+    <string name="groups_edit_keys_title">Claves en %1$s</string>
+    <string name="groups_editor_no_keys">Aún no hay claves en tu llavero.</string>
+    <string name="groups_delete_title">¿Eliminar este grupo?</string>
+    <string name="groups_delete_body">Se eliminará %1$s. Las claves que contiene se quedan en tu llavero.</string>
+    <string name="groups_keys_heading">Claves</string>
+    <string name="groups_save_as_group">Guardar como grupo</string>
+    <plurals name="groups_pick_added">
+        <item quantity="one">Se añadió %1$d clave de %2$s.</item>
+        <item quantity="many">Se añadieron %1$d claves de %2$s.</item>
+        <item quantity="other">Se añadieron %1$d claves de %2$s.</item>
+    </plurals>
+    <string name="groups_pick_none">Ninguna clave de %1$s se puede usar ahora mismo.</string>
+    <string name="groups_pick_left_out">Sin añadir: %1$s</string>
+    <string name="groups_left_out_revoked">%1$s (revocada)</string>
+    <string name="groups_left_out_expired">%1$s (caducada)</string>
+    <string name="groups_left_out_no_certificate">%1$s (aún sin clave pública)</string>
+    <string name="groups_left_out_deleted">%1$s (en Eliminados recientemente)</string>
+    <string name="groups_left_out_missing">%1$s (no está en tu llavero)</string>
+    <string name="groups_status_revoked">Revocada</string>
+    <string name="groups_status_expired">Caducada</string>
+    <string name="groups_status_no_certificate">Aún sin clave pública</string>
+    <string name="groups_status_deleted">En Eliminados recientemente</string>
+    <string name="groups_status_missing">No está en tu llavero</string>
+    <string name="key_detail_section_groups">Grupos</string>
+    <string name="key_detail_groups_none">Esta clave no está en ningún grupo.</string>
+    <string name="key_detail_groups_add">Añadir a un grupo</string>
+    <string name="key_detail_groups_new">Nuevo grupo con esta clave</string>
+    <string name="key_detail_groups_remove_cd">Quitar de %1$s</string>
+    <string name="restore_groups_added">Grupos añadidos</string>
+    <string name="restore_groups_merged">Grupos con claves nuevas</string>
+    <!-- 4.8.0 RC8 (#100) -->
+    <plurals name="qr_scan_missing_parts">
+        <item quantity="one">Aún falta la parte %1$s.</item>
+        <item quantity="many">Aún faltan las partes %1$s.</item>
+        <item quantity="other">Aún faltan las partes %1$s.</item>
+    </plurals>
+    <plurals name="qr_too_large_parts">
+        <item quantity="one">Un código QR para esta clave necesitaría %1$d parte. El límite es %2$d.</item>
+        <item quantity="many">Un código QR para esta clave necesitaría %1$d partes. El límite es %2$d.</item>
+        <item quantity="other">Un código QR para esta clave necesitaría %1$d partes. El límite es %2$d.</item>
+    </plurals>
+    <string name="qr_too_large_long_hint">Activa \"Códigos QR largos\" en Ajustes para mostrarla en hasta %1$d partes, que solo se pueden escanear en PGPony Android 4.8.0 o posterior.</string>
+    <!-- %1$s is the qr_too_large_parts sentence, followed by qr_too_large_long_hint when it applies. -->
+    <string name="qr_too_large_with_parts">Esta clave es demasiado grande para un código QR. %1$s Usa Compartir o Copiar en su lugar.</string>
+    <string name="settings_qr_long_codes_title">Códigos QR largos</string>
+    <string name="settings_qr_long_codes_subtitle">Muestra en hasta %1$d partes una clave que no cabe en %2$d partes QR. Los códigos de más de %2$d partes solo se pueden escanear en PGPony Android 4.8.0 o posterior.</string>
 </resources>

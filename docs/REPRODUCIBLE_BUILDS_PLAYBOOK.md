@@ -138,6 +138,20 @@ state). `dependenciesInfo` removes the Google-signed opaque blob, which
 F-Droid wants gone anyway. AGP already normalizes ZIP entry timestamps to
 1981-01-01; do not add tooling that rewrites them.
 
+Since 4.8.0 RC8 (#114) the build's commit hash is embedded on purpose, as
+`BuildConfig.GIT_COMMIT`, and Settings > About shows its first seven
+characters. It stays reproducible because it is only `git rev-parse HEAD`:
+no dirty marker, date or branch name. Two clean clones of a tag and
+F-Droid's checkout of it resolve the same HEAD, so they embed the same
+string. A rebuilder running as another user than the checkout's owner would
+otherwise hit git's "dubious ownership" refusal and embed nothing, so the
+build passes `safe.directory=*` and, if git still gives no hash, reads
+`.git/HEAD` (or a worktree's `gitdir:` file), the loose ref and
+`packed-refs` itself. Only when both fail is the field empty, and that APK
+would not match the published one. This is one more reason for R1: a
+working-tree build embeds whatever HEAD happens to be, which may not be the
+tagged commit.
+
 ### 4.3 Signing config that degrades to debug
 
 The clean clone and the F-Droid buildserver have no keystore, so signing

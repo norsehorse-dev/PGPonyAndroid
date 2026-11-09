@@ -16,8 +16,20 @@ object QrChunking {
     /** The compatible transport retains its released ceiling of 32 parts and 32,000 characters. */
     const val MAX_FRAMES = 32
 
+    /**
+     * 4.8.0 RC8 (#100): the ceiling with Long QR codes on. A sender only goes
+     * past [MAX_FRAMES] when the text does not fit in it, so a key that fits in
+     * 32 parts is sent exactly as before and iOS and Desktop (which stop at 32)
+     * still read it. PGPony Android 4.8.0 and later accept up to this many
+     * parts whatever the setting, so the receiving phone needs no change.
+     */
+    const val MAX_FRAMES_LONG = 512
+
     /** Maximum retained text, including older senders with larger per-frame payloads. */
     const val MAX_TEXT_CHARS = PAYLOAD_MAX * MAX_FRAMES
+
+    /** 4.8.0 RC8 (#100): the longest text a [MAX_FRAMES_LONG] sequence carries. */
+    const val MAX_TEXT_CHARS_LONG = PAYLOAD_MAX * MAX_FRAMES_LONG
     private const val MAX_HEADER_CHARS = 64
 
     private const val ID_LEN = 8
@@ -64,12 +76,23 @@ object QrChunking {
      * actionable too-large message instead of a raw encoder exception.
      * Profiles retain the same wire grammar and single-symbol threshold. If a
      * preferred width would exceed 32 parts, the width rises to fit that cap.
+     *
+     * 4.8.0 RC8 (#100): [maxFrames] is the sender's ceiling, [MAX_FRAMES] unless
+     * Long QR codes is on. A text that fits in [MAX_TEXT_CHARS] keeps the
+     * 32-part ceiling either way, so turning the setting on never changes a
+     * code that other PGPony apps can already read.
      */
-    fun split(text: String, policy: QrEncodingPolicy = QrEncodingPolicy.BASELINE): List<String>? {
+    fun split(
+        text: String,
+        policy: QrEncodingPolicy = QrEncodingPolicy.BASELINE,
+        maxFrames: Int = MAX_FRAMES,
+    ): List<String>? {
+        require(maxFrames in MAX_FRAMES..MAX_FRAMES_LONG) { "Unsupported part limit" }
         if (text.length <= SINGLE_MAX) return listOf(text)
-        if (text.length > MAX_TEXT_CHARS) return null
+        val cap = if (text.length <= MAX_TEXT_CHARS) MAX_FRAMES else maxFrames
+        if (text.length > PAYLOAD_MAX * cap) return null
 
-        val payload = maxOf(policy.payloadChars, ceilDiv(text.length, MAX_FRAMES))
+        val payload = maxOf(policy.payloadChars, ceilDiv(text.length, cap))
         val total = ceilDiv(text.length, payload)
         // Old collectors identify a sequence by content ID and count alone.
         // Equal counts must therefore imply equal slices across every profile.
@@ -87,6 +110,14 @@ object QrChunking {
     }
 
     private fun ceilDiv(value: Int, divisor: Int): Int = (value + divisor - 1) / divisor
+
+    /**
+     * 4.8.0 RC8 (#100): how many parts [text] takes at the widest part, which
+     * is the fewest any sender makes. The too-large message names it, so the
+     * user can see how far over the limit the key is.
+     */
+    fun partsNeeded(text: String): Int =
+        if (text.length <= SINGLE_MAX) 1 else ceilDiv(text.length, PAYLOAD_MAX)
 
     /** True when [raw] carries our marker. Cheap pre-check for the scanner. */
     fun isFrame(raw: String): Boolean = raw.startsWith(PREFIX)
@@ -117,7 +148,9 @@ object QrChunking {
         val id = rest.substring(c2 + 1, c3)
         val payload = rest.substring(c3 + 1)
 
-        if (seq < 1 || total < 1 || seq > total || total > MAX_FRAMES) return null
+        // 4.8.0 RC8 (#100): up to 512 parts are accepted whatever this phone's
+        // own sending limit is. seq and total are plain decimals, no fixed width.
+        if (seq < 1 || total < 1 || seq > total || total > MAX_FRAMES_LONG) return null
         if (id.length != ID_LEN || !id.all { it in HEX }) return null
         if (payload.length > MAX_TEXT_CHARS) return null
 
@@ -139,6 +172,12 @@ object QrChunking {
 
         val have: Int get() = parts.size
         val expected: Int get() = total
+
+        /**
+         * 4.8.0 RC8 (#100): the part numbers (from 1) not received yet, so the
+         * scanner can say which ones to wait for. Empty before the first part.
+         */
+        fun missing(): List<Int> = (1..total).filter { it !in parts }
 
         fun reset() {
             id = null
@@ -168,7 +207,10 @@ object QrChunking {
             }
             val fresh = previous == null
             if (fresh) {
-                if (retainedChars + frame.payload.length > MAX_TEXT_CHARS) {
+                // 4.8.0 RC8 (#100): the bound grows with the declared part
+                // count, so a 512-part code fits while a short one keeps the
+                // 32,000-character bound older senders were held to.
+                if (retainedChars + frame.payload.length > maxOf(MAX_TEXT_CHARS, PAYLOAD_MAX * total)) {
                     reset()
                     return Outcome.Malformed
                 }

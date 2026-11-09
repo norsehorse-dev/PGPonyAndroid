@@ -98,6 +98,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.pgpony.android.ui.components.PassphraseVisibilityToggle
 import com.pgpony.android.ui.util.keepsKeyboard
+import com.pgpony.android.provider.rememberProviderAutoFocus
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -937,6 +939,45 @@ fun KeyDetailScreen(
     if (state.showRefreshSigs) {
         var refreshPass by remember { mutableStateOf("") }
         var refreshPassShown by remember { mutableStateOf(false) }
+        // 4.8.0 RC8 (#86): Refresh, shared by its button and the keyboard's
+        // Done key, so the passphrase can be typed and sent without a tap.
+        val submitRefresh: () -> Unit = {
+            val pass = refreshPass.ifBlank { null }
+            // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
+            refreshPass = ""
+            val onCard = state.cardPrimaryEdits
+            deleteWithOptionalBiometricGate(
+                context = context,
+                title = context.getString(R.string.key_detail_resign_biometric_title),
+                subtitle = context.getString(R.string.key_detail_resign_biometric_subtitle)
+            ) {
+                if (onCard) {
+                    // 4.8.0 (#71): the same rebuild as the card expiry change, keeping
+                    // every expiry; a signing subkey's binding is passed over.
+                    runCardPrimaryEdit<org.bouncycastle.openpgp.PGPPublicKeyRing>(
+                        pin = pass.orEmpty(),
+                        onStarted = { viewModel.onCardRefreshStarted() },
+                        onFailure = { viewModel.onCardRefreshFailure(it) },
+                        onDone = { viewModel.onCardRefreshed(it) }
+                    ) { signer, pub, _ ->
+                        KeyExpirationService.shared.setExpirationWith(
+                            signer, pub, null, null, KeyExpirationService.Target.Refresh
+                        ).publicRing
+                    }
+                } else {
+                    viewModel.applyRefreshSigs(pass)
+                }
+            }
+        }
+        // 4.8.0 RC8 (#86): Done runs Refresh only when something was typed,
+        // so an empty field never starts a re-sign from the keyboard.
+        val refreshImeDone = androidx.compose.foundation.text.KeyboardActions(onDone = {
+            if (!state.refreshSigsInFlight && refreshPass.isNotEmpty()) submitRefresh()
+        })
+        val refreshImeOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+            imeAction = androidx.compose.ui.text.input.ImeAction.Done
+        )
         AlertDialog(
             onDismissRequest = { viewModel.dismissRefreshSigs() },
             title = { Text(stringResource(R.string.key_detail_refresh_sigs_title)) },
@@ -954,14 +995,19 @@ fun KeyDetailScreen(
                     }
                     // 4.8.0 (#71): the primary signs on the security key; the field takes its PIN.
                     if (state.cardPrimaryEdits) {
+                        // 4.8.0 RC8 (#86): the field takes focus and the keyboard
+                        // opens when the dialog appears (the #59 helper).
+                        val refreshFocus = rememberProviderAutoFocus()
                         OutlinedTextField(
                             value = refreshPass,
                             onValueChange = { refreshPass = it },
                             label = { Text(stringResource(R.string.card_decrypt_pin_label)) },
                             visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = refreshImeOptions,
+                            keyboardActions = refreshImeDone,
                             singleLine = true,
                             enabled = !state.refreshSigsInFlight,
-                            modifier = Modifier.keepsKeyboard().fillMaxWidth()
+                            modifier = Modifier.keepsKeyboard().fillMaxWidth().focusRequester(refreshFocus)
                         )
                         Text(
                             stringResource(
@@ -971,15 +1017,19 @@ fun KeyDetailScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     } else if (state.privateKeyIsProtected) {
+                        // 4.8.0 RC8 (#86): as for the PIN above.
+                        val refreshFocus = rememberProviderAutoFocus()
                         OutlinedTextField(
                             value = refreshPass,
                             onValueChange = { refreshPass = it },
                             label = { Text(stringResource(R.string.key_detail_expiry_passphrase_label)) },
                             visualTransformation = if (refreshPassShown) VisualTransformation.None else PasswordVisualTransformation(),
                             trailingIcon = { PassphraseVisibilityToggle(refreshPassShown) { refreshPassShown = !refreshPassShown } },
+                            keyboardOptions = refreshImeOptions,
+                            keyboardActions = refreshImeDone,
                             singleLine = true,
                             enabled = !state.refreshSigsInFlight,
-                            modifier = Modifier.keepsKeyboard().fillMaxWidth()
+                            modifier = Modifier.keepsKeyboard().fillMaxWidth().focusRequester(refreshFocus)
                         )
                     }
                     state.refreshSigsError?.let {
@@ -991,34 +1041,7 @@ fun KeyDetailScreen(
                 TextButton(
                     // 4.7.0 RC6 (item 66, #86): the dialog is the confirmation;
                     // the device-auth gate comes before the re-signing.
-                    onClick = {
-                        val pass = refreshPass.ifBlank { null }
-                        // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
-                        refreshPass = ""
-                        val onCard = state.cardPrimaryEdits
-                        deleteWithOptionalBiometricGate(
-                            context = context,
-                            title = context.getString(R.string.key_detail_resign_biometric_title),
-                            subtitle = context.getString(R.string.key_detail_resign_biometric_subtitle)
-                        ) {
-                            if (onCard) {
-                                // 4.8.0 (#71): the same rebuild as the card expiry change, keeping
-                                // every expiry; a signing subkey's binding is passed over.
-                                runCardPrimaryEdit<org.bouncycastle.openpgp.PGPPublicKeyRing>(
-                                    pin = pass.orEmpty(),
-                                    onStarted = { viewModel.onCardRefreshStarted() },
-                                    onFailure = { viewModel.onCardRefreshFailure(it) },
-                                    onDone = { viewModel.onCardRefreshed(it) }
-                                ) { signer, pub, _ ->
-                                    KeyExpirationService.shared.setExpirationWith(
-                                        signer, pub, null, null, KeyExpirationService.Target.Refresh
-                                    ).publicRing
-                                }
-                            } else {
-                                viewModel.applyRefreshSigs(pass)
-                            }
-                        }
-                    },
+                    onClick = submitRefresh,
                     enabled = !state.refreshSigsInFlight && (!state.cardPrimaryEdits || refreshPass.isNotEmpty())
                 ) { Text(stringResource(R.string.key_detail_refresh_sigs_action)) }
             },
@@ -1064,6 +1087,8 @@ fun KeyDetailScreen(
             errorMessage = state.expiryError,
             subkeyLabel = expirySubkey?.keyId,
             offerCurrentSubkeys = state.subkeys.any { !it.isRevoked && (it.expiresAt == null || it.expiresAt > nowMs) },
+            // 4.8.0 RC8 (#86): focus the passphrase field only when there is a passphrase.
+            passphraseProtected = state.privateKeyIsProtected,
             onApplySoftware = { expiresAt, passphrase, alsoSubkeys ->
                 pendingExpiry = PendingExpiryChange(expiresAt, alsoSubkeys) {
                     viewModel.applyExpirationSoftware(expiresAt, passphrase, alsoSubkeys)
@@ -1293,7 +1318,11 @@ fun KeyDetailScreen(
             },
             confirmButton = {
                 Row {
-                    if (state.key?.trustLevel != com.pgpony.android.data.TrustLevel.VERIFIED) {
+                    // 4.8.0 RC8 (#115): no button when the certification just made
+                    // already shows the key as Verified; tapping it would lock in a
+                    // manual level that outlives withdrawing the certification.
+                    val certifiedNow = state.key?.let { com.pgpony.android.data.CertifiedTrust.verificationFor(it) } != null
+                    if (state.key?.trustLevel != com.pgpony.android.data.TrustLevel.VERIFIED && !certifiedNow) {
                         TextButton(onClick = { viewModel.markVerifiedAfterCertify() }) {
                             Text(stringResource(R.string.certify_done_mark_verified))
                         }
@@ -1321,6 +1350,42 @@ fun KeyDetailScreen(
         val onCard = !local && row.issuer?.let { it.isCardBacked && !it.isKeyPair } == true
         val revokePairFirst = stringResource(R.string.card_sign_pair_first)
         val revokeNoLink = stringResource(R.string.card_scan_nfc_unavailable)
+        // 4.8.0 RC8 (#86): Withdraw, shared by its button and the keyboard's Done key.
+        val submitCertRevoke: () -> Unit = {
+            val issuer = row.issuer
+            val target = state.key
+            if (onCard && issuer != null && target != null) {
+                val pin = certRevokePass.toByteArray(Charsets.UTF_8)
+                viewModel.onCardRevokeStarted()
+                val started = activity?.startCardOperation({ session ->
+                    session.select()
+                    val ard = session.getApplicationRelatedData()
+                    val repo = PGPonyApp.instance.keyRepository
+                    val certifierRing = repo.loadPublicKeyRing(issuer.fingerprint)
+                        ?: throw OpenPgpCardException.Malformed(revokePairFirst)
+                    val targetRing = repo.loadPublicKeyRing(target.fingerprint)
+                        ?: throw OpenPgpCardException.Malformed(revokePairFirst)
+                    com.pgpony.android.crypto.CertificationService.revokeOnCard(
+                        session, ard.sigFingerprint, pin, certifierRing, targetRing, row.certification.userId
+                    )
+                }) { result ->
+                    activity.stopCardScan()
+                    java.util.Arrays.fill(pin, 0)
+                    result
+                        .onSuccess { made -> viewModel.onCardRevoked(issuer.fingerprint, made) }
+                        .onFailure { e -> viewModel.onCardRevokeFailure(e) }
+                }
+                if (started != true) {
+                    java.util.Arrays.fill(pin, 0)
+                    viewModel.onCardRevokeFailure(IllegalStateException(revokeNoLink))
+                }
+            } else {
+                // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
+                val entered = certRevokePass
+                certRevokePass = ""
+                viewModel.confirmRevokeCertification(entered.ifBlank { null })
+            }
+        }
         AlertDialog(
             onDismissRequest = { if (!state.certRevokeInFlight) viewModel.dismissRevokeCertification() },
             title = { Text(stringResource(R.string.key_detail_cert_revoke_title)) },
@@ -1333,6 +1398,8 @@ fun KeyDetailScreen(
                         )
                     )
                     if (!local) {
+                        // 4.8.0 RC8 (#86): focus and keyboard when the dialog appears.
+                        val certRevokeFocus = rememberProviderAutoFocus()
                         OutlinedTextField(
                             value = certRevokePass,
                             onValueChange = { certRevokePass = it },
@@ -1347,9 +1414,17 @@ fun KeyDetailScreen(
                             // 4.8.0 (item 4d): show or hide for a passphrase only, never a card PIN.
                             visualTransformation = if (certRevokeShown && !onCard) VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
                             trailingIcon = if (onCard) null else ({ PassphraseVisibilityToggle(certRevokeShown) { certRevokeShown = !certRevokeShown } }),
+                            // 4.8.0 RC8 (#86): Done withdraws once something is typed.
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                                imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                            ),
+                            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = {
+                                if (!state.certRevokeInFlight && certRevokePass.isNotEmpty()) submitCertRevoke()
+                            }),
                             singleLine = true,
                             enabled = !state.certRevokeInFlight,
-                            modifier = Modifier.keepsKeyboard()
+                            modifier = Modifier.keepsKeyboard().focusRequester(certRevokeFocus)
                         )
                         if (onCard) {
                             Text(
@@ -1366,41 +1441,7 @@ fun KeyDetailScreen(
             },
             confirmButton = {
                 TextButton(
-                    onClick = {
-                        val issuer = row.issuer
-                        val target = state.key
-                        if (onCard && issuer != null && target != null) {
-                            val pin = certRevokePass.toByteArray(Charsets.UTF_8)
-                            viewModel.onCardRevokeStarted()
-                            val started = activity?.startCardOperation({ session ->
-                                session.select()
-                                val ard = session.getApplicationRelatedData()
-                                val repo = PGPonyApp.instance.keyRepository
-                                val certifierRing = repo.loadPublicKeyRing(issuer.fingerprint)
-                                    ?: throw OpenPgpCardException.Malformed(revokePairFirst)
-                                val targetRing = repo.loadPublicKeyRing(target.fingerprint)
-                                    ?: throw OpenPgpCardException.Malformed(revokePairFirst)
-                                com.pgpony.android.crypto.CertificationService.revokeOnCard(
-                                    session, ard.sigFingerprint, pin, certifierRing, targetRing, row.certification.userId
-                                )
-                            }) { result ->
-                                activity.stopCardScan()
-                                java.util.Arrays.fill(pin, 0)
-                                result
-                                    .onSuccess { made -> viewModel.onCardRevoked(issuer.fingerprint, made) }
-                                    .onFailure { e -> viewModel.onCardRevokeFailure(e) }
-                            }
-                            if (started != true) {
-                                java.util.Arrays.fill(pin, 0)
-                                viewModel.onCardRevokeFailure(IllegalStateException(revokeNoLink))
-                            }
-                        } else {
-                            // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
-                            val entered = certRevokePass
-                            certRevokePass = ""
-                            viewModel.confirmRevokeCertification(entered.ifBlank { null })
-                        }
-                    },
+                    onClick = submitCertRevoke,
                     enabled = !state.certRevokeInFlight && (!onCard || certRevokePass.isNotEmpty())
                 ) {
                     Text(stringResource(R.string.key_detail_userids_revoke), color = MaterialTheme.colorScheme.error)
@@ -1606,6 +1647,13 @@ fun KeyDetailScreen(
     if (state.showRecoveryDialog) {
         val recoveryPass = remember { mutableStateOf("") }
         var recoveryShown by remember { mutableStateOf(false) }
+        // 4.8.0 RC8 (#86): Restore, shared by its button and the keyboard's Done key.
+        val submitRecovery: () -> Unit = {
+            // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
+            val entered = recoveryPass.value
+            recoveryPass.value = ""
+            viewModel.submitRecovery(entered)
+        }
         AlertDialog(
             onDismissRequest = { if (!state.isRecovering) viewModel.dismissRecoveryDialog() },
             title = { Text(stringResource(R.string.key_detail_recovery_title)) },
@@ -1613,6 +1661,9 @@ fun KeyDetailScreen(
                 Column {
                     Text(stringResource(R.string.key_detail_recovery_body))
                     Spacer(Modifier.height(12.dp))
+                    // 4.8.0 RC8 (#86): focus and keyboard when the dialog appears,
+                    // and Done restores once something is typed.
+                    val recoveryFocus = rememberProviderAutoFocus()
                     OutlinedTextField(
                         value = recoveryPass.value,
                         onValueChange = { recoveryPass.value = it },
@@ -1620,7 +1671,14 @@ fun KeyDetailScreen(
                         visualTransformation = if (recoveryShown) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = { PassphraseVisibilityToggle(recoveryShown) { recoveryShown = !recoveryShown } },
                         label = { Text(stringResource(R.string.encrypt_passphrase_label)) },
-                        modifier = Modifier.keepsKeyboard()
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Done
+                        ),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = {
+                            if (recoveryPass.value.isNotEmpty() && !state.isRecovering) submitRecovery()
+                        }),
+                        modifier = Modifier.keepsKeyboard().focusRequester(recoveryFocus)
                     )
                     state.recoveryError?.let {
                         Spacer(Modifier.height(8.dp))
@@ -1631,12 +1689,7 @@ fun KeyDetailScreen(
             confirmButton = {
                 TextButton(
                     enabled = recoveryPass.value.isNotEmpty() && !state.isRecovering,
-                    onClick = {
-                        // 4.8.0 (item 4d): the passphrase is used once; a retry starts empty.
-                        val entered = recoveryPass.value
-                        recoveryPass.value = ""
-                        viewModel.submitRecovery(entered)
-                    }
+                    onClick = submitRecovery
                 ) {
                     Text(
                         if (state.isRecovering) stringResource(R.string.key_detail_recovery_restoring)
@@ -1726,6 +1779,9 @@ fun KeyDetailScreen(
                 Column {
                     Text(stringResource(R.string.key_detail_export_private_passphrase_body))
                     Spacer(Modifier.height(12.dp))
+                    // 4.8.0 RC8 (#86): the field takes focus and the keyboard opens
+                    // when the dialog appears; Done already continued.
+                    val exportFocus = rememberProviderAutoFocus()
                     OutlinedTextField(
                         value = exportPass.value,
                         onValueChange = { exportPass.value = it },
@@ -1739,10 +1795,10 @@ fun KeyDetailScreen(
                             imeAction = androidx.compose.ui.text.input.ImeAction.Done
                         ),
                         keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                            onDone = { if (exportPass.value.isNotEmpty()) submitExportPass() }
+                            onDone = { if (exportPass.value.isNotEmpty() && !state.exportPassphraseChecking) submitExportPass() }
                         ),
                         isError = state.exportPassphraseWrong,
-                        modifier = Modifier.keepsKeyboard()
+                        modifier = Modifier.keepsKeyboard().focusRequester(exportFocus)
                     )
                     if (state.exportPassphraseWrong) {
                         Spacer(Modifier.height(8.dp))
@@ -2378,6 +2434,11 @@ private fun LoadedBody(
                 key = key,
                 onComingSoon = onComingSoon
             )
+        }
+        // 4.8.0 RC8 (item 4n): the recipient groups this key is in, with add
+        // and remove. Self-contained (its own view model), for any key.
+        item(key = "groups") {
+            com.pgpony.android.ui.groups.KeyGroupsItem(fingerprint = key.fingerprint)
         }
         // §5.6.2 (#36): QR, Actions, and Danger Zone moved to the top-bar
         // overflow menu; Share Public Key moved into the fingerprint card.

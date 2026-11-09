@@ -20,6 +20,14 @@ class QrFrameStoreTest {
         assertNull(QrFrameStore.create("a".repeat(32_001)))
     }
 
+    // 4.8.0 RC8 (#100): Long QR codes holds a 512-part sequence; the default stays at 32.
+    @Test fun longCodesFactoryHoldsUpTo512Parts() {
+        val text = "a".repeat(QrChunking.MAX_TEXT_CHARS_LONG)
+        assertNull(QrFrameStore.create(text))
+        assertEquals(512, QrFrameStore.create(text, QrEncodingPolicy.BASELINE, QrChunking.MAX_FRAMES_LONG)!!.frameCount)
+        assertNull(QrFrameStore.create(text + "a", QrEncodingPolicy.BASELINE, QrChunking.MAX_FRAMES_LONG))
+    }
+
     // 4.8.0 RC6 (#95): Larger dots never makes a single code denser.
     @Test fun singleCodeAlwaysUsesBaselineWhateverThePolicy() {
         val text = "a".repeat(1_200)
@@ -34,7 +42,8 @@ class QrFrameStoreTest {
     }
 
     @Test fun genericFrameBoundsFailBeforeExpensiveEncoding() {
-        for (frames in listOf(emptyList(), List(257) { "a" }, listOf("a".repeat(4_097)))) {
+        // 4.8.0 RC8 (#100): the frame ceiling is 512 now (Long QR codes), so 513 is the first rejected count.
+        for (frames in listOf(emptyList(), List(513) { "a" }, listOf("a".repeat(4_097)))) {
             try {
                 QrFrameStore.fromFrames(frames)
                 fail("invalid frame collection must be rejected")

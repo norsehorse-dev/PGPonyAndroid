@@ -449,12 +449,16 @@ interface PGPKeyDao {
 // (FallbackKeyEntity.kt), MIGRATION_7_8 in data/RoomMigrations.kt.
 // 4.8.0 (item 4c): schema v13 adds the unique fingerprint index on pgp_keys,
 // MIGRATION_12_13.
+// 4.8.0 RC8 (item 4n): schema v14 adds the recipient group tables
+// (data/groups/RecipientGroupEntity.kt), MIGRATION_13_14.
 @Database(
     entities = [
         PGPKeyEntity::class, ApiClientEntity::class, AutocryptPeerEntity::class,
-        FallbackKeyEntity::class, SigningDefaultsEntity::class
+        FallbackKeyEntity::class, SigningDefaultsEntity::class,
+        com.pgpony.android.data.groups.RecipientGroupEntity::class,
+        com.pgpony.android.data.groups.RecipientGroupMemberEntity::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 @TypeConverters(
@@ -468,4 +472,6 @@ abstract class PGPDatabase : RoomDatabase() {
     abstract fun autocryptPeerDao(): AutocryptPeerDao
     abstract fun fallbackKeyDao(): FallbackKeyDao
     abstract fun signingDefaultsDao(): SigningDefaultsDao
+    // 4.8.0 RC8 (item 4n)
+    abstract fun recipientGroupDao(): com.pgpony.android.data.groups.RecipientGroupDao
 }

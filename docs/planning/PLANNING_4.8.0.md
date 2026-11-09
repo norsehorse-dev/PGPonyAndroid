@@ -476,6 +476,25 @@ groups from the sync (PLANNING_DESKTOP_4_0_0.md section 6), so groups are built 
 Desktop takes the data layer and the backup and pairing format from the sync and builds its own screens and the
 `pgpony encrypt -r @name` form. iOS mirrors it when it takes 4.8.0.
 
+Done in RC8: data/groups holds the data layer, with no Compose in it: RecipientGroupEntity (tables
+recipient_groups and recipient_group_members, members by primary fingerprint in lowercase hex), its DAO,
+RecipientGroupStore, and RecipientGroups for the rules (the picker's order, names trimmed, at most 64 characters
+and unique ignoring case, what a pick adds and leaves out, the merge by name). Schema v14 with MIGRATION_13_14,
+whose SQL sits in RecipientGroupSchema (exportSchema stays false, and the project has no Room migration test, so a
+JVM test pins the SQL). The Encrypt picker and the share target's picker list your own keys first, then everyone
+else A to Z. The picker sheet lists groups above the keys, search matches their names, and Save as group turns
+the selection into one; picking a group adds its usable keys as chips and names the ones left out (revoked,
+expired, a security key without its certificate, in Recently Deleted). Don't use keys are added, since the picker
+offers them and encrypting asks first. Keyring > More > Groups (a pushed "groups" page, like Recently Deleted)
+creates, renames, edits the keys of and deletes groups; Key Details has a Groups section with add, remove and a
+new group holding the key. A key in Recently Deleted stays a member and is shown as such; a key deleted for good
+(purge, the automatic purge, Empty, Clear All Data) leaves every group in KeyRepository. The full backup, and so
+the full-backup pairing transfer, carries an additive recipient-groups.json entry (formatVersion 1, name,
+createdAt, members), with only members whose key is in the backup; a restore merges by name after the keys are in,
+keeps only members whose key is on the device, and reports groups added and groups with new keys. 4.7.x reads
+only keys/*.asc and its two JSON files, so it skips the entry. Strings are in values/ only; the other locales
+follow with 4f in RC9.
+
 
 ## 4o. Three follow-ups from #78, #88 and #90 (Nov 5)
 
@@ -542,6 +561,128 @@ path: the same card with its slots at Ed25519/Cv25519, move the RSA key (the att
 
 Done in RC5. Desktop mirrors it (done separately), along with its Read card treating 6A83 like 6A88 on the optional
 reads.
+
+
+## 4r. Done after a backup goes back to the choice (#113)
+
+Origin: #113 (Nov 7). After a backup is saved, the Backup screen's Done button closed the screen and went to Settings,
+while the X in its app bar went back to the choice between Back up and Restore. Restore had the same mismatch: Done on
+the restore report closed the screen, the X went back to the choice.
+
+The work: Done on both the backup-saved and the restore-report screens resets to the choice (BackupViewModel.reset),
+the same as the X. A restore's pending settings question is dropped by Done as it already was by the X. No new strings.
+
+Done in RC8.
+
+
+## 4s. The passphrase keyboard in Key Details (#86 follow-up)
+
+Origin: #86 (Nov 7). After RC4's hash choice, the tester found that the passphrase field in Refresh self-signatures
+did not take focus, so the keyboard (which shows its privacy mode on password fields) never came up, and that the
+keyboard's action key did not run Refresh. The expiry change asks for the passphrase in its sheet, before the
+confirmation with the hash choice, and had the same gap.
+
+The work: each passphrase or PIN field below takes focus and opens the keyboard when its dialog or sheet appears
+(rememberProviderAutoFocus, the #59 helper, called inside the dialog or sheet so it reaches that window's keyboard),
+and the keyboard's Done key runs the confirm action once something is typed and nothing is in flight:
+- Refresh self-signatures (the passphrase field and the card PIN field).
+- Edit expiration sheet (passphrase and card PIN). Done there opens the confirmation dialog, as Save does; nothing is
+  signed before it and the screen lock step.
+- User ID action sheet (revoke a User ID, make it primary; Remove has no field).
+- Withdraw a certification (passphrase or card PIN).
+- Restore key access, after the device reset the key's secure storage.
+- The passphrase before a private key export (Done already worked there; focus added).
+Left as they are: Add User ID, Add subkey, Edit notations, Change passphrase, Certify, Revoke key, Move to security
+key and Delete key, where the passphrase is one field in a longer form (focusing it would skip the fields above it,
+and Done on Revoke key would revoke without a look at the reason). No new strings.
+
+Done in RC8.
+
+
+## 4t. Missing QR parts, the parts a large key needs, and Long QR codes (#100 follow-up)
+
+Origin: #100 (Nov 7). The tester scanned a 32-part code after RC6, but sat at 31 of 32 with no way to tell which part
+was missing. He asked how many parts a key too large for a QR code would need, and for a much longer slideshow as an
+option, switching between the normal limit and 512.
+
+The work:
+- Scanner: while a PGPONY1 code is collected, a strip of one cell per part (solid when received, faint while
+  missing) shows under the progress line, 32 per row for a normal code and 64 per row for a long one, so 512 parts
+  make an 8-row block. Once eight or fewer parts are left their numbers are listed ("Still missing parts 3, 17.").
+  PGPONY2 completes from any of its parts, so it shows only its count, as before (QrMissingParts, Collector.missing).
+- Too large: Show Key and Key Details say how many parts the key would need at the current limit, and point to Long
+  QR codes when turning it on would fit the key (QrPartLimit.tooLarge, QrChunking.partsNeeded).
+- Settings, Sharing: Long QR codes, off by default, raises the sender's limit from 32 to 512 parts. A key that fits in
+  32 parts is split exactly as before with it on, so iOS and Desktop, which stop at 32, still read every normal code.
+  The receiver always accepts up to 512 parts (QrChunking.parse), and its retained-text bound grows with the declared
+  part count (max of 32,000 and 1,000 per part). seq and total are plain decimals with no fixed width; the frame
+  store holds 512 frames. PGPONY2 keeps its own 160-shard ceiling and is not sent by the app.
+- Tests: 512-part round trips (plain and through PublicKeyQrCollector), the 512 cap and the 32 default, codes that fit
+  in 32 unchanged by the setting for every profile, 513 refused on parse, the retained bound, missing parts, the strip
+  layout and the too-large numbers (QrChunkingTest, QrPartLimitTest, QrFrameStoreTest).
+
+Done in RC8. iOS and Desktop can take the receiver side (accept up to 512) when they next touch QR.
+
+
+## 4u. NIST curves for key generation (#109 follow-up)
+
+Origin: #109 (Nov 7). The tester confirmed RC4's brainpool and secp256k1 keys work in the provisioning app, and noticed
+that a P-384 key imported fine but NIST curves could not be generated.
+
+The work: NIST P-256, P-384 and P-521 join the Advanced group the same way as 4l: v4, an ECDSA primary with an ECDH
+subkey on the same curve, KDF SHA-256/AES-128, SHA-384/AES-192 and SHA-512/AES-256, self-signatures with the
+matching hash (EcdsaKeygen, KeyAlgorithm.generatableEcdsa, PGPCryptoService). They come first in the ECDSA chips. The
+existing ECDSA_NIST_* entries, labels and card handling are reused. EcdsaCurveKeygenTest covers the seven curves
+(shape, labels, encrypt and decrypt, encrypt and sign, cleartext and detached signatures, export, the hash floor and a
+later User ID). No new strings: the 4l caption applies.
+
+Done in RC8. The gpg 2.4 / 2.5 checks from 4l cover these curves too.
+
+
+## 4v. The commit hash on About (#114)
+
+Origin: #114 (Nov 7). A tester asked for a way to tell which RC is installed, with a hash that stays static and does
+not break the reproducible build checks.
+
+The work: app/build.gradle.kts reads HEAD with `git rev-parse --verify HEAD` (providers.exec, configuration-cache
+safe) into BuildConfig.GIT_COMMIT, empty without git, with no dirty marker. Settings > About shows the version with
+the short hash ("4.8.0 (1a2b3c4)"), and the feedback email carries the same. Two clean clones of a tag and F-Droid's
+checkout resolve the same HEAD, so the APK stays reproducible; the playbook says so in 4.2. BuildCommitTest covers
+the short form and the fallback.
+
+Done in RC8.
+
+
+## 4w. Keys certified by your own Ultimate key show as Verified (#115)
+
+Origin: #115 (Nov 7). A tester imported his public keys from GitHub. His old key carries a certification by his own
+key pair, which is on the phone at Ultimate, and it still showed as Unverified. gpg shows such a key as fully valid.
+
+Found: no code turned a certification into trust. The stored level is set by the user, by key generation (Ultimate)
+and by import (Unknown, key pairs included). Certifications were only listed in Key Details, and certifying a key in
+PGPony offers a manual Mark as Verified. The 4.7.0 item 27 note that a weak User ID never counts toward Verified had
+no computation behind it.
+
+The work: an effective trust, derived and never stored, kept per User ID. A key that is not yours, stored at
+Unknown, shows Verified while the User ID it is shown under (bound now by a verified, unrevoked, not weak-only
+self-signature) carries a certification (0x10 to 0x13) by the primary of one of your keys that is at Ultimate,
+unrevoked and unexpired. The certification must verify, have a creation time that is not in the future or before the
+certifier, be unexpired, use SHA-2 or SHA-3, carry no unknown critical subpacket, and not be withdrawn by a later 0x30
+from the same certifier. A User ID the certification does not cover is not raised, so a User ID added later by the
+key's owner does not borrow it; the provider's confirmed answers (Autocrypt status, the signature result) need a
+certified User ID with the address asked about. Unverified, Don't use, a Verified or Ultimate the user set, and your
+own keys are never changed. An imported key pair stays at Unknown until the user sets it to Ultimate, as in gpg.
+crypto/TrustFromCertification holds the rule; data/CertifiedTrust caches the answers per key, keyed on the key's
+stored files (seen by both the app and the provider process) and the set of Ultimate keys, and each answer runs until
+the earliest expiry of its certification, certifier or key. The Keyring list refreshes in the background; Key
+Details, the decrypt banner and the provider check the keys they show first, and card lookups skip the check. The
+Keyring, Contacts, the provider's recipient review, the provider's signature result and the decrypt banner use the
+effective level; Key Details shows it with a line naming the certifying key, and the User IDs it covers when not all
+are. Mark as Verified after certifying is hidden when the certification already makes the key Verified. Backup,
+deduplication and the trust picker keep the stored level. TrustFromCertificationTest covers the rule, including a
+User ID added after the certification.
+
+Done in RC8.
 
 
 ## 5. Contributor PRs waiting on a decision
@@ -663,6 +804,13 @@ RC6: #95 whole, with #100's slower playback.
 RC7: item 1, SSH with ML-DSA-44 + Ed25519, after the OkcAgent, okc-agents and OpenSSH 10.4 checks in the item.
 
 RC8: 4n, recipient groups and the picker's order (added Nov 4).
+- 4r (#113, added Nov 7): Done after a backup or restore goes back to the choice.
+- 4s (#86, added Nov 7): the passphrase fields in Key Details take focus, and Done confirms.
+- 4t (#100, added Nov 7): missing QR parts on the scanner, the parts a large key needs, and Long QR codes.
+- 4u (#109, added Nov 7): NIST P-256, P-384 and P-521 key generation.
+- 4v (#114, added Nov 7): the commit hash on About.
+- 4w (#115, added Nov 7): keys certified by your own Ultimate key show as Verified.
+- Also (Nov 9, owner request): TapPony and HashPony in Settings, More from NorseHorse, with the subtitles PGPony Desktop already ships.
 
 RC9: 4f, Polish. Last, so the translation covers the final values/ in one pass, item 1's and 4n's strings included.
 

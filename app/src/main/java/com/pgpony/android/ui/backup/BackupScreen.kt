@@ -155,12 +155,17 @@ fun BackupScreen(
                         warning = if (state.sshSkipped > 0) {
                             pluralStringResource(R.plurals.ssh_backup_skipped, state.sshSkipped, state.sshSkipped)
                         } else null,
-                        onDone = onDismiss
+                        // 4.8.0 RC8 (#113): Done returns to the backup or
+                        // restore choice, as the X in the app bar does. It
+                        // used to close the whole screen.
+                        onDone = vm::reset
                     )
 
                     BackupViewModel.Phase.RestoreDone -> RestoreReportBody(
                         report = state.report,
-                        onDone = onDismiss,
+                        // 4.8.0 RC8 (#113): same as after a backup, Done and
+                        // the X both go back to the choice.
+                        onDone = vm::reset,
                         onApplySettings = { vm.applyRestoredSettings() },
                         onSkipSettings = { vm.skipRestoredSettings() }
                     )
@@ -331,6 +336,14 @@ private fun RestoreReportBody(
         // already held and ones that could not be read join the shared lines.
         if (report.sshAdded.isNotEmpty()) {
             ReportLine(stringResource(R.string.restore_ssh_added), report.sshAdded.size, Color(0xFF22C55E))
+        }
+        // 4.8.0 RC8 (item 4n): recipient groups, merged by name. A group the
+        // backup matched without adding anyone gets no line.
+        if (report.groupsAdded.isNotEmpty()) {
+            ReportLine(stringResource(R.string.restore_groups_added), report.groupsAdded.size, Color(0xFF22C55E))
+        }
+        if (report.groupsMerged.isNotEmpty()) {
+            ReportLine(stringResource(R.string.restore_groups_merged), report.groupsMerged.size, Color(0xFF3B82F6))
         }
         ReportLine(
             stringResource(R.string.restore_unchanged),

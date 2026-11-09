@@ -1260,11 +1260,11 @@ class PGPonyOpenPgpService : Service() {
                     anyMissing = true
                     allConfirmed = false
                 } else {
-                    if (!matches.all {
-                            it.trustLevel == com.pgpony.android.data.TrustLevel.VERIFIED ||
-                                it.trustLevel == com.pgpony.android.data.TrustLevel.ULTIMATE
-                        }
-                    ) {
+                    // 4.8.0 RC8 (#115): a key your own Ultimate key certified is
+                    // confirmed for this address only through a certified User ID
+                    // carrying it. Checked now for just these keys.
+                    repo.ensureCertifiedTrust(matches.map { it.fingerprint })
+                    if (!matches.all { com.pgpony.android.data.CertifiedTrust.isConfirmedFor(it, email) }) {
                         allConfirmed = false
                     }
                     val rec = autocryptStore.recommendation(email)
@@ -1868,6 +1868,24 @@ class PGPonyOpenPgpService : Service() {
                 keyIdRaw, null
             )
         }
+        // 4.8.0 RC8 (#115): a key your own Ultimate key certified counts as
+        // confirmed only through a certified User ID with the sender's
+        // address (or, with no sender address, the User ID shown for it).
+        // Checked now for this key: this process may not have refreshed yet.
+        if (com.pgpony.android.crypto.TrustFromCertification.canRaise(entity.trustLevel, entity.isOwnKey)) {
+            runBlocking { repo.ensureCertifiedTrust(listOf(entity.fingerprint)) }
+        }
+        val ringUserIds: List<String> =
+            runCatching {
+                repo.loadPublicKeyRing(entity.fingerprint)
+                    ?.publicKey?.userIDs?.asSequence()?.toList()
+            }.getOrNull() ?: listOf(entity.userID)
+        // 4.8.0 RC8 (#115): which User IDs the result may call confirmed. For
+        // a level the user set to Verified or Ultimate, all of them as before;
+        // through a certification, only the certified ones, with the one for
+        // the sender's address as primary. Null means not confirmed, so the
+        // status and the User IDs reported can never disagree.
+        val confirmation = com.pgpony.android.data.CertifiedTrust.confirmationFor(entity, ringUserIds, senderAddress)
         // Revocation / expiry override validity, matching the reference
         // provider's semantics (and PGPony's own banner rules).
         val status = forcedStatus ?: when {
@@ -1875,8 +1893,7 @@ class PGPonyOpenPgpService : Service() {
                 OpenPgpSignatureResult.RESULT_INVALID_KEY_REVOKED
             entity.isExpired ->
                 OpenPgpSignatureResult.RESULT_INVALID_KEY_EXPIRED
-            entity.trustLevel == com.pgpony.android.data.TrustLevel.VERIFIED ||
-                entity.trustLevel == com.pgpony.android.data.TrustLevel.ULTIMATE ->
+            confirmation != null ->
                 OpenPgpSignatureResult.RESULT_VALID_KEY_CONFIRMED
             else ->
                 OpenPgpSignatureResult.RESULT_VALID_KEY_UNCONFIRMED
@@ -1892,12 +1909,7 @@ class PGPonyOpenPgpService : Service() {
         // state; match+unconfirmed → unverified; NO match → the
         // sender-mismatch warning (the "signed by someone other than
         // the sender" spoof signal); no sender supplied → UNKNOWN
-        // (treated as unverified).
-        val ringUserIds: List<String> =
-            runCatching {
-                repo.loadPublicKeyRing(entity.fingerprint)
-                    ?.publicKey?.userIDs?.asSequence()?.toList()
-            }.getOrNull() ?: listOf(entity.userID)
+        // (treated as unverified). ringUserIds is read above.
         val senderEmail = senderAddress
             ?.substringAfterLast('<')?.substringBefore('>')?.trim()
             ?.ifEmpty { senderAddress.trim() }
@@ -1919,10 +1931,11 @@ class PGPonyOpenPgpService : Service() {
 
         return OpenPgpSignatureResult.createWithValidSignature(
             status,
-            entity.userID,
+            // 4.8.0 RC8 (#115): see confirmation above.
+            if (confirmed && confirmation != null) confirmation.primaryUserId else entity.userID,
             keyIdRaw,
             ringUserIds,
-            if (confirmed) ringUserIds else emptyList(),
+            if (confirmed && confirmation != null) confirmation.confirmedUserIds else emptyList(),
             senderStatus,
             null
         )

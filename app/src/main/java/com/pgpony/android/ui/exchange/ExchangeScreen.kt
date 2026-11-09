@@ -199,6 +199,26 @@ private fun ShowKeySection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
                 )
+                // 4.8.0 RC8 (#100): how many parts it would need, and the setting
+                // when turning it on would fit the key.
+                state.qrTooLargeInfo?.let { info ->
+                    Text(
+                        androidx.compose.ui.res.pluralStringResource(
+                            R.plurals.qr_too_large_parts, info.partsNeeded, info.partsNeeded, info.limit
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (info.longCodesWouldFit) {
+                        Text(
+                            stringResource(R.string.qr_too_large_long_hint, com.pgpony.android.qr.QrChunking.MAX_FRAMES_LONG),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp)
+                        )
+                    }
+                }
             } else if (state.selectedKey != null) {
                 com.pgpony.android.ui.components.PublicKeyQrDisplay(
                     store = state.qrStore, policy = state.qrPolicy,

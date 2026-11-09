@@ -190,8 +190,9 @@ fun KeyCard(
                 }
             }
 
-            // Trust indicator
-            TrustBadge(key.trustLevel)
+            // Trust indicator. 4.8.0 RC8 (#115): the shown level, which counts
+            // a certification by one of your own Ultimate keys.
+            TrustBadge(com.pgpony.android.data.CertifiedTrust.effective(key))
 
             // Optional trailing slot (e.g. drag handle in manual sort mode)
             if (trailing != null) {

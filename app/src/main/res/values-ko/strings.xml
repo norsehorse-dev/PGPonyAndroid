@@ -192,6 +192,8 @@
     <string name="settings_more_relaypony_subtitle">암호화된 파일 전송, 폰 대 폰</string>
     <string name="settings_more_scrubpony_title" translatable="false">ScrubPony</string>
     <string name="settings_more_scrubpony_subtitle">이미지에서 신원 메타데이터를 제거합니다. 픽셀은 그대로입니다.</string>
+    <string name="settings_more_tappony_subtitle">NFC 태그를 탭해 태그의 ID와 내용을 내 서버로 보냅니다. 계정도 클라우드도 없습니다.</string>
+    <string name="settings_more_hashpony_subtitle">sha256sum처럼 파일을 해시하고 검증합니다. 체크섬 파일, 폴더 검사, 널리 쓰이는 모든 알고리즘을 지원합니다.</string>
     <string name="settings_more_source_title">오픈 소스 엔진</string>
     <string name="settings_more_source_subtitle">GitHub의 PGPonyCore, 감사받은 암호 코어</string>
     <string name="settings_more_appsource_title">소스 코드</string>
@@ -3173,4 +3175,66 @@
     <plurals name="ssh_backup_skipped">
         <item quantity="other">SSH 키 %1$d개를 읽을 수 없어 이 백업에 포함되지 않았습니다.</item>
     </plurals>
+    <!-- 4.8.0 RC8 (#115) -->
+    <string name="key_detail_trust_certified_by">내 키 %1$s에 의해 검증됨</string>
+    <string name="key_detail_trust_certified_by_uids">내 키 %1$s에 의해 검증됨: %2$s</string>
+    <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
+    <string name="groups_title">그룹</string>
+    <string name="groups_new">새 그룹</string>
+    <string name="groups_empty">아직 그룹이 없습니다. 그룹은 이름을 붙인 키 묶음으로, 암호화 탭에서 한 번에 받는 사람으로 추가할 수 있습니다.</string>
+    <string name="groups_load_failed">그룹을 읽을 수 없습니다.</string>
+    <string name="groups_error_save">그룹 변경 사항을 저장할 수 없습니다.</string>
+    <plurals name="groups_member_count">
+        <item quantity="other">키 %1$d개</item>
+    </plurals>
+    <plurals name="groups_member_deleted_count">
+        <item quantity="other">최근 삭제됨에 %1$d개</item>
+    </plurals>
+    <string name="groups_name_label">그룹 이름</string>
+    <string name="groups_name_blank">이름을 입력하세요.</string>
+    <string name="groups_name_too_long">%1$d 자 이하로 입력하세요.</string>
+    <string name="groups_name_taken">같은 이름의 그룹이 이미 있습니다.</string>
+    <string name="groups_rename">이름 바꾸기</string>
+    <string name="groups_rename_title">그룹 이름 바꾸기</string>
+    <string name="groups_edit_keys">키 편집</string>
+    <string name="groups_edit_keys_title">%1$s의 키</string>
+    <string name="groups_editor_no_keys">키링에 아직 키가 없습니다.</string>
+    <string name="groups_delete_title">이 그룹을 삭제할까요?</string>
+    <string name="groups_delete_body">%1$s 그룹이 삭제됩니다. 그룹에 있던 키는 키링에 그대로 남습니다.</string>
+    <string name="groups_keys_heading">키</string>
+    <string name="groups_save_as_group">그룹으로 저장</string>
+    <plurals name="groups_pick_added">
+        <item quantity="other">%2$s에서 키 %1$d개를 추가했습니다.</item>
+    </plurals>
+    <string name="groups_pick_none">%1$s에는 지금 사용할 수 있는 키가 없습니다.</string>
+    <string name="groups_pick_left_out">제외됨: %1$s</string>
+    <string name="groups_left_out_revoked">%1$s (철회됨)</string>
+    <string name="groups_left_out_expired">%1$s (만료됨)</string>
+    <string name="groups_left_out_no_certificate">%1$s (아직 공개 키 없음)</string>
+    <string name="groups_left_out_deleted">%1$s (최근 삭제됨에 있음)</string>
+    <string name="groups_left_out_missing">%1$s (키링에 없음)</string>
+    <string name="groups_status_revoked">철회됨</string>
+    <string name="groups_status_expired">만료됨</string>
+    <string name="groups_status_no_certificate">아직 공개 키 없음</string>
+    <string name="groups_status_deleted">최근 삭제됨에 있음</string>
+    <string name="groups_status_missing">키링에 없음</string>
+    <string name="key_detail_section_groups">그룹</string>
+    <string name="key_detail_groups_none">이 키는 어느 그룹에도 속해 있지 않습니다.</string>
+    <string name="key_detail_groups_add">그룹에 추가</string>
+    <string name="key_detail_groups_new">이 키로 새 그룹 만들기</string>
+    <string name="key_detail_groups_remove_cd">%1$s에서 제거</string>
+    <string name="restore_groups_added">그룹이 추가되었습니다</string>
+    <string name="restore_groups_merged">새 키가 추가된 그룹</string>
+    <!-- 4.8.0 RC8 (#100) -->
+    <plurals name="qr_scan_missing_parts">
+        <item quantity="other">아직 스캔하지 못한 부분: %1$s</item>
+    </plurals>
+    <plurals name="qr_too_large_parts">
+        <item quantity="other">이 키를 QR 코드로 만들려면 %1$d 부가 필요합니다. 한도는 %2$d 부입니다.</item>
+    </plurals>
+    <string name="qr_too_large_long_hint">설정에서 ‘긴 QR 코드’를 켜면 최대 %1$d 부로 표시할 수 있습니다. 이 코드는 PGPony Android 4.8.0 이상에서만 스캔할 수 있습니다.</string>
+    <!-- %1$s is the qr_too_large_parts sentence, followed by qr_too_large_long_hint when it applies. -->
+    <string name="qr_too_large_with_parts">이 키는 QR 코드에 담기 너무 큽니다. %1$s 대신 공유나 복사를 사용하세요.</string>
+    <string name="settings_qr_long_codes_title">긴 QR 코드</string>
+    <string name="settings_qr_long_codes_subtitle">QR 코드 %2$d 부에 담기지 않는 키를 최대 %1$d 부로 표시합니다. %2$d 부를 넘는 코드는 PGPony Android 4.8.0 이상에서만 스캔할 수 있습니다.</string>
 </resources>

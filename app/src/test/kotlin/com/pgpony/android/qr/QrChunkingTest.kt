@@ -203,7 +203,8 @@ class QrChunkingTest {
         assertTrue(c.offer("PGPONY1:notanumber:3:deadbeef:xx") is QrChunking.Outcome.Malformed)
         assertTrue(c.offer("PGPONY1:5:3:deadbeef:xx") is QrChunking.Outcome.Malformed)
         assertTrue(c.offer("PGPONY1:1:3:NOTHEX00:xx") is QrChunking.Outcome.Malformed)
-        assertTrue(c.offer("PGPONY1:1:99:deadbeef:xx") is QrChunking.Outcome.Malformed)
+        // 4.8.0 RC8 (#100): up to 512 parts parse, so 513 is the first count past the ceiling.
+        assertTrue(c.offer("PGPONY1:1:513:deadbeef:xx") is QrChunking.Outcome.Malformed)
         assertTrue(c.offer("PGPONY1:1:3:deadbeef") is QrChunking.Outcome.Malformed)
     }
 
@@ -292,5 +293,108 @@ class QrChunkingTest {
             "PGPONY1:${index + 1}:${payloads.size}:${QrChunking.idFor(text)}:$part"
         }
         assertEquals(QrChunking.Outcome.Complete(text), feed(frames.reversed()))
+    }
+
+    // ── 4.8.0 RC8 (#100): Long QR codes, up to 512 parts ────────────────
+
+    @Test
+    fun longCodes_512PartRoundTrip() {
+        val text = "A".repeat(QrChunking.MAX_TEXT_CHARS_LONG)
+        val frames = QrChunking.split(text, maxFrames = QrChunking.MAX_FRAMES_LONG)!!
+        assertEquals(512, frames.size)
+        assertTrue(frames.last().startsWith("PGPONY1:512:512:"))
+        assertEquals(QrChunking.Outcome.Complete(text), feed(frames.shuffled(java.util.Random(7))))
+    }
+
+    @Test
+    fun longCodes_armoredKeyRoundTripsThroughThePublicKeyCollector() {
+        val text = armored(150_000)
+        val frames = QrChunking.split(text, maxFrames = QrChunking.MAX_FRAMES_LONG)!!
+        assertTrue(frames.size in 33..512)
+        val collector = PublicKeyQrCollector()
+        var last: PublicKeyQrResult = PublicKeyQrResult.Duplicate
+        for (f in frames.reversed()) last = collector.offer(f)
+        assertEquals(PublicKeyQrResult.Complete(text), last)
+    }
+
+    @Test
+    fun longCodes_capIs512PartsAndTheDefaultStays32() {
+        val over = "A".repeat(QrChunking.MAX_TEXT_CHARS_LONG + 1)
+        assertNull(QrChunking.split(over, maxFrames = QrChunking.MAX_FRAMES_LONG))
+        assertNull(QrChunking.split("A".repeat(QrChunking.MAX_TEXT_CHARS + 1)))
+        assertEquals(33, QrChunking.split("A".repeat(QrChunking.MAX_TEXT_CHARS + 1), maxFrames = 512)!!.size)
+        for (bad in listOf(QrChunking.MAX_FRAMES - 1, QrChunking.MAX_FRAMES_LONG + 1)) {
+            try {
+                QrChunking.split("A".repeat(2_000), maxFrames = bad)
+                org.junit.Assert.fail("a part limit of $bad must be refused")
+            } catch (_: IllegalArgumentException) { }
+        }
+    }
+
+    @Test
+    fun longCodes_leaveKeysThatFitIn32PartsUnchanged() {
+        // iOS and Desktop stop at 32 parts, so the setting must not change these codes.
+        for (length in listOf(1_200, 1_201, 5_000, 18_554, 25_000, 32_000)) {
+            val text = "a".repeat(length)
+            for (policy in QrEncodingPolicy.entries) {
+                assertEquals(
+                    "$length $policy",
+                    QrChunking.split(text, policy),
+                    QrChunking.split(text, policy, QrChunking.MAX_FRAMES_LONG)
+                )
+            }
+        }
+    }
+
+    @Test
+    fun longCodes_everyProfileStaysWithin512Parts() {
+        val text = "a".repeat(QrChunking.MAX_TEXT_CHARS_LONG)
+        for (policy in QrEncodingPolicy.entries) {
+            val frames = QrChunking.split(text, policy, QrChunking.MAX_FRAMES_LONG)!!
+            assertTrue("$policy ${frames.size}", frames.size <= 512)
+            assertEquals(QrChunking.Outcome.Complete(text), feed(frames))
+        }
+    }
+
+    @Test
+    fun receiverAccepts512PartsWhateverTheSendingLimit() {
+        assertEquals(512, QrChunking.parse("PGPONY1:512:512:deadbeef:x")!!.total)
+        assertEquals(1, QrChunking.parse("PGPONY1:1:512:deadbeef:x")!!.seq)
+        assertNull(QrChunking.parse("PGPONY1:513:513:deadbeef:x"))
+        assertNull(QrChunking.parse("PGPONY1:513:512:deadbeef:x"))
+    }
+
+    @Test
+    fun retainedTextBoundGrowsWithThePartCount() {
+        // A 40-part sequence of 1,000-character parts is past the old 32,000 bound.
+        val text = "b".repeat(40_000)
+        val frames = QrChunking.split(text, maxFrames = 512)!!
+        assertEquals(40, frames.size)
+        assertEquals(QrChunking.Outcome.Complete(text), feed(frames))
+        // Parts larger than 1,000 characters still cannot exceed max(32,000, 1,000 x total).
+        val c = QrChunking.Collector()
+        assertEquals(QrChunking.Outcome.Progress(1, 40), c.offer("PGPONY1:1:40:deadbeef:" + "a".repeat(32_000)))
+        assertEquals(QrChunking.Outcome.Progress(2, 40), c.offer("PGPONY1:2:40:deadbeef:" + "a".repeat(8_000)))
+        assertEquals(QrChunking.Outcome.Malformed, c.offer("PGPONY1:3:40:deadbeef:a"))
+    }
+
+    @Test
+    fun collectorListsTheMissingParts() {
+        val frames = QrChunking.split("c".repeat(32_000))!!
+        assertEquals(32, frames.size)
+        val c = QrChunking.Collector()
+        assertEquals(emptyList<Int>(), c.missing())
+        frames.forEachIndexed { i, f -> if (i != 30) c.offer(f) }
+        assertEquals(listOf(31), c.missing())
+        c.offer(frames[30]).let { assertTrue(it is QrChunking.Outcome.Complete) }
+    }
+
+    @Test
+    fun partsNeededNamesTheFewestParts() {
+        assertEquals(1, QrChunking.partsNeeded("a".repeat(1_200)))
+        assertEquals(2, QrChunking.partsNeeded("a".repeat(1_201)))
+        assertEquals(32, QrChunking.partsNeeded("a".repeat(32_000)))
+        assertEquals(33, QrChunking.partsNeeded("a".repeat(32_001)))
+        assertEquals(513, QrChunking.partsNeeded("a".repeat(512_001)))
     }
 }

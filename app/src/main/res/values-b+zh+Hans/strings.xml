@@ -185,6 +185,8 @@
     <string name="settings_more_passpony_subtitle">你的 pass 和 passage 密码库，随身携带</string>
     <string name="settings_more_relaypony_subtitle">加密文件传输，手机到手机</string>
     <string name="settings_more_scrubpony_subtitle">从图片中清除可识别身份的元数据。不改动任何像素。</string>
+    <string name="settings_more_tappony_subtitle">轻触 NFC 标签，将其 ID 和内容发送到你自己的服务器。无需账号，不经云端。</string>
+    <string name="settings_more_hashpony_subtitle">像 sha256sum 一样计算和校验文件哈希，支持校验和文件、文件夹检查和所有常用算法。</string>
     <string name="settings_more_source_title">开源引擎</string>
     <string name="settings_more_source_subtitle">GitHub 上的 PGPonyCore，经过审计的加密核心</string>
     <string name="settings_more_appsource_title">源代码</string>
@@ -3175,4 +3177,66 @@
     <plurals name="ssh_backup_skipped">
         <item quantity="other">有 %1$d 个 SSH 密钥无法读取，未包含在此备份中。</item>
     </plurals>
+    <!-- 4.8.0 RC8 (#115) -->
+    <string name="key_detail_trust_certified_by">已由你的密钥 %1$s 验证</string>
+    <string name="key_detail_trust_certified_by_uids">已由你的密钥 %1$s 验证：%2$s</string>
+    <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
+    <string name="groups_title">分组</string>
+    <string name="groups_new">新建分组</string>
+    <string name="groups_empty">还没有分组。分组是一组带名称的密钥，可以在「加密」标签页中一步添加为收件人。</string>
+    <string name="groups_load_failed">无法读取分组。</string>
+    <string name="groups_error_save">无法保存对分组的更改。</string>
+    <plurals name="groups_member_count">
+        <item quantity="other">%1$d 个密钥</item>
+    </plurals>
+    <plurals name="groups_member_deleted_count">
+        <item quantity="other">%1$d 个在「最近删除」中</item>
+    </plurals>
+    <string name="groups_name_label">分组名称</string>
+    <string name="groups_name_blank">请输入名称。</string>
+    <string name="groups_name_too_long">名称最多 %1$d 个字符。</string>
+    <string name="groups_name_taken">已有同名的分组。</string>
+    <string name="groups_rename">重命名</string>
+    <string name="groups_rename_title">重命名分组</string>
+    <string name="groups_edit_keys">编辑密钥</string>
+    <string name="groups_edit_keys_title">%1$s 中的密钥</string>
+    <string name="groups_editor_no_keys">你的密钥环中还没有密钥。</string>
+    <string name="groups_delete_title">删除此分组？</string>
+    <string name="groups_delete_body">%1$s 将被删除。其中的密钥仍会保留在你的密钥环中。</string>
+    <string name="groups_keys_heading">密钥</string>
+    <string name="groups_save_as_group">保存为分组</string>
+    <plurals name="groups_pick_added">
+        <item quantity="other">已从 %2$s 添加 %1$d 个密钥。</item>
+    </plurals>
+    <string name="groups_pick_none">%1$s 中目前没有可用的密钥。</string>
+    <string name="groups_pick_left_out">未添加：%1$s</string>
+    <string name="groups_left_out_revoked">%1$s（已吊销）</string>
+    <string name="groups_left_out_expired">%1$s（已过期）</string>
+    <string name="groups_left_out_no_certificate">%1$s（尚无公钥）</string>
+    <string name="groups_left_out_deleted">%1$s（在「最近删除」中）</string>
+    <string name="groups_left_out_missing">%1$s（不在你的密钥环中）</string>
+    <string name="groups_status_revoked">已吊销</string>
+    <string name="groups_status_expired">已过期</string>
+    <string name="groups_status_no_certificate">尚无公钥</string>
+    <string name="groups_status_deleted">在「最近删除」中</string>
+    <string name="groups_status_missing">不在你的密钥环中</string>
+    <string name="key_detail_section_groups">分组</string>
+    <string name="key_detail_groups_none">此密钥不在任何分组中。</string>
+    <string name="key_detail_groups_add">添加到分组</string>
+    <string name="key_detail_groups_new">用此密钥新建分组</string>
+    <string name="key_detail_groups_remove_cd">从 %1$s 中移除</string>
+    <string name="restore_groups_added">已添加的分组</string>
+    <string name="restore_groups_merged">加入了新密钥的分组</string>
+    <!-- 4.8.0 RC8 (#100) -->
+    <plurals name="qr_scan_missing_parts">
+        <item quantity="other">仍缺少第 %1$s 段。</item>
+    </plurals>
+    <plurals name="qr_too_large_parts">
+        <item quantity="other">此密钥的二维码需要分成 %1$d 段，上限为 %2$d 段。</item>
+    </plurals>
+    <string name="qr_too_large_long_hint">在设置中开启「长二维码」后，最多可分 %1$d 段显示，但只有 PGPony Android 4.8.0 或更高版本能扫描。</string>
+    <!-- %1$s is the qr_too_large_parts sentence, followed by qr_too_large_long_hint when it applies. -->
+    <string name="qr_too_large_with_parts">此密钥太大，无法生成二维码。%1$s请改用「共享」或「复制」。</string>
+    <string name="settings_qr_long_codes_title">长二维码</string>
+    <string name="settings_qr_long_codes_subtitle">%2$d 段二维码放不下的密钥，最多可分 %1$d 段显示。超过 %2$d 段的二维码只能用 PGPony Android 4.8.0 或更高版本扫描。</string>
 </resources>

@@ -19,6 +19,7 @@ import com.pgpony.android.data.MIGRATION_9_10
 import com.pgpony.android.data.MIGRATION_10_11
 import com.pgpony.android.data.MIGRATION_11_12
 import com.pgpony.android.data.MIGRATION_12_13
+import com.pgpony.android.data.MIGRATION_13_14
 import com.pgpony.android.autocrypt.AutocryptPeerStore
 import com.pgpony.android.data.PGPDatabase
 import com.pgpony.android.data.SecureKeyStore
@@ -60,6 +61,15 @@ class PGPonyApp : Application() {
         com.pgpony.android.data.ssh.SshKeyStore(com.pgpony.android.data.ssh.SecureSshKeyVault(secureKeyStore))
     }
 
+    /**
+     * 4.8.0 RC8 (item 4n): recipient groups, for the Encrypt picker, the Groups
+     * screen, Key Details and the backup. Built on first use, after onCreate
+     * has opened the database; it caches nothing.
+     */
+    val recipientGroups: com.pgpony.android.data.groups.RecipientGroupStore by lazy {
+        com.pgpony.android.data.groups.RecipientGroupStore(database.recipientGroupDao())
+    }
+
     override fun onCreate() {
         super.onCreate()
 
@@ -99,7 +109,7 @@ class PGPonyApp : Application() {
             PGPDatabase::class.java,
             "pgpony.db"
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
             // #2.1: the :remote_api provider process opens this same DB, so
             // invalidations must cross processes to keep both views coherent
             // (e.g. a consent revocation in the main app reaching a running
@@ -126,7 +136,9 @@ class PGPonyApp : Application() {
             store = secureKeyStore,
             // RC3 §N (#34)
             fallbackDao = database.fallbackKeyDao(),
-            signingDefaultsDao = database.signingDefaultsDao()
+            signingDefaultsDao = database.signingDefaultsDao(),
+            // 4.8.0 RC8 (item 4n): a key deleted for good leaves every group.
+            groupDao = database.recipientGroupDao()
         )
 
         // 4.0.0 Phase 4 — Autocrypt peer-state store (OpenPGP API).

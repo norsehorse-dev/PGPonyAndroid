@@ -1,6 +1,7 @@
 // EcdsaCurveKeygenTest.kt
 // PGPony Android, 4.8.0 (4l, #109): generating v4 ECDSA keys on
 // brainpoolP256r1, brainpoolP384r1, brainpoolP512r1 and secp256k1.
+// 4.8.0 RC8 (#109): and on NIST P-256, P-384 and P-521.
 //
 // For each curve, with and without a passphrase: the key is v4, the primary
 // is ECDSA and the subkey ECDH on the same curve with gpg's KDF parameters,
@@ -62,6 +63,22 @@ class EcdsaCurveKeygenTest {
     private val svc = PGPCryptoService.shared
 
     private val curves = listOf(
+        // 4.8.0 RC8 (#109): the NIST curves, in the picker's order.
+        Expect(
+            KeyAlgorithm.ECDSA_NIST_P256, "1.2.840.10045.3.1.7",
+            HashAlgorithmTags.SHA256, SymmetricKeyAlgorithmTags.AES_128,
+            "ECDSA (NIST P-256)", "Hash: SHA256"
+        ),
+        Expect(
+            KeyAlgorithm.ECDSA_NIST_P384, "1.3.132.0.34",
+            HashAlgorithmTags.SHA384, SymmetricKeyAlgorithmTags.AES_192,
+            "ECDSA (NIST P-384)", "Hash: SHA384"
+        ),
+        Expect(
+            KeyAlgorithm.ECDSA_NIST_P521, "1.3.132.0.35",
+            HashAlgorithmTags.SHA512, SymmetricKeyAlgorithmTags.AES_256,
+            "ECDSA (NIST P-521)", "Hash: SHA512"
+        ),
         Expect(
             KeyAlgorithm.ECDSA_BRAINPOOL_P256, "1.3.36.3.3.2.8.1.1.7",
             HashAlgorithmTags.SHA256, SymmetricKeyAlgorithmTags.AES_128,
@@ -83,6 +100,8 @@ class EcdsaCurveKeygenTest {
             "ECDSA (secp256k1)", "Hash: SHA256"
         )
     )
+
+    private fun curve(algorithm: KeyAlgorithm): Expect = curves.single { it.algorithm == algorithm }
 
     private fun generate(e: Expect, passphrase: String?): Key {
         val gen = svc.generateKeyPair("Curve Test", "curve@example.test", e.algorithm, passphrase)
@@ -165,7 +184,7 @@ class EcdsaCurveKeygenTest {
     }
 
     @Test
-    fun `the four curves sit in the Advanced group only`() {
+    fun `the seven curves sit in the Advanced group only`() {
         val ecdsa = curves.map { it.algorithm }
         assertEquals(ecdsa, KeyAlgorithm.generatableEcdsa)
         assertTrue(KeyAlgorithm.generatableAdvanced.containsAll(ecdsa))
@@ -176,10 +195,12 @@ class EcdsaCurveKeygenTest {
         }
         val all = KeyAlgorithm.generatable
         assertEquals(all.size, all.toSet().size)
-        // The NIST curves stay import-only.
-        assertFalse(KeyAlgorithm.ECDSA_NIST_P256 in all)
-        assertFalse(KeyAlgorithm.ECDSA_NIST_P384 in all)
-        assertFalse(KeyAlgorithm.ECDSA_NIST_P521 in all)
+        // 4.8.0 RC8 (#109): the NIST curves are generated now; the bare ECDSA
+        // label stays import-only.
+        assertTrue(KeyAlgorithm.ECDSA_NIST_P256 in all)
+        assertTrue(KeyAlgorithm.ECDSA_NIST_P384 in all)
+        assertTrue(KeyAlgorithm.ECDSA_NIST_P521 in all)
+        assertFalse(KeyAlgorithm.ECDSA in all)
     }
 
     // ── Encrypt and decrypt ──────────────────────────────────────────
@@ -269,14 +290,19 @@ class EcdsaCurveKeygenTest {
 
     @Test
     fun `an ECDSA signer never gets a hash shorter than its curve`() {
-        val bp384 = generate(curves[1], null).pub.publicKey
-        val bp512 = generate(curves[2], null).pub.publicKey
-        val k1 = generate(curves[3], null).pub.publicKey
+        // 4.8.0 RC8 (#109): picked by algorithm, since the NIST curves now lead the list.
+        val bp384 = generate(curve(KeyAlgorithm.ECDSA_BRAINPOOL_P384), null).pub.publicKey
+        val bp512 = generate(curve(KeyAlgorithm.ECDSA_BRAINPOOL_P512), null).pub.publicKey
+        val k1 = generate(curve(KeyAlgorithm.ECDSA_SECP256K1), null).pub.publicKey
+        val p384 = generate(curve(KeyAlgorithm.ECDSA_NIST_P384), null).pub.publicKey
+        val p521 = generate(curve(KeyAlgorithm.ECDSA_NIST_P521), null).pub.publicKey
         assertEquals(HashAlgorithmTags.SHA384, EcCurveOid.signatureHash(bp384, HashAlgorithmTags.SHA256))
         assertEquals(HashAlgorithmTags.SHA512, EcCurveOid.signatureHash(bp384, HashAlgorithmTags.SHA512))
         assertEquals(HashAlgorithmTags.SHA512, EcCurveOid.signatureHash(bp512, HashAlgorithmTags.SHA256))
         assertEquals(HashAlgorithmTags.SHA256, EcCurveOid.signatureHash(k1, HashAlgorithmTags.SHA256))
         assertEquals(HashAlgorithmTags.SHA384, EcCurveOid.signatureHash(k1, HashAlgorithmTags.SHA384))
+        assertEquals(HashAlgorithmTags.SHA384, EcCurveOid.signatureHash(p384, HashAlgorithmTags.SHA256))
+        assertEquals(HashAlgorithmTags.SHA512, EcCurveOid.signatureHash(p521, HashAlgorithmTags.SHA256))
         // Other key types keep the requested hash.
         val ed = svc.importKeyData(
             svc.generateKeyPair("E", "e@example.test", KeyAlgorithm.ED25519_CV25519, null).publicKeyData
@@ -286,17 +312,18 @@ class EcdsaCurveKeygenTest {
 
     @Test
     fun `a User ID added later is certified with the curve's hash`() {
-        val e = curves[2]
-        val k = generate(e, PASS)
-        val updated = UserIdService.shared.addUserId(
-            secretRing = k.sec,
-            publicRing = k.pub,
-            userId = "Second <second@example.test>",
-            makePrimary = false,
-            passphrase = PASS
-        )
-        val cert = updated.publicRing.publicKey.getSignaturesForID("Second <second@example.test>")
-            .asSequence().filterIsInstance<PGPSignature>().first()
-        assertEquals(e.hash, cert.hashAlgorithm)
+        for (e in listOf(curve(KeyAlgorithm.ECDSA_BRAINPOOL_P512), curve(KeyAlgorithm.ECDSA_NIST_P521))) {
+            val k = generate(e, PASS)
+            val updated = UserIdService.shared.addUserId(
+                secretRing = k.sec,
+                publicRing = k.pub,
+                userId = "Second <second@example.test>",
+                makePrimary = false,
+                passphrase = PASS
+            )
+            val cert = updated.publicRing.publicKey.getSignaturesForID("Second <second@example.test>")
+                .asSequence().filterIsInstance<PGPSignature>().first()
+            assertEquals(e.hash, cert.hashAlgorithm)
+        }
     }
 }

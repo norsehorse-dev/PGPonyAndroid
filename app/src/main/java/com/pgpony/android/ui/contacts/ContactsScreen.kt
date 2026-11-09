@@ -552,7 +552,8 @@ private fun LinkedContactRow(contact: ContactWithKeys) {
                                 .copy(alpha = 0.7f)
                         )
                         Spacer(modifier = Modifier.weight(1f))
-                        TrustBadge(trust = key.trustLevel)
+                        // 4.8.0 RC8 (#115): the shown level, as on the Keyring.
+                        TrustBadge(trust = com.pgpony.android.data.CertifiedTrust.effective(key))
                     }
                 }
             }

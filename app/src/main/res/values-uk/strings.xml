@@ -185,6 +185,8 @@
     <string name="settings_more_passpony_subtitle">Ваше сховище pass і passage у кишені</string>
     <string name="settings_more_relaypony_subtitle">Зашифроване передавання файлів з телефона на телефон</string>
     <string name="settings_more_scrubpony_subtitle">Видаліть із зображень метадані, що вас ідентифікують. Жоден піксель не змінюється.</string>
+    <string name="settings_more_tappony_subtitle">Прикладіть NFC-мітку й надішліть її ідентифікатор і вміст на власний сервер. Без облікового запису, без хмари.</string>
+    <string name="settings_more_hashpony_subtitle">Обчислюйте й перевіряйте хеші файлів так само, як sha256sum: з файлами контрольних сум, перевіркою папок і всіма поширеними алгоритмами.</string>
     <string name="settings_more_source_title">Рушій з відкритим кодом</string>
     <string name="settings_more_source_subtitle">PGPonyCore на GitHub, криптографічне ядро, що пройшло аудит</string>
     <string name="settings_more_appsource_title">Вихідний код</string>
@@ -3256,4 +3258,81 @@
         <item quantity="many">%1$d ключів SSH не вдалося прочитати й додати до цієї резервної копії.</item>
         <item quantity="other">%1$d ключа SSH не вдалося прочитати й додати до цієї резервної копії.</item>
     </plurals>
+    <!-- 4.8.0 RC8 (#115) -->
+    <string name="key_detail_trust_certified_by">Перевірено вашим ключем %1$s</string>
+    <string name="key_detail_trust_certified_by_uids">Перевірено вашим ключем %1$s для %2$s</string>
+    <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
+    <string name="groups_title">Групи</string>
+    <string name="groups_new">Нова група</string>
+    <string name="groups_empty">Груп поки немає. Група об’єднує ключі під однією назвою, щоб на вкладці «Зашифрувати» додавати їх як отримувачів за один крок.</string>
+    <string name="groups_load_failed">Не вдалося прочитати групи.</string>
+    <string name="groups_error_save">Не вдалося зберегти зміни в групі.</string>
+    <plurals name="groups_member_count">
+        <item quantity="one">%1$d ключ</item>
+        <item quantity="few">%1$d ключі</item>
+        <item quantity="many">%1$d ключів</item>
+        <item quantity="other">%1$d ключа</item>
+    </plurals>
+    <plurals name="groups_member_deleted_count">
+        <item quantity="one">%1$d у розділі «Нещодавно видалені»</item>
+        <item quantity="few">%1$d у розділі «Нещодавно видалені»</item>
+        <item quantity="many">%1$d у розділі «Нещодавно видалені»</item>
+        <item quantity="other">%1$d у розділі «Нещодавно видалені»</item>
+    </plurals>
+    <string name="groups_name_label">Назва групи</string>
+    <string name="groups_name_blank">Введіть назву.</string>
+    <string name="groups_name_too_long">Максимум символів: %1$d.</string>
+    <string name="groups_name_taken">Група з такою назвою вже існує.</string>
+    <string name="groups_rename">Перейменувати</string>
+    <string name="groups_rename_title">Перейменувати групу</string>
+    <string name="groups_edit_keys">Змінити ключі</string>
+    <string name="groups_edit_keys_title">Ключі в групі «%1$s»</string>
+    <string name="groups_editor_no_keys">У вашій зв’язці ключів поки немає ключів.</string>
+    <string name="groups_delete_title">Видалити цю групу?</string>
+    <string name="groups_delete_body">Групу «%1$s» буде видалено. Ключі з неї залишаться у вашій зв’язці ключів.</string>
+    <string name="groups_keys_heading">Ключі</string>
+    <string name="groups_save_as_group">Зберегти як групу</string>
+    <plurals name="groups_pick_added">
+        <item quantity="one">Додано %1$d ключ із групи «%2$s».</item>
+        <item quantity="few">Додано %1$d ключі з групи «%2$s».</item>
+        <item quantity="many">Додано %1$d ключів із групи «%2$s».</item>
+        <item quantity="other">Додано %1$d ключа з групи «%2$s».</item>
+    </plurals>
+    <string name="groups_pick_none">Жоден ключ із групи «%1$s» зараз не можна використати.</string>
+    <string name="groups_pick_left_out">Не додано: %1$s</string>
+    <string name="groups_left_out_revoked">%1$s (відкликано)</string>
+    <string name="groups_left_out_expired">%1$s (термін минув)</string>
+    <string name="groups_left_out_no_certificate">%1$s (відкритого ключа ще немає)</string>
+    <string name="groups_left_out_deleted">%1$s (у розділі «Нещодавно видалені»)</string>
+    <string name="groups_left_out_missing">%1$s (немає у вашій зв’язці ключів)</string>
+    <string name="groups_status_revoked">Відкликано</string>
+    <string name="groups_status_expired">Термін минув</string>
+    <string name="groups_status_no_certificate">Відкритого ключа ще немає</string>
+    <string name="groups_status_deleted">У розділі «Нещодавно видалені»</string>
+    <string name="groups_status_missing">Немає у вашій зв’язці ключів</string>
+    <string name="key_detail_section_groups">Групи</string>
+    <string name="key_detail_groups_none">Цей ключ не входить до жодної групи.</string>
+    <string name="key_detail_groups_add">Додати до групи</string>
+    <string name="key_detail_groups_new">Нова група з цим ключем</string>
+    <string name="key_detail_groups_remove_cd">Вилучити з групи «%1$s»</string>
+    <string name="restore_groups_added">Додано груп</string>
+    <string name="restore_groups_merged">Поповнено груп</string>
+    <!-- 4.8.0 RC8 (#100) -->
+    <plurals name="qr_scan_missing_parts">
+        <item quantity="one">Ще бракує частини %1$s.</item>
+        <item quantity="few">Ще бракує частин %1$s.</item>
+        <item quantity="many">Ще бракує частин %1$s.</item>
+        <item quantity="other">Ще бракує частин %1$s.</item>
+    </plurals>
+    <plurals name="qr_too_large_parts">
+        <item quantity="one">Для QR-коду цього ключа потрібна %1$d частина. Максимум: %2$d.</item>
+        <item quantity="few">Для QR-коду цього ключа потрібні %1$d частини. Максимум: %2$d.</item>
+        <item quantity="many">Для QR-коду цього ключа потрібно %1$d частин. Максимум: %2$d.</item>
+        <item quantity="other">Для QR-коду цього ключа потрібно %1$d частини. Максимум: %2$d.</item>
+    </plurals>
+    <string name="qr_too_large_long_hint">Увімкніть «Довгі QR-коди» на вкладці «Налаштування», щоб показати ключ у вигляді коду до %1$d частин. Такі коди скануються лише в PGPony Android 4.8.0 або новішому.</string>
+    <!-- %1$s is the qr_too_large_parts sentence, followed by qr_too_large_long_hint when it applies. -->
+    <string name="qr_too_large_with_parts">Цей ключ завеликий для QR-коду. %1$s Скористайтеся функцією «Поділитися» або «Копіювати».</string>
+    <string name="settings_qr_long_codes_title">Довгі QR-коди</string>
+    <string name="settings_qr_long_codes_subtitle">Показувати ключ, що не вміщується в QR-код із %2$d частин, у вигляді коду до %1$d частин. Коди з понад %2$d частин скануються лише в PGPony Android 4.8.0 або новішому.</string>
 </resources>

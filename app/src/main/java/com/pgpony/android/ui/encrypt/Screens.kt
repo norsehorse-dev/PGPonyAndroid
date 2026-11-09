@@ -1256,13 +1256,20 @@ private fun RecipientPickerCard(
     }
 
     if (showPicker) {
+        // 4.8.0 RC8 (item 4n): groups at the top of the sheet, read again each
+        // time it opens; the pick note goes when the sheet closes.
+        LaunchedEffect(Unit) { viewModel.refreshRecipientGroups() }
         RecipientPickerSheet(
             available = state.availableRecipients,
             selected = state.selectedRecipients,
             onToggle = { viewModel.toggleRecipient(it) },
             onSelectAll = { viewModel.selectAllRecipients() },
             onClear = { viewModel.clearRecipients() },
-            onDismiss = { showPicker = false }
+            onDismiss = { showPicker = false; viewModel.clearGroupPickNote() },
+            groups = state.recipientGroups,
+            groupNote = state.groupPickNote,
+            onPickGroup = { viewModel.pickGroup(it) },
+            onSaveAsGroup = { viewModel.saveRecipientsAsGroup(it) }
         )
     }
 }
@@ -1276,10 +1283,17 @@ private fun RecipientPickerSheet(
     onToggle: (PGPKeyEntity) -> Unit,
     onSelectAll: () -> Unit,
     onClear: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    // 4.8.0 RC8 (item 4n): recipient groups, the note from the last pick, and
+    // Save as group (returns why a name was refused, or null once saved).
+    groups: List<com.pgpony.android.data.groups.RecipientGroup> = emptyList(),
+    groupNote: GroupPickNote? = null,
+    onPickGroup: (com.pgpony.android.data.groups.RecipientGroup) -> Unit = {},
+    onSaveAsGroup: (suspend (String) -> com.pgpony.android.data.groups.GroupNameProblem?)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var query by remember { mutableStateOf("") }
+    var showSaveAsGroup by remember { mutableStateOf(false) }
 
     fun matches(key: PGPKeyEntity): Boolean {
         if (query.isBlank()) return true
@@ -1290,6 +1304,8 @@ private fun RecipientPickerSheet(
     }
 
     val filtered = available.filter { matches(it) }
+    // 4.8.0 RC8 (item 4n): search matches group names too.
+    val filteredGroups = groups.filter { query.isBlank() || it.name.lowercase().contains(query.trim().lowercase()) }
     val allSelected = available.isNotEmpty() && selected.size == available.size
     val anySelected = selected.isNotEmpty()
 
@@ -1337,6 +1353,15 @@ private fun RecipientPickerSheet(
                     }
                 }
                 Spacer(modifier = Modifier.weight(1f))
+                // 4.8.0 RC8 (item 4n): the current selection as a new group.
+                if (anySelected && onSaveAsGroup != null) {
+                    TextButton(onClick = { showSaveAsGroup = true }) {
+                        Text(
+                            stringResource(R.string.groups_save_as_group),
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
                 if (anySelected) {
                     TextButton(onClick = onClear) {
                         Text(
@@ -1347,7 +1372,11 @@ private fun RecipientPickerSheet(
                 }
             }
 
-            if (filtered.isEmpty()) {
+            groupNote?.let { note ->
+                com.pgpony.android.ui.groups.GroupPickNoteText(note, modifier = Modifier.padding(vertical = 8.dp))
+            }
+
+            if (filtered.isEmpty() && filteredGroups.isEmpty()) {
                 Text(
                     stringResource(R.string.encrypt_recipients_no_match_format, query),
                     style = MaterialTheme.typography.bodyMedium,
@@ -1360,6 +1389,30 @@ private fun RecipientPickerSheet(
                         .fillMaxWidth()
                         .heightIn(max = 360.dp)
                 ) {
+                    // 4.8.0 RC8 (item 4n): groups first, then the keys, each
+                    // under its heading when both are listed.
+                    if (filteredGroups.isNotEmpty()) {
+                        item(key = "groups_heading") {
+                            Text(
+                                stringResource(R.string.groups_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                            )
+                        }
+                        items(filteredGroups, key = { "group:" + it.id }) { group ->
+                            com.pgpony.android.ui.groups.RecipientGroupPickRow(group = group, onClick = { onPickGroup(group) })
+                        }
+                        if (filtered.isNotEmpty()) {
+                            item(key = "keys_heading") {
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                                Text(
+                                    stringResource(R.string.groups_keys_heading),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                            }
+                        }
+                    }
                     // 4.7.2 (Play crash on 4.6.4): see SignAsSheet, same duplicate-key guard.
                     items(filtered.distinctBy { it.fingerprint }, key = { it.fingerprint }) { key ->
                         val isSel = selected.any { it.fingerprint == key.fingerprint }
@@ -1380,6 +1433,14 @@ private fun RecipientPickerSheet(
                 Text(stringResource(R.string.common_button_done))
             }
         }
+    }
+
+    if (showSaveAsGroup && onSaveAsGroup != null) {
+        com.pgpony.android.ui.groups.GroupNameDialog(
+            title = stringResource(R.string.groups_save_as_group),
+            onConfirm = onSaveAsGroup,
+            onDismiss = { showSaveAsGroup = false }
+        )
     }
 }
 

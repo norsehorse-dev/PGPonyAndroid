@@ -192,6 +192,11 @@
     <string name="settings_more_relaypony_subtitle">Encrypted file transfer, phone to phone</string>
     <string name="settings_more_scrubpony_title" translatable="false">ScrubPony</string>
     <string name="settings_more_scrubpony_subtitle">Strip identifying metadata from images. No pixel moves.</string>
+    <!-- 4.8.0 RC8: TapPony and HashPony in More from NorseHorse -->
+    <string name="settings_more_tappony_title" translatable="false">TapPony</string>
+    <string name="settings_more_tappony_subtitle">Tap an NFC tag and send its ID and contents to your own server. No account, no cloud.</string>
+    <string name="settings_more_hashpony_title" translatable="false">HashPony</string>
+    <string name="settings_more_hashpony_subtitle">Hash and verify files the way sha256sum does, with checksum files, folder checks and every common algorithm.</string>
     <string name="settings_more_source_title">Open-source engine</string>
     <string name="settings_more_source_subtitle">PGPonyCore on GitHub, the audited crypto core</string>
     <string name="settings_more_appsource_title">Source code</string>
@@ -784,6 +789,9 @@
 
     <!-- ── Trust ───────────────────────────────────────────────────── -->
     <string name="key_detail_trust_level_label">Trust Level</string>
+    <!-- 4.8.0 RC8 (#115) -->
+    <string name="key_detail_trust_certified_by">Verified by your key %1$s</string>
+    <string name="key_detail_trust_certified_by_uids">Verified by your key %1$s for %2$s</string>
 
     <!-- ── Contact section ─────────────────────────────────────────── -->
     <string name="key_detail_section_contact">Contact</string>
@@ -3223,4 +3231,70 @@
         <item quantity="one">%1$d SSH key could not be read and is not in this backup.</item>
         <item quantity="other">%1$d SSH keys could not be read and are not in this backup.</item>
     </plurals>
+    <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
+    <string name="groups_title">Groups</string>
+    <string name="groups_new">New group</string>
+    <string name="groups_empty">No groups yet. A group is a named set of keys that you can add as recipients in one step on the Encrypt tab.</string>
+    <string name="groups_load_failed">Couldn\'t read the groups.</string>
+    <string name="groups_error_save">Couldn\'t save the change to the group.</string>
+    <plurals name="groups_member_count">
+        <item quantity="one">%1$d key</item>
+        <item quantity="other">%1$d keys</item>
+    </plurals>
+    <plurals name="groups_member_deleted_count">
+        <item quantity="one">%1$d in Recently Deleted</item>
+        <item quantity="other">%1$d in Recently Deleted</item>
+    </plurals>
+    <string name="groups_name_label">Group name</string>
+    <string name="groups_name_blank">Enter a name.</string>
+    <string name="groups_name_too_long">Use at most %1$d characters.</string>
+    <string name="groups_name_taken">There is already a group with this name.</string>
+    <string name="groups_rename">Rename</string>
+    <string name="groups_rename_title">Rename group</string>
+    <string name="groups_edit_keys">Edit keys</string>
+    <string name="groups_edit_keys_title">Keys in %1$s</string>
+    <string name="groups_editor_no_keys">There are no keys in your keyring yet.</string>
+    <string name="groups_delete_title">Delete this group?</string>
+    <string name="groups_delete_body">%1$s will be deleted. The keys in it stay in your keyring.</string>
+    <string name="groups_keys_heading">Keys</string>
+    <string name="groups_save_as_group">Save as group</string>
+    <plurals name="groups_pick_added">
+        <item quantity="one">Added %1$d key from %2$s.</item>
+        <item quantity="other">Added %1$d keys from %2$s.</item>
+    </plurals>
+    <string name="groups_pick_none">No key in %1$s can be used right now.</string>
+    <string name="groups_pick_left_out">Left out: %1$s</string>
+    <string name="groups_left_out_revoked">%1$s (revoked)</string>
+    <string name="groups_left_out_expired">%1$s (expired)</string>
+    <string name="groups_left_out_no_certificate">%1$s (no public key yet)</string>
+    <string name="groups_left_out_deleted">%1$s (in Recently Deleted)</string>
+    <string name="groups_left_out_missing">%1$s (not in your keyring)</string>
+    <string name="groups_status_revoked">Revoked</string>
+    <string name="groups_status_expired">Expired</string>
+    <string name="groups_status_no_certificate">No public key yet</string>
+    <string name="groups_status_deleted">In Recently Deleted</string>
+    <string name="groups_status_missing">Not in your keyring</string>
+    <string name="key_detail_section_groups">Groups</string>
+    <string name="key_detail_groups_none">This key is not in any group.</string>
+    <string name="key_detail_groups_add">Add to group</string>
+    <string name="key_detail_groups_new">New group with this key</string>
+    <string name="key_detail_groups_remove_cd">Remove from %1$s</string>
+    <string name="restore_groups_added">Groups added</string>
+    <string name="restore_groups_merged">Groups with new keys</string>
+    <!-- 4.8.0 RC8 (#100) -->
+    <plurals name="qr_scan_missing_parts">
+        <item quantity="one">Still missing part %1$s.</item>
+        <item quantity="other">Still missing parts %1$s.</item>
+    </plurals>
+    <plurals name="qr_too_large_parts">
+        <item quantity="one">A QR code for this key would need %1$d part. The limit is %2$d.</item>
+        <item quantity="other">A QR code for this key would need %1$d parts. The limit is %2$d.</item>
+    </plurals>
+    <string name="qr_too_large_long_hint">Turn on Long QR codes in Settings to show it in up to %1$d parts, which only PGPony Android 4.8.0 or later can scan.</string>
+    <!-- %1$s is the qr_too_large_parts sentence, followed by qr_too_large_long_hint when it applies. -->
+    <string name="qr_too_large_with_parts">This key is too large for a QR code. %1$s Use Share or Copy instead.</string>
+    <string name="settings_qr_long_codes_title">Long QR codes</string>
+    <string name="settings_qr_long_codes_subtitle">Show a key that does not fit in %2$d QR parts in up to %1$d parts. Codes over %2$d parts only scan in PGPony Android 4.8.0 or later.</string>
+    <!-- 4.8.0 RC8 (#114) -->
+    <string name="settings_about_version_commit_format" translatable="false">%1$s (%2$s)</string>
 </resources>

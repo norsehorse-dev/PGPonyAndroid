@@ -211,6 +211,9 @@ class KeyRepository(
     // unchanged; production wiring in PGPonyApp passes both.
     private val fallbackDao: com.pgpony.android.data.FallbackKeyDao? = null,
     private val signingDefaultsDao: com.pgpony.android.data.SigningDefaultsDao? = null,
+    // 4.8.0 RC8 (item 4n): recipient group members, so a key deleted for good
+    // leaves every group. Nullable like the two above; PGPonyApp passes it.
+    private val groupDao: com.pgpony.android.data.groups.RecipientGroupDao? = null,
     private val crypto: PGPCryptoService = PGPCryptoService.shared,
     // Phase A6: revocation primitives. Default to the shared instance
     // since RevocationService is stateless; the parameter is here so
@@ -1410,7 +1413,8 @@ class KeyRepository(
     fun loadPublicKeyRingByCardFingerprint(fp: String): org.bouncycastle.openpgp.PGPPublicKeyRing? {
         loadPublicKeyRing(fp)?.let { return it }
         val entity = kotlinx.coroutines.runBlocking {
-            getAllKeys().firstOrNull {
+            // 4.8.0 RC8 (#115): plain read, this runs on the NFC thread.
+            getAllKeysPlain().firstOrNull {
                 it.cardSigFingerprint.equals(fp, ignoreCase = true) ||
                     it.cardDecFingerprint.equals(fp, ignoreCase = true) ||
                     it.cardAuthFingerprint.equals(fp, ignoreCase = true)
@@ -1431,7 +1435,7 @@ class KeyRepository(
     private suspend fun cardPlaceholderFor(ring: PGPPublicKeyRing): PGPKeyEntity? {
         val ringFps = ring.publicKeys.asSequence()
             .map { org.bouncycastle.util.encoders.Hex.toHexString(it.fingerprint).uppercase() }.toSet()
-        return getAllKeys().firstOrNull { e ->
+        return getAllKeysPlain().firstOrNull { e -> // 4.8.0 RC8 (#115): plain read, card flow
             e.isCardBacked && e.armoredPublicKey == null &&
                 listOfNotNull(e.cardSigFingerprint, e.cardDecFingerprint, e.cardAuthFingerprint)
                     .any { it.uppercase() in ringFps }
@@ -1443,7 +1447,7 @@ class KeyRepository(
     ): PGPKeyEntity? {
         if (fingerprints.isEmpty()) return null
         val wanted = fingerprints.map { it.uppercase() }.toSet()
-        for (entity in getAllKeys()) {
+        for (entity in getAllKeysPlain()) { // 4.8.0 RC8 (#115): plain read, card flow
             val ring = loadPublicKeyRing(entity.fingerprint) ?: continue
             val ringFps = ring.publicKeys.asSequence().map {
                 org.bouncycastle.util.encoders.Hex.toHexString(it.fingerprint).uppercase()
@@ -2362,11 +2366,30 @@ class KeyRepository(
         // when the referenced key is gone) but clean is clean.
         fallbackDao?.deleteAllReferencing(entity.fingerprint)
         signingDefaultsDao?.deleteFor(entity.fingerprint)
+        // 4.8.0 RC8 (item 4n): deleted for good, so out of every group.
+        leaveAllGroups(entity.fingerprint)
     }
 
     suspend fun deleteByFingerprint(fingerprint: String) {
         store.deleteKeys(fingerprint)
         dao.getByFingerprint(fingerprint)?.let { dao.delete(it) }
+        leaveAllGroups(fingerprint) // 4.8.0 RC8 (item 4n)
+    }
+
+    /**
+     * 4.8.0 RC8 (item 4n): a key deleted for good (purge from Recently Deleted,
+     * the automatic purge after the retention window, Empty, a hard delete,
+     * Clear All Data) is removed from every recipient group. A key moved to
+     * Recently Deleted stays a member, so restoring it puts it back.
+     */
+    private suspend fun leaveAllGroups(fingerprint: String) {
+        try {
+            groupDao?.removeFromAllGroups(com.pgpony.android.data.groups.RecipientGroups.normalize(fingerprint))
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // A failed group cleanup never stops the delete itself.
+        }
     }
 
     // ── §5.6.1 (#36 part 1) recycle bin ─────────────────────────────────
@@ -2424,6 +2447,7 @@ class KeyRepository(
         fallbackDao?.deleteAllReferencing(entity.fingerprint)
         signingDefaultsDao?.deleteFor(entity.fingerprint)
         runCatching { com.pgpony.android.crypto.SigningSubkeyPins.clear(entity.fingerprint) } // 4.7.0 (item 46)
+        leaveAllGroups(entity.fingerprint) // 4.8.0 RC8 (item 4n)
         dao.purgeById(entity.id)
     }
 
@@ -2480,7 +2504,49 @@ class KeyRepository(
 
     // ── Query ──────────────────────────────────────────────────────────
 
-    suspend fun getAllKeys(): List<PGPKeyEntity> = dao.getAllKeys()
+    // 4.8.0 RC8 (#115): every full keyring read also starts a background
+    // refresh of the trust worked out from your own Ultimate keys'
+    // certifications (see data/CertifiedTrust). It never waits for it: the
+    // answers land in Compose state and the screens redraw.
+    // The read's order is taken before the read (CertifiedTrust.nextSeq).
+    suspend fun getAllKeys(): List<PGPKeyEntity> {
+        val seq = com.pgpony.android.data.CertifiedTrust.nextSeq()
+        return dao.getAllKeys().also { refreshCertifiedTrustLater(seq, it) }
+    }
+
+    /** 4.8.0 RC8 (#115): the keyring without starting a trust refresh, for
+     *  lookups that run while a card is on the phone. */
+    suspend fun getAllKeysPlain(): List<PGPKeyEntity> = dao.getAllKeys()
+
+    /**
+     * 4.8.0 RC8 (#115): bring the trust worked out from certifications up to
+     * date now, for [fingerprints] only when given, for a caller that needs
+     * the answer before it goes on (the OpenPGP provider's confirmed checks,
+     * Key Details).
+     */
+    suspend fun ensureCertifiedTrust(fingerprints: Collection<String>? = null) {
+        try {
+            val seq = com.pgpony.android.data.CertifiedTrust.nextSeq()
+            com.pgpony.android.data.CertifiedTrust.refresh(
+                seq, dao.getAllKeys(), fingerprints, ::loadPublicKeyRing, ::localCertificationsOf, ::certificationStamp
+            )
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Trust shown stays as it was; the next read tries again.
+        }
+    }
+
+    private fun refreshCertifiedTrustLater(seq: Long, keys: List<PGPKeyEntity>) {
+        com.pgpony.android.data.CertifiedTrust.refreshLater(seq, keys, ::loadPublicKeyRing, ::localCertificationsOf, ::certificationStamp)
+    }
+
+    private fun localCertificationsOf(fingerprint: String): List<Pair<String, org.bouncycastle.openpgp.PGPSignature>> =
+        com.pgpony.android.crypto.CertificationService.decodeLocal(store.loadLocalCertifications(fingerprint))
+            .map { it.userId to it.signature }
+
+    private fun certificationStamp(fingerprint: String): String = store.blobStamp(fingerprint)
+
     suspend fun getKeyPairs(): List<PGPKeyEntity> = dao.getKeyPairs()
     suspend fun getByFingerprint(fp: String): PGPKeyEntity? = dao.getByFingerprint(fp)
 

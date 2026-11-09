@@ -185,6 +185,8 @@
     <string name="settings_more_passpony_subtitle">pass ve passage deponuz cebinizde</string>
     <string name="settings_more_relaypony_subtitle">Telefondan telefona şifreli dosya aktarımı</string>
     <string name="settings_more_scrubpony_subtitle">Görüntülerden kimlik belirleyici meta verileri silin. Tek bir piksel bile oynamaz.</string>
+    <string name="settings_more_tappony_subtitle">Bir NFC etiketine dokunun, kimliğini ve içeriğini kendi sunucunuza gönderin. Hesap yok, bulut yok.</string>
+    <string name="settings_more_hashpony_subtitle">Dosyaları sha256sum gibi özetleyin ve doğrulayın: sağlama toplamı dosyaları, klasör denetimleri ve tüm yaygın algoritmalar.</string>
     <string name="settings_more_source_title">Açık kaynak motor</string>
     <string name="settings_more_source_subtitle">GitHub\'daki PGPonyCore, denetlenmiş kripto çekirdeği</string>
     <string name="settings_more_appsource_title">Kaynak kodu</string>
@@ -3202,4 +3204,71 @@
         <item quantity="one">%1$d SSH anahtarı okunamadı ve bu yedekte yer almıyor.</item>
         <item quantity="other">%1$d SSH anahtarı okunamadı ve bu yedekte yer almıyor.</item>
     </plurals>
+    <!-- 4.8.0 RC8 (#115) -->
+    <string name="key_detail_trust_certified_by">%1$s anahtarınızla doğrulandı</string>
+    <string name="key_detail_trust_certified_by_uids">%1$s anahtarınızla %2$s için doğrulandı</string>
+    <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
+    <string name="groups_title">Gruplar</string>
+    <string name="groups_new">Yeni grup</string>
+    <string name="groups_empty">Henüz grup yok. Grup, Şifrele sekmesinde tek adımda alıcı olarak ekleyebileceğiniz, adı olan bir anahtar kümesidir.</string>
+    <string name="groups_load_failed">Gruplar okunamadı.</string>
+    <string name="groups_error_save">Gruptaki değişiklik kaydedilemedi.</string>
+    <plurals name="groups_member_count">
+        <item quantity="one">%1$d anahtar</item>
+        <item quantity="other">%1$d anahtar</item>
+    </plurals>
+    <plurals name="groups_member_deleted_count">
+        <item quantity="one">%1$d tanesi Son Silinenler\'de</item>
+        <item quantity="other">%1$d tanesi Son Silinenler\'de</item>
+    </plurals>
+    <string name="groups_name_label">Grup adı</string>
+    <string name="groups_name_blank">Bir ad girin.</string>
+    <string name="groups_name_too_long">En fazla %1$d karakter kullanın.</string>
+    <string name="groups_name_taken">Bu adda bir grup zaten var.</string>
+    <string name="groups_rename">Yeniden adlandır</string>
+    <string name="groups_rename_title">Grubu yeniden adlandır</string>
+    <string name="groups_edit_keys">Anahtarları düzenle</string>
+    <string name="groups_edit_keys_title">%1$s grubundaki anahtarlar</string>
+    <string name="groups_editor_no_keys">Anahtarlığınızda henüz anahtar yok.</string>
+    <string name="groups_delete_title">Bu grup silinsin mi?</string>
+    <string name="groups_delete_body">%1$s grubu silinecek. İçindeki anahtarlar anahtarlığınızda kalır.</string>
+    <string name="groups_keys_heading">Anahtarlar</string>
+    <string name="groups_save_as_group">Grup olarak kaydet</string>
+    <plurals name="groups_pick_added">
+        <item quantity="one">%2$s grubundan %1$d anahtar eklendi.</item>
+        <item quantity="other">%2$s grubundan %1$d anahtar eklendi.</item>
+    </plurals>
+    <string name="groups_pick_none">%1$s grubundaki anahtarların hiçbiri şu anda kullanılamıyor.</string>
+    <string name="groups_pick_left_out">Eklenmeyenler: %1$s</string>
+    <string name="groups_left_out_revoked">%1$s (geçersiz kılındı)</string>
+    <string name="groups_left_out_expired">%1$s (süresi doldu)</string>
+    <string name="groups_left_out_no_certificate">%1$s (henüz açık anahtar yok)</string>
+    <string name="groups_left_out_deleted">%1$s (Son Silinenler\'de)</string>
+    <string name="groups_left_out_missing">%1$s (anahtarlığınızda değil)</string>
+    <string name="groups_status_revoked">Geçersiz kılındı</string>
+    <string name="groups_status_expired">Süresi doldu</string>
+    <string name="groups_status_no_certificate">Henüz açık anahtar yok</string>
+    <string name="groups_status_deleted">Son Silinenler\'de</string>
+    <string name="groups_status_missing">Anahtarlığınızda değil</string>
+    <string name="key_detail_section_groups">Gruplar</string>
+    <string name="key_detail_groups_none">Bu anahtar hiçbir grupta değil.</string>
+    <string name="key_detail_groups_add">Gruba ekle</string>
+    <string name="key_detail_groups_new">Bu anahtarla yeni grup</string>
+    <string name="key_detail_groups_remove_cd">%1$s grubundan kaldır</string>
+    <string name="restore_groups_added">Eklenen gruplar</string>
+    <string name="restore_groups_merged">Yeni anahtar alan gruplar</string>
+    <!-- 4.8.0 RC8 (#100) -->
+    <plurals name="qr_scan_missing_parts">
+        <item quantity="one">Hâlâ eksik olan bölüm: %1$s.</item>
+        <item quantity="other">Hâlâ eksik olan bölümler: %1$s.</item>
+    </plurals>
+    <plurals name="qr_too_large_parts">
+        <item quantity="one">Bu anahtar için bir QR kodu %1$d bölüm gerektirir. Sınır %2$d.</item>
+        <item quantity="other">Bu anahtar için bir QR kodu %1$d bölüm gerektirir. Sınır %2$d.</item>
+    </plurals>
+    <string name="qr_too_large_long_hint">Anahtarı en fazla %1$d bölümde göstermek için Ayarlar\'da \"Uzun QR kodları\" seçeneğini açın. Bu kodlar yalnızca PGPony Android 4.8.0 veya sonraki sürümlerde taranabilir.</string>
+    <!-- %1$s is the qr_too_large_parts sentence, followed by qr_too_large_long_hint when it applies. -->
+    <string name="qr_too_large_with_parts">Bu anahtar bir QR kodu için çok büyük. %1$s Bunun yerine Paylaş veya Kopyala\'yı kullanın.</string>
+    <string name="settings_qr_long_codes_title">Uzun QR kodları</string>
+    <string name="settings_qr_long_codes_subtitle">%2$d QR bölümüne sığmayan bir anahtarı en fazla %1$d bölümde gösterir. %2$d bölümden uzun kodlar yalnızca PGPony Android 4.8.0 veya sonraki sürümlerde taranabilir.</string>
 </resources>

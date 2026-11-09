@@ -14,6 +14,10 @@
 // the same pairs for brainpool on its own, but has no default for secp256k1
 // and refuses it ("unknown curve"). The self-signatures use the same hash, so
 // the hash is never shorter than the curve.
+//
+// 4.8.0 RC8 (#109): NIST P-256, P-384 and P-521 the same way. The tester who
+// asked for brainpool found that a P-384 key imported but could not be
+// generated. P-521 takes SHA-512 + AES-256, as gpg writes it.
 
 package com.pgpony.android.crypto
 
@@ -52,6 +56,16 @@ internal object EcdsaKeygen {
     private val SECP256K1 = Curve(
         SECObjectIdentifiers.secp256k1, HashAlgorithmTags.SHA256, SymmetricKeyAlgorithmTags.AES_128
     )
+    // 4.8.0 RC8 (#109): the NIST curves (secp256r1 is the OID gpg calls nistp256).
+    private val NIST_P256 = Curve(
+        SECObjectIdentifiers.secp256r1, HashAlgorithmTags.SHA256, SymmetricKeyAlgorithmTags.AES_128
+    )
+    private val NIST_P384 = Curve(
+        SECObjectIdentifiers.secp384r1, HashAlgorithmTags.SHA384, SymmetricKeyAlgorithmTags.AES_192
+    )
+    private val NIST_P521 = Curve(
+        SECObjectIdentifiers.secp521r1, HashAlgorithmTags.SHA512, SymmetricKeyAlgorithmTags.AES_256
+    )
 
     /** The curve for [algorithm], or null when it is not a generatable ECDSA key. */
     fun curveFor(algorithm: KeyAlgorithm): Curve? = when (algorithm) {
@@ -59,6 +73,10 @@ internal object EcdsaKeygen {
         KeyAlgorithm.ECDSA_BRAINPOOL_P384 -> BRAINPOOL_P384
         KeyAlgorithm.ECDSA_BRAINPOOL_P512 -> BRAINPOOL_P512
         KeyAlgorithm.ECDSA_SECP256K1 -> SECP256K1
+        // 4.8.0 RC8 (#109)
+        KeyAlgorithm.ECDSA_NIST_P256 -> NIST_P256
+        KeyAlgorithm.ECDSA_NIST_P384 -> NIST_P384
+        KeyAlgorithm.ECDSA_NIST_P521 -> NIST_P521
         else -> null
     }
 

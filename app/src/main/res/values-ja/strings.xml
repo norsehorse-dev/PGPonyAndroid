@@ -1949,6 +1949,8 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="export_private_gpg_compat_caption">GnuPG (GPG4WIN) が期待する形式で複合鍵を出力し、そちらでインポートできるようにします。他のアプリではオフのままにしてください。</string>
     <string name="keyring_more_cd">その他</string>
     <string name="settings_more_scrubpony_subtitle">画像から識別可能なメタデータを除去します。ピクセルは移動しません。</string>
+    <string name="settings_more_tappony_subtitle">NFC タグに端末をかざすだけで、タグの ID と内容を自分のサーバーに送信。アカウントもクラウドも不要です。</string>
+    <string name="settings_more_hashpony_subtitle">sha256sum のようにファイルのハッシュを計算・検証。チェックサムファイル、フォルダー検証、主要なアルゴリズムすべてに対応。</string>
     <string name="settings_key_default_choose">デフォルトの鍵を選択</string>
     <string name="kd_avatar_hint_encrypt">ヒント: アバターをタップすると、この鍵に暗号化できます</string>
     <string name="kd_avatar_hint_decrypt">ヒント: アバターをタップすると、この鍵で復号できます</string>
@@ -3101,4 +3103,66 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <plurals name="ssh_backup_skipped">
         <item quantity="other">%1$d 個の SSH 鍵を読み取れなかったため、このバックアップには含まれていません。</item>
     </plurals>
+    <!-- 4.8.0 RC8 (#115) -->
+    <string name="key_detail_trust_certified_by">自分の鍵 %1$s によって確認済み</string>
+    <string name="key_detail_trust_certified_by_uids">自分の鍵 %1$s によって %2$s を確認済み</string>
+    <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
+    <string name="groups_title">グループ</string>
+    <string name="groups_new">新しいグループ</string>
+    <string name="groups_empty">グループはまだありません。グループは名前を付けた鍵のまとまりで、「暗号化」タブで一度に宛先として追加できます。</string>
+    <string name="groups_load_failed">グループを読み取れませんでした。</string>
+    <string name="groups_error_save">グループへの変更を保存できませんでした。</string>
+    <plurals name="groups_member_count">
+        <item quantity="other">%1$d 個の鍵</item>
+    </plurals>
+    <plurals name="groups_member_deleted_count">
+        <item quantity="other">「最近削除した項目」に %1$d 個</item>
+    </plurals>
+    <string name="groups_name_label">グループ名</string>
+    <string name="groups_name_blank">名前を入力してください。</string>
+    <string name="groups_name_too_long">%1$d 文字以内にしてください。</string>
+    <string name="groups_name_taken">この名前のグループはすでにあります。</string>
+    <string name="groups_rename">名前を変更</string>
+    <string name="groups_rename_title">グループの名前を変更</string>
+    <string name="groups_edit_keys">鍵を編集</string>
+    <string name="groups_edit_keys_title">%1$s の鍵</string>
+    <string name="groups_editor_no_keys">鍵束にはまだ鍵がありません。</string>
+    <string name="groups_delete_title">このグループを削除しますか？</string>
+    <string name="groups_delete_body">%1$s は削除されます。グループ内の鍵は鍵束に残ります。</string>
+    <string name="groups_keys_heading">鍵</string>
+    <string name="groups_save_as_group">グループとして保存</string>
+    <plurals name="groups_pick_added">
+        <item quantity="other">%2$s から %1$d 個の鍵を追加しました。</item>
+    </plurals>
+    <string name="groups_pick_none">%1$s には今使える鍵がありません。</string>
+    <string name="groups_pick_left_out">追加しなかった鍵: %1$s</string>
+    <string name="groups_left_out_revoked">%1$s（失効済み）</string>
+    <string name="groups_left_out_expired">%1$s（期限切れ）</string>
+    <string name="groups_left_out_no_certificate">%1$s（公開鍵がまだありません）</string>
+    <string name="groups_left_out_deleted">%1$s（「最近削除した項目」にあります）</string>
+    <string name="groups_left_out_missing">%1$s（鍵束にありません）</string>
+    <string name="groups_status_revoked">失効済み</string>
+    <string name="groups_status_expired">期限切れ</string>
+    <string name="groups_status_no_certificate">公開鍵がまだありません</string>
+    <string name="groups_status_deleted">「最近削除した項目」にあります</string>
+    <string name="groups_status_missing">鍵束にありません</string>
+    <string name="key_detail_section_groups">グループ</string>
+    <string name="key_detail_groups_none">この鍵はどのグループにも入っていません。</string>
+    <string name="key_detail_groups_add">グループに追加</string>
+    <string name="key_detail_groups_new">この鍵で新しいグループを作成</string>
+    <string name="key_detail_groups_remove_cd">%1$s から削除</string>
+    <string name="restore_groups_added">グループを追加</string>
+    <string name="restore_groups_merged">新しい鍵が加わったグループ</string>
+    <!-- 4.8.0 RC8 (#100) -->
+    <plurals name="qr_scan_missing_parts">
+        <item quantity="other">まだ読み取れていないパート: %1$s</item>
+    </plurals>
+    <plurals name="qr_too_large_parts">
+        <item quantity="other">この鍵を QR コードにするには %1$d パートが必要です。上限は %2$d パートです。</item>
+    </plurals>
+    <string name="qr_too_large_long_hint">設定で「長い QR コード」をオンにすると、最大 %1$d パートで表示できます。ただし、読み取れるのは PGPony Android 4.8.0 以降だけです。</string>
+    <!-- %1$s is the qr_too_large_parts sentence, followed by qr_too_large_long_hint when it applies. -->
+    <string name="qr_too_large_with_parts">この鍵は QR コードには大きすぎます。%1$s共有またはコピーをお使いください。</string>
+    <string name="settings_qr_long_codes_title">長い QR コード</string>
+    <string name="settings_qr_long_codes_subtitle">%2$d パートの QR コードに収まらない鍵を、最大 %1$d パートで表示します。%2$d パートを超えるコードは PGPony Android 4.8.0 以降でのみ読み取れます。</string>
 </resources>

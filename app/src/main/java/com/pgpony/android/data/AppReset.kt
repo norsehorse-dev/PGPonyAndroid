@@ -72,7 +72,8 @@ object AppReset {
         // well keeps that true if they ever move.
         failures.attempt { pgpony.sshKeyStore.deleteAll() }
         // Provider and SSH approvals (allowed_api_clients), Autocrypt peers and
-        // every other table.
+        // every other table. 4.8.0 RC8 (item 4n): the recipient groups too; the
+        // purges above already took each deleted key out of them.
         failures.attempt { pgpony.database.clearAllTables() }
 
         // Settings: the whole prefs file (onboarding_completed, biometric_lock,

@@ -20,6 +20,9 @@ object NavRoutes {
     // back stack saved by an earlier build (the system restores it after a
     // recreate) still resolves; it sits under the Keyring either way.
     const val CONTACTS = "contacts"
+
+    // 4.8.0 RC8 (item 4n): Keyring > Groups, a pushed page like Recently Deleted.
+    const val GROUPS = "groups"
 }
 
 /**
@@ -31,14 +34,14 @@ val bottomNavRoutes: List<String> = listOf(
 
 /**
  * Top-level routes that belong to the Keyring tab: the NFC/card flow, the
- * recycle bin and (4.8.0 RC6) Contacts, reached from the Keyring but
+ * recycle bin, (4.8.0 RC6) Contacts and (4.8.0 RC8) Groups, reached from the Keyring but
  * registered as their own destinations. Tapping the Keyring tab from any of
  * them returns to the list.
  */
 val keyringOwnedRoutes: Set<String> = setOf(
     "card_scan", "card_pin_change", "card_keygen",
     "card_management", "card_sign", "card_decrypt", "recently_deleted",
-    NavRoutes.CONTACTS
+    NavRoutes.CONTACTS, NavRoutes.GROUPS
 )
 
 /**

@@ -385,6 +385,7 @@ private fun ReviewKeyRow(
             }
         }
         Spacer(modifier = Modifier.width(8.dp))
-        TrustMark(trust = key.trustLevel, size = 18.dp)
+        // 4.8.0 RC8 (#115): the shown level, as on the Keyring.
+        TrustMark(trust = com.pgpony.android.data.CertifiedTrust.effective(key), size = 18.dp)
     }
 }
