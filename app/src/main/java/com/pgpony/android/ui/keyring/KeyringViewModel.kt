@@ -119,6 +119,11 @@ data class KeyringUiState(
     val granularBaseV6: Boolean = true,
     // 4.8.0 (item 4i): switching to v4 removed subkeys a v4 key can't hold.
     val granularDroppedForV4: Boolean = false,
+    // 4.8.0 RC10 (#109): switching to v6 removed subkeys a v6 key can't hold
+    // (RSA, ECDSA and ECDH), which the v6 assembly would otherwise refuse.
+    val granularDroppedForV6: Boolean = false,
+    // 4.8.0 RC10 (#109): the curve the composer's ECDSA and ECDH entries use (v4 base).
+    val granularEcdsaCurve: KeyAlgorithm = KeyAlgorithm.ECDSA_NIST_P256,
     // 4.8.0 (item 4j): the user set the default encryption subkey switch, so
     // the composer stops choosing its value from the subkey list.
     val granularIncludeDefaultTouched: Boolean = false,
@@ -618,6 +623,8 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             granularSubkeys = emptyList(),
             granularBaseV6 = true,
             granularDroppedForV4 = false,
+            granularDroppedForV6 = false,
+            granularEcdsaCurve = KeyAlgorithm.ECDSA_NIST_P256,
             granularIncludeDefaultTouched = false,
             errorMessage = null
         )
@@ -681,12 +688,26 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
         val s = _state.value
         if (v6 == s.granularBaseV6) return
         if (v6) {
-            _state.value = s.copy(granularBaseV6 = true, granularDroppedForV4 = false)
+            // 4.8.0 RC10 (#109): RSA, ECDSA and ECDH stay on a v4 base.
+            val keptV6 = GranularComposer.keptForV6(s.granularSubkeys)
+            _state.value = s.copy(
+                granularBaseV6 = true, granularDroppedForV4 = false,
+                granularDroppedForV6 = keptV6.size != s.granularSubkeys.size
+            )
+            setGranularSubkeys(keptV6, keepDroppedNote = true)
             return
         }
         val kept = GranularComposer.keptForV4(s.granularSubkeys)
-        _state.value = s.copy(granularBaseV6 = false, granularDroppedForV4 = kept.size != s.granularSubkeys.size)
+        _state.value = s.copy(
+            granularBaseV6 = false, granularDroppedForV6 = false,
+            granularDroppedForV4 = kept.size != s.granularSubkeys.size
+        )
         setGranularSubkeys(kept, keepDroppedNote = true)
+    }
+
+    /** 4.8.0 RC10 (#109): the curve the composer's ECDSA and ECDH entries use. */
+    fun setGranularEcdsaCurve(curve: KeyAlgorithm) {
+        if (curve in KeyAlgorithm.generatableEcdsa) _state.value = _state.value.copy(granularEcdsaCurve = curve)
     }
 
     private fun setGranularSubkeys(list: List<AddSubkeyChoice>, keepDroppedNote: Boolean = false) {
@@ -694,6 +715,7 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
         _state.value = s.copy(
             granularSubkeys = list,
             granularDroppedForV4 = keepDroppedNote && s.granularDroppedForV4,
+            granularDroppedForV6 = keepDroppedNote && s.granularDroppedForV6,
             granularIncludeDefaultEncryption = if (s.granularIncludeDefaultTouched) s.granularIncludeDefaultEncryption
                 else GranularComposer.defaultEncryptionSubkey(list)
         )
@@ -1480,20 +1502,37 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
  */
 object GranularComposer {
 
-    /** The Add subkey menu for [baseV6], given the subkeys already [chosen]. */
-    fun menu(baseV6: Boolean, chosen: List<AddSubkeyChoice>): List<AddSubkeyChoice> {
-        val all = AddSubkeyChoice.classicalFor(isV6 = baseV6) + AddSubkeyChoice.postQuantumFor(isV6 = baseV6)
+    /**
+     * The Add subkey menu for [baseV6], given the subkeys already [chosen].
+     * 4.8.0 RC10 (#109): the same list Add subkey shows in Key Details for a key
+     * of that version (AddSubkeyChoice.optionsFor, same order and labels), with
+     * ECDSA and ECDH on [curve]. The one difference: a v4 base takes a single
+     * ML-KEM-768 subkey here, because Bouncy Castle cannot carry that subkey
+     * through a later edit, so the composer grafts it last and only once.
+     */
+    fun menu(
+        baseV6: Boolean,
+        chosen: List<AddSubkeyChoice>,
+        curve: KeyAlgorithm = KeyAlgorithm.ECDSA_NIST_P256
+    ): List<AddSubkeyChoice> {
+        val all = AddSubkeyChoice.optionsFor(
+            if (baseV6) AddSubkeyChoice.Base.V6 else AddSubkeyChoice.Base.V4, curve
+        )
         if (baseV6 || chosen.none { it is AddSubkeyChoice.PqEncryption }) return all
         return all.filterNot { it is AddSubkeyChoice.PqEncryption }
     }
 
+    /** 4.8.0 RC10 (#109): [chosen] with what a v6 base can't hold removed: RSA, ECDSA and ECDH. */
+    fun keptForV6(chosen: List<AddSubkeyChoice>): List<AddSubkeyChoice> =
+        chosen.filter { AddSubkeyChoice.allowedOn(AddSubkeyChoice.Base.V6, it) }
+
     /** [chosen] with what a v4 base can't hold removed: ML-DSA, ML-KEM-1024, a second ML-KEM-768. */
     fun keptForV4(chosen: List<AddSubkeyChoice>): List<AddSubkeyChoice> {
-        val allowed = (AddSubkeyChoice.classicalFor(isV6 = false) + AddSubkeyChoice.postQuantumFor(isV6 = false)).toSet()
         var pqKept = false
         return chosen.filter { c ->
             when {
-                c !in allowed -> false
+                // 4.8.0 RC10 (#109): the shared rule, which also keeps ECDSA and ECDH on any curve.
+                !AddSubkeyChoice.allowedOn(AddSubkeyChoice.Base.V4, c) -> false
                 c is AddSubkeyChoice.PqEncryption -> if (pqKept) false else { pqKept = true; true }
                 else -> true
             }

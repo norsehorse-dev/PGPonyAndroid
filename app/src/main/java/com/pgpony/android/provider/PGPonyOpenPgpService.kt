@@ -1872,7 +1872,7 @@ class PGPonyOpenPgpService : Service() {
         // confirmed only through a certified User ID with the sender's
         // address (or, with no sender address, the User ID shown for it).
         // Checked now for this key: this process may not have refreshed yet.
-        if (com.pgpony.android.crypto.TrustFromCertification.canRaise(entity.trustLevel, entity.isOwnKey)) {
+        if (com.pgpony.android.crypto.TrustFromCertification.canRaise(entity.trustLevel)) {
             runBlocking { repo.ensureCertifiedTrust(listOf(entity.fingerprint)) }
         }
         val ringUserIds: List<String> =

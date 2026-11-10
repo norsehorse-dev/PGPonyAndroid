@@ -1158,6 +1158,8 @@ fun KeyDetailScreen(
             errorMessage = state.addSubkeyError,
             isV6 = keyForAddSubkey.isV6Key,
             isCompositeSign = keyForAddSubkey.algorithm.isCompositeSign,
+            // 4.8.0 RC10 (#109): an ECDSA key's subkey list starts on its own curve.
+            keyAlgorithm = keyForAddSubkey.algorithm,
             onApply = { choice, expiresAt, passphrase ->
                 viewModel.addSubkey(choice, expiresAt, passphrase)
             },

@@ -2123,7 +2123,7 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="key_detail_action_copy_ssh_key">SSH 公開鍵をコピー</string>
     <string name="key_detail_ssh_key_copied">SSH 公開鍵をコピーしました</string>
     <string name="keyring_generate_ssh_auth_toggle">SSH 認証サブキーを追加</string>
-    <string name="keyring_generate_ssh_auth_caption">ssh-agent ブリッジ経由で SSH によりサーバーにログインするためのサブキーです。RSA 鍵には RSA、それ以外の鍵には Ed25519 を使います。</string>
+    <string name="keyring_generate_ssh_auth_caption">ssh-agent ブリッジ経由で SSH によりサーバーにログインするためのサブキーです。RSA 鍵には RSA、NIST ECDSA 鍵には ECDSA、それ以外の鍵には Ed25519 を使います。</string>
     <string name="keyring_generate_ssh_auth_failed">鍵は作成されましたが、SSH サブキーを追加できませんでした: %1$s。鍵の詳細から追加できます。</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">Termux からの SSH</string>
@@ -3106,6 +3106,9 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <!-- 4.8.0 RC8 (#115) -->
     <string name="key_detail_trust_certified_by">自分の鍵 %1$s によって確認済み</string>
     <string name="key_detail_trust_certified_by_uids">自分の鍵 %1$s によって %2$s を確認済み</string>
+    <!-- 4.8.0 RC10 (#115) -->
+    <string name="key_detail_trust_certified_by_introducer">自分の鍵 %2$s の信頼された紹介者 %1$s によって確認済み</string>
+    <string name="key_detail_trust_certified_by_introducer_uids">自分の鍵 %2$s の信頼された紹介者 %1$s によって %3$s を確認済み</string>
     <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
     <string name="groups_title">グループ</string>
     <string name="groups_new">新しいグループ</string>
@@ -3165,4 +3168,14 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="qr_too_large_with_parts">この鍵は QR コードには大きすぎます。%1$s共有またはコピーをお使いください。</string>
     <string name="settings_qr_long_codes_title">長い QR コード</string>
     <string name="settings_qr_long_codes_subtitle">%2$d パートの QR コードに収まらない鍵を、最大 %1$d パートで表示します。%2$d パートを超えるコードは PGPony Android 4.8.0 以降でのみ読み取れます。</string>
+    <!-- 4.8.0 RC10 (#109) -->
+    <string name="key_detail_add_subkey_group_sign">署名</string>
+    <string name="key_detail_add_subkey_group_auth">認証</string>
+    <string name="key_detail_add_subkey_group_encrypt">暗号化</string>
+    <string name="key_detail_add_subkey_curve_label">ECDSA と ECDH の曲線</string>
+    <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s（署名）</string>
+    <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s（認証）</string>
+    <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s（暗号化）</string>
+    <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH で使える ECDSA は NIST 曲線のみです。この曲線の認証サブキーはセキュリティキー用です。</string>
+    <string name="keyring_generate_granular_dropped_for_v6">v6 鍵には選択したサブキーの一部を含められないため、それらを削除しました。</string>
 </resources>

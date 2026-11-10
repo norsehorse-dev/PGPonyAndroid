@@ -46,7 +46,8 @@ fun EditNotationsSheet(
     onApply: (notations: List<UserIdService.Notation>, passphrase: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // 4.8.0 RC10 (#109): a swipe does not close this form; back and Cancel do.
+    val sheetState = com.pgpony.android.ui.components.rememberFormSheetState()
 
     val rows = remember {
         mutableStateListOf<NotationDraft>().apply {

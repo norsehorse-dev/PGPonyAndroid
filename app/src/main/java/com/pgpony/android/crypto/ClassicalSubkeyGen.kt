@@ -73,7 +73,19 @@ object ClassicalSubkeyGen {
      */
     enum class Capability { SIGN, ENCRYPT, AUTHENTICATE }
 
-    enum class ClassicalSubkeyType(val displayName: String, val capability: Capability) {
+    /**
+     * 4.8.0 RC10 (#109): the ECDSA (sign, authenticate) and ECDH (encrypt)
+     * entries carry their [curve], one of KeyAlgorithm.generatableEcdsa. They
+     * are v4 only, like the keys PGPony generates on those curves, and are
+     * made with the same curve parameters (EcdsaKeygen). An Authenticate
+     * subkey on brainpool or secp256k1 is for a security key's AUT slot: SSH
+     * has no key type for those curves, so SshAuth passes it over.
+     */
+    enum class ClassicalSubkeyType(
+        val displayName: String,
+        val capability: Capability,
+        val curve: KeyAlgorithm? = null
+    ) {
         RSA_2048_SIGN("RSA 2048 (Sign)", Capability.SIGN),
         RSA_2048_ENCRYPT("RSA 2048 (Encrypt)", Capability.ENCRYPT),
         RSA_4096_SIGN("RSA 4096 (Sign)", Capability.SIGN),
@@ -82,7 +94,35 @@ object ClassicalSubkeyGen {
         RSA_4096_AUTH("RSA 4096 (Authenticate)", Capability.AUTHENTICATE),
         ED25519_SIGN("Ed25519 (Sign)", Capability.SIGN),
         ED25519_AUTH("Ed25519 (Authenticate)", Capability.AUTHENTICATE),
-        X25519_ENCRYPT("X25519 (Encrypt)", Capability.ENCRYPT)
+        X25519_ENCRYPT("X25519 (Encrypt)", Capability.ENCRYPT),
+        // 4.8.0 RC10 (#109)
+        ECDSA_P256_SIGN("ECDSA NIST P-256 (Sign)", Capability.SIGN, KeyAlgorithm.ECDSA_NIST_P256),
+        ECDSA_P256_AUTH("ECDSA NIST P-256 (Authenticate)", Capability.AUTHENTICATE, KeyAlgorithm.ECDSA_NIST_P256),
+        ECDH_P256_ENCRYPT("ECDH NIST P-256 (Encrypt)", Capability.ENCRYPT, KeyAlgorithm.ECDSA_NIST_P256),
+        ECDSA_P384_SIGN("ECDSA NIST P-384 (Sign)", Capability.SIGN, KeyAlgorithm.ECDSA_NIST_P384),
+        ECDSA_P384_AUTH("ECDSA NIST P-384 (Authenticate)", Capability.AUTHENTICATE, KeyAlgorithm.ECDSA_NIST_P384),
+        ECDH_P384_ENCRYPT("ECDH NIST P-384 (Encrypt)", Capability.ENCRYPT, KeyAlgorithm.ECDSA_NIST_P384),
+        ECDSA_P521_SIGN("ECDSA NIST P-521 (Sign)", Capability.SIGN, KeyAlgorithm.ECDSA_NIST_P521),
+        ECDSA_P521_AUTH("ECDSA NIST P-521 (Authenticate)", Capability.AUTHENTICATE, KeyAlgorithm.ECDSA_NIST_P521),
+        ECDH_P521_ENCRYPT("ECDH NIST P-521 (Encrypt)", Capability.ENCRYPT, KeyAlgorithm.ECDSA_NIST_P521),
+        ECDSA_BP256_SIGN("ECDSA brainpoolP256r1 (Sign)", Capability.SIGN, KeyAlgorithm.ECDSA_BRAINPOOL_P256),
+        ECDSA_BP256_AUTH("ECDSA brainpoolP256r1 (Authenticate)", Capability.AUTHENTICATE, KeyAlgorithm.ECDSA_BRAINPOOL_P256),
+        ECDH_BP256_ENCRYPT("ECDH brainpoolP256r1 (Encrypt)", Capability.ENCRYPT, KeyAlgorithm.ECDSA_BRAINPOOL_P256),
+        ECDSA_BP384_SIGN("ECDSA brainpoolP384r1 (Sign)", Capability.SIGN, KeyAlgorithm.ECDSA_BRAINPOOL_P384),
+        ECDSA_BP384_AUTH("ECDSA brainpoolP384r1 (Authenticate)", Capability.AUTHENTICATE, KeyAlgorithm.ECDSA_BRAINPOOL_P384),
+        ECDH_BP384_ENCRYPT("ECDH brainpoolP384r1 (Encrypt)", Capability.ENCRYPT, KeyAlgorithm.ECDSA_BRAINPOOL_P384),
+        ECDSA_BP512_SIGN("ECDSA brainpoolP512r1 (Sign)", Capability.SIGN, KeyAlgorithm.ECDSA_BRAINPOOL_P512),
+        ECDSA_BP512_AUTH("ECDSA brainpoolP512r1 (Authenticate)", Capability.AUTHENTICATE, KeyAlgorithm.ECDSA_BRAINPOOL_P512),
+        ECDH_BP512_ENCRYPT("ECDH brainpoolP512r1 (Encrypt)", Capability.ENCRYPT, KeyAlgorithm.ECDSA_BRAINPOOL_P512),
+        ECDSA_SECP256K1_SIGN("ECDSA secp256k1 (Sign)", Capability.SIGN, KeyAlgorithm.ECDSA_SECP256K1),
+        ECDSA_SECP256K1_AUTH("ECDSA secp256k1 (Authenticate)", Capability.AUTHENTICATE, KeyAlgorithm.ECDSA_SECP256K1),
+        ECDH_SECP256K1_ENCRYPT("ECDH secp256k1 (Encrypt)", Capability.ENCRYPT, KeyAlgorithm.ECDSA_SECP256K1);
+
+        companion object {
+            /** 4.8.0 RC10 (#109): the ECDSA or ECDH entry for [curve] and [capability], or null. */
+            fun ecdsa(curve: KeyAlgorithm, capability: Capability): ClassicalSubkeyType? =
+                entries.firstOrNull { it.curve == curve && it.capability == capability }
+        }
     }
 
     class SubkeyAddError(message: String, cause: Throwable? = null) : Exception(message, cause)
@@ -91,11 +131,18 @@ object ClassicalSubkeyGen {
      * 4.6.0 (item 16): the SSH authentication subkey keygen adds to a new key
      * of [algorithm]. An RSA key gets an RSA subkey (2048 for RSA 2048, 4096
      * for larger sizes) so it stays all-RSA for servers and policies that
-     * expect it; every other key gets Ed25519.
+     * expect it; every other key gets Ed25519. 4.8.0 RC10 (#109): a NIST
+     * ECDSA key gets ECDSA on its curve.
      */
     fun sshAuthTypeFor(algorithm: KeyAlgorithm): ClassicalSubkeyType = when (algorithm) {
         KeyAlgorithm.RSA_2048 -> ClassicalSubkeyType.RSA_2048_AUTH
         KeyAlgorithm.RSA_3072, KeyAlgorithm.RSA_4096, KeyAlgorithm.RSA_8192 -> ClassicalSubkeyType.RSA_4096_AUTH
+        // 4.8.0 RC10 (#109): a NIST ECDSA key gets an ECDSA subkey on its own
+        // curve, which SSH takes; brainpool and secp256k1 have no SSH type, so
+        // they keep Ed25519 for SSH.
+        KeyAlgorithm.ECDSA_NIST_P256 -> ClassicalSubkeyType.ECDSA_P256_AUTH
+        KeyAlgorithm.ECDSA_NIST_P384 -> ClassicalSubkeyType.ECDSA_P384_AUTH
+        KeyAlgorithm.ECDSA_NIST_P521 -> ClassicalSubkeyType.ECDSA_P521_AUTH
         else -> ClassicalSubkeyType.ED25519_AUTH
     }
 
@@ -177,8 +224,12 @@ object ClassicalSubkeyGen {
         // not cross-certified and PGPony's own binding check did not count it
         // as a signer. BC embeds the back-signature when given the subkey's
         // signer builder.
+        // 4.8.0 RC10 (#109): an ECDSA subkey's back-signature uses a hash as long as its curve.
         val backSigner = if (type.capability == Capability.SIGN) {
-            BcPGPContentSignerBuilder(subKeyPair.publicKey.algorithm, HashAlgorithmTags.SHA256)
+            BcPGPContentSignerBuilder(
+                subKeyPair.publicKey.algorithm,
+                EcCurveOid.signatureHash(subKeyPair.publicKey, HashAlgorithmTags.SHA256)
+            )
         } else null
         try {
             gen.addSubKey(subKeyPair, hashedGen.generate(), unhashedGen.generate(), backSigner)
@@ -247,7 +298,11 @@ object ClassicalSubkeyGen {
         }
         if (type.capability == Capability.SIGN) {
             // 4.7.0 (item 39): the back-signature is made by the new subkey.
-            val back = PonySigGen(BcPGPContentSignerBuilder(subPub.algorithm, HashAlgorithmTags.SHA256), subPub)
+            // 4.8.0 RC10 (#109): as long as an ECDSA subkey's curve.
+            val back = PonySigGen(
+                BcPGPContentSignerBuilder(subPub.algorithm, EcCurveOid.signatureHash(subPub, HashAlgorithmTags.SHA256)),
+                subPub
+            )
             back.init(PGPSignature.PRIMARYKEY_BINDING, subPriv)
             hashedGen.setEmbeddedSignature(false, back.generateCertification(primaryPub, subPub))
         }
@@ -310,6 +365,33 @@ object ClassicalSubkeyGen {
         type: ClassicalSubkeyType,
         random: SecureRandom,
         creationTime: Date
+    ): PGPKeyPair {
+        // 4.8.0 RC10 (#109): ECDSA or ECDH on one of the generated curves.
+        type.curve?.let { return ecKeyPair(it, type.capability == Capability.ENCRYPT, random, creationTime) }
+        return classicalKeyPair(type, random, creationTime)
+    }
+
+    /**
+     * 4.8.0 RC10 (#109): an ECDSA (algo 19) or ECDH (algo 18) v4 key pair on
+     * [curve], with the curve parameters and ECDH KDF of a generated key on
+     * that curve (EcdsaKeygen), so an added subkey matches one PGPony would
+     * have generated.
+     */
+    private fun ecKeyPair(curve: KeyAlgorithm, encrypt: Boolean, random: SecureRandom, creationTime: Date): PGPKeyPair {
+        val params = EcdsaKeygen.curveFor(curve)
+            ?: throw SubkeyAddError("Cannot make a subkey on ${curve.shortName}")
+        val pair = EcdsaKeygen.generateKeyPair(params, random)
+        return if (encrypt) {
+            BcPGPKeyPair(PublicKeyPacket.VERSION_4, PublicKeyAlgorithmTags.ECDH, EcdsaKeygen.kdfParameters(params), pair, creationTime)
+        } else {
+            BcPGPKeyPair(PublicKeyPacket.VERSION_4, PublicKeyAlgorithmTags.ECDSA, pair, creationTime)
+        }
+    }
+
+    private fun classicalKeyPair(
+        type: ClassicalSubkeyType,
+        random: SecureRandom,
+        creationTime: Date
     ): PGPKeyPair = when (type) {
         ClassicalSubkeyType.RSA_2048_SIGN, ClassicalSubkeyType.RSA_2048_ENCRYPT,
         ClassicalSubkeyType.RSA_2048_AUTH ->
@@ -331,6 +413,7 @@ object ClassicalSubkeyGen {
             xGen.init(X25519KeyGenerationParameters(random))
             BcPGPKeyPair(PublicKeyAlgorithmTags.ECDH, xGen.generateKeyPair(), creationTime)
         }
+        else -> throw SubkeyAddError("Unsupported subkey type ${type.displayName}")
     }
 
     private fun rsaKeyPair(bits: Int, random: SecureRandom, creationTime: Date): PGPKeyPair {

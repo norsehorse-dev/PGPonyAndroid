@@ -2184,7 +2184,7 @@
     <string name="key_detail_action_copy_ssh_key">SSH 공개 키 복사</string>
     <string name="key_detail_ssh_key_copied">SSH 공개 키를 복사했습니다</string>
     <string name="keyring_generate_ssh_auth_toggle">SSH 인증 보조 키 추가</string>
-    <string name="keyring_generate_ssh_auth_caption">ssh-agent 브리지를 통해 SSH로 서버에 로그인하기 위한 보조 키입니다. RSA 키에는 RSA, 그 밖의 키에는 Ed25519를 사용합니다.</string>
+    <string name="keyring_generate_ssh_auth_caption">ssh-agent 브리지를 통해 SSH로 서버에 로그인하기 위한 보조 키입니다. RSA 키에는 RSA, NIST ECDSA 키에는 ECDSA, 그 밖의 키에는 Ed25519를 사용합니다.</string>
     <string name="keyring_generate_ssh_auth_failed">키가 생성되었지만 SSH 보조 키를 추가하지 못했습니다: %1$s. 키 세부 정보에서 추가할 수 있습니다.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">Termux에서 SSH</string>
@@ -3178,6 +3178,9 @@
     <!-- 4.8.0 RC8 (#115) -->
     <string name="key_detail_trust_certified_by">내 키 %1$s에 의해 검증됨</string>
     <string name="key_detail_trust_certified_by_uids">내 키 %1$s에 의해 검증됨: %2$s</string>
+    <!-- 4.8.0 RC10 (#115) -->
+    <string name="key_detail_trust_certified_by_introducer">내 키 %2$s의 신뢰하는 소개자 %1$s에 의해 검증됨</string>
+    <string name="key_detail_trust_certified_by_introducer_uids">내 키 %2$s의 신뢰하는 소개자 %1$s에 의해 검증됨: %3$s</string>
     <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
     <string name="groups_title">그룹</string>
     <string name="groups_new">새 그룹</string>
@@ -3237,4 +3240,14 @@
     <string name="qr_too_large_with_parts">이 키는 QR 코드에 담기 너무 큽니다. %1$s 대신 공유나 복사를 사용하세요.</string>
     <string name="settings_qr_long_codes_title">긴 QR 코드</string>
     <string name="settings_qr_long_codes_subtitle">QR 코드 %2$d 부에 담기지 않는 키를 최대 %1$d 부로 표시합니다. %2$d 부를 넘는 코드는 PGPony Android 4.8.0 이상에서만 스캔할 수 있습니다.</string>
+    <!-- 4.8.0 RC10 (#109) -->
+    <string name="key_detail_add_subkey_group_sign">서명</string>
+    <string name="key_detail_add_subkey_group_auth">인증</string>
+    <string name="key_detail_add_subkey_group_encrypt">암호화</string>
+    <string name="key_detail_add_subkey_curve_label">ECDSA 및 ECDH 곡선</string>
+    <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (서명)</string>
+    <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (인증)</string>
+    <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (암호화)</string>
+    <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH는 NIST 곡선의 ECDSA만 지원합니다. 이 곡선의 인증 보조 키는 보안 키용입니다.</string>
+    <string name="keyring_generate_granular_dropped_for_v6">v6 키에는 선택한 보조 키 중 일부를 담을 수 없어 제거했습니다.</string>
 </resources>

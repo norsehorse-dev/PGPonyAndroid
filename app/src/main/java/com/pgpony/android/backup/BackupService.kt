@@ -2,9 +2,10 @@
 // PGPony Android — 4.0.0 Phase 3 (encrypted keyring backup)
 //
 // Export/restore the whole keyring as one passphrase-encrypted file that
-// cross-restores with iOS PGPony 8.0.0 and standard OpenPGP tools. See
-// BACKUP_FORMAT_4_0_0.md for the byte-level spec (reverse-engineered from
-// a real iOS backup and validated against GNU tar + Python tarfile).
+// cross-restores with iOS PGPony 8.0.0 and standard OpenPGP tools. The
+// format is written down in docs/PGPONY_BACKUP_FORMAT.md (4.8.0 RC10; first
+// reverse-engineered from a real iOS backup and validated against GNU tar
+// and Python tarfile).
 //
 // Container: uncompressed ustar TAR — pgpony-meta.json first, then
 // keys/<fingerprint>.asc per key, then an additive pgpony-settings.json

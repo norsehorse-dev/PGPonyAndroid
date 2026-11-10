@@ -1812,13 +1812,13 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="key_detail_add_subkey_passphrase_label">Phrase secrète</string>
     <string name="key_detail_add_subkey_sheet_subtitle">Nouvelle sous-clé pour %1$s</string>
     <string name="key_detail_add_subkey_sheet_title">Ajouter une sous-clé</string>
-    <string name="key_detail_add_subkey_type_ed25519_sign">Ed25519 (Signature)</string>
+    <string name="key_detail_add_subkey_type_ed25519_sign">Ed25519 (Signer)</string>
     <string name="key_detail_add_subkey_type_label">Type de clé</string>
-    <string name="key_detail_add_subkey_type_rsa_2048_encrypt">RSA 2048 (Chiffrement)</string>
-    <string name="key_detail_add_subkey_type_rsa_2048_sign">RSA 2048 (Signature)</string>
-    <string name="key_detail_add_subkey_type_rsa_4096_encrypt">RSA 4096 (Chiffrement)</string>
-    <string name="key_detail_add_subkey_type_rsa_4096_sign">RSA 4096 (Signature)</string>
-    <string name="key_detail_add_subkey_type_x25519_encrypt">X25519 (Chiffrement)</string>
+    <string name="key_detail_add_subkey_type_rsa_2048_encrypt">RSA 2048 (Chiffrer)</string>
+    <string name="key_detail_add_subkey_type_rsa_2048_sign">RSA 2048 (Signer)</string>
+    <string name="key_detail_add_subkey_type_rsa_4096_encrypt">RSA 4096 (Chiffrer)</string>
+    <string name="key_detail_add_subkey_type_rsa_4096_sign">RSA 4096 (Signer)</string>
+    <string name="key_detail_add_subkey_type_x25519_encrypt">X25519 (Chiffrer)</string>
     <string name="key_detail_add_userid_apply">Ajouter un ID utilisateur</string>
     <string name="key_detail_notations_title">Notations</string>
     <string name="key_detail_notations_empty">Aucune notation sur cette clé.</string>
@@ -2130,7 +2130,7 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="key_detail_action_copy_ssh_key">Copier la clé publique SSH</string>
     <string name="key_detail_ssh_key_copied">Clé publique SSH copiée</string>
     <string name="keyring_generate_ssh_auth_toggle">Ajouter une sous-clé d\'authentification SSH</string>
-    <string name="keyring_generate_ssh_auth_caption">Une sous-clé pour se connecter à des serveurs en SSH via un pont ssh-agent : RSA sur une clé RSA, Ed25519 sur toute autre clé.</string>
+    <string name="keyring_generate_ssh_auth_caption">Une sous-clé pour se connecter à des serveurs en SSH via un pont ssh-agent : RSA sur une clé RSA, ECDSA sur une clé ECDSA NIST, Ed25519 sur toute autre clé.</string>
     <string name="keyring_generate_ssh_auth_failed">Clé créée, mais la sous-clé SSH n\'a pas pu être ajoutée : %1$s. Tu peux l\'ajouter depuis le détail de la clé.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">SSH depuis Termux</string>
@@ -3143,6 +3143,9 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <!-- 4.8.0 RC8 (#115) -->
     <string name="key_detail_trust_certified_by">Vérifiée par votre clé %1$s</string>
     <string name="key_detail_trust_certified_by_uids">Vérifiée par votre clé %1$s pour %2$s</string>
+    <!-- 4.8.0 RC10 (#115) -->
+    <string name="key_detail_trust_certified_by_introducer">Vérifiée par %1$s, introducteur de confiance pour votre clé %2$s</string>
+    <string name="key_detail_trust_certified_by_introducer_uids">Vérifiée pour %3$s par %1$s, introducteur de confiance pour votre clé %2$s</string>
     <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
     <string name="groups_title">Groupes</string>
     <string name="groups_new">Nouveau groupe</string>
@@ -3212,4 +3215,14 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="qr_too_large_with_parts">Cette clé est trop grande pour un code QR. %1$s Utilisez plutôt Partager ou Copier.</string>
     <string name="settings_qr_long_codes_title">Codes QR longs</string>
     <string name="settings_qr_long_codes_subtitle">Affiche en %1$d parties maximum une clé qui ne tient pas en %2$d parties QR. Les codes de plus de %2$d parties ne se scannent que dans PGPony Android 4.8.0 ou plus récent.</string>
+    <!-- 4.8.0 RC10 (#109) -->
+    <string name="key_detail_add_subkey_group_sign">Signature</string>
+    <string name="key_detail_add_subkey_group_auth">Authentification</string>
+    <string name="key_detail_add_subkey_group_encrypt">Chiffrement</string>
+    <string name="key_detail_add_subkey_curve_label">Courbe pour ECDSA et ECDH</string>
+    <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (Signer)</string>
+    <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (Authentifier)</string>
+    <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (Chiffrer)</string>
+    <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH n\'accepte ECDSA que sur les courbes NIST. Sur cette courbe, une sous-clé d\'authentification est destinée à une clé de sécurité.</string>
+    <string name="keyring_generate_granular_dropped_for_v6">Une clé v6 ne peut pas porter certaines des sous-clés que vous avez choisies, elles ont donc été retirées.</string>
 </resources>

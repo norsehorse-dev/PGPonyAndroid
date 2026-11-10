@@ -2130,7 +2130,7 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="key_detail_action_copy_ssh_key">Öffentlichen SSH-Schlüssel kopieren</string>
     <string name="key_detail_ssh_key_copied">Öffentlicher SSH-Schlüssel kopiert</string>
     <string name="keyring_generate_ssh_auth_toggle">SSH-Authentifizierungs-Unterschlüssel hinzufügen</string>
-    <string name="keyring_generate_ssh_auth_caption">Ein Unterschlüssel, um dich über eine ssh-agent-Brücke per SSH an Servern anzumelden: RSA bei einem RSA-Schlüssel, sonst Ed25519.</string>
+    <string name="keyring_generate_ssh_auth_caption">Ein Unterschlüssel, um dich über eine ssh-agent-Brücke per SSH an Servern anzumelden: RSA bei einem RSA-Schlüssel, ECDSA bei einem NIST-ECDSA-Schlüssel, sonst Ed25519.</string>
     <string name="keyring_generate_ssh_auth_failed">Schlüssel erstellt, aber der SSH-Unterschlüssel konnte nicht hinzugefügt werden: %1$s. Du kannst ihn in den Schlüsseldetails hinzufügen.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">SSH aus Termux</string>
@@ -3131,6 +3131,9 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <!-- 4.8.0 RC8 (#115) -->
     <string name="key_detail_trust_certified_by">Verifiziert durch deinen Schlüssel %1$s</string>
     <string name="key_detail_trust_certified_by_uids">Verifiziert durch deinen Schlüssel %1$s für %2$s</string>
+    <!-- 4.8.0 RC10 (#115) -->
+    <string name="key_detail_trust_certified_by_introducer">Verifiziert durch %1$s, vertrauenswürdiger Vermittler für deinen Schlüssel %2$s</string>
+    <string name="key_detail_trust_certified_by_introducer_uids">Verifiziert für %3$s durch %1$s, vertrauenswürdiger Vermittler für deinen Schlüssel %2$s</string>
     <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
     <string name="groups_title">Gruppen</string>
     <string name="groups_new">Neue Gruppe</string>
@@ -3195,4 +3198,14 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="qr_too_large_with_parts">Dieser Schlüssel ist zu groß für einen QR-Code. %1$s Nutze stattdessen Teilen oder Kopieren.</string>
     <string name="settings_qr_long_codes_title">Lange QR-Codes</string>
     <string name="settings_qr_long_codes_subtitle">Zeigt einen Schlüssel, der nicht in %2$d QR-Teile passt, in bis zu %1$d Teilen an. Codes mit mehr als %2$d Teilen lassen sich nur mit PGPony Android 4.8.0 oder neuer scannen.</string>
+    <!-- 4.8.0 RC10 (#109) -->
+    <string name="key_detail_add_subkey_group_sign">Signatur</string>
+    <string name="key_detail_add_subkey_group_auth">Authentifizierung</string>
+    <string name="key_detail_add_subkey_group_encrypt">Verschlüsselung</string>
+    <string name="key_detail_add_subkey_curve_label">Kurve für ECDSA und ECDH</string>
+    <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (Signieren)</string>
+    <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (Authentifizieren)</string>
+    <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (Verschlüsseln)</string>
+    <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH unterstützt ECDSA nur auf den NIST-Kurven. Auf dieser Kurve ist ein Authentifizierungs-Unterschlüssel für einen Sicherheitsschlüssel gedacht.</string>
+    <string name="keyring_generate_granular_dropped_for_v6">Ein v6-Schlüssel kann einige der gewählten Unterschlüssel nicht aufnehmen, daher wurden sie entfernt.</string>
 </resources>

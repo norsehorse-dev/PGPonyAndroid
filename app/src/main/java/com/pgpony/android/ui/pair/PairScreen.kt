@@ -620,7 +620,7 @@ private fun SessionPane(
         val item = r.item
         if (!add) {
             rows = rows + receivedRow(item, r.preview, PairOutcome.SKIPPED)
-            sendResult(PairResult(item.id, false, str(R.string.pair_skipped_reason)))
+            sendResult(PairResult(item.id, false, str(R.string.pair_skipped_reason), skipped = true))
             return
         }
         scope.launch {
@@ -690,7 +690,7 @@ private fun SessionPane(
                 }
             }
             is PairMessage.Result -> {
-                val (next, settled) = PairLedger.answered(rows, m.result.id, m.result.ok, m.result.error)
+                val (next, settled) = PairLedger.answered(rows, m.result.id, m.result.ok, m.result.error, m.result.skipped)
                 rows = next
                 if (settled?.outcome == PairOutcome.ADDED) haptics.success()
                 pendingResults -= 1

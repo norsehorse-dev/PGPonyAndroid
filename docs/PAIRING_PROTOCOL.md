@@ -199,12 +199,19 @@ tag. The plaintext is at most 1,048,576 bytes.
 | `0x20` | ITEM_BEGIN | `id(4)` \|\| `size(8)` |
 | `0x21` | ITEM_DATA | `id(4)` \|\| bytes |
 | `0x22` | ITEM_END | `id(4)` \|\| `SHA-256 of the item(32)` |
-| `0x30` | RESULT | JSON `{"id": n, "ok": true, "error": null}` |
+| `0x30` | RESULT | JSON `{"id": n, "ok": true, "error": null}`, plus `"skipped": true` when the user skipped the item (4.8.0) |
 | `0x3F` | BYE | empty |
 
 `ITEM` is `{"id": n, "kind": "public-key" | "key-pair" | "backup", "name": "...",
 "fingerprint": "hex or null", "size": n}`. JSON is UTF-8. Member order is not significant and
 unknown members are ignored; an unknown message type ends the session.
+
+A RESULT for an item the receiving user chose to skip has `ok` false, the reason in `error`, and,
+from Android 4.8.0 on, `"skipped": true`. The member is written only when true, so every other
+RESULT is unchanged. The side that offered the item counts it as skipped, not failed, when the
+member is true, or, from a peer that does not send it, when `error` is one of the skip reasons
+PGPony sends in its languages (pair/PairSkip.kt, which a platform adding a language extends). A
+side reporting a skip sends both the member and the reason.
 
 `accepts` in INFO lists the item kinds that side can import. Left out, it means all three. A
 side offers nothing the other does not accept, and a receiver never accepts an item whose kind
@@ -254,6 +261,13 @@ flight stops.
 - **backup**: a PGPony backup file (the Android and desktop `backup/` format), encrypted under a
   recovery code generated for this transfer. The sending screen shows the code and the
   receiving user types it, as in a restore from a file.
+  The file is the one docs/PGPONY_BACKUP_FORMAT.md describes, so one sent by Android 4.8.0 can carry
+  SSH-only keys (`ssh-keys/`) and recipient groups (`recipient-groups.json`) besides the OpenPGP
+  keys. A receiver restores what it supports and skips the rest. Android counts the SSH keys it
+  added in the restore summary next to the OpenPGP keys. A receiver that does not hold SSH keys
+  names them as left out in what it shows its user and does not count them as failures; the
+  RESULT for the item is `ok` true when the rest of the backup restored. Groups are merged by name
+  as in a restore from a file.
 
 `fingerprint` is required for public-key and key-pair items. Before anything is written, the
 receiver checks each received item against what the OFFER said:

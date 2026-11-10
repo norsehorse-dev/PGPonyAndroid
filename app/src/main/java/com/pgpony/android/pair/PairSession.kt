@@ -101,15 +101,22 @@ data class PairAnswer(val accept: List<Int>) {
     }
 }
 
-data class PairResult(val id: Int, val ok: Boolean, val error: String? = null) {
+/**
+ * 4.8.0 RC10: [skipped] marks a RESULT the other user answered with Skip. It is written only when
+ * true, so a RESULT without it is byte for byte what 4.7.x sends, and a reader that does not know
+ * the member ignores it and still has the reason text (see [PairSkip]).
+ */
+data class PairResult(val id: Int, val ok: Boolean, val error: String? = null, val skipped: Boolean = false) {
     fun toJson() = buildJsonObject {
         put("id", id); put("ok", ok); put("error", error?.let { JsonPrimitive(it) } ?: JsonNull)
+        if (skipped) put("skipped", true)
     }
 
     companion object {
         fun fromJson(o: JsonObject) = PairResult(
             o["id"]!!.jsonPrimitive.int, o["ok"]?.jsonPrimitive?.booleanOrNull ?: false,
-            o["error"]?.jsonPrimitive?.contentOrNull
+            o["error"]?.jsonPrimitive?.contentOrNull,
+            (o["skipped"] as? JsonPrimitive)?.booleanOrNull ?: false
         )
     }
 }

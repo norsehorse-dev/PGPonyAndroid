@@ -792,6 +792,9 @@
     <!-- 4.8.0 RC8 (#115) -->
     <string name="key_detail_trust_certified_by">Verified by your key %1$s</string>
     <string name="key_detail_trust_certified_by_uids">Verified by your key %1$s for %2$s</string>
+    <!-- 4.8.0 RC10 (#115) -->
+    <string name="key_detail_trust_certified_by_introducer">Verified by %1$s, trusted introducer for your key %2$s</string>
+    <string name="key_detail_trust_certified_by_introducer_uids">Verified by %1$s, trusted introducer for your key %2$s, for %3$s</string>
 
     <!-- ── Contact section ─────────────────────────────────────────── -->
     <string name="key_detail_section_contact">Contact</string>
@@ -2237,7 +2240,7 @@
     <string name="key_detail_action_copy_ssh_key">Copy SSH Public Key</string>
     <string name="key_detail_ssh_key_copied">SSH public key copied</string>
     <string name="keyring_generate_ssh_auth_toggle">Add SSH authentication subkey</string>
-    <string name="keyring_generate_ssh_auth_caption">A subkey for signing in to servers over SSH through an ssh-agent bridge: RSA on an RSA key, Ed25519 on any other key.</string>
+    <string name="keyring_generate_ssh_auth_caption">A subkey for signing in to servers over SSH through an ssh-agent bridge: RSA on an RSA key, ECDSA on a NIST ECDSA key, Ed25519 on any other key.</string>
     <string name="keyring_generate_ssh_auth_failed">Key created, but the SSH subkey could not be added: %1$s. You can add it from Key Detail.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">SSH from Termux</string>
@@ -3297,4 +3300,14 @@
     <string name="settings_qr_long_codes_subtitle">Show a key that does not fit in %2$d QR parts in up to %1$d parts. Codes over %2$d parts only scan in PGPony Android 4.8.0 or later.</string>
     <!-- 4.8.0 RC8 (#114) -->
     <string name="settings_about_version_commit_format" translatable="false">%1$s (%2$s)</string>
+    <!-- 4.8.0 RC10 (#109) -->
+    <string name="key_detail_add_subkey_group_sign">Signing</string>
+    <string name="key_detail_add_subkey_group_auth">Authentication</string>
+    <string name="key_detail_add_subkey_group_encrypt">Encryption</string>
+    <string name="key_detail_add_subkey_curve_label">Curve for ECDSA and ECDH</string>
+    <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (Sign)</string>
+    <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (Authenticate)</string>
+    <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (Encrypt)</string>
+    <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH takes ECDSA on the NIST curves only. On this curve, an Authenticate subkey is for a security key.</string>
+    <string name="keyring_generate_granular_dropped_for_v6">A v6 key can\'t hold some of the subkeys you picked, so they were removed.</string>
 </resources>

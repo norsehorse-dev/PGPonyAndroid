@@ -4,8 +4,9 @@
 // Your key at any other level, a SHA-1 certification, a withdrawn or expired
 // certification, a revoked or expired certifier, and a different key that
 // carries the same User ID (or names your key as issuer) all leave it as
-// stored. Only a stored Unknown is raised: Unverified, Don't use, a Verified
-// or Ultimate set by hand, and your own keys are never changed. A
+// stored. Only a stored Unknown is raised (on your own key pairs too since
+// RC10): Unverified, Don't use, a Verified or Ultimate set by hand never
+// change. Trusted introducers are covered in TrustIntroducerTest. A
 // certification covers one User ID: another User ID added to the key later is
 // not verified by it, by name or by address. Each answer says when it stops
 // holding.
@@ -105,7 +106,7 @@ class TrustFromCertificationTest {
         val target = withSigs(themPub, theirUid, thirdParty(me, themPub, theirUid))
         assertTrue(rule.isUsableCertifier(ring(mePub), now))
         assertSame(mePub, by(target, emptyList(), listOf(mePub), now))
-        assertEquals(TrustLevel.VERIFIED, rule.effective(TrustLevel.UNKNOWN, isOwnKey = false, shownUserIdCertified = true))
+        assertEquals(TrustLevel.VERIFIED, rule.effective(TrustLevel.UNKNOWN, shownUserIdValid = true))
         val f = rule.findings(target, emptyList(), vouchers(mePub), now)
         assertEquals(setOf(theirUid), f.byUserId.keys)
         assertEquals(setOf(theirUid), f.boundUserIds)
@@ -215,15 +216,16 @@ class TrustFromCertificationTest {
 
     @Test
     fun `only Unknown is raised, every level the user set stays`() {
-        assertEquals(TrustLevel.UNVERIFIED, rule.effective(TrustLevel.UNVERIFIED, isOwnKey = false, shownUserIdCertified = true))
-        assertEquals(TrustLevel.DONT_USE, rule.effective(TrustLevel.DONT_USE, isOwnKey = false, shownUserIdCertified = true))
-        assertEquals(TrustLevel.VERIFIED, rule.effective(TrustLevel.VERIFIED, isOwnKey = false, shownUserIdCertified = true))
-        assertEquals(TrustLevel.ULTIMATE, rule.effective(TrustLevel.ULTIMATE, isOwnKey = false, shownUserIdCertified = true))
-        assertEquals(TrustLevel.UNKNOWN, rule.effective(TrustLevel.UNKNOWN, isOwnKey = true, shownUserIdCertified = true))
-        assertEquals(TrustLevel.UNKNOWN, rule.effective(TrustLevel.UNKNOWN, isOwnKey = false, shownUserIdCertified = false))
-        assertTrue(rule.canRaise(TrustLevel.UNKNOWN, isOwnKey = false))
+        assertEquals(TrustLevel.UNVERIFIED, rule.effective(TrustLevel.UNVERIFIED, shownUserIdValid = true))
+        assertEquals(TrustLevel.DONT_USE, rule.effective(TrustLevel.DONT_USE, shownUserIdValid = true))
+        assertEquals(TrustLevel.VERIFIED, rule.effective(TrustLevel.VERIFIED, shownUserIdValid = true))
+        assertEquals(TrustLevel.ULTIMATE, rule.effective(TrustLevel.ULTIMATE, shownUserIdValid = true))
+        // RC10 (#115): your own key pair left at Unknown is raised like a public key.
+        assertTrue(rule.canRaise(TrustLevel.UNKNOWN))
+        assertEquals(TrustLevel.UNKNOWN, rule.effective(TrustLevel.UNKNOWN, shownUserIdValid = false))
+        assertTrue(rule.canRaise(TrustLevel.UNKNOWN))
         for (level in listOf(TrustLevel.UNVERIFIED, TrustLevel.VERIFIED, TrustLevel.ULTIMATE, TrustLevel.DONT_USE)) {
-            assertFalse(level.name, rule.canRaise(level, isOwnKey = false))
+            assertFalse(level.name, rule.canRaise(level))
         }
     }
 
@@ -247,9 +249,9 @@ class TrustFromCertificationTest {
         assertEquals(setOf(malloryUid, ceoUid), f.boundUserIds)
         assertEquals("only the certified User ID", setOf(malloryUid), f.byUserId.keys)
         // Shown as the CEO: not raised.
-        assertEquals(TrustLevel.UNKNOWN, rule.effective(TrustLevel.UNKNOWN, false, shownUserIdCertified = ceoUid in f.byUserId))
+        assertEquals(TrustLevel.UNKNOWN, rule.effective(TrustLevel.UNKNOWN, shownUserIdValid = ceoUid in f.byUserId))
         // Shown as Mallory: raised.
-        assertEquals(TrustLevel.VERIFIED, rule.effective(TrustLevel.UNKNOWN, false, shownUserIdCertified = malloryUid in f.byUserId))
+        assertEquals(TrustLevel.VERIFIED, rule.effective(TrustLevel.UNKNOWN, shownUserIdValid = malloryUid in f.byUserId))
         // The provider's address check.
         assertFalse(rule.certifiesAddress(f.byUserId.keys, "ceo@corp.example"))
         assertFalse(rule.certifiesAddress(f.byUserId.keys, "CEO <ceo@corp.example>"))

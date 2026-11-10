@@ -13,6 +13,12 @@
 // second "Post-Quantum" group — ML-KEM encryption (768 on any key, 1024
 // on v6) and, on a v6 key, ML-DSA signing. The sheet speaks a single
 // AddSubkeyChoice, and the view model routes each kind to its generator.
+//
+// 4.8.0 RC10 (#109): the types are grouped by what the subkey is for (Signing,
+// Authentication, Encryption) from AddSubkeyChoice.optionsFor, the same list
+// the composer in Generate Key shows. A v4 key also gets ECDSA and ECDH on a
+// curve picked in a field (the key's own curve first, for an ECDSA key), so a
+// brainpool key can take an Authenticate subkey for a security key's AUT slot.
 
 package com.pgpony.android.ui.keyring
 
@@ -33,6 +39,10 @@ import com.pgpony.android.ui.util.dismissKeyboardOnTap
 import com.pgpony.android.ui.util.keepsKeyboard
 import com.pgpony.android.crypto.ClassicalSubkeyGen
 import com.pgpony.android.crypto.AddSubkeyChoice
+import com.pgpony.android.crypto.KeyAlgorithm
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import com.pgpony.android.crypto.pqc.CompositeSignSuite
 import com.pgpony.android.crypto.pqc.CompositeSuite
 import java.text.DateFormat
@@ -60,13 +70,18 @@ fun AddSubkeySheet(
      *  whose secret is never stored unprotected. */
     onApplyCard: ((choice: AddSubkeyChoice, expiresAtEpochSeconds: Long?, pin: String, passphrase: String?) -> Unit)? = null,
     askPassphrase: Boolean = true,
+    /** 4.8.0 RC10 (#109): the key's algorithm, so an ECDSA key starts on its own curve. */
+    keyAlgorithm: KeyAlgorithm? = null,
 ) {
     val onCard = onApplyCard != null
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // 4.8.0 RC10 (#109): a swipe does not close this form; back and Cancel do.
+    val sheetState = com.pgpony.android.ui.components.rememberFormSheetState()
 
     var selectedChoice: AddSubkeyChoice by remember {
         mutableStateOf(AddSubkeyChoice.Classical(ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_SIGN))
     }
+    // 4.8.0 RC10 (#109): the curve the ECDSA and ECDH types use.
+    var curve by remember { mutableStateOf(AddSubkeyChoice.defaultCurve(keyAlgorithm)) }
     var selectedPreset by remember { mutableStateOf<AddSubkeyExpiryOption?>(AddSubkeyExpiryOption.NEVER) }
     var customMillis by remember { mutableStateOf<Long?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -128,7 +143,17 @@ fun AddSubkeySheet(
                 isV6 = isV6,
                 isCompositeSign = isCompositeSign,
                 onSelect = { selectedChoice = it },
-                showPostQuantum = !cardLinked
+                showPostQuantum = !cardLinked,
+                curve = curve,
+                onCurve = { picked ->
+                    curve = picked
+                    // The same use on the new curve, when an ECDSA or ECDH type is selected.
+                    val sel = selectedChoice
+                    if (sel is AddSubkeyChoice.Classical && sel.type.curve != null) {
+                        ClassicalSubkeyGen.ClassicalSubkeyType.ecdsa(picked, sel.type.capability)
+                            ?.let { selectedChoice = AddSubkeyChoice.Classical(it) }
+                    }
+                }
             )
             if (cardLinked) {
                 Text(
@@ -358,22 +383,40 @@ private fun AddSubkeyTypeChips(
     isCompositeSign: Boolean,
     onSelect: (AddSubkeyChoice) -> Unit,
     /** 4.8.0 (#71): false on a key linked to a security key. */
-    showPostQuantum: Boolean = true
+    showPostQuantum: Boolean = true,
+    /** 4.8.0 RC10 (#109): the curve for the ECDSA and ECDH types (v4 keys). */
+    curve: KeyAlgorithm = KeyAlgorithm.ECDSA_NIST_P256,
+    onCurve: (KeyAlgorithm) -> Unit = {}
 ) {
-    val classical = AddSubkeyChoice.classicalFor(isV6, isCompositeSign)
-    val postQuantum = AddSubkeyChoice.postQuantumFor(isV6)
+    // 4.8.0 RC10 (#109): one list shared with the composer, grouped by use.
+    val base = AddSubkeyChoice.baseFor(isV6, isCompositeSign)
+    val options = AddSubkeyChoice.optionsFor(base, curve, postQuantum = showPostQuantum)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = stringResource(R.string.key_detail_add_subkey_group_classical),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            classical.forEach { choice ->
-                FilterChip(
-                    selected = selected == choice,
-                    onClick = { onSelect(choice) },
-                    label = { Text(addSubkeyChoiceLabel(choice)) }
+        if (base == AddSubkeyChoice.Base.V4) {
+            EcdsaCurveField(curve = curve, onSelect = onCurve)
+        }
+        SubkeyUsageGroups(options) { usage, choices ->
+            Text(
+                text = subkeyUsageLabel(usage),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                choices.forEach { choice ->
+                    FilterChip(
+                        selected = selected == choice,
+                        onClick = { onSelect(choice) },
+                        label = { Text(addSubkeyChoiceLabel(choice)) }
+                    )
+                }
+            }
+            if (usage == AddSubkeyChoice.Usage.AUTHENTICATE && base == AddSubkeyChoice.Base.V4 &&
+                curve !in SSH_CURVES
+            ) {
+                Text(
+                    text = stringResource(R.string.key_detail_add_subkey_ecdsa_ssh_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -386,18 +429,60 @@ private fun AddSubkeyTypeChips(
                 color = MaterialTheme.colorScheme.tertiary
             )
         }
-        if (showPostQuantum) {
-            Text(
-                text = stringResource(R.string.key_detail_add_subkey_group_pq),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                postQuantum.forEach { choice ->
-                    FilterChip(
-                        selected = selected == choice,
-                        onClick = { onSelect(choice) },
-                        label = { Text(addSubkeyChoiceLabel(choice)) }
+    }
+}
+
+/** 4.8.0 RC10 (#109): the curves SSH has an ECDSA key type for. */
+private val SSH_CURVES = setOf(KeyAlgorithm.ECDSA_NIST_P256, KeyAlgorithm.ECDSA_NIST_P384, KeyAlgorithm.ECDSA_NIST_P521)
+
+/**
+ * 4.8.0 RC10 (#109): [options] split by use, in AddSubkeyChoice.Usage order,
+ * empty groups left out. Shared by Add subkey and the composer's menu.
+ */
+@Composable
+fun SubkeyUsageGroups(
+    options: List<AddSubkeyChoice>,
+    group: @Composable (AddSubkeyChoice.Usage, List<AddSubkeyChoice>) -> Unit
+) {
+    AddSubkeyChoice.Usage.entries.forEach { usage ->
+        val choices = options.filter { AddSubkeyChoice.usageOf(it) == usage }
+        if (choices.isNotEmpty()) group(usage, choices)
+    }
+}
+
+@Composable
+fun subkeyUsageLabel(usage: AddSubkeyChoice.Usage): String = when (usage) {
+    AddSubkeyChoice.Usage.SIGN -> stringResource(R.string.key_detail_add_subkey_group_sign)
+    AddSubkeyChoice.Usage.AUTHENTICATE -> stringResource(R.string.key_detail_add_subkey_group_auth)
+    AddSubkeyChoice.Usage.ENCRYPT -> stringResource(R.string.key_detail_add_subkey_group_encrypt)
+}
+
+/**
+ * 4.8.0 RC10 (#109): the curve for ECDSA and ECDH subkeys, a dropdown over
+ * KeyAlgorithm.generatableEcdsa. Shared by Add subkey and the composer.
+ */
+@Composable
+fun EcdsaCurveField(curve: KeyAlgorithm, onSelect: (KeyAlgorithm) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = stringResource(R.string.key_detail_add_subkey_curve_label),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Box {
+            OutlinedButton(onClick = { open = true }) {
+                Text(curve.shortName)
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                KeyAlgorithm.generatableEcdsa.forEach { c ->
+                    DropdownMenuItem(
+                        text = { Text(c.shortName) },
+                        onClick = {
+                            open = false
+                            onSelect(c)
+                        }
                     )
                 }
             }
@@ -417,6 +502,15 @@ fun addSubkeyChoiceLabel(choice: AddSubkeyChoice): String = when (choice) {
         ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_SIGN -> stringResource(R.string.key_detail_add_subkey_type_ed25519_sign)
         ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_AUTH -> stringResource(R.string.key_detail_add_subkey_type_ed25519_auth)
         ClassicalSubkeyGen.ClassicalSubkeyType.X25519_ENCRYPT -> stringResource(R.string.key_detail_add_subkey_type_x25519_encrypt)
+        // 4.8.0 RC10 (#109): ECDSA and ECDH, named with the curve.
+        else -> {
+            val curveName = choice.type.curve?.shortName.orEmpty()
+            when (choice.type.capability) {
+                ClassicalSubkeyGen.Capability.SIGN -> stringResource(R.string.key_detail_add_subkey_type_ecdsa_sign, curveName)
+                ClassicalSubkeyGen.Capability.AUTHENTICATE -> stringResource(R.string.key_detail_add_subkey_type_ecdsa_auth, curveName)
+                ClassicalSubkeyGen.Capability.ENCRYPT -> stringResource(R.string.key_detail_add_subkey_type_ecdh_encrypt, curveName)
+            }
+        }
     }
     is AddSubkeyChoice.PqEncryption -> when (choice.suite) {
         CompositeSuite.IETF_1024 -> stringResource(R.string.key_detail_add_subkey_type_mlkem1024)

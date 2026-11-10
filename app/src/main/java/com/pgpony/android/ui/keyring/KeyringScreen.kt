@@ -946,7 +946,10 @@ private fun LazyListScope.keySection(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // 4.8.0 RC10 (#109): a swipe does not close this form (it was lost while
+    // scrolling to Advanced); back and the Close button do.
+    val sheetState = com.pgpony.android.ui.components.rememberFormSheetState()
+    val sheetScope = rememberCoroutineScope()
 
     ModalBottomSheet(
         onDismissRequest = { viewModel.dismissGenerate() },
@@ -977,7 +980,19 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
                 // 4.8.0 (item 4b): a tap away from a field closes the keyboard.
                 .dismissKeyboardOnTap()
         ) {
-            Text(stringResource(R.string.keyring_generate_title), style = MaterialTheme.typography.headlineSmall)
+            // 4.8.0 RC10 (#109): with swipe-to-close gone, the sheet needs a visible way out.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.keyring_generate_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = {
+                    sheetScope.launch { sheetState.hide() }.invokeOnCompletion { viewModel.dismissGenerate() }
+                }) {
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.common_button_close))
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
 
             OutlinedTextField(
@@ -1083,6 +1098,20 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
                         color = MaterialTheme.colorScheme.error
                     )
                 }
+                // 4.8.0 RC10 (#109): RSA, ECDSA and ECDH stay on a v4 base.
+                if (state.granularDroppedForV6) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.keyring_generate_granular_dropped_for_v6),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                // 4.8.0 RC10 (#109): the curve for ECDSA and ECDH subkeys, as in Add subkey.
+                if (!state.granularBaseV6) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    EcdsaCurveField(curve = state.granularEcdsaCurve, onSelect = { viewModel.setGranularEcdsaCurve(it) })
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier
@@ -1138,14 +1167,25 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
                         onDismissRequest = { granularMenuOpen = false }
                     ) {
                         // 4.8.0 (item 4i): the subkeys the chosen base can hold.
-                        GranularComposer.menu(state.granularBaseV6, state.granularSubkeys).forEach { choice ->
-                            DropdownMenuItem(
-                                text = { Text(addSubkeyChoiceLabel(choice)) },
-                                onClick = {
-                                    viewModel.addGranularSubkey(choice)
-                                    granularMenuOpen = false
-                                }
+                        // 4.8.0 RC10 (#109): the Add subkey list, grouped by use the same way.
+                        SubkeyUsageGroups(
+                            GranularComposer.menu(state.granularBaseV6, state.granularSubkeys, state.granularEcdsaCurve)
+                        ) { usage, choices ->
+                            Text(
+                                subkeyUsageLabel(usage),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                             )
+                            choices.forEach { choice ->
+                                DropdownMenuItem(
+                                    text = { Text(addSubkeyChoiceLabel(choice)) },
+                                    onClick = {
+                                        viewModel.addGranularSubkey(choice)
+                                        granularMenuOpen = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }

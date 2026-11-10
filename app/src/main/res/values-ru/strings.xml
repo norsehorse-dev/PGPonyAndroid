@@ -847,7 +847,7 @@
     <string name="key_detail_add_subkey_type_rsa_4096_sign">RSA 4096 (подпись)</string>
     <string name="key_detail_add_subkey_type_rsa_4096_encrypt">RSA 4096 (шифрование)</string>
     <string name="key_detail_add_subkey_type_ed25519_sign">Ed25519 (подпись)</string>
-    <string name="key_detail_add_subkey_type_x25519_encrypt">X25519 (Шифрование)</string>
+    <string name="key_detail_add_subkey_type_x25519_encrypt">X25519 (шифрование)</string>
     <string name="key_detail_action_delete_key">Удалить ключ</string>
     <string name="key_detail_action_revoke_key">Отозвать ключ…</string>
     <string name="key_detail_action_export_revocation_cert">Экспортировать сертификат отзыва</string>
@@ -2096,13 +2096,13 @@
     <string name="key_detail_subkey_action_failed">Не удалось выполнить действие с подключом. Повторите попытку.</string>
     <string name="key_detail_add_subkey_group_classical">Классические</string>
     <string name="key_detail_add_subkey_group_pq">Постквантовые</string>
-    <string name="key_detail_add_subkey_type_mlkem768">ML-KEM-768 (Шифрование)</string>
-    <string name="key_detail_add_subkey_type_mlkem1024">ML-KEM-1024 (Шифрование)</string>
-    <string name="key_detail_add_subkey_type_mldsa65">ML-DSA-65 (Подпись)</string>
-    <string name="key_detail_add_subkey_type_mldsa87">ML-DSA-87 (Подпись)</string>
-    <string name="key_detail_add_subkey_type_rsa_2048_auth">RSA 2048 (Аутентификация)</string>
-    <string name="key_detail_add_subkey_type_rsa_4096_auth">RSA 4096 (Аутентификация)</string>
-    <string name="key_detail_add_subkey_type_ed25519_auth">Ed25519 (Аутентификация)</string>
+    <string name="key_detail_add_subkey_type_mlkem768">ML-KEM-768 (шифрование)</string>
+    <string name="key_detail_add_subkey_type_mlkem1024">ML-KEM-1024 (шифрование)</string>
+    <string name="key_detail_add_subkey_type_mldsa65">ML-DSA-65 (подпись)</string>
+    <string name="key_detail_add_subkey_type_mldsa87">ML-DSA-87 (подпись)</string>
+    <string name="key_detail_add_subkey_type_rsa_2048_auth">RSA 2048 (аутентификация)</string>
+    <string name="key_detail_add_subkey_type_rsa_4096_auth">RSA 4096 (аутентификация)</string>
+    <string name="key_detail_add_subkey_type_ed25519_auth">Ed25519 (аутентификация)</string>
     <string name="key_delete_revoke_instead_note">После удаления ключа создать сертификат отзыва уже нельзя. Если этот ключ может быть у других, вместо удаления отзовите его, чтобы ему перестали доверять.</string>
     <string name="key_delete_revoke_instead_button">Вместо этого отозвать этот ключ</string>
     <string name="key_detail_subkey_remove_biometric_title">Подтвердите удаление подключа</string>
@@ -2211,7 +2211,7 @@
     <string name="key_detail_action_copy_ssh_key">Копировать открытый SSH-ключ</string>
     <string name="key_detail_ssh_key_copied">Открытый SSH-ключ скопирован</string>
     <string name="keyring_generate_ssh_auth_toggle">Добавить подключ аутентификации SSH</string>
-    <string name="keyring_generate_ssh_auth_caption">Подключ для входа на серверы по SSH через мост ssh-agent: RSA для ключа RSA, Ed25519 для любого другого ключа.</string>
+    <string name="keyring_generate_ssh_auth_caption">Подключ для входа на серверы по SSH через мост ssh-agent: RSA для ключа RSA, ECDSA для ключа ECDSA на кривой NIST, Ed25519 для любого другого ключа.</string>
     <string name="keyring_generate_ssh_auth_failed">Ключ создан, но подключ SSH добавить не удалось: %1$s. Его можно добавить в сведениях о ключе.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">SSH из Termux</string>
@@ -3246,6 +3246,9 @@
     <!-- 4.8.0 RC8 (#115) -->
     <string name="key_detail_trust_certified_by">Проверено вашим ключом %1$s</string>
     <string name="key_detail_trust_certified_by_uids">Проверено вашим ключом %1$s для %2$s</string>
+    <!-- 4.8.0 RC10 (#115) -->
+    <string name="key_detail_trust_certified_by_introducer">Проверено ключом %1$s, доверенным посредником для вашего ключа %2$s</string>
+    <string name="key_detail_trust_certified_by_introducer_uids">Проверено для %3$s ключом %1$s, доверенным посредником для вашего ключа %2$s</string>
     <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
     <string name="groups_title">Группы</string>
     <string name="groups_new">Новая группа</string>
@@ -3320,4 +3323,14 @@
     <string name="qr_too_large_with_parts">Этот ключ слишком велик для QR-кода. %1$s Используйте «Поделиться» или «Копировать».</string>
     <string name="settings_qr_long_codes_title">Длинные QR-коды</string>
     <string name="settings_qr_long_codes_subtitle">Показывать ключ, который не помещается в QR-код из %2$d частей, в виде кода до %1$d частей. Коды более чем из %2$d частей сканируются только в PGPony Android 4.8.0 и новее.</string>
+    <!-- 4.8.0 RC10 (#109) -->
+    <string name="key_detail_add_subkey_group_sign">Подпись</string>
+    <string name="key_detail_add_subkey_group_auth">Аутентификация</string>
+    <string name="key_detail_add_subkey_group_encrypt">Шифрование</string>
+    <string name="key_detail_add_subkey_curve_label">Кривая для ECDSA и ECDH</string>
+    <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (подпись)</string>
+    <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (аутентификация)</string>
+    <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (шифрование)</string>
+    <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH поддерживает ECDSA только на кривых NIST. На этой кривой подключ аутентификации предназначен для ключа безопасности.</string>
+    <string name="keyring_generate_granular_dropped_for_v6">Ключ v6 не может содержать некоторые из выбранных подключей, поэтому они удалены.</string>
 </resources>

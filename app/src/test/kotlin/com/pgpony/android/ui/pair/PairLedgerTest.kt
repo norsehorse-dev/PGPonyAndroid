@@ -6,6 +6,7 @@
 package com.pgpony.android.ui.pair
 
 import com.pgpony.android.pair.PairItem
+import com.pgpony.android.pair.PairSkip
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -63,27 +64,16 @@ class PairLedgerTest {
         assertEquals(PairTally(sent = 1, received = 1, skipped = 2, failed = 1, unanswered = 0), PairLedger.tally(got))
     }
 
+    // 4.8.0 RC10: the "skipped" member counts as a skip whatever the reason text says.
     @Test
-    fun skipReasons_fromEitherAppInEveryLanguage() {
-        listOf(
-            "skipped by the other user",
-            " Skipped by the other user ",
-            "ignoré par l’autre personne",
-            "ignoré par l'autre personne",
-            "pulado pela outra pessoa",
-            "ignorado pela outra pessoa",
-            "相手の利用者がスキップしました",
-            "相手のユーザーがスキップしました",
-            "对方已跳过",
-            "已被对方跳过",
-            "diğer kullanıcı tarafından atlandı"
-        ).forEach { assertTrue(it, PairSkip.isSkip(it)) }
-        assertFalse(PairSkip.isSkip(null))
-        assertFalse(PairSkip.isSkip(""))
-        assertFalse(PairSkip.isSkip("Could not import Alice."))
+    fun skippedMember_countsAsSkipWithoutTheText() {
+        val rows = PairLedger.offered(emptyList(), listOf(PairItem(1, PairItem.PUBLIC_KEY, "Alice", "AA", 10)), setOf(1))
+        val (_, row) = PairLedger.answered(rows, 1, false, "übersprungen, in einer neuen Sprache", skipped = true)
+        assertEquals(PairOutcome.SKIPPED, row!!.outcome)
     }
 
-    // 4.8.0 RC9: every language the app ships sends a skip reason the other side recognises.
+    // The reason list itself is tested in pair/PairSkipTest. This one reads the app's resources,
+    // so it stays on the Android side. 4.8.0 RC9: every language the app ships sends a skip reason the other side recognises.
     @Test
     fun everyShippedSkipReasonCountsAsSkip() {
         val res = java.io.File("src/main/res")

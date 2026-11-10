@@ -7,7 +7,7 @@
 package com.pgpony.android.ui.pair
 
 import com.pgpony.android.pair.PairItem
-import java.util.Locale
+import com.pgpony.android.pair.PairSkip
 
 internal enum class PairDirection { SENT, RECEIVED }
 
@@ -64,13 +64,14 @@ internal object PairLedger {
      * A RESULT for a sent item. Returns the new rows and the row it settled, or null when no
      * sent item with that id is still waiting.
      */
-    fun answered(rows: List<PairRow>, id: Int, ok: Boolean, error: String?): Pair<List<PairRow>, PairRow?> {
+    fun answered(rows: List<PairRow>, id: Int, ok: Boolean, error: String?, skipped: Boolean = false): Pair<List<PairRow>, PairRow?> {
         val i = rows.indexOfLast { it.direction == PairDirection.SENT && it.id == id && it.outcome == PairOutcome.WAITING }
         if (i < 0) return rows to null
         val settled = rows[i].copy(
             outcome = when {
                 ok -> PairOutcome.ADDED
-                PairSkip.isSkip(error) -> PairOutcome.SKIPPED
+                // 4.8.0 RC10: the "skipped" member first; the reason text for apps that do not send it.
+                skipped || PairSkip.isSkip(error) -> PairOutcome.SKIPPED
                 else -> PairOutcome.FAILED
             },
             detail = if (ok) null else error?.takeIf { it.isNotBlank() }
@@ -91,33 +92,3 @@ internal object PairLedger {
     )
 }
 
-/**
- * Whether a RESULT error means the other user chose Skip. Protocol v1 has no flag for it, so this
- * matches the reason each PGPony sends, in every language it ships (Android pair_skipped_reason,
- * desktop d_pair_skipped_reason). Anything else is a failure.
- */
-internal object PairSkip {
-    private val KNOWN = setOf(
-        "skipped by the other user",
-        "von der anderen person übersprungen",
-        "omitido por la otra persona",
-        "ignoré par l'autre personne",
-        "pulado pela outra pessoa",
-        "ignorado pela outra pessoa",
-        "пропущено другим пользователем",
-        "пропущено іншим користувачем",
-        "diğer kullanıcı tarafından atlandı",
-        "相手の利用者がスキップしました",
-        "相手のユーザーがスキップしました",
-        "对方已跳过",
-        "已被对方跳过",
-        "상대방이 건너뜀",
-        // 4.8.0 RC9: the Korean text Android actually ships, and Polish (item 4f).
-        "상대 사용자가 건너뜀",
-        "pominięte przez drugiego użytkownika"
-    )
-
-    private fun normalize(s: String) = s.trim().replace('’', '\'').lowercase(Locale.ROOT)
-
-    fun isSkip(error: String?): Boolean = error != null && normalize(error) in KNOWN
-}

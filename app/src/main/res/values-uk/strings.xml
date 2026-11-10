@@ -2239,7 +2239,7 @@
     <string name="key_detail_action_copy_ssh_key">Копіювати відкритий ключ SSH</string>
     <string name="key_detail_ssh_key_copied">Відкритий ключ SSH скопійовано</string>
     <string name="keyring_generate_ssh_auth_toggle">Додати підключ автентифікації SSH</string>
-    <string name="keyring_generate_ssh_auth_caption">Підключ для входу на сервери через SSH за допомогою мосту ssh-agent: RSA для ключа RSA, Ed25519 для будь-якого іншого ключа.</string>
+    <string name="keyring_generate_ssh_auth_caption">Підключ для входу на сервери через SSH за допомогою мосту ssh-agent: RSA для ключа RSA, ECDSA для ключа ECDSA на кривій NIST, Ed25519 для будь-якого іншого ключа.</string>
     <string name="keyring_generate_ssh_auth_failed">Ключ створено, але не вдалося додати підключ SSH: %1$s. Його можна додати в розділі «Відомості про ключ».</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">SSH із Termux</string>
@@ -3261,6 +3261,9 @@
     <!-- 4.8.0 RC8 (#115) -->
     <string name="key_detail_trust_certified_by">Перевірено вашим ключем %1$s</string>
     <string name="key_detail_trust_certified_by_uids">Перевірено вашим ключем %1$s для %2$s</string>
+    <!-- 4.8.0 RC10 (#115) -->
+    <string name="key_detail_trust_certified_by_introducer">Перевірено ключем %1$s, довіреним посередником для вашого ключа %2$s</string>
+    <string name="key_detail_trust_certified_by_introducer_uids">Перевірено для %3$s ключем %1$s, довіреним посередником для вашого ключа %2$s</string>
     <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
     <string name="groups_title">Групи</string>
     <string name="groups_new">Нова група</string>
@@ -3335,4 +3338,14 @@
     <string name="qr_too_large_with_parts">Цей ключ завеликий для QR-коду. %1$s Скористайтеся функцією «Поділитися» або «Копіювати».</string>
     <string name="settings_qr_long_codes_title">Довгі QR-коди</string>
     <string name="settings_qr_long_codes_subtitle">Показувати ключ, що не вміщується в QR-код із %2$d частин, у вигляді коду до %1$d частин. Коди з понад %2$d частин скануються лише в PGPony Android 4.8.0 або новішому.</string>
+    <!-- 4.8.0 RC10 (#109) -->
+    <string name="key_detail_add_subkey_group_sign">Підпис</string>
+    <string name="key_detail_add_subkey_group_auth">Автентифікація</string>
+    <string name="key_detail_add_subkey_group_encrypt">Шифрування</string>
+    <string name="key_detail_add_subkey_curve_label">Крива для ECDSA та ECDH</string>
+    <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (підпис)</string>
+    <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (автентифікація)</string>
+    <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (шифрування)</string>
+    <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH підтримує ECDSA лише на кривих NIST. На цій кривій підключ автентифікації призначений для ключа безпеки.</string>
+    <string name="keyring_generate_granular_dropped_for_v6">Ключ v6 не може містити деякі з вибраних підключів, тому їх вилучено.</string>
 </resources>

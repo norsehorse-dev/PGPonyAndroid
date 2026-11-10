@@ -42,7 +42,8 @@ class AddSubkeyChoiceTest {
     @Test
     fun `v4 offers RSA classical and ML-KEM-768 only for PQ`() {
         val classical = AddSubkeyChoice.classicalFor(isV6 = false)
-        assertEquals(ClassicalSubkeyGen.ClassicalSubkeyType.entries.size, classical.size)
+        // 4.8.0 RC10 (#109): the ECDSA and ECDH entries come through optionsFor, one curve at a time.
+        assertEquals(ClassicalSubkeyGen.ClassicalSubkeyType.entries.count { it.curve == null }, classical.size)
         assertTrue("v4 keeps RSA options", classical.any { it.type.name.startsWith("RSA") })
 
         val pq = AddSubkeyChoice.postQuantumFor(isV6 = false)

@@ -57,7 +57,8 @@ fun CertifySheet(
     ) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // 4.8.0 RC10 (#109): a swipe does not close this form; back and Cancel do.
+    val sheetState = com.pgpony.android.ui.components.rememberFormSheetState()
     val certifiable = userIds.filter { !it.isRevoked }
     var picked by remember { mutableStateOf(certifiable.map { it.raw }.toSet()) }
     var certifier by remember { mutableStateOf(certifiers.firstOrNull { it.isDefault } ?: certifiers.firstOrNull()) }

@@ -572,10 +572,21 @@ fun DetailsSection(
         // when a certification did, so it reads apart from a Verified set by hand.
         // A certification covers one User ID, so name them when not all are.
         val verification = com.pgpony.android.data.CertifiedTrust.verificationFor(key)
+        // 4.8.0 RC10 (#115): through a trusted introducer, name the key that
+        // certified it and your key at the top of the chain.
         val certifiedLine = verification?.let { v ->
             val only = v.onlyUserIds
-            if (only == null) stringResource(R.string.key_detail_trust_certified_by, v.certifierLabel)
-            else stringResource(R.string.key_detail_trust_certified_by_uids, v.certifierLabel, only.joinToString(", "))
+            val via = v.introducerFor
+            when {
+                via == null && only == null ->
+                    stringResource(R.string.key_detail_trust_certified_by, v.certifierLabel)
+                via == null ->
+                    stringResource(R.string.key_detail_trust_certified_by_uids, v.certifierLabel, only.orEmpty().joinToString(", "))
+                only == null ->
+                    stringResource(R.string.key_detail_trust_certified_by_introducer, v.certifierLabel, via.orEmpty())
+                else ->
+                    stringResource(R.string.key_detail_trust_certified_by_introducer_uids, v.certifierLabel, via.orEmpty(), only.orEmpty().joinToString(", "))
+            }
         }
         TrustLevelRow(
             trust = com.pgpony.android.data.CertifiedTrust.effective(key),

@@ -41,7 +41,8 @@ fun AddUserIdSheet(
      *  the card PIN and the self-certification is signed there. */
     cardPin: Boolean = false,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // 4.8.0 RC10 (#109): a swipe does not close this form; back and Cancel do.
+    val sheetState = com.pgpony.android.ui.components.rememberFormSheetState()
 
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }

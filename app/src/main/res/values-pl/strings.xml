@@ -642,6 +642,9 @@
     <!-- 4.8.0 RC8 (#115) -->
     <string name="key_detail_trust_certified_by">Zweryfikowany Twoim kluczem %1$s</string>
     <string name="key_detail_trust_certified_by_uids">Zweryfikowany Twoim kluczem %1$s dla %2$s</string>
+    <!-- 4.8.0 RC10 (#115) -->
+    <string name="key_detail_trust_certified_by_introducer">Zweryfikowany kluczem %1$s, zaufanym pośrednikiem dla Twojego klucza %2$s</string>
+    <string name="key_detail_trust_certified_by_introducer_uids">Zweryfikowany dla %3$s kluczem %1$s, zaufanym pośrednikiem dla Twojego klucza %2$s</string>
     <!-- ── Contact section ─────────────────────────────────────────── -->
     <string name="key_detail_section_contact">Kontakt</string>
     <string name="key_detail_contact_linked">Powiązano z kontaktem</string>
@@ -1994,7 +1997,7 @@
     <string name="key_detail_action_copy_ssh_key">Kopiuj klucz publiczny SSH</string>
     <string name="key_detail_ssh_key_copied">Skopiowano klucz publiczny SSH</string>
     <string name="keyring_generate_ssh_auth_toggle">Dodaj podklucz uwierzytelniania SSH</string>
-    <string name="keyring_generate_ssh_auth_caption">Podklucz do logowania się na serwerach przez SSH za pośrednictwem mostka ssh-agent: RSA dla klucza RSA, Ed25519 dla każdego innego klucza.</string>
+    <string name="keyring_generate_ssh_auth_caption">Podklucz do logowania się na serwerach przez SSH za pośrednictwem mostka ssh-agent: RSA dla klucza RSA, ECDSA dla klucza ECDSA na krzywej NIST, Ed25519 dla każdego innego klucza.</string>
     <string name="keyring_generate_ssh_auth_failed">Klucz został utworzony, ale nie udało się dodać podklucza SSH: %1$s. Możesz go dodać na ekranie „Szczegóły klucza”.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">SSH w aplikacji Termux</string>
@@ -3082,4 +3085,14 @@
     <string name="qr_too_large_with_parts">Ten klucz jest za duży na kod QR. %1$s Zamiast tego użyj opcji „Udostępnij” lub „Kopiuj”.</string>
     <string name="settings_qr_long_codes_title">Długie kody QR</string>
     <string name="settings_qr_long_codes_subtitle">Pokazuj klucz, który nie mieści się w %2$d częściach kodu QR, w maksymalnie %1$d częściach. Kody mające ponad %2$d części zeskanuje tylko PGPony Android 4.8.0 lub nowszy.</string>
+    <!-- 4.8.0 RC10 (#109) -->
+    <string name="key_detail_add_subkey_group_sign">Podpisywanie</string>
+    <string name="key_detail_add_subkey_group_auth">Uwierzytelnianie</string>
+    <string name="key_detail_add_subkey_group_encrypt">Szyfrowanie</string>
+    <string name="key_detail_add_subkey_curve_label">Krzywa dla ECDSA i ECDH</string>
+    <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (podpisywanie)</string>
+    <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (uwierzytelnianie)</string>
+    <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (szyfrowanie)</string>
+    <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH obsługuje ECDSA tylko na krzywych NIST. Na tej krzywej podklucz uwierzytelniania jest przeznaczony dla klucza bezpieczeństwa.</string>
+    <string name="keyring_generate_granular_dropped_for_v6">Klucz v6 nie może zawierać niektórych wybranych podkluczy, więc zostały usunięte.</string>
 </resources>

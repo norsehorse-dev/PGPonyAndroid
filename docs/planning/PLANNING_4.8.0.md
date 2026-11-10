@@ -484,8 +484,11 @@ groups from the sync (PLANNING_DESKTOP_4_0_0.md section 6), so groups are built 
   backup format leaves room for iOS to read groups later. Check that 4.7.x still restores a backup that carries
   groups and skips them.
 - Strings: new ones in all locales, before 4f so the Polish pass covers them.
-Desktop takes the data layer and the backup and pairing format from the sync and builds its own screens and the
-`pgpony encrypt -r @name` form. iOS mirrors it when it takes 4.8.0.
+Desktop takes data/groups/ and backup/RecipientGroupBackup.kt from the sync (corrected in RC10: its backup
+service and its database migrations are its own code, BackupService.kt and RoomMigrations.kt being excluded there,
+so it wires groups into those itself, calling RecipientGroupSchema.MIGRATION_13_14 for the SQL), builds its own
+screens and the `pgpony encrypt -r @name` form. The format is in docs/PGPONY_BACKUP_FORMAT.md. iOS mirrors it when it takes
+4.8.0.
 
 Done in RC8: data/groups holds the data layer, with no Compose in it: RecipientGroupEntity (tables
 recipient_groups and recipient_group_members, members by primary fingerprint in lowercase hex), its DAO,
@@ -570,8 +573,8 @@ RSA 2048 (a YubiKey 5 after an RSA 2048 move or `key-attr`), move an RSA 2048 ke
 C1 to C3 is sent (the fake-NEO test covers the commands) and the move must pass its check as before. Then the Write
 path: the same card with its slots at Ed25519/Cv25519, move the RSA key (the attributes are written first).
 
-Done in RC5. Desktop mirrors it (done separately), along with its Read card treating 6A83 like 6A88 on the optional
-reads.
+Done in RC5. Desktop (corrected in RC10): not done there yet. KeyToCard's attribute plan comes with the v4.8.0
+sync; desktop's own Read card change (6A83 handled like 6A88 on the optional reads) is desktop 4.0.0 work.
 
 
 ## 4r. Done after a backup goes back to the choice (#113)
@@ -695,6 +698,66 @@ User ID added after the certification.
 
 Done in RC8.
 
+RC10 (Nov 10, the tester's follow-up on #115): trusted introducers and key pairs. The tester's own Ultimate key A
+certified his old key O with a trust signature, and O certified his current key pair C; C stayed Unknown. Now a
+certification by a root (your key at Ultimate) that is a trust signature of level L >= 1 and amount >= 120 makes
+its target a trusted introducer of depth L (capped at 8): its certifications validate User IDs like a root's, and
+its own trust signatures of level m make further introducers of depth min(m, L-1), as gpg does. A plain
+certification by a key that is not a root never vouches; a marginal amount, a Regular Expression subpacket (scoping
+not implemented), a revoked, expired, Don't use or Unverified key never make an introducer. Of one certifier's
+certifications on a User ID only the newest that verifies is in force; if it has expired or fails a check, nothing
+from that certifier counts there, so an older trust signature does not come back. Your own key pairs at Unknown can
+now be raised too; Unverified, Don't use and a level the user set still never change. The answers are computed over
+the whole keyring, one computation at a time, with each certification's result cached until either key changes or
+it expires; a published path is checked against the newest keyring read, and a failed computation raises nothing.
+Key Details names the introducer and your key at the top of the chain. TrustIntroducerTest and
+CertifiedTrustChainTest cover it.
+
+
+## 4x. The Generate Key sheet, and subkey types that match (#109, after RC8)
+
+Origin: #109 (Nov 9 and 10), two testers on RC8. One slid the Generate Key sheet away "half a dozen times" while
+scrolling to the NIST curves under Advanced, and could not compose a subkey on those curves. The other, provisioning
+a security key from a brainpoolP384r1 key, had signing and encryption on the card but an empty AUT slot: Add subkey
+offered no ECDSA or ECDH type, and its list and the composer's differed both ways (Add subkey had RSA and lacked
+ML-KEM-1024 and ML-DSA on their key; the composer, on its default v6 base, had those and lacked RSA).
+
+The work:
+- A swipe no longer closes a sheet that holds a form (ui/components/FormSheet.kt): Generate Key (with a Close button
+  in its title row), the first-key sheet in onboarding, and in Key Details Add subkey, Add User ID, Edit notations,
+  Change passphrase, Revoke key and Certify. A drag springs back and the content still scrolls; back and the sheet's
+  Close or Cancel close it. A tap on the scrim no longer does: Material 3 1.3 asks the same question for a scrim tap
+  as for a drag, and sheetGesturesEnabled only arrived in 1.4.
+- ECDSA (Sign, Authenticate) and ECDH (Encrypt) subkeys on every curve PGPony generates (NIST P-256/384/521,
+  brainpoolP256r1/384r1/512r1, secp256k1), v4 only, made like a generated key on that curve (EcdsaKeygen, gpg's KDF,
+  a back-signature as long as the curve). An Authenticate subkey on brainpool or secp256k1 is for a card's AUT slot;
+  SSH has no type for those curves, which the sheet says, and SshAuth passes it over. A NIST key's SSH subkey from
+  Generate Key is now ECDSA on its curve.
+- One list for both (AddSubkeyChoice.optionsFor), grouped Signing, Authentication, Encryption, in the same order with
+  the same labels, and a curve field for the ECDSA and ECDH entries (an ECDSA key starts on its own curve). It differs
+  only by the key's version, said in AddSubkeyChoice.allowedOn: ECDSA and ECDH are v4 only; RSA is v4 or a composite
+  ML-DSA primary; ML-DSA and ML-KEM-1024 are v6 only (an ML-DSA subkey on a classical v6 primary signs since 4j). The
+  composer takes one ML-KEM-768 subkey on a v4 base, as before, and switching it to v6 now removes RSA, ECDSA and ECDH
+  subkeys (with a note) instead of failing at Generate.
+- Tests: EcdsaSubkeyTest (every curve and use added with the right shape, a brainpool signing subkey signs, ECDH
+  subkeys decrypt, NIST Authenticate subkeys for SSH and a brainpool one kept for a card, a composed key with brainpool
+  subkeys encrypts and decrypts), SubkeyOptionsTest, and the composer and choice tests updated.
+
+Done in RC10.
+
+
+## 4y. The keyboard's private mode on every field (#86, after RC8)
+
+Origin: #86 (Nov 9). A tester asked for the keyboard's private (incognito) mode. Passphrase fields already were, as
+password fields; message, name and comment fields were not.
+
+The work: every text field asks the keyboard not to learn from it (EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING),
+through Compose's InterceptPlatformTextInput in ui/components/PrivateKeyboard.kt. It wraps PGPonyTheme's content,
+the root of every activity with text input (the app, the OpenPGP API dialogs, the share target and process text),
+and dialogs and sheets inherit it. Always on, no setting. A keyboard may ignore the flag. No new strings.
+
+Done in RC10.
+
 
 ## 5. Contributor PRs waiting on a decision
 
@@ -709,7 +772,8 @@ Done in RC8.
   details or a reproduction.
 - 4.7.0 item 8: interop check for LibrePGP ML-KEM-768 + brainpoolP256r1 keys against gpg 2.5.
 - 4.7.0 item 21 remainder: an optional `"skipped": true` member on RESULT so a skip is not told from a failure by
-  its reason text, and the matching rows in desktop's PairDialog.
+  its reason text, and the matching rows in desktop's PairDialog. Android side done in RC10; desktop's rows are desktop 4.0.0
+  work.
 - 4.7.0 item 31 left-out: an ML-DSA certifier or target (needs the raw-packet path).
 - 4.7.0 item 37 left-out: a foreground worker so a save survives the sheet or Quick Action closing.
 - 4.7.0 item 38 left-outs: verifying several detached signatures with their files; .zip and .eml in a batch; a
@@ -825,6 +889,16 @@ RC8: 4n, recipient groups and the picker's order (added Nov 4).
 
 RC9: 4f, Polish. Last, so the translation covers the final values/ in one pass, item 1's and 4n's strings included.
   Done in RC9, with the Korean pairing skip fix found on the way.
+
+RC10 (added Nov 9): what PGPony Desktop 4.0.0 needs from the v4.8.0 tag, from docs/planning/BEFORE_DESKTOP_4_0_0.md.
+PairSkip moves to pair/PairSkip.kt and buildExportFilename to crypto/ExportFilename.kt (move only, both shared trees
+desktop vendors, with their tests); a skip RESULT carries an optional "skipped": true member (the 4.7.0 item 21
+remainder from section 6), counted before the reason text; docs/PGPONY_BACKUP_FORMAT.md writes the backup format down,
+with the 4.8.0 ssh-keys/ and recipient-groups.json entries; PAIRING_PROTOCOL.md gets the member and what a backup
+item carries; and the 4n and 4p notes on desktop are corrected. No new strings. Done in RC10.
+- 4x (#109, added Nov 10): a swipe no longer closes Generate Key or the Key Details forms; ECDSA and ECDH subkeys on
+  every generated curve, Authenticate included; one subkey list for Add subkey and the composer.
+- 4y (#86, added Nov 10): every text field asks the keyboard for its private mode.
 
 Not in an RC: the section 6 carry-overs unless one comes up on its own, and the in-app viewer for decrypted files
 (4b), which is not planned yet.

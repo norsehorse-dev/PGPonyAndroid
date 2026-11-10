@@ -56,7 +56,8 @@ fun OnboardingGenerateSheet(
     onSuccess: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // 4.8.0 RC10 (#109): a swipe does not close this form; back and Cancel do.
+    val sheetState = com.pgpony.android.ui.components.rememberFormSheetState()
     val vmState by keyringVm.state.collectAsState()
 
     var name by remember { mutableStateOf("") }

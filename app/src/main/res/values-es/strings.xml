@@ -2130,7 +2130,7 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="key_detail_action_copy_ssh_key">Copiar clave pública SSH</string>
     <string name="key_detail_ssh_key_copied">Clave pública SSH copiada</string>
     <string name="keyring_generate_ssh_auth_toggle">Añadir subclave de autenticación SSH</string>
-    <string name="keyring_generate_ssh_auth_caption">Una subclave para iniciar sesión en servidores por SSH a través de un puente ssh-agent: RSA en una clave RSA, Ed25519 en cualquier otra.</string>
+    <string name="keyring_generate_ssh_auth_caption">Una subclave para iniciar sesión en servidores por SSH a través de un puente ssh-agent: RSA en una clave RSA, ECDSA en una clave ECDSA NIST, Ed25519 en cualquier otra.</string>
     <string name="keyring_generate_ssh_auth_failed">Clave creada, pero no se pudo añadir la subclave SSH: %1$s. Puedes añadirla desde el detalle de la clave.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">SSH desde Termux</string>
@@ -3145,6 +3145,9 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <!-- 4.8.0 RC8 (#115) -->
     <string name="key_detail_trust_certified_by">Verificada por tu clave %1$s</string>
     <string name="key_detail_trust_certified_by_uids">Verificada por tu clave %1$s para %2$s</string>
+    <!-- 4.8.0 RC10 (#115) -->
+    <string name="key_detail_trust_certified_by_introducer">Verificada por %1$s, introductor de confianza para tu clave %2$s</string>
+    <string name="key_detail_trust_certified_by_introducer_uids">Verificada para %3$s por %1$s, introductor de confianza para tu clave %2$s</string>
     <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
     <string name="groups_title">Grupos</string>
     <string name="groups_new">Nuevo grupo</string>
@@ -3214,4 +3217,14 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="qr_too_large_with_parts">Esta clave es demasiado grande para un código QR. %1$s Usa Compartir o Copiar en su lugar.</string>
     <string name="settings_qr_long_codes_title">Códigos QR largos</string>
     <string name="settings_qr_long_codes_subtitle">Muestra en hasta %1$d partes una clave que no cabe en %2$d partes QR. Los códigos de más de %2$d partes solo se pueden escanear en PGPony Android 4.8.0 o posterior.</string>
+    <!-- 4.8.0 RC10 (#109) -->
+    <string name="key_detail_add_subkey_group_sign">Firma</string>
+    <string name="key_detail_add_subkey_group_auth">Autenticación</string>
+    <string name="key_detail_add_subkey_group_encrypt">Cifrado</string>
+    <string name="key_detail_add_subkey_curve_label">Curva para ECDSA y ECDH</string>
+    <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (Firmar)</string>
+    <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (Autenticar)</string>
+    <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (Cifrar)</string>
+    <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH solo admite ECDSA en las curvas NIST. En esta curva, una subclave de autenticación sirve solo para una llave de seguridad.</string>
+    <string name="keyring_generate_granular_dropped_for_v6">Una clave v6 no puede contener algunas de las subclaves que elegiste, así que se quitaron.</string>
 </resources>

@@ -87,7 +87,8 @@ fun RevokeKeySheet(
      *  signed there. */
     cardPin: Boolean = false
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // 4.8.0 RC10 (#109): a swipe does not close this form; back and Cancel do.
+    val sheetState = com.pgpony.android.ui.components.rememberFormSheetState()
     var selectedReason by remember { mutableStateOf(RevocationReason.NO_REASON) }
     var comment by remember { mutableStateOf("") }
     var passphrase by remember { mutableStateOf("") }

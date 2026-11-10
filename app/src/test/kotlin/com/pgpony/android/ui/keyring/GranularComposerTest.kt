@@ -22,8 +22,9 @@ class GranularComposerTest {
 
     @Test
     fun `the v6 menu is unchanged and the v4 menu holds only what v4 can`() {
+        // 4.8.0 RC10 (#109): the same list Add subkey shows for a v6 key.
         assertEquals(
-            AddSubkeyChoice.classicalFor(isV6 = true) + AddSubkeyChoice.postQuantumFor(isV6 = true),
+            AddSubkeyChoice.optionsFor(AddSubkeyChoice.Base.V6),
             GranularComposer.menu(baseV6 = true, chosen = emptyList())
         )
         val v4 = GranularComposer.menu(baseV6 = false, chosen = emptyList())
@@ -53,5 +54,32 @@ class GranularComposerTest {
         assertFalse(GranularComposer.defaultEncryptionSubkey(listOf(mlkem1024, mldsa87)))
         assertTrue("a classical subkey in the list keeps it", GranularComposer.defaultEncryptionSubkey(listOf(mlkem768, edSign)))
         assertTrue("no post-quantum encryption subkey keeps it", GranularComposer.defaultEncryptionSubkey(listOf(mldsa87)))
+    }
+
+    // ── 4.8.0 RC10 (#109) ────────────────────────────────────────────
+
+    private val bpAuth = AddSubkeyChoice.Classical(ClassicalSubkeyType.ECDSA_BP384_AUTH)
+    private val p256Sign = AddSubkeyChoice.Classical(ClassicalSubkeyType.ECDSA_P256_SIGN)
+
+    @Test
+    fun `the v4 menu is the Add subkey list for a v4 key, with the chosen curve`() {
+        for (curve in com.pgpony.android.crypto.KeyAlgorithm.generatableEcdsa) {
+            assertEquals(
+                AddSubkeyChoice.optionsFor(AddSubkeyChoice.Base.V4, curve),
+                GranularComposer.menu(baseV6 = false, chosen = emptyList(), curve = curve)
+            )
+        }
+        val bp = GranularComposer.menu(false, emptyList(), com.pgpony.android.crypto.KeyAlgorithm.ECDSA_BRAINPOOL_P384)
+        assertTrue(bp.contains(bpAuth))
+        assertTrue(bp.contains(AddSubkeyChoice.Classical(ClassicalSubkeyType.ECDH_BP384_ENCRYPT)))
+        assertFalse("v6 has no ECDSA", GranularComposer.menu(true, emptyList()).any {
+            it is AddSubkeyChoice.Classical && it.type.curve != null
+        })
+    }
+
+    @Test
+    fun `ECDSA subkeys stay on v4 and leave on v6`() {
+        assertEquals(listOf(bpAuth, p256Sign, rsaEnc), GranularComposer.keptForV4(listOf(bpAuth, p256Sign, rsaEnc)))
+        assertEquals(listOf(edSign, mldsa87), GranularComposer.keptForV6(listOf(bpAuth, edSign, rsaEnc, p256Sign, mldsa87)))
     }
 }

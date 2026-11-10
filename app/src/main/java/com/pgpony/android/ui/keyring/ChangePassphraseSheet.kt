@@ -37,7 +37,8 @@ fun ChangePassphraseSheet(
     onApply: (oldPassphrase: String, newPassphrase: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // 4.8.0 RC10 (#109): a swipe does not close this form; back and Cancel do.
+    val sheetState = com.pgpony.android.ui.components.rememberFormSheetState()
 
     var current by remember { mutableStateOf("") }
     var newPass by remember { mutableStateOf("") }

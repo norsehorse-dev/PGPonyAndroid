@@ -793,7 +793,9 @@ fun PGPonyTheme(content: @Composable () -> Unit) {
     val colorScheme = resolveColorScheme(theme)
     MaterialTheme(
         colorScheme = colorScheme,
-        content = content
+        // 4.8.0 RC10 (#86): every activity's root is this theme, so every text
+        // field asks the keyboard for its private mode (see PrivateKeyboard).
+        content = { com.pgpony.android.ui.components.PrivateKeyboard(content) }
     )
 }
 

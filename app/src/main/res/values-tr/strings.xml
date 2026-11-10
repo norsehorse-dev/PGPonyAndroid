@@ -2221,7 +2221,7 @@
     <string name="key_detail_action_copy_ssh_key">SSH Açık Anahtarını Kopyala</string>
     <string name="key_detail_ssh_key_copied">SSH açık anahtarı kopyalandı</string>
     <string name="keyring_generate_ssh_auth_toggle">SSH kimlik doğrulama alt anahtarı ekle</string>
-    <string name="keyring_generate_ssh_auth_caption">Bir ssh-agent köprüsü aracılığıyla SSH üzerinden sunuculara giriş yapmak için bir alt anahtar: RSA anahtarında RSA, diğer tüm anahtarlarda Ed25519.</string>
+    <string name="keyring_generate_ssh_auth_caption">Bir ssh-agent köprüsü aracılığıyla SSH üzerinden sunuculara giriş yapmak için bir alt anahtar: RSA anahtarında RSA, NIST ECDSA anahtarında ECDSA, diğer tüm anahtarlarda Ed25519.</string>
     <string name="keyring_generate_ssh_auth_failed">Anahtar oluşturuldu ancak SSH alt anahtarı eklenemedi: %1$s. Alt anahtarı Anahtar Ayrıntıları\'ndan ekleyebilirsiniz.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">Termux\'tan SSH</string>
@@ -3207,6 +3207,9 @@
     <!-- 4.8.0 RC8 (#115) -->
     <string name="key_detail_trust_certified_by">%1$s anahtarınızla doğrulandı</string>
     <string name="key_detail_trust_certified_by_uids">%1$s anahtarınızla %2$s için doğrulandı</string>
+    <!-- 4.8.0 RC10 (#115) -->
+    <string name="key_detail_trust_certified_by_introducer">%2$s anahtarınız için güvenilir tanıtıcı olan %1$s anahtarıyla doğrulandı</string>
+    <string name="key_detail_trust_certified_by_introducer_uids">%2$s anahtarınız için güvenilir tanıtıcı olan %1$s anahtarıyla %3$s için doğrulandı</string>
     <!-- 4.8.0 RC8 (item 4n, recipient groups) -->
     <string name="groups_title">Gruplar</string>
     <string name="groups_new">Yeni grup</string>
@@ -3271,4 +3274,14 @@
     <string name="qr_too_large_with_parts">Bu anahtar bir QR kodu için çok büyük. %1$s Bunun yerine Paylaş veya Kopyala\'yı kullanın.</string>
     <string name="settings_qr_long_codes_title">Uzun QR kodları</string>
     <string name="settings_qr_long_codes_subtitle">%2$d QR bölümüne sığmayan bir anahtarı en fazla %1$d bölümde gösterir. %2$d bölümden uzun kodlar yalnızca PGPony Android 4.8.0 veya sonraki sürümlerde taranabilir.</string>
+    <!-- 4.8.0 RC10 (#109) -->
+    <string name="key_detail_add_subkey_group_sign">İmzalama</string>
+    <string name="key_detail_add_subkey_group_auth">Kimlik doğrulama</string>
+    <string name="key_detail_add_subkey_group_encrypt">Şifreleme</string>
+    <string name="key_detail_add_subkey_curve_label">ECDSA ve ECDH için eğri</string>
+    <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (İmzalama)</string>
+    <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (Kimlik Doğrulama)</string>
+    <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (Şifreleme)</string>
+    <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH, ECDSA\'yı yalnızca NIST eğrilerinde kabul eder. Bu eğride bir kimlik doğrulama alt anahtarı, güvenlik anahtarı içindir.</string>
+    <string name="keyring_generate_granular_dropped_for_v6">Bir v6 anahtarı seçtiğiniz alt anahtarların bazılarını içeremez, bu yüzden bunlar kaldırıldı.</string>
 </resources>
