@@ -41,6 +41,14 @@ names its exports itself and would copy the rule. Move it, move only, to a share
 crypto/ExportFilename.kt), with ui/keyring/ExportFilenameTest.kt moving to the matching test tree. KeyShareIntents
 keeps calling it.
 
+### 1.3 Move the backup constants out of BackupService (found Nov 10, after RC10)
+
+backup/BackupFileSniff.kt (RC5, #67) named BackupService.FILE_EXTENSION, and its test BackupService.ARMOR_COMMENT.
+BackupService.kt is excluded on desktop, so the vendored file would not compile there. The check above read
+imports, and this is a same-package reference with none. Done on main after RC10: ARMOR_COMMENT, FORMAT_VERSION and
+FILE_EXTENSION live in backup/BackupFormat.kt (plain Kotlin, no imports), BackupService's companion keeps the three
+names as aliases for the app's callers, and BackupFileSniff and its test read BackupFormat. Values unchanged.
+
 ## 2. Docs, before the tag
 
 ### 2.1 Write down the backup format

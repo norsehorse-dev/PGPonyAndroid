@@ -27,7 +27,7 @@ class BackupFileSniffTest {
 
     @Test
     fun `a PGPony backup is recognized by its armor comment, whatever its name`() {
-        val backup = armored("Comment" to BackupService.ARMOR_COMMENT)
+        val backup = armored("Comment" to BackupFormat.ARMOR_COMMENT)
         assertTrue(BackupFileSniff.isKeyringBackup(backup, "pgpony-2026-11-05.pgpony"))
         assertTrue(BackupFileSniff.isKeyringBackup(backup, "renamed.asc"))
         assertTrue(BackupFileSniff.isKeyringBackup(backup, null))
@@ -41,7 +41,7 @@ class BackupFileSniffTest {
 
     @Test
     fun `CRLF line endings and leading whitespace still read as a backup`() {
-        val crlf = String(armored("Comment" to BackupService.ARMOR_COMMENT), Charsets.UTF_8)
+        val crlf = String(armored("Comment" to BackupFormat.ARMOR_COMMENT), Charsets.UTF_8)
             .replace("\r\n", "\n").replace("\n", "\r\n")
         assertTrue(BackupFileSniff.isKeyringBackup(("\r\n  " + crlf).toByteArray(Charsets.UTF_8), null))
     }
@@ -68,7 +68,7 @@ class BackupFileSniffTest {
         val note = "How to restore a PGPony Backup v1\nPassphrase-Format: numeric9x4\n"
         assertFalse(BackupFileSniff.isKeyringBackup(note.toByteArray(), "notes.txt"))
         // A backup's armor quoted inside other text is not a backup file either.
-        val quoted = "See below:\n\n" + String(armored("Comment" to BackupService.ARMOR_COMMENT), Charsets.UTF_8)
+        val quoted = "See below:\n\n" + String(armored("Comment" to BackupFormat.ARMOR_COMMENT), Charsets.UTF_8)
         assertFalse(BackupFileSniff.isKeyringBackup(quoted.toByteArray(Charsets.UTF_8), "mail.eml"))
     }
 

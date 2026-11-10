@@ -119,9 +119,11 @@ class BackupService(
 ) {
 
     companion object {
-        const val ARMOR_COMMENT = "PGPony Backup v1"
-        const val FORMAT_VERSION = 1
-        const val FILE_EXTENSION = "pgpony"
+        // The values live in BackupFormat (shared with PGPony Desktop);
+        // these names stay for the app's existing callers.
+        const val ARMOR_COMMENT = BackupFormat.ARMOR_COMMENT
+        const val FORMAT_VERSION = BackupFormat.FORMAT_VERSION
+        const val FILE_EXTENSION = BackupFormat.FILE_EXTENSION
 
         private const val META_NAME = "pgpony-meta.json"
         private const val SETTINGS_NAME = "pgpony-settings.json"

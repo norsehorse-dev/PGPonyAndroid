@@ -900,6 +900,12 @@ item carries; and the 4n and 4p notes on desktop are corrected. No new strings. 
   every generated curve, Authenticate included; one subkey list for Add subkey and the composer.
 - 4y (#86, added Nov 10): every text field asks the keyboard for its private mode.
 
+After RC10 (Nov 10), for PGPony Desktop 4.0.0: the backup format constants (the armor comment, the format version and
+the file extension) move from BackupService's companion to backup/BackupFormat.kt, values unchanged, and
+BackupFileSniff and its test read them there. BackupFileSniff named BackupService, which desktop does not vendor, so
+it could not compile there (BEFORE_DESKTOP_4_0_0.md section 1.3). A compiled source changes, so the APK differs from
+RC10's: this needs a build before the v4.8.0 tag.
+
 Not in an RC: the section 6 carry-overs unless one comes up on its own, and the in-app viewer for decrypted files
 (4b), which is not planned yet.
 

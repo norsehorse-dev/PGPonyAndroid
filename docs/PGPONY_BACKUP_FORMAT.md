@@ -2,7 +2,8 @@
 
 What PGPony Android 4.8.0 writes and reads as a full backup, for the other apps that read or write
 the same file (PGPony Desktop, PGPony iOS). The code is backup/BackupService.kt, with the entries in
-backup/SshKeyBackup.kt and backup/RecipientGroupBackup.kt and the archive in backup/UstarArchive.kt.
+backup/SshKeyBackup.kt and backup/RecipientGroupBackup.kt, the archive in backup/UstarArchive.kt and the
+constants in backup/BackupFormat.kt.
 The full-backup item of the pairing protocol (docs/PAIRING_PROTOCOL.md, section 6) is this same
 file.
 

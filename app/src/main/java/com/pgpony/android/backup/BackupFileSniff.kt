@@ -3,7 +3,7 @@
 // content?
 //
 // A PGPony backup is an armored PGP MESSAGE whose armor carries
-// `Comment: PGPony Backup v1` (BackupService.ARMOR_COMMENT). An OpenKeychain
+// `Comment: PGPony Backup v1` (BackupFormat.ARMOR_COMMENT). An OpenKeychain
 // backup is an armored PGP MESSAGE with a `Passphrase-Format:` header. Both
 // open in Settings > Backup > Restore, so both count. The .pgpony extension
 // alone is not enough: it counts only on a file that is an armored PGP
@@ -49,6 +49,6 @@ object BackupFileSniff {
         if (pgponyComment) return true
         val openKeychain = headers.any { it.startsWith("Passphrase-Format:", ignoreCase = true) }
         if (openKeychain) return true
-        return filename?.trim()?.endsWith(".${BackupService.FILE_EXTENSION}", ignoreCase = true) == true
+        return filename?.trim()?.endsWith(".${BackupFormat.FILE_EXTENSION}", ignoreCase = true) == true
     }
 }
