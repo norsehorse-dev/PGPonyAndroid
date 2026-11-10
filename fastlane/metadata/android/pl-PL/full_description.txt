@@ -1,0 +1,71 @@
+PGPony to prawdziwe szyfrowanie OpenPGP na Androida z kryptografią postkwantową i obsługą kluczy sprzętowych. Generuj klucze PGP, szyfruj, odszyfrowuj, podpisuj i weryfikuj wiadomości oraz pliki na urządzeniu. Bez konta, serwera i śledzenia. Pełna zgodność z GnuPG (GPG), OpenKeychain i innymi narzędziami OpenPGP.
+
+NOWOŚĆ: parowanie z PGPony Desktop, logowanie SSH kluczami PGP i postkwantowe podpisy ML-DSA.
+
+▌SZYFROWANIE POSTKWANTOWE
+- Złożone klucze ML-KEM-768 i ML-KEM-1024 (Kyber) odporne na ataki kwantowe
+- Podpisy ML-DSA-65 i ML-DSA-87 (Dilithium) na kluczach OpenPGP v6
+- Standard IETF oraz format LibrePGP używany w GnuPG 2.5
+- Chroni wiadomości przed atakami „zbierz teraz, odszyfruj później”
+
+▌E-MAIL, HASŁA I SSH
+- Aplikacja OpenPGP dla Thunderbird for Android, K-9 Mail i FairEmail
+- Nowoczesny następca OpenKeychain: to samo API, aktywny rozwój
+- Każdą połączoną aplikację zatwierdzasz; dostęp cofniesz w Ustawieniach
+- Odczyt wpisów pass (password-store), także tych na kluczu sprzętowym
+- Logowanie SSH kluczem z PGPony przez ssh-agent w Termux
+
+▌KLUCZE SPRZĘTOWE
+- YubiKey, Token2 lub inna karta inteligentna OpenPGP przez NFC albo USB
+- Klucz prywatny nie opuszcza sprzętu; PIN potwierdza każdą operację
+- Generowanie kluczy na karcie, podpis, odszyfrowanie, szyfrowanie z podpisem; opcjonalna pamięć PIN-u
+- Zmiana PIN-ów i reset karty; PIN-y chronione KDF
+
+▌ZARZĄDZANIE KLUCZAMI PGP
+- Generowanie par kluczy Ed25519, RSA, OpenPGP v6 lub postkwantowych
+- Import i eksport w opakowaniu ASCII; podklucze, identyfikatory użytkownika, wygaśnięcie, unieważnienie
+- Szyfrowana kopia zapasowa pęku kluczy i przywracanie, też z OpenKeychain
+
+▌SZYFRUJ, ODSZYFRUJ, PODPISZ
+- Szyfrowanie tekstu lub plików dla jednego lub wielu odbiorców
+- Weryfikacja podpisów z wyraźnym znakiem zweryfikowanego autora
+- E-mail PGP/MIME: odszyfrowanie wiadomości z załącznikami, tworzenie .eml
+
+▌ZGODNOŚĆ Z OPENPGP V4 + V6 + PQC
+- Pełne OpenPGP v4 (RFC 4880) i v6 (RFC 9580): generowanie, szyfrowanie, odszyfrowanie, podpis
+- Uwierzytelnione szyfrowanie AEAD-OCB i ochrona kluczy Argon2id
+- Zgodność z GnuPG co do bajta, testowana w każdym wydaniu
+
+▌ŁATWA WYMIANA KLUCZY
+- Klucz publiczny jako kod QR, plik lub tekst; zeskanuj, by zaimportować
+- Import klucza z linku po sprawdzeniu odcisku klucza
+- Serwery kluczy i Web Key Directory (WKD), w tym keys.openpgp.org
+- Parowanie z PGPony Desktop (macOS, Windows, Linux) lub innym telefonem
+- Obsługa Autocrypt i wbudowana lista kontaktów
+
+▌PRYWATNOŚĆ OD PODSTAW
+- Szyfrowanie w 100% na Twoim urządzeniu: bez konta, bez telemetrii
+- Tryb offline wyłącza wszystkie funkcje sieciowe
+- Ruch do serwerów kluczy przez Tor z Orbot
+- Klucze prywatne w szyfrowanej pamięci opartej na Android Keystore
+- Opcjonalnie: blokada biometryczna, podpis odciskiem palca, autoczyszczenie schowka
+
+▌DLA KOGO PGPONY
+- Dziennikarze, badacze i aktywiści pracujący z poufnymi danymi
+- Użytkownicy Thunderbird, K-9 Mail i FairEmail szukający aplikacji OpenPGP
+- Programiści i administratorzy używający PGP do podpisu kodu, wydań i SSH
+- Użytkownicy GnuPG szukający wersji mobilnej lub zamiennika OpenKeychain
+- Każdy, kto chce szyfrowania prywatnego także w erze kwantowej
+
+▌DLACZEGO PGPONY
+Większość „bezpiecznych komunikatorów” każe ufać ich serwerom. PGPony nie potrzebuje żadnych. Klucze powstają i są przechowywane na Twoim urządzeniu, a opuszczają je tylko, gdy je udostępnisz. Znasz GnuPG z komputera? Poczujesz się jak w domu. Zaczynasz z PGP? To ma być najłatwiejszy start.
+
+▌OTWARTE ŹRÓDŁO
+- Licencja Apache-2.0; rdzeń OpenPGP wydany jako osobna biblioteka
+- Odtwarzalne kompilacje: każdy porówna wydane APK z kodem źródłowym
+- Za darmo, bez reklam i zakupów w aplikacji
+
+▌OBIETNICA PRYWATNOŚCI
+PGPony nie zbiera, nie przechowuje ani nie przesyła danych osobowych. Bez kont i SDK śledzących. Polityka prywatności: pgpony.app/privacy
+
+Od niezależnego twórcy z Alabamy. Pytania lub prośby? Dotknij „Wyślij opinię” w aplikacji albo napisz na NorseHorse@norsehor.se.

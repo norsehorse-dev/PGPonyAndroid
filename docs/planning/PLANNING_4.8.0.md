@@ -322,6 +322,17 @@ Origin: a Google Play review, Oct 30 2026 (five stars, waiting for Polish).
 - Release notes and the reply on the review say plainly that the translation is mostly machine-made and ask for
   corrections. iOS and desktop add Polish when they mirror this item.
 
+Done in RC9 (Nov 9): values-pl covers all 2,551 translatable strings and 32 plurals. A glossary came first, taken
+from the Polish GnuPG, Kleopatra, Thunderbird and OpenKeychain strings (informal ty, "pęk kluczy" for keyring,
+"odcisk klucza" for fingerprint, "hasło" for passphrase, trust levels Nieznany, Niezweryfikowany, Zweryfikowany,
+Absolutny, Nie używać). Seven agents translated one part each, seven others reviewed a part they did not
+translate, and one pass over the whole file settled the terms and made every quoted label match its string.
+SupportedLanguage.PL (Polski) and locales_config.xml register it; SupportedLanguagePlTest checks that values-pl
+has every string with the English format arguments and all four plural forms. PairSkip now also knows the Polish
+skip reason and the Korean one Android actually sends ("상대 사용자가 건너뜀" was missing, so a skip from a Korean
+phone counted as a failure); PairLedgerTest checks every shipped language. Store text in
+fastlane/metadata/android/pl-PL.
+
 
 ## 4g. Messages whose first partial chunk is under 512 octets (#110)
 
@@ -813,6 +824,7 @@ RC8: 4n, recipient groups and the picker's order (added Nov 4).
 - Also (Nov 9, owner request): TapPony and HashPony in Settings, More from NorseHorse, with the subtitles PGPony Desktop already ships.
 
 RC9: 4f, Polish. Last, so the translation covers the final values/ in one pass, item 1's and 4n's strings included.
+  Done in RC9, with the Korean pairing skip fix found on the way.
 
 Not in an RC: the section 6 carry-overs unless one comes up on its own, and the in-app viewer for decrypted files
 (4b), which is not planned yet.

@@ -64,7 +64,9 @@ enum class SupportedLanguage(val tag: String, val nativeName: String) {
     TR("tr", "Türkçe"),
     UK("uk", "Українська"),
     ZH_HANS("zh-Hans", "简体中文"),
-    KO("ko", "한국어");
+    KO("ko", "한국어"),
+    // 4.8.0 RC9 (item 4f): Polish.
+    PL("pl", "Polski");
 
     companion object {
         /**
@@ -103,6 +105,7 @@ enum class SupportedLanguage(val tag: String, val nativeName: String) {
                 "uk" -> UK
                 "zh" -> if (isTraditionalChinese(normalized)) null else ZH_HANS
                 "ko" -> KO
+                "pl" -> PL
                 else -> null
             }
         }

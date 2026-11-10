@@ -82,4 +82,20 @@ class PairLedgerTest {
         assertFalse(PairSkip.isSkip(""))
         assertFalse(PairSkip.isSkip("Could not import Alice."))
     }
+
+    // 4.8.0 RC9: every language the app ships sends a skip reason the other side recognises.
+    @Test
+    fun everyShippedSkipReasonCountsAsSkip() {
+        val res = java.io.File("src/main/res")
+        val files = res.listFiles { f -> f.isDirectory && f.name.startsWith("values") }!!
+            .map { java.io.File(it, "strings.xml") }.filter { it.exists() }
+        val re = Regex("""<string name="pair_skipped_reason">(.*?)</string>""")
+        var seen = 0
+        for (f in files) {
+            val reason = re.find(f.readText())?.groupValues?.get(1) ?: continue
+            seen++
+            assertTrue("${f.parentFile.name}: $reason", PairSkip.isSkip(reason.replace("\\'", "'")))
+        }
+        assertTrue(seen >= 12)
+    }
 }

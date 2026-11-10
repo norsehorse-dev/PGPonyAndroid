@@ -111,7 +111,10 @@ internal object PairSkip {
         "相手のユーザーがスキップしました",
         "对方已跳过",
         "已被对方跳过",
-        "상대방이 건너뜀"
+        "상대방이 건너뜀",
+        // 4.8.0 RC9: the Korean text Android actually ships, and Polish (item 4f).
+        "상대 사용자가 건너뜀",
+        "pominięte przez drugiego użytkownika"
     )
 
     private fun normalize(s: String) = s.trim().replace('’', '\'').lowercase(Locale.ROOT)

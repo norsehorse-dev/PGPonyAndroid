@@ -8,7 +8,7 @@
   German (de), Spanish (es), French (fr), Japanese (ja), Portuguese-Brazil
   (pt-BR), Russian (ru).
   4.6.2 adds Turkish (tr), Ukrainian (uk) and Simplified Chinese (zh-Hans, folder
-  values-b+zh+Hans). 4.8.0 adds Korean (ko), complete with its error messages.
+  values-b+zh+Hans). 4.8.0 adds Korean (ko), complete with its error messages, and Polish (pl).
 
   android:defaultLocale="en" tells the system to fall back to English when
   the user's preferred language isn't supported — same fallback Android
@@ -32,4 +32,5 @@
     <locale android:name="uk" />
     <locale android:name="zh-Hans" />
     <locale android:name="ko" />
+    <locale android:name="pl" />
 </locale-config>
