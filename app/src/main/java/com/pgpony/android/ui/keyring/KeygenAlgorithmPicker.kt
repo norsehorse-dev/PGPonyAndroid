@@ -7,6 +7,10 @@
 // (RSA, ECDSA on NIST, brainpool and secp256k1, LibrePGP) tucked behind an Advanced
 // expander, and a caption explaining the selected algorithm. The group lists
 // live on KeyAlgorithm.
+//
+// 4.8.0 RC11 (#109): it stays on screen in compose mode (the composer builds
+// on the primary picked here), a collapsed group names the primary picked in
+// it, and the group spacing is on the 4dp grid.
 
 package com.pgpony.android.ui.keyring
 
@@ -46,7 +50,10 @@ import com.pgpony.android.crypto.KeyAlgorithm
 fun KeygenAlgorithmPicker(
     selected: KeyAlgorithm,
     onSelect: (KeyAlgorithm) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** 4.8.0 RC11 (#109): compose mode describes the key itself, so the
+     *  plain-Generate caption (the key shape with its default subkeys) is left out. */
+    composing: Boolean = false
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -62,14 +69,14 @@ fun KeygenAlgorithmPicker(
             selected = selected,
             onSelect = onSelect
         )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
         AlgorithmGroup(
             title = stringResource(R.string.keyring_generate_algorithm_group_pqc),
             algorithms = KeyAlgorithm.generatablePostQuantum,
             selected = selected,
             onSelect = onSelect
         )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
 
         // item 14 (#56): interop tier — the three ML-KEM-768+X25519 wire shapes
         // (v6 / v4 / v5), the same key for different tools. Collapsed unless the
@@ -96,6 +103,15 @@ fun KeygenAlgorithmPicker(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // 4.8.0 RC11 (#109): a collapsed group still shows the primary picked in it.
+            if (!interopExpanded && selected in KeyAlgorithm.generatableInterop) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    selected.shortName,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
         AnimatedVisibility(visible = interopExpanded) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -109,7 +125,7 @@ fun KeygenAlgorithmPicker(
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
 
         // Advanced / compatibility, collapsed unless the selection lives here.
         var advancedExpanded by remember {
@@ -129,10 +145,19 @@ fun KeygenAlgorithmPicker(
             )
             Spacer(Modifier.width(4.dp))
             Text(
-                stringResource(R.string.keyring_generate_algorithm_group_advanced),
+                stringResource(R.string.keyring_generate_algorithm_group_rsa_ecdsa),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // 4.8.0 RC11 (#109): a collapsed group still shows the primary picked in it.
+            if (!advancedExpanded && selected in KeyAlgorithm.generatableAdvanced) {
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    selected.shortName,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
         AnimatedVisibility(visible = advancedExpanded) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -146,12 +171,14 @@ fun KeygenAlgorithmPicker(
             }
         }
 
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = captionFor(selected),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        if (!composing) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = captionFor(selected),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         // 4.6.0 (item 13): set expectations for every post-quantum choice: the
         // keys are complete, other apps are the limit.
         if (selected.isPostQuantum) {

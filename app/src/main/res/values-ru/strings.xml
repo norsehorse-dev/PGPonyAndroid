@@ -2064,17 +2064,11 @@
     <string name="keyring_generate_algorithm_group_classical">Классические</string>
     <string name="keyring_generate_algorithm_group_pqc">Постквантовые</string>
     <string name="keyring_generate_algorithm_group_interop">Совместимость / interop</string>
-    <string name="keyring_generate_algorithm_group_advanced">Расширенные / совместимость</string>
     <string name="keyring_generate_algorithm_caption_pqc_v4">Постквантовое шифрование с самым широким охватом. Стандартный ключ v4 Ed25519, который уже понимает любой инструмент OpenPGP, несёт постквантовый подключ шифрования ML-KEM-768 рядом с классическим, так что старое ПО по-прежнему может шифровать для вас, а современные инструменты используют ML-KEM. Рекомендуемый выбор для постквантового шифрования, работающего с реальными корреспондентами. Резервное копирование закрытого ключа для этой формы пока недоступно.</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign">Полностью постквантовый без классического запасного варианта: подписывающая личность ML-DSA плюс подключ шифрования ML-KEM на современном ключе v6 (RFC 9980). И подпись, и шифрование устойчивы к квантовым атакам, а поскольку ключ не несёт более слабого классического подключа, понижать не к чему. Использовать его может только актуальное ПО OpenPGP.</string>
     <string name="keyring_generate_granular_toggle">Расширенно: составить подключи</string>
     <string name="keyring_generate_granular_include_default">Включить подключ шифрования по умолчанию</string>
     <string name="keyring_generate_granular_add_subkey">Добавить подключ</string>
-    <string name="keyring_generate_granular_base_label">Основной ключ</string>
-    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
-    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
-    <string name="keyring_generate_granular_dropped_for_v4">Ключ v4 не может содержать некоторые из выбранных подключей, поэтому они удалены.</string>
-    <string name="keyring_generate_granular_include_default_caption">Добавляет классический подключ шифрования X25519 в дополнение к выбранным.</string>
     <string name="keyring_error_email_invalid">Этот адрес эл. почты выглядит неправильно</string>
     <string name="import_button_encrypt_to_key">Зашифровать для этого ключа</string>
     <string name="key_detail_copy_email_cd">Скопировать адрес эл. почты</string>
@@ -2094,8 +2088,6 @@
     <string name="key_detail_subkey_last_enc_body">Это единственный подключ шифрования на этом ключе. Его удаление или отзыв лишит ключ возможности получать зашифрованные сообщения. Всё равно продолжить?</string>
     <string name="key_detail_subkey_last_enc_action">Продолжить</string>
     <string name="key_detail_subkey_action_failed">Не удалось выполнить действие с подключом. Повторите попытку.</string>
-    <string name="key_detail_add_subkey_group_classical">Классические</string>
-    <string name="key_detail_add_subkey_group_pq">Постквантовые</string>
     <string name="key_detail_add_subkey_type_mlkem768">ML-KEM-768 (шифрование)</string>
     <string name="key_detail_add_subkey_type_mlkem1024">ML-KEM-1024 (шифрование)</string>
     <string name="key_detail_add_subkey_type_mldsa65">ML-DSA-65 (подпись)</string>
@@ -2210,9 +2202,6 @@
     <string name="ssh_keypicker_empty">Ни у одного из ваших ключей нет подключа аутентификации SSH, и SSH-ключей тоже нет. В PGPony добавьте подключ аутентификации к паре ключей или создайте ключ в разделе «Настройки», «SSH-ключи» и повторите попытку.</string>
     <string name="key_detail_action_copy_ssh_key">Копировать открытый SSH-ключ</string>
     <string name="key_detail_ssh_key_copied">Открытый SSH-ключ скопирован</string>
-    <string name="keyring_generate_ssh_auth_toggle">Добавить подключ аутентификации SSH</string>
-    <string name="keyring_generate_ssh_auth_caption">Подключ для входа на серверы по SSH через мост ssh-agent: RSA для ключа RSA, ECDSA для ключа ECDSA на кривой NIST, Ed25519 для любого другого ключа.</string>
-    <string name="keyring_generate_ssh_auth_failed">Ключ создан, но подключ SSH добавить не удалось: %1$s. Его можно добавить в сведениях о ключе.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">SSH из Termux</string>
     <string name="ssh_help_row_subtitle">Используйте ключи PGPony с ssh и git в Termux</string>
@@ -3327,10 +3316,37 @@
     <string name="key_detail_add_subkey_group_sign">Подпись</string>
     <string name="key_detail_add_subkey_group_auth">Аутентификация</string>
     <string name="key_detail_add_subkey_group_encrypt">Шифрование</string>
-    <string name="key_detail_add_subkey_curve_label">Кривая для ECDSA и ECDH</string>
     <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (подпись)</string>
     <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (аутентификация)</string>
     <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (шифрование)</string>
     <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH поддерживает ECDSA только на кривых NIST. На этой кривой подключ аутентификации предназначен для ключа безопасности.</string>
-    <string name="keyring_generate_granular_dropped_for_v6">Ключ v6 не может содержать некоторые из выбранных подключей, поэтому они удалены.</string>
+    <!-- 4.8.0 RC11 (#109) -->
+    <string name="keyring_generate_auth_toggle">Подключ аутентификации</string>
+    <string name="keyring_generate_auth_caption">Добавляет %1$s для входа по SSH через мост ssh-agent или с помощью слота аутентификации ключа безопасности.</string>
+    <string name="keyring_generate_auth_caption_choice">Добавляет подключ аутентификации: на кривой %1$s для ключа безопасности или Ed25519 для SSH, где нет типа ключа для %1$s.</string>
+    <string name="keyring_generate_auth_same_curve">Та же кривая (для ключа безопасности)</string>
+    <string name="keyring_generate_auth_ed25519">Ed25519 (для SSH)</string>
+    <string name="keyring_generate_auth_failed">Ключ создан, но подключ аутентификации добавить не удалось: %1$s. Его можно добавить в сведениях о ключе.</string>
+    <string name="keyring_generate_granular_primary_caption">Основной ключ: %1$s, OpenPGP v%2$d. Версия зависит от основного ключа: %3$s даёт ключ v6, любой другой тип даёт ключ v4.</string>
+    <string name="keyring_generate_granular_unavailable">Составление подключей требует классического основного ключа. Для постквантовых подключей выберите %1$s или %2$s, чтобы добавить подключ ML-KEM-768.</string>
+    <string name="keyring_generate_granular_include_default_caption_format">Добавляет %1$s, подключ шифрования, который этот тип ключа получает по умолчанию.</string>
+    <string name="keyring_generate_auth_caption_choice_on">В SSH нет типа ключа для %1$s. Выберите, для чего нужен этот подключ:</string>
+    <string name="keyring_generate_granular_card_note">Ключи безопасности поддерживают разные кривые, поэтому перед переносом ключа убедитесь, что ваш ключ безопасности поддерживает кривую %1$s.</string>
+    <string name="keyring_generate_granular_certify_only">Основной ключ только для сертификации</string>
+    <!-- 4.8.0 RC11 (#109): the subkey picker's rows, and the picker group for RSA, ECDSA and the LibrePGP keys. -->
+    <string name="key_detail_add_subkey_use_label">Назначение</string>
+    <string name="key_detail_add_subkey_curve_heading">Кривая</string>
+    <string name="key_detail_add_subkey_size_label">Размер ключа</string>
+    <string name="key_detail_add_subkey_level_label">Уровень безопасности</string>
+    <string name="keyring_generate_algorithm_group_rsa_ecdsa">RSA, ECDSA и LibrePGP</string>
+    <string name="keyring_generate_granular_certify_only_caption">Для ключа безопасности: основной ключ только сертифицирует и не переносится на карту, а подпись, шифрование и аутентификацию выполняют подключи.</string>
+    <string name="keyring_generate_granular_fixed_v6">Основной ключ v6 только сертифицирует, поэтому ключ всегда получает %1$s.</string>
+    <string name="keyring_generate_granular_fixed_signing">Основной ключ только сертифицирует, поэтому для подписи добавляется %1$s.</string>
+    <string name="keyring_generate_granular_remove_cd">Удалить подключ</string>
+    <plurals name="keyring_generate_granular_dropped_named">
+        <item quantity="one">Удалён, так как выбранный основной ключ не может его содержать: %1$s.</item>
+        <item quantity="few">Удалены, так как выбранный основной ключ не может их содержать: %1$s.</item>
+        <item quantity="many">Удалены, так как выбранный основной ключ не может их содержать: %1$s.</item>
+        <item quantity="other">Удалены, так как выбранный основной ключ не может их содержать: %1$s.</item>
+    </plurals>
 </resources>

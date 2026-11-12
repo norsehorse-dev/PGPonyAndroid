@@ -472,7 +472,9 @@ class PGPCryptoService private constructor() {
         bits: Int,
         passphrase: String?,
         creationDate: Date,
-        expirationSeconds: Long?
+        expirationSeconds: Long?,
+        // 4.8.0 RC11 (#109): the composer's "Primary certifies only" passes CAN_CERTIFY alone.
+        primaryKeyFlags: Int = PGPKeyFlags.CAN_SIGN or PGPKeyFlags.CAN_CERTIFY
     ): PGPKeyRingGenerator {
         val rsaGen = org.bouncycastle.crypto.generators.RSAKeyPairGenerator()
         rsaGen.init(org.bouncycastle.crypto.params.RSAKeyGenerationParameters(
@@ -487,8 +489,7 @@ class PGPCryptoService private constructor() {
         val encKeyPair = BcPGPKeyPair(PublicKeyAlgorithmTags.RSA_GENERAL, encBcKeyPair, creationDate)
 
         val sigHashGen = PGPSignatureSubpacketGenerator()
-        sigHashGen.setKeyFlags(false,
-            PGPKeyFlags.CAN_SIGN or PGPKeyFlags.CAN_CERTIFY)
+        sigHashGen.setKeyFlags(false, primaryKeyFlags) // 4.8.0 RC11 (#109)
         sigHashGen.setPreferredSymmetricAlgorithms(false, intArrayOf(
             SymmetricKeyAlgorithmTags.AES_256,
             SymmetricKeyAlgorithmTags.AES_192,
@@ -543,7 +544,9 @@ class PGPCryptoService private constructor() {
         // SEIPDv2 and can reach the algo-35 subkey instead of downgrading to the
         // classical one. Left null for classical and LibrePGP keys, which must
         // NOT advertise SEIPDv2 (their subkeys pair with v3 PKESK + SEIPDv1).
-        features: Byte? = null
+        features: Byte? = null,
+        // 4.8.0 RC11 (#109): the composer's "Primary certifies only" passes CAN_CERTIFY alone.
+        primaryKeyFlags: Int = PGPKeyFlags.CAN_SIGN or PGPKeyFlags.CAN_CERTIFY
     ): PGPKeyRingGenerator {
         // Ed25519 signing key (primary) — BC lightweight + EDDSA_LEGACY (algo 22)
         val edGen = org.bouncycastle.crypto.generators.Ed25519KeyPairGenerator()
@@ -564,8 +567,7 @@ class PGPCryptoService private constructor() {
         )
 
         val sigHashGen = PGPSignatureSubpacketGenerator()
-        sigHashGen.setKeyFlags(false,
-            PGPKeyFlags.CAN_SIGN or PGPKeyFlags.CAN_CERTIFY)
+        sigHashGen.setKeyFlags(false, primaryKeyFlags) // 4.8.0 RC11 (#109)
         sigHashGen.setPreferredSymmetricAlgorithms(false, intArrayOf(
             SymmetricKeyAlgorithmTags.AES_256,
             SymmetricKeyAlgorithmTags.AES_192,
@@ -633,7 +635,9 @@ class PGPCryptoService private constructor() {
         algorithm: KeyAlgorithm,
         passphrase: String?,
         creationDate: Date,
-        expirationSeconds: Long?
+        expirationSeconds: Long?,
+        // 4.8.0 RC11 (#109): the composer's "Primary certifies only" passes CAN_CERTIFY alone.
+        primaryKeyFlags: Int = PGPKeyFlags.CAN_SIGN or PGPKeyFlags.CAN_CERTIFY
     ): PGPKeyRingGenerator {
         val curve = EcdsaKeygen.curveFor(algorithm)
             ?: throw PGPCryptoError.KeyGenerationFailed("Cannot generate ${algorithm.displayName} keys")
@@ -654,8 +658,7 @@ class PGPCryptoService private constructor() {
         )
 
         val sigHashGen = PGPSignatureSubpacketGenerator()
-        sigHashGen.setKeyFlags(false,
-            PGPKeyFlags.CAN_SIGN or PGPKeyFlags.CAN_CERTIFY)
+        sigHashGen.setKeyFlags(false, primaryKeyFlags) // 4.8.0 RC11 (#109)
         sigHashGen.setPreferredSymmetricAlgorithms(false, intArrayOf(
             SymmetricKeyAlgorithmTags.AES_256,
             SymmetricKeyAlgorithmTags.AES_192,
@@ -827,6 +830,15 @@ class PGPCryptoService private constructor() {
      * subkey through a later edit. A key with that subkey advertises SEIPDv2,
      * as the v4 interop keygen does; a classical one doesn't. ML-DSA and
      * ML-KEM-1024 are v6 only, and a v4 key takes one ML-KEM-768 subkey here.
+     *
+     * 4.8.0 RC11 (#109): [primary] is the key type picked in Generate Key, so
+     * the composer keeps it. Ed25519, RSA 2048 or 4096, or ECDSA on any
+     * generated curve: the base is the key plain Generate makes for it (with
+     * its default encryption subkey: Cv25519, RSA of the same size or ECDH on
+     * the same curve), and the subkeys are added through ClassicalSubkeyGen as
+     * Add subkey does. The whole key is built in memory, so a failure leaves
+     * nothing stored. ML-KEM-768 stays Ed25519 only: its v4 binding is an
+     * EdDSA signature (see AddSubkeyChoice.allowedOn).
      */
     fun assembleGranularV4(
         userID: String,
@@ -834,8 +846,22 @@ class PGPCryptoService private constructor() {
         subkeys: List<GranularSubkeySpec>,
         passphrase: String?,
         creationDate: Date = Date(),
-        expirationSeconds: Long? = null
+        expirationSeconds: Long? = null,
+        primary: KeyAlgorithm = KeyAlgorithm.ED25519_CV25519,
+        // 4.8.0 RC11 (#109): "Primary certifies only", for a security key: the
+        // primary gets the Certify flag alone (kept offline, gpg's sec# shape) and
+        // signing goes to a subkey. With no signing subkey composed, one of the
+        // primary's own type is added (AddSubkeyChoice.signingFor), as the
+        // composer's fixed chip says.
+        certifyOnly: Boolean = false
     ): GranularV4Key {
+        val base = AddSubkeyChoice.composerBaseFor(primary)
+        require(base == AddSubkeyChoice.Base.V4 || base == AddSubkeyChoice.Base.V4_OTHER) {
+            "Cannot compose a v4 key on ${primary.displayName}"
+        }
+        require(subkeys.all { AddSubkeyChoice.allowedOn(base, it.choice) }) {
+            "A ${primary.displayName} key cannot hold some of these subkeys"
+        }
         val pq = subkeys.filter { it.choice is AddSubkeyChoice.PqEncryption }
         require(subkeys.none { it.choice is AddSubkeyChoice.PqSigning }) { "ML-DSA signing subkeys need a v6 key" }
         require(pq.all { (it.choice as AddSubkeyChoice.PqEncryption).suite == com.pgpony.android.crypto.pqc.CompositeSuite.IETF_768 }) {
@@ -843,10 +869,23 @@ class PGPCryptoService private constructor() {
         }
         require(pq.size <= 1) { "A v4 key takes one ML-KEM-768 subkey" }
 
-        var ring = buildEd25519KeyRingGenerator(
-            userID, passphrase, creationDate, expirationSeconds,
-            features = if (pq.isEmpty()) null else (0x01 or 0x08).toByte()
-        ).generateSecretKeyRing()
+        val primaryFlags = if (certifyOnly) PGPKeyFlags.CAN_CERTIFY else PGPKeyFlags.CAN_SIGN or PGPKeyFlags.CAN_CERTIFY
+        var ring = when (primary) {
+            KeyAlgorithm.RSA_2048 ->
+                buildRSAKeyRingGenerator(userID, 2048, passphrase, creationDate, expirationSeconds, primaryFlags).generateSecretKeyRing()
+            KeyAlgorithm.RSA_4096 ->
+                buildRSAKeyRingGenerator(userID, 4096, passphrase, creationDate, expirationSeconds, primaryFlags).generateSecretKeyRing()
+            KeyAlgorithm.ED25519_CV25519 -> buildEd25519KeyRingGenerator(
+                userID, passphrase, creationDate, expirationSeconds,
+                features = if (pq.isEmpty()) null else (0x01 or 0x08).toByte(),
+                primaryKeyFlags = primaryFlags
+            ).generateSecretKeyRing()
+            // 4.8.0 RC11 (#109): ECDSA on the picked curve, with its ECDH subkey.
+            else -> buildEcdsaKeyRingGenerator(userID, primary, passphrase, creationDate, expirationSeconds, primaryFlags)
+                .generateSecretKeyRing()
+        }
+        val toAdd = subkeys + AddSubkeyChoice.addedSigningSubkey(primary, certifyOnly, subkeys.map { it.choice })
+            .map { GranularSubkeySpec(it, expirationSeconds) }
 
         if (!includeDefaultEncryptionSubkey) {
             val defaultEnc = ring.secretKeys.asSequence().firstOrNull {
@@ -854,7 +893,7 @@ class PGPCryptoService private constructor() {
             }
             if (defaultEnc != null) ring = ClassicalSubkeyGen.removeSubkey(ring, defaultEnc.keyID)
         }
-        for (spec in subkeys) {
+        for (spec in toAdd) {
             val choice = spec.choice as? AddSubkeyChoice.Classical ?: continue
             ring = ClassicalSubkeyGen.addSubkey(ring, choice.type, passphrase, spec.expirationSeconds)
         }

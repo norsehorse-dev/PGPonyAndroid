@@ -179,4 +179,139 @@ class EcdsaSubkeyTest {
         assertArrayEquals(text, out.data)
         assertEquals(subs.single { it.algorithm == PublicKeyAlgorithmTags.ECDH }.keyID, out.decryptingKeyIdRaw)
     }
+
+    // ── 4.8.0 RC11 (#109): the composer on the picked primary ─────────
+
+    @Test
+    fun `a composed NIST P-256 key with ECDSA auth and ECDH encrypt subkeys round-trips`() {
+        val key = svc.assembleGranularV4(
+            "P256 <p256@example.test>", includeDefaultEncryptionSubkey = false,
+            subkeys = listOf(
+                GranularSubkeySpec(AddSubkeyChoice.Classical(ClassicalSubkeyType.ECDSA_P256_AUTH), null),
+                GranularSubkeySpec(AddSubkeyChoice.Classical(ClassicalSubkeyType.ECDH_P256_ENCRYPT), null)
+            ),
+            passphrase = PASS,
+            primary = KeyAlgorithm.ECDSA_NIST_P256
+        )
+        val pub = key.publicRing!!
+        val p256 = oids.getValue(KeyAlgorithm.ECDSA_NIST_P256)
+        assertEquals(PublicKeyAlgorithmTags.ECDSA, pub.publicKey.algorithm)
+        assertEquals(p256, curveOid(pub.publicKey))
+        assertEquals(KeyAlgorithm.ECDSA_NIST_P256, svc.detectAlgorithm(pub.publicKey, pub))
+        val subs = pub.publicKeys.asSequence().filter { !it.isMasterKey }.toList()
+        assertEquals("the default ECDH subkey is left out, the two composed ones are there", 2, subs.size)
+        assertTrue(subs.all { curveOid(it) == p256 })
+        val auth = subs.single { it.algorithm == PublicKeyAlgorithmTags.ECDSA }
+        assertEquals(0x20, binding(auth).hashedSubPackets.keyFlags)
+        assertEquals(auth.keyID, SshAuth.authSubkey(pub.encoded)!!.keyId)
+
+        val secret = PGPSecretKeyRing(ByteArrayInputStream(key.secret), JcaKeyFingerprintCalculator())
+        val text = "to a composed NIST P-256 key".toByteArray()
+        val ct = svc.encrypt(data = text, recipientPublicKeys = listOf(pub), armor = true)
+        val out = svc.decrypt(ct, listOf(secret), PASS)
+        assertArrayEquals(text, out.data)
+        assertEquals(subs.single { it.algorithm == PublicKeyAlgorithmTags.ECDH }.keyID, out.decryptingKeyIdRaw)
+
+        val sig = SigningService.shared.signDetached(data = text, secretKeyRing = secret, passphrase = PASS, armor = false)
+        val verified = VerifyService.shared.verifyDetached(sig, text, listOf(pub))
+        assertTrue("$verified", verified is VerificationResult.Verified)
+    }
+
+    @Test
+    fun `a composed RSA key keeps its RSA encryption subkey when asked`() {
+        val key = svc.assembleGranularV4(
+            "RSA <rsa@example.test>", includeDefaultEncryptionSubkey = true,
+            subkeys = listOf(GranularSubkeySpec(AddSubkeyChoice.Classical(ClassicalSubkeyType.ECDSA_BP256_AUTH), null)),
+            passphrase = null,
+            primary = KeyAlgorithm.RSA_2048
+        )
+        val pub = key.publicRing!!
+        assertEquals(PublicKeyAlgorithmTags.RSA_GENERAL, pub.publicKey.algorithm)
+        val subs = pub.publicKeys.asSequence().filter { !it.isMasterKey }.toList()
+        assertTrue("the default RSA encryption subkey", subs.any { it.algorithm == PublicKeyAlgorithmTags.RSA_GENERAL && it.isEncryptionKey })
+        assertTrue("the brainpool auth subkey", subs.any { it.algorithm == PublicKeyAlgorithmTags.ECDSA })
+    }
+
+    @Test
+    fun `an RSA or ECDSA primary refuses an ML-KEM-768 subkey`() {
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            svc.assembleGranularV4(
+                "No <no@example.test>", includeDefaultEncryptionSubkey = true,
+                subkeys = listOf(GranularSubkeySpec(AddSubkeyChoice.PqEncryption(com.pgpony.android.crypto.pqc.CompositeSuite.IETF_768), null)),
+                passphrase = null,
+                primary = KeyAlgorithm.ECDSA_NIST_P256
+            )
+        }
+    }
+
+    @Test
+    fun `the authentication subkey switch gives a brainpool key a brainpool AUT subkey, or Ed25519 for SSH`() {
+        val base = keyPair(KeyAlgorithm.ECDSA_BRAINPOOL_P384, PASS)
+        val same = ClassicalSubkeyGen.addSubkey(base, ClassicalSubkeyGen.authTypeFor(KeyAlgorithm.ECDSA_BRAINPOOL_P384), PASS)
+        val aut = added(base, same)
+        assertEquals(PublicKeyAlgorithmTags.ECDSA, aut.algorithm)
+        assertEquals(oids.getValue(KeyAlgorithm.ECDSA_BRAINPOOL_P384), curveOid(aut))
+        assertEquals(0x20, binding(aut).hashedSubPackets.keyFlags)
+
+        val forSsh = ClassicalSubkeyGen.addSubkey(base, ClassicalSubkeyGen.authTypeFor(KeyAlgorithm.ECDSA_BRAINPOOL_P384, forSsh = true), PASS)
+        val ed = added(base, forSsh)
+        assertEquals(PublicKeyAlgorithmTags.EDDSA_LEGACY, ed.algorithm)
+        assertEquals(0x20, binding(ed).hashedSubPackets.keyFlags)
+        assertNotNull("Ed25519 is usable over SSH", SshAuth.authSubkey(pubOf(forSsh).encoded))
+    }
+
+    // ── 4.8.0 RC11 (#109): a certify-only primary for a security key ──
+
+    @Test
+    fun `a composed certify-only brainpool key gets a signing subkey, signs, takes subkeys and moves S, E and A to a card`() {
+        val key = svc.assembleGranularV4(
+            "Card <card@example.test>", includeDefaultEncryptionSubkey = true,
+            subkeys = listOf(GranularSubkeySpec(AddSubkeyChoice.Classical(ClassicalSubkeyType.ECDSA_BP384_AUTH), null)),
+            passphrase = PASS,
+            primary = KeyAlgorithm.ECDSA_BRAINPOOL_P384,
+            certifyOnly = true
+        )
+        val pub = key.publicRing!!
+        val certification = pub.publicKey.signatures.asSequence().filterIsInstance<PGPSignature>()
+            .first { it.signatureType == PGPSignature.POSITIVE_CERTIFICATION }
+        assertEquals("the primary certifies only", 0x01, certification.hashedSubPackets.keyFlags)
+        val subs = pub.publicKeys.asSequence().filter { !it.isMasterKey }.toList()
+        val bp384 = oids.getValue(KeyAlgorithm.ECDSA_BRAINPOOL_P384)
+        assertTrue(subs.all { curveOid(it) == bp384 })
+        val flags = subs.associateWith { binding(it).hashedSubPackets.keyFlags }
+        val sign = subs.single { flags[it] == 0x02 }
+        val enc = subs.single { flags[it] == 0x0C }
+        val auth = subs.single { flags[it] == 0x20 }
+        assertEquals("the added signing subkey is the primary's type", PublicKeyAlgorithmTags.ECDSA, sign.algorithm)
+
+        // Signing uses the subkey, not the certify-only primary.
+        val secret = PGPSecretKeyRing(ByteArrayInputStream(key.secret), JcaKeyFingerprintCalculator())
+        val data = "signed by the subkey of a certify-only key".toByteArray()
+        val sig = SigningService.shared.signDetached(data = data, secretKeyRing = secret, passphrase = PASS, armor = false)
+        val verified = VerifyService.shared.verifyDetached(sig, data, listOf(pub))
+        assertTrue("$verified", verified is VerificationResult.Verified)
+        assertEquals(String.format("%016X", sign.keyID), (verified as VerificationResult.Verified).signerKeyID)
+
+        // Add subkey works: the certify-only primary binds a new subkey.
+        val more = ClassicalSubkeyGen.addSubkey(secret, ClassicalSubkeyType.ECDSA_BP384_SIGN, PASS)
+        assertEquals(subs.size + 1, more.publicKeys.asSequence().count { !it.isMasterKey })
+
+        // keytocard: each of S, E and A is movable and fits its own slot.
+        fun movable(k: PGPPublicKey) = com.pgpony.android.crypto.card.KeyToCard.eligibility(k)
+            as com.pgpony.android.crypto.card.KeyToCard.Eligibility.Movable
+        assertTrue(com.pgpony.android.crypto.card.KeyToCard.fitsSlot(movable(sign).kind,
+            com.pgpony.android.crypto.card.CardSlot.SIGNATURE, canSign = true, canEncrypt = false, canAuthenticate = false))
+        assertTrue(com.pgpony.android.crypto.card.KeyToCard.fitsSlot(movable(enc).kind,
+            com.pgpony.android.crypto.card.CardSlot.DECRYPTION, canSign = false, canEncrypt = true, canAuthenticate = false))
+        assertTrue(com.pgpony.android.crypto.card.KeyToCard.fitsSlot(movable(auth).kind,
+            com.pgpony.android.crypto.card.CardSlot.AUTHENTICATION, canSign = false, canEncrypt = false, canAuthenticate = true))
+    }
+
+    @Test
+    fun `plain Generate still makes a primary that signs and certifies`() {
+        val ring = keyPair(KeyAlgorithm.ECDSA_BRAINPOOL_P384, null)
+        val certification = ring.publicKey.signatures.asSequence().filterIsInstance<PGPSignature>()
+            .first { it.signatureType == PGPSignature.POSITIVE_CERTIFICATION }
+        assertEquals(0x03, certification.hashedSubPackets.keyFlags)
+    }
 }

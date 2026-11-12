@@ -76,4 +76,47 @@ class SubkeyOptionsTest {
         assertEquals(KeyAlgorithm.ECDSA_NIST_P256, AddSubkeyChoice.defaultCurve(KeyAlgorithm.ED25519_CV25519))
         assertEquals(KeyAlgorithm.ECDSA_NIST_P256, AddSubkeyChoice.defaultCurve(null))
     }
+
+    // ── 4.8.0 RC11 (#109) ────────────────────────────────────────────
+
+    @Test fun `an RSA or ECDSA v4 key gets the v4 list without ML-KEM-768`() {
+        val v4 = AddSubkeyChoice.optionsFor(Base.V4, KeyAlgorithm.ECDSA_BRAINPOOL_P384)
+        assertEquals(v4.filterNot { it is AddSubkeyChoice.PqEncryption },
+            AddSubkeyChoice.optionsFor(Base.V4_OTHER, KeyAlgorithm.ECDSA_BRAINPOOL_P384))
+        assertEquals(Base.V4_OTHER, AddSubkeyChoice.baseFor(false, false, KeyAlgorithm.ECDSA_BRAINPOOL_P384))
+        assertEquals(Base.V4_OTHER, AddSubkeyChoice.baseFor(false, false, KeyAlgorithm.RSA_4096))
+        assertEquals(Base.V4, AddSubkeyChoice.baseFor(false, false, KeyAlgorithm.ED25519_CV25519))
+        // 4.8.0 RC11 (#109): Base.V4 is an allow-list of Ed25519 primaries.
+        assertEquals(Base.V4_OTHER, AddSubkeyChoice.baseFor(false, false, null))
+        assertEquals(Base.V4_OTHER, AddSubkeyChoice.baseFor(false, false, KeyAlgorithm.UNKNOWN))
+        assertEquals(Base.V4_OTHER, AddSubkeyChoice.baseFor(false, false, KeyAlgorithm.MLKEM1024_BP384_LIBREPGP))
+        assertEquals(Base.V4, AddSubkeyChoice.baseFor(false, false, KeyAlgorithm.MLKEM768_X25519_V4))
+        assertEquals(Base.V6, AddSubkeyChoice.baseFor(true, false, KeyAlgorithm.V6_ED25519))
+    }
+
+    @Test fun `the authentication subkey at generation matches the primary`() {
+        assertEquals(ClassicalSubkeyType.ECDSA_BP384_AUTH, com.pgpony.android.crypto.ClassicalSubkeyGen.authTypeFor(KeyAlgorithm.ECDSA_BRAINPOOL_P384))
+        assertEquals(ClassicalSubkeyType.ED25519_AUTH, com.pgpony.android.crypto.ClassicalSubkeyGen.authTypeFor(KeyAlgorithm.ECDSA_BRAINPOOL_P384, forSsh = true))
+        assertEquals(ClassicalSubkeyType.ECDSA_SECP256K1_AUTH, com.pgpony.android.crypto.ClassicalSubkeyGen.authTypeFor(KeyAlgorithm.ECDSA_SECP256K1))
+        assertEquals(ClassicalSubkeyType.ECDSA_P384_AUTH, com.pgpony.android.crypto.ClassicalSubkeyGen.authTypeFor(KeyAlgorithm.ECDSA_NIST_P384, forSsh = true))
+        assertEquals(ClassicalSubkeyType.RSA_2048_AUTH, com.pgpony.android.crypto.ClassicalSubkeyGen.authTypeFor(KeyAlgorithm.RSA_2048))
+        assertEquals(ClassicalSubkeyType.ED25519_AUTH, com.pgpony.android.crypto.ClassicalSubkeyGen.authTypeFor(KeyAlgorithm.ED25519_CV25519))
+        assertEquals(ClassicalSubkeyType.ED25519_AUTH, com.pgpony.android.crypto.ClassicalSubkeyGen.authTypeFor(KeyAlgorithm.V6_ED25519))
+        assertTrue(com.pgpony.android.crypto.ClassicalSubkeyGen.authHasSshChoice(KeyAlgorithm.ECDSA_BRAINPOOL_P256))
+        assertFalse(com.pgpony.android.crypto.ClassicalSubkeyGen.authHasSshChoice(KeyAlgorithm.ECDSA_NIST_P521))
+    }
+
+    @Test fun `the primary's own family comes first in each use`() {
+        val bp = AddSubkeyChoice.optionsFor(Base.V4_OTHER, KeyAlgorithm.ECDSA_BRAINPOOL_P384, primary = KeyAlgorithm.ECDSA_BRAINPOOL_P384)
+        assertEquals(c(ClassicalSubkeyType.ECDSA_BP384_SIGN), bp.first())
+        assertEquals(c(ClassicalSubkeyType.ECDSA_BP384_AUTH), bp.first { AddSubkeyChoice.usageOf(it) == Usage.AUTHENTICATE })
+        assertEquals(c(ClassicalSubkeyType.ECDH_BP384_ENCRYPT), bp.first { AddSubkeyChoice.usageOf(it) == Usage.ENCRYPT })
+        val rsa = AddSubkeyChoice.optionsFor(Base.V4_OTHER, primary = KeyAlgorithm.RSA_4096)
+        assertEquals(listOf(c(ClassicalSubkeyType.RSA_2048_SIGN), c(ClassicalSubkeyType.RSA_4096_SIGN)), rsa.take(2))
+        // The same kinds, only reordered, and still grouped by use.
+        assertEquals(AddSubkeyChoice.optionsFor(Base.V4_OTHER, KeyAlgorithm.ECDSA_BRAINPOOL_P384).toSet(), bp.toSet())
+        val usages = bp.map { AddSubkeyChoice.usageOf(it) }
+        assertEquals(usages.sortedBy { it.ordinal }, usages)
+        assertEquals(c(ClassicalSubkeyType.ED25519_SIGN), AddSubkeyChoice.optionsFor(Base.V4, primary = KeyAlgorithm.ED25519_CV25519).first())
+    }
 }

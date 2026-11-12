@@ -745,6 +745,51 @@ The work:
 
 Done in RC10.
 
+RC11 (Nov 11), after the RC10 comments. Compose subkeys ignored the primary: it hid the algorithm picker and built
+an Ed25519 key (v6 unless the v4 chip was picked), and its curve field for ECDSA and ECDH subkeys sat where the primary
+had been, so a NIST P-256 pick looked lost and then restored by the v4 chip. Only Ed25519 Authenticate subkeys were
+on the default v6 base, and the simple SSH switch gave a brainpool or secp256k1 key an Ed25519 AUT subkey.
+- The picker stays at the top in compose mode and the composer builds on the primary picked there: Ed25519 v6 (the v6
+  composer), Ed25519, RSA 2048 or 4096, or ECDSA on any generated curve (a v4 key made as plain Generate makes it,
+  then the subkeys added through ClassicalSubkeyGen, all in memory so a failure stores nothing). The v4/v6 base chips
+  are gone. While composing, the picker's own caption is hidden and the composer's caption names the primary by its
+  chip name and says the version follows it; an ECDSA primary keeps the card note. A post-quantum primary turns
+  compose off and clears it, and the switch says why (pick Ed25519 v6, or Ed25519 for an ML-KEM-768 subkey).
+  Turning compose on or off never changes the primary. Composed keys get the revocation pre-cache and the expiry
+  read from the key, as plain Generate does.
+- One subkey picker for both (SubkeyPicker, rules in SubkeyPick): three short rows of chips, "Used for" (Signing,
+  Authentication, Encryption), "Key type" (Ed25519 or X25519, ECDSA or ECDH, RSA, ML-DSA or ML-KEM; shown when the use
+  has more than one) and "Curve", "Key size" or "Security level" (shown when the type has more than one), with the
+  subkey's full name under them. It starts on the first use the key lacks (encryption before authentication), the
+  primary's family and the primary's curve or size; changing the use or type keeps the rest where it can. In Key
+  Details it replaces the type field; in the composer, Add subkey opens it in place with Cancel and Add. An earlier
+  RC11 build had one dropdown menu of every kind, with a curve row inside it that renamed four entries; it ran past
+  the screen, so it was replaced before the tag. The SSH note shows for an ECDSA Authenticate subkey on a curve SSH has
+  no type for, in both. A v6 key's Ed25519 signing subkey is a fixed chip, with a lock instead of the disabled look,
+  and not offered again. "Include default encryption subkey" names what it adds (ECDH on the curve, RSA of the size,
+  X25519 (Encrypt), Add subkey's name for it). A new primary drops the subkeys it can't hold and names them. The
+  picker group "Advanced / compatibility", which sat next to "Interop / compatibility", is "RSA, ECDSA and LibrePGP".
+- "Primary certifies only" (v4 composer, off by default) gives the primary the Certify flag alone for a security key
+  that holds S, E and A; with no signing subkey composed, one of the primary's type is added and shown as a fixed chip.
+  Plain Generate is unchanged.
+- Add subkey offers ML-KEM-768 on a v4 key only when its primary is Ed25519 (an allow-list); its v4 binding is an
+  EdDSA signature, so it failed on RSA and ECDSA keys. The repository's v4 path checks the primary too.
+- The simple switch is "Authentication subkey" and matches the primary (ECDSA on its curve, RSA of its size, Ed25519
+  otherwise). On brainpool and secp256k1, with the switch on, it offers "Same curve (for a security key)", the default,
+  or "Ed25519 (for SSH)"; the caption says what each is for and only asks to pick while the choice is shown.
+- UX pass: a collapsed algorithm group names the primary picked in it; the picker's spacing is on the 4dp grid; the
+  onboarding sheet always makes a plain key with the default expiry (it shares state with the Keyring sheet); the
+  composer's remove icon has a label for TalkBack.
+- Tests: GenerateFormTest (compose never changes the primary, the curve follows the primary, a post-quantum primary
+  clears compose, dropped subkeys are named, onboarding resets), GranularComposerTest (options per primary, where the
+  picker starts, fixed subkeys), SubkeyPickTest (every curve once, start on a brainpool key is its AUT subkey, use and
+  type changes keep the rest), SubkeyOptionsTest (allow-listed base, primary family first), EcdsaSubkeyTest (a composed NIST P-256 key
+  with ECDSA auth and ECDH encrypt subkeys; a composed RSA key; ML-KEM-768 refused on ECDSA; the brainpool AUT subkey
+  and its Ed25519 choice; a certify-only brainpool key that signs with its added subkey, takes a new subkey and moves
+  S, E and A to their card slots; plain Generate still signs and certifies).
+
+Done in RC11.
+
 
 ## 4y. The keyboard's private mode on every field (#86, after RC8)
 
@@ -905,6 +950,10 @@ the file extension) move from BackupService's companion to backup/BackupFormat.k
 BackupFileSniff and its test read them there. BackupFileSniff named BackupService, which desktop does not vendor, so
 it could not compile there (BEFORE_DESKTOP_4_0_0.md section 1.3). A compiled source changes, so the APK differs from
 RC10's: this needs a build before the v4.8.0 tag.
+
+RC11 (added Nov 11): 4x after the RC10 comments (#109): compose subkeys on the primary picked in Generate Key, the
+Authentication subkey on the primary's own algorithm and curve, no ML-KEM-768 on an RSA or ECDSA key, and the UX
+pass in 4x. RC11 also carries the BackupFormat.kt move above, so it is the build that move needed.
 
 Not in an RC: the section 6 carry-overs unless one comes up on its own, and the in-app viewer for decrypted files
 (4b), which is not planned yet.

@@ -1987,17 +1987,11 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="keyring_generate_algorithm_group_classical">Classique</string>
     <string name="keyring_generate_algorithm_group_pqc">Post-quantique</string>
     <string name="keyring_generate_algorithm_group_interop">Interop / compatibilité</string>
-    <string name="keyring_generate_algorithm_group_advanced">Avancé / compatibilité</string>
     <string name="keyring_generate_algorithm_caption_pqc_v4">Chiffrement post-quantique avec la plus grande portée. Une clé v4 Ed25519 standard que tout outil OpenPGP gère déjà, portant une sous-clé de chiffrement post-quantique ML-KEM-768 aux côtés d\'une classique, afin que les logiciels anciens puissent encore vous chiffrer tandis que les outils à jour utilisent ML-KEM. Le choix recommandé pour un chiffrement post-quantique qui fonctionne avec de vrais correspondants. La sauvegarde de la clé privée pour cette forme n\'est pas encore disponible.</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign">Entièrement post-quantique sans repli classique : une identité de signature ML-DSA plus une sous-clé de chiffrement ML-KEM sur une clé v6 moderne (RFC 9980). La signature comme le chiffrement résistent aux attaques quantiques, et comme la clé ne porte aucune sous-clé classique plus faible, il n\'y a rien vers quoi se rabattre. Seuls les logiciels OpenPGP à jour peuvent l\'utiliser.</string>
     <string name="keyring_generate_granular_toggle">Avancé : composer les sous-clés</string>
     <string name="keyring_generate_granular_include_default">Inclure la sous-clé de chiffrement par défaut</string>
     <string name="keyring_generate_granular_add_subkey">Ajouter une sous-clé</string>
-    <string name="keyring_generate_granular_base_label">Clé de base</string>
-    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
-    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
-    <string name="keyring_generate_granular_dropped_for_v4">Une clé v4 ne peut pas porter certaines des sous-clés que vous avez choisies, elles ont donc été retirées.</string>
-    <string name="keyring_generate_granular_include_default_caption">Ajoute une sous-clé de chiffrement X25519 classique aux côtés de celles que vous choisissez.</string>
     <string name="keyring_error_email_invalid">Cette adresse e-mail ne semble pas correcte</string>
     <string name="import_button_encrypt_to_key">Chiffrer vers cette clé</string>
     <string name="key_detail_copy_email_cd">Copier l\'adresse e-mail</string>
@@ -2017,8 +2011,6 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="key_detail_subkey_last_enc_body">C\'est la seule sous-clé de chiffrement de cette clé. La retirer ou la révoquer rend la clé incapable de recevoir des messages chiffrés. Continuer quand même ?</string>
     <string name="key_detail_subkey_last_enc_action">Continuer</string>
     <string name="key_detail_subkey_action_failed">Impossible de terminer l\'action de sous-clé. Veuillez réessayer.</string>
-    <string name="key_detail_add_subkey_group_classical">Classique</string>
-    <string name="key_detail_add_subkey_group_pq">Post-quantique</string>
     <string name="key_detail_add_subkey_type_mlkem768">ML-KEM-768 (Chiffrer)</string>
     <string name="key_detail_add_subkey_type_mlkem1024">ML-KEM-1024 (Chiffrer)</string>
     <string name="key_detail_add_subkey_type_mldsa65">ML-DSA-65 (Signer)</string>
@@ -2129,9 +2121,6 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="ssh_keypicker_empty">Aucune de vos clés n\'a de sous-clé d\'authentification SSH, et il n\'y a aucune clé SSH. Dans PGPony, ajoutez une sous-clé d\'authentification à une paire de clés, ou créez une clé dans Réglages, Clés SSH, puis réessayez.</string>
     <string name="key_detail_action_copy_ssh_key">Copier la clé publique SSH</string>
     <string name="key_detail_ssh_key_copied">Clé publique SSH copiée</string>
-    <string name="keyring_generate_ssh_auth_toggle">Ajouter une sous-clé d\'authentification SSH</string>
-    <string name="keyring_generate_ssh_auth_caption">Une sous-clé pour se connecter à des serveurs en SSH via un pont ssh-agent : RSA sur une clé RSA, ECDSA sur une clé ECDSA NIST, Ed25519 sur toute autre clé.</string>
-    <string name="keyring_generate_ssh_auth_failed">Clé créée, mais la sous-clé SSH n\'a pas pu être ajoutée : %1$s. Tu peux l\'ajouter depuis le détail de la clé.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">SSH depuis Termux</string>
     <string name="ssh_help_row_subtitle">Utilise tes clés PGPony avec ssh et git dans Termux</string>
@@ -3219,10 +3208,36 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="key_detail_add_subkey_group_sign">Signature</string>
     <string name="key_detail_add_subkey_group_auth">Authentification</string>
     <string name="key_detail_add_subkey_group_encrypt">Chiffrement</string>
-    <string name="key_detail_add_subkey_curve_label">Courbe pour ECDSA et ECDH</string>
     <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (Signer)</string>
     <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (Authentifier)</string>
     <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (Chiffrer)</string>
     <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH n\'accepte ECDSA que sur les courbes NIST. Sur cette courbe, une sous-clé d\'authentification est destinée à une clé de sécurité.</string>
-    <string name="keyring_generate_granular_dropped_for_v6">Une clé v6 ne peut pas porter certaines des sous-clés que vous avez choisies, elles ont donc été retirées.</string>
+    <!-- 4.8.0 RC11 (#109) -->
+    <string name="keyring_generate_auth_toggle">Sous-clé d\'authentification</string>
+    <string name="keyring_generate_auth_caption">Ajoute %1$s, pour se connecter en SSH via un pont ssh-agent ou depuis l\'emplacement d\'authentification d\'une clé de sécurité.</string>
+    <string name="keyring_generate_auth_caption_choice">Ajoute une sous-clé d\'authentification : sur la courbe %1$s pour une clé de sécurité, ou Ed25519 pour SSH, qui n\'a pas de type de clé pour %1$s.</string>
+    <string name="keyring_generate_auth_same_curve">Même courbe (pour une clé de sécurité)</string>
+    <string name="keyring_generate_auth_ed25519">Ed25519 (pour SSH)</string>
+    <string name="keyring_generate_auth_failed">Clé créée, mais la sous-clé d\'authentification n\'a pas pu être ajoutée : %1$s. Vous pouvez l\'ajouter depuis le détail de la clé.</string>
+    <string name="keyring_generate_granular_primary_caption">Clé principale : %1$s, OpenPGP v%2$d. La version suit la clé principale : %3$s donne une clé v6, tout autre type une clé v4.</string>
+    <string name="keyring_generate_granular_unavailable">La composition des sous-clés s\'appuie sur une clé principale classique. Pour des sous-clés post-quantiques, choisissez %1$s, ou %2$s pour ajouter une sous-clé ML-KEM-768.</string>
+    <string name="keyring_generate_granular_include_default_caption_format">Ajoute %1$s, la sous-clé de chiffrement que ce type de clé reçoit par défaut.</string>
+    <string name="keyring_generate_auth_caption_choice_on">SSH n\'a pas de type de clé pour %1$s. Choisissez l\'usage de cette sous-clé :</string>
+    <string name="keyring_generate_granular_card_note">Les clés de sécurité ne prennent pas toutes en charge les mêmes courbes : vérifiez que la vôtre accepte la courbe %1$s avant d\'y déplacer la clé.</string>
+    <string name="keyring_generate_granular_certify_only">La clé principale certifie uniquement</string>
+    <!-- 4.8.0 RC11 (#109): the subkey picker's rows, and the picker group for RSA, ECDSA and the LibrePGP keys. -->
+    <string name="key_detail_add_subkey_use_label">Utilisation</string>
+    <string name="key_detail_add_subkey_curve_heading">Courbe</string>
+    <string name="key_detail_add_subkey_size_label">Taille de clé</string>
+    <string name="key_detail_add_subkey_level_label">Niveau de sécurité</string>
+    <string name="keyring_generate_algorithm_group_rsa_ecdsa">RSA, ECDSA et LibrePGP</string>
+    <string name="keyring_generate_granular_certify_only_caption">Pour une clé de sécurité : la clé principale ne fait que certifier et reste hors de la carte. La signature, le chiffrement et l\'authentification passent par des sous-clés.</string>
+    <string name="keyring_generate_granular_fixed_v6">Une clé principale v6 ne fait que certifier, la clé reçoit donc toujours %1$s.</string>
+    <string name="keyring_generate_granular_fixed_signing">La clé principale ne fait que certifier, on ajoute donc %1$s pour signer.</string>
+    <string name="keyring_generate_granular_remove_cd">Retirer la sous-clé</string>
+    <plurals name="keyring_generate_granular_dropped_named">
+        <item quantity="one">Retirée, car la clé principale choisie ne peut pas la porter : %1$s.</item>
+        <item quantity="many">Retirées, car la clé principale choisie ne peut pas les porter : %1$s.</item>
+        <item quantity="other">Retirées, car la clé principale choisie ne peut pas les porter : %1$s.</item>
+    </plurals>
 </resources>

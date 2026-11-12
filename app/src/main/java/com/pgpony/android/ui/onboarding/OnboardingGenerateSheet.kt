@@ -115,6 +115,8 @@ fun OnboardingGenerateSheet(
                     isGenerating = vmState.isGenerating,
                     onGenerate = {
                         keyringVm.clearError()
+                        // 4.8.0 RC11 (#109): a plain key, whatever the Keyring's Generate sheet left set.
+                        keyringVm.useSimpleGenerate()
                         keyringVm.updateGenerateName(name.trim())
                         keyringVm.updateGenerateEmail(email.trim())
                         keyringVm.updateGenerateAlgorithm(algorithm)
@@ -150,6 +152,8 @@ fun OnboardingGenerateSheet(
                     isGenerating = vmState.isGenerating,
                     onGenerate = {
                         keyringVm.clearError()
+                        // 4.8.0 RC11 (#109): a plain key, whatever the Keyring's Generate sheet left set.
+                        keyringVm.useSimpleGenerate()
                         keyringVm.updateGenerateName(name.trim())
                         keyringVm.updateGenerateEmail(email.trim())
                         keyringVm.updateGenerateAlgorithm(algorithm)

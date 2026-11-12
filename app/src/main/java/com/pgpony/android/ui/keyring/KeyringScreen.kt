@@ -54,6 +54,9 @@ import com.pgpony.android.ui.util.dismissKeyboardOnTap
 import com.pgpony.android.ui.util.keepsKeyboard
 import com.pgpony.android.ui.components.ScreenTooltip
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import com.pgpony.android.crypto.AddSubkeyChoice
 import androidx.compose.ui.semantics.Role
 
 // Auto-hiding keyring FAB: idle timeout before the "+" fades out, and the
@@ -1013,183 +1016,65 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Algorithm picker (hidden in granular mode: the primary is an
-            // Ed25519 base, v6 or v4 (4.8.0 item 4i), whose subkey set the user
-            // composes below).
-            if (!state.generateGranular) {
-                KeygenAlgorithmPicker(
-                    selected = state.generateAlgorithm,
-                    onSelect = { viewModel.updateGenerateAlgorithm(it) }
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-            }
+            val composeAvailable = GranularComposer.supports(state.generateAlgorithm)
+            val composing = state.generateGranular && composeAvailable
 
-            // 4.6.0 (item 16): opt-in SSH authentication subkey.
-            if (!state.generateGranular) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .toggleable(value = state.generateSshAuth, role = Role.Switch, onValueChange = { viewModel.setGenerateSshAuth(it) }),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Switch(
-                        checked = state.generateSshAuth,
-                        onCheckedChange = null,
-                        modifier = Modifier.minimumInteractiveComponentSize()
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(stringResource(R.string.keyring_generate_ssh_auth_toggle))
-                        Text(
-                            stringResource(R.string.keyring_generate_ssh_auth_caption),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+            // 4.8.0 RC11 (#109): the picker stays at the top in compose mode too, so
+            // the primary you pick is the one you get and you can always see it.
+            // Compose used to hide it and build an Ed25519 key of its own. While
+            // composing, the caption below the switch describes the key instead.
+            KeygenAlgorithmPicker(
+                selected = state.generateAlgorithm,
+                onSelect = { viewModel.updateGenerateAlgorithm(it) },
+                composing = composing
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 4.6.0 (item 16): opt-in authentication subkey (simple mode; the
+            // composer has the same subkeys in its list).
+            if (!composing) {
+                AuthSubkeyOption(state, viewModel)
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
             // item 7 (#55): advanced granular composer.
+            // 4.8.0 RC11 (#109): on the picked primary; a post-quantum primary
+            // can't be composed, so the switch is off and says why.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .toggleable(value = state.generateGranular, role = Role.Switch, onValueChange = { viewModel.toggleGenerateGranular(it) }),
+                    .toggleable(
+                        value = composing,
+                        enabled = composeAvailable,
+                        role = Role.Switch,
+                        onValueChange = { viewModel.toggleGenerateGranular(it) }
+                    ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Switch(
-                    checked = state.generateGranular,
+                    checked = composing,
                     onCheckedChange = null,
+                    enabled = composeAvailable,
                     modifier = Modifier.minimumInteractiveComponentSize()
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.keyring_generate_granular_toggle))
-            }
-            if (state.generateGranular) {
-                Spacer(modifier = Modifier.height(8.dp))
-                // 4.8.0 (item 4i): the base key, v6 by default.
-                Text(stringResource(R.string.keyring_generate_granular_base_label), style = MaterialTheme.typography.labelMedium)
-                Spacer(modifier = Modifier.height(4.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = state.granularBaseV6,
-                        onClick = { viewModel.setGranularBase(true) },
-                        label = { Text(stringResource(R.string.keyring_generate_granular_base_v6)) }
-                    )
-                    FilterChip(
-                        selected = !state.granularBaseV6,
-                        onClick = { viewModel.setGranularBase(false) },
-                        label = { Text(stringResource(R.string.keyring_generate_granular_base_v4)) }
-                    )
-                }
-                Text(
-                    stringResource(
-                        if (state.granularBaseV6) R.string.keyring_generate_algorithm_caption_v6
-                        else R.string.keyring_generate_algorithm_caption_ed25519
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (state.granularDroppedForV4) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        stringResource(R.string.keyring_generate_granular_dropped_for_v4),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-                // 4.8.0 RC10 (#109): RSA, ECDSA and ECDH stay on a v4 base.
-                if (state.granularDroppedForV6) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        stringResource(R.string.keyring_generate_granular_dropped_for_v6),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-                // 4.8.0 RC10 (#109): the curve for ECDSA and ECDH subkeys, as in Add subkey.
-                if (!state.granularBaseV6) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    EcdsaCurveField(curve = state.granularEcdsaCurve, onSelect = { viewModel.setGranularEcdsaCurve(it) })
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .toggleable(value = state.granularIncludeDefaultEncryption, role = Role.Switch, onValueChange = { viewModel.setGranularIncludeDefaultEncryption(it) }),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Switch(
-                        checked = state.granularIncludeDefaultEncryption,
-                        onCheckedChange = null,
-                        modifier = Modifier.minimumInteractiveComponentSize()
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    // 4.8.0 (item 4j): the caption says what the switch adds.
-                    Column {
-                        Text(stringResource(R.string.keyring_generate_granular_include_default))
+                Column {
+                    Text(stringResource(R.string.keyring_generate_granular_toggle))
+                    if (!composeAvailable) {
                         Text(
-                            stringResource(R.string.keyring_generate_granular_include_default_caption),
+                            stringResource(
+                                R.string.keyring_generate_granular_unavailable,
+                                KeyAlgorithm.V6_ED25519.shortName,
+                                KeyAlgorithm.ED25519_CV25519.shortName
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                if (state.granularSubkeys.isNotEmpty()) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        state.granularSubkeys.forEachIndexed { index, choice ->
-                            InputChip(
-                                selected = false,
-                                onClick = { viewModel.removeGranularSubkey(index) },
-                                label = { Text(addSubkeyChoiceLabel(choice)) },
-                                trailingIcon = {
-                                    Icon(
-                                        Icons.Filled.Close,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                var granularMenuOpen by remember { mutableStateOf(false) }
-                Box {
-                    OutlinedButton(onClick = { granularMenuOpen = true }) {
-                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.keyring_generate_granular_add_subkey))
-                    }
-                    DropdownMenu(
-                        expanded = granularMenuOpen,
-                        onDismissRequest = { granularMenuOpen = false }
-                    ) {
-                        // 4.8.0 (item 4i): the subkeys the chosen base can hold.
-                        // 4.8.0 RC10 (#109): the Add subkey list, grouped by use the same way.
-                        SubkeyUsageGroups(
-                            GranularComposer.menu(state.granularBaseV6, state.granularSubkeys, state.granularEcdsaCurve)
-                        ) { usage, choices ->
-                            Text(
-                                subkeyUsageLabel(usage),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                            )
-                            choices.forEach { choice ->
-                                DropdownMenuItem(
-                                    text = { Text(addSubkeyChoiceLabel(choice)) },
-                                    onClick = {
-                                        viewModel.addGranularSubkey(choice)
-                                        granularMenuOpen = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(12.dp))
+            }
+            if (composing) {
+                ComposerSection(state, viewModel)
             }
 
             // Expiration picker
@@ -1267,6 +1152,269 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
             }
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+}
+
+/**
+ * 4.8.0 RC11 (#109): the subkey composer, on the primary picked above. Every
+ * caption names what will be made for that primary, with the primary called
+ * by its picker chip's name and each subkey by its Add subkey label.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ComposerSection(state: KeyringUiState, viewModel: KeyringViewModel) {
+    val primary = state.generateAlgorithm
+    val v6 = primary.isV6
+    Spacer(modifier = Modifier.height(4.dp))
+    // The primary and the version rule, in place of the v4/v6 base chips.
+    Text(
+        stringResource(
+            R.string.keyring_generate_granular_primary_caption,
+            primary.shortName,
+            if (v6) 6 else 4,
+            KeyAlgorithm.V6_ED25519.shortName
+        ),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    // The picker's caption is hidden while composing; its card note is not.
+    if (primary in KeyAlgorithm.generatableEcdsa) {
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.keyring_generate_granular_card_note, primary.shortName),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+
+    // "Primary certifies only", for a security key holding the S, E and A
+    // subkeys. A v6 primary already certifies only, so v4 only.
+    if (!v6) {
+        ComposerSwitch(
+            checked = state.granularCertifyOnly,
+            onChange = { viewModel.setGranularCertifyOnly(it) },
+            title = stringResource(R.string.keyring_generate_granular_certify_only),
+            caption = stringResource(R.string.keyring_generate_granular_certify_only_caption)
+        )
+    }
+    // 4.8.0 (item 4j): the caption says what the switch adds, named for the
+    // primary (ECDH on its curve, RSA of its size, X25519 for Ed25519) as plain
+    // Generate makes it.
+    ComposerSwitch(
+        checked = state.granularIncludeDefaultEncryption,
+        onChange = { viewModel.setGranularIncludeDefaultEncryption(it) },
+        title = stringResource(R.string.keyring_generate_granular_include_default),
+        caption = AddSubkeyChoice.defaultEncryptionFor(primary)?.let {
+            stringResource(R.string.keyring_generate_granular_include_default_caption_format, addSubkeyChoiceLabel(it))
+        }
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+
+    // The subkeys: the ones the key always gets first, as fixed chips, then the picked ones.
+    val fixed = GranularComposer.fixedSubkeys(primary, state.granularCertifyOnly, state.granularSubkeys)
+    if (fixed.isNotEmpty() || state.granularSubkeys.isNotEmpty()) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // 4.8.0 RC11 (#109): a lock, not the disabled look, so a fixed subkey
+            // reads as one the key always gets rather than one that is off.
+            fixed.forEach { choice ->
+                AssistChip(
+                    onClick = {},
+                    enabled = false,
+                    label = { Text(addSubkeyChoiceLabel(choice)) },
+                    leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    colors = AssistChipDefaults.assistChipColors(
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurface,
+                        disabledLeadingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    border = AssistChipDefaults.assistChipBorder(
+                        enabled = false,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+            }
+            state.granularSubkeys.forEachIndexed { index, choice ->
+                InputChip(
+                    selected = false,
+                    onClick = { viewModel.removeGranularSubkey(index) },
+                    label = { Text(addSubkeyChoiceLabel(choice)) },
+                    trailingIcon = {
+                        Icon(
+                            Icons.Filled.Close,
+                            contentDescription = stringResource(R.string.keyring_generate_granular_remove_cd),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                )
+            }
+        }
+    }
+    fixed.firstOrNull()?.let { added ->
+        Text(
+            stringResource(
+                if (v6) R.string.keyring_generate_granular_fixed_v6 else R.string.keyring_generate_granular_fixed_signing,
+                addSubkeyChoiceLabel(added)
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+    if (state.granularDroppedSubkeys.isNotEmpty()) {
+        val names = state.granularDroppedSubkeys.map { addSubkeyChoiceLabel(it) }.joinToString(", ")
+        Text(
+            androidx.compose.ui.res.pluralStringResource(
+                R.plurals.keyring_generate_granular_dropped_named, state.granularDroppedSubkeys.size, names
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error
+        )
+    }
+    // The same trigger as Add subkey: an ECDSA Authenticate subkey on a curve SSH has no type for.
+    if (state.granularSubkeys.any { it.isAuthWithoutSsh() }) {
+        Text(
+            stringResource(R.string.key_detail_add_subkey_ecdsa_ssh_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+
+    // 4.8.0 RC11 (#109): Add subkey opens the picker Add subkey uses in Key
+    // Details, in place, starting on the first use the key does not have yet.
+    var picking by remember { mutableStateOf(false) }
+    val options = GranularComposer.options(primary, state.granularSubkeys)
+    if (!picking) {
+        OutlinedButton(onClick = { picking = true }, enabled = options.isNotEmpty()) {
+            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(stringResource(R.string.keyring_generate_granular_add_subkey))
+        }
+    } else {
+        val start = SubkeyPick.start(
+            options,
+            GranularComposer.have(primary, state.granularIncludeDefaultEncryption, state.granularSubkeys),
+            primary
+        )
+        var choice by remember(primary) { mutableStateOf(start) }
+        val current = choice?.takeIf { it in options } ?: start
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (current != null) {
+                    SubkeyPicker(options = options, selected = current, primary = primary, onSelect = { choice = it })
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { picking = false }, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.common_button_cancel))
+                    }
+                    Button(
+                        onClick = {
+                            current?.let { viewModel.addGranularSubkey(it) }
+                            picking = false
+                        },
+                        enabled = current != null,
+                        modifier = Modifier.weight(1f)
+                    ) { Text(stringResource(R.string.keyring_generate_granular_add_subkey)) }
+                }
+            }
+        }
+    }
+    Spacer(modifier = Modifier.height(12.dp))
+}
+
+@Composable
+private fun ComposerSwitch(checked: Boolean, onChange: (Boolean) -> Unit, title: String, caption: String?) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Switch(checked = checked, onCheckedChange = null, modifier = Modifier.minimumInteractiveComponentSize())
+        Spacer(modifier = Modifier.width(8.dp))
+        Column {
+            Text(title)
+            caption?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+/**
+ * 4.8.0 RC11 (#109): the Authentication subkey switch. It used to be "SSH
+ * authentication subkey" and gave a brainpool or secp256k1 key an Ed25519
+ * subkey, so a security key provisioned from it had a mismatched AUT slot.
+ * The subkey now matches the primary (ClassicalSubkeyGen.authTypeFor). On a
+ * curve SSH has no type for, two choices say what each is for, the same curve
+ * first.
+ */
+@Composable
+private fun AuthSubkeyOption(state: KeyringUiState, viewModel: KeyringViewModel) {
+    val algorithm = state.generateAlgorithm
+    val hasChoice = com.pgpony.android.crypto.ClassicalSubkeyGen.authHasSshChoice(algorithm)
+    val sameType = AddSubkeyChoice.Classical(com.pgpony.android.crypto.ClassicalSubkeyGen.authTypeFor(algorithm))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(value = state.generateAuthSubkey, role = Role.Switch, onValueChange = { viewModel.setGenerateAuthSubkey(it) }),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Switch(
+            checked = state.generateAuthSubkey,
+            onCheckedChange = null,
+            modifier = Modifier.minimumInteractiveComponentSize()
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Column {
+            Text(stringResource(R.string.keyring_generate_auth_toggle))
+            Text(
+                // 4.8.0 RC11 (#109): "pick" only once the choice rows are on screen.
+                when {
+                    !hasChoice -> stringResource(R.string.keyring_generate_auth_caption, addSubkeyChoiceLabel(sameType))
+                    state.generateAuthSubkey -> stringResource(R.string.keyring_generate_auth_caption_choice_on, algorithm.shortName)
+                    else -> stringResource(R.string.keyring_generate_auth_caption_choice, algorithm.shortName)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+    if (state.generateAuthSubkey && hasChoice) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 56.dp)
+                .selectableGroup()
+        ) {
+            AuthChoiceRow(
+                label = stringResource(R.string.keyring_generate_auth_same_curve),
+                selected = !state.generateAuthForSsh,
+                onClick = { viewModel.setGenerateAuthForSsh(false) }
+            )
+            AuthChoiceRow(
+                label = stringResource(R.string.keyring_generate_auth_ed25519),
+                selected = state.generateAuthForSsh,
+                onClick = { viewModel.setGenerateAuthForSsh(true) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AuthChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = null, modifier = Modifier.minimumInteractiveComponentSize())
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(label)
     }
 }
 

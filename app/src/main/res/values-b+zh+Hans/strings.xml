@@ -620,18 +620,12 @@
     <string name="keyring_generate_algorithm_group_classical">传统算法</string>
     <string name="keyring_generate_algorithm_group_pqc">后量子</string>
     <string name="keyring_generate_algorithm_group_interop">互操作 / 兼容性</string>
-    <string name="keyring_generate_algorithm_group_advanced">高级 / 兼容性</string>
     <string name="keyring_generate_algorithm_caption_pqc_v4">覆盖面最广的后量子加密。一个所有 OpenPGP 工具都已支持的标准 v4 Ed25519 密钥，在传统加密子钥之外还带有一个后量子 ML-KEM-768 加密子钥，因此较旧的软件仍可向你加密，而最新的工具则使用 ML-KEM。若要与真实通信对象进行后量子加密，推荐选择此项。此类密钥暂不支持私钥备份。</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign">完全后量子，没有传统算法回退：在现代 v6 密钥（RFC 9980）上使用 ML-DSA 签名身份加 ML-KEM 加密子钥。签名和加密都能抵御量子攻击，并且由于密钥不含较弱的传统子钥，也就不存在可降级的对象。只有最新的 OpenPGP 软件才能使用它。</string>
     <string name="keyring_generate_algorithm_caption_pqc_librepgp">仅用于与 GnuPG / LibrePGP 互操作。这是 GnuPG 2.5.x 使用的 LibrePGP 格式：ML-KEM（GnuPG 仍称之为 Kyber）加椭圆曲线，在 gpg 中显示为 ky768_cv25519 和 ky1024_cv448。它实际上只适用于 GnuPG，互操作性不广，因此仅在需要与 GnuPG 交换密钥时选择它。若要覆盖更广，请改用 RFC 9980 后量子选项。ML-KEM-1024 是强度更高的选项。</string>
     <string name="keyring_generate_granular_toggle">高级：自行组合子钥</string>
     <string name="keyring_generate_granular_include_default">包含默认加密子钥</string>
     <string name="keyring_generate_granular_add_subkey">添加子钥</string>
-    <string name="keyring_generate_granular_base_label">基础密钥</string>
-    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
-    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
-    <string name="keyring_generate_granular_dropped_for_v4">v4 密钥无法容纳你选择的部分子钥，因此已将它们移除。</string>
-    <string name="keyring_generate_granular_include_default_caption">在你选择的子钥之外，再添加一个传统 X25519 加密子钥。</string>
     <string name="keyring_generate_expiration_label">有效期</string>
     <string name="keyring_generate_passphrase_label">口令（可选）</string>
     <string name="keyring_generate_passphrase_confirm_label">确认口令</string>
@@ -923,8 +917,6 @@
     <string name="key_detail_add_subkey_type_rsa_4096_encrypt">RSA 4096（加密）</string>
     <string name="key_detail_add_subkey_type_ed25519_sign">Ed25519（签名）</string>
     <string name="key_detail_add_subkey_type_x25519_encrypt">X25519（加密）</string>
-    <string name="key_detail_add_subkey_group_classical">传统算法</string>
-    <string name="key_detail_add_subkey_group_pq">后量子</string>
     <string name="key_detail_add_subkey_type_mlkem768">ML-KEM-768（加密）</string>
     <string name="key_detail_add_subkey_type_mlkem1024">ML-KEM-1024（加密）</string>
     <string name="key_detail_add_subkey_type_mldsa65">ML-DSA-65（签名）</string>
@@ -2211,9 +2203,6 @@
     <string name="ssh_keypicker_empty">你的密钥都没有 SSH 身份验证子钥，也没有 SSH 密钥。请在 PGPony 中为一个密钥对添加身份验证子钥，或在「设置」中的「SSH 密钥」里创建一个密钥，然后重试。</string>
     <string name="key_detail_action_copy_ssh_key">复制 SSH 公钥</string>
     <string name="key_detail_ssh_key_copied">已复制 SSH 公钥</string>
-    <string name="keyring_generate_ssh_auth_toggle">添加 SSH 身份验证子钥</string>
-    <string name="keyring_generate_ssh_auth_caption">用于通过 ssh-agent 桥接经 SSH 登录服务器的子钥：RSA 密钥上使用 RSA，NIST ECDSA 密钥上使用 ECDSA，其他密钥上使用 Ed25519。</string>
-    <string name="keyring_generate_ssh_auth_failed">密钥已创建，但无法添加 SSH 子钥：%1$s。你可以在「密钥详情」中添加。</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">在 Termux 中使用 SSH</string>
     <string name="ssh_help_row_subtitle">在 Termux 中将你的 PGPony 密钥用于 ssh 和 git</string>
@@ -3246,10 +3235,34 @@
     <string name="key_detail_add_subkey_group_sign">签名</string>
     <string name="key_detail_add_subkey_group_auth">身份验证</string>
     <string name="key_detail_add_subkey_group_encrypt">加密</string>
-    <string name="key_detail_add_subkey_curve_label">ECDSA 和 ECDH 的曲线</string>
     <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s（签名）</string>
     <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s（身份验证）</string>
     <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s（加密）</string>
     <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH 只接受 NIST 曲线上的 ECDSA。在此曲线上，身份验证子钥仅用于硬件密钥。</string>
-    <string name="keyring_generate_granular_dropped_for_v6">v6 密钥无法容纳你选择的部分子钥，因此已将它们移除。</string>
+    <!-- 4.8.0 RC11 (#109) -->
+    <string name="keyring_generate_auth_toggle">身份验证子钥</string>
+    <string name="keyring_generate_auth_caption">添加 %1$s，用于通过 ssh-agent 桥接经 SSH 登录，或通过硬件密钥的身份验证槽位登录。</string>
+    <string name="keyring_generate_auth_caption_choice">添加一个身份验证子钥：用于硬件密钥时使用 %1$s 曲线，用于 SSH 时使用 Ed25519，因为 SSH 没有适用于 %1$s 的密钥类型。</string>
+    <string name="keyring_generate_auth_same_curve">相同曲线（用于硬件密钥）</string>
+    <string name="keyring_generate_auth_ed25519">Ed25519（用于 SSH）</string>
+    <string name="keyring_generate_auth_failed">密钥已创建，但无法添加身份验证子钥：%1$s。你可以在「密钥详情」中添加。</string>
+    <string name="keyring_generate_granular_primary_caption">主钥：%1$s，OpenPGP v%2$d。版本取决于主钥：%3$s 生成 v6 密钥，其他类型都生成 v4 密钥。</string>
+    <string name="keyring_generate_granular_unavailable">自行组合子钥需要传统主钥。如需后量子子钥，请改选 %1$s；或选择 %2$s 来添加 ML-KEM-768 子钥。</string>
+    <string name="keyring_generate_granular_include_default_caption_format">添加 %1$s，即此密钥类型默认附带的加密子钥。</string>
+    <string name="keyring_generate_auth_caption_choice_on">SSH 没有适用于 %1$s 的密钥类型。请选择此子钥的用途：</string>
+    <string name="keyring_generate_granular_card_note">不同硬件密钥支持的曲线各不相同，因此在将密钥移至硬件密钥之前，请确认你的硬件密钥支持 %1$s 曲线。</string>
+    <string name="keyring_generate_granular_certify_only">主钥仅用于认证</string>
+    <!-- 4.8.0 RC11 (#109): the subkey picker's rows, and the picker group for RSA, ECDSA and the LibrePGP keys. -->
+    <string name="key_detail_add_subkey_use_label">用途</string>
+    <string name="key_detail_add_subkey_curve_heading">曲线</string>
+    <string name="key_detail_add_subkey_size_label">密钥长度</string>
+    <string name="key_detail_add_subkey_level_label">安全级别</string>
+    <string name="keyring_generate_algorithm_group_rsa_ecdsa">RSA、ECDSA 和 LibrePGP</string>
+    <string name="keyring_generate_granular_certify_only_caption">适用于硬件密钥：主钥仅用于认证，不放到卡上，签名、加密和身份验证由子钥负责。</string>
+    <string name="keyring_generate_granular_fixed_v6">v6 主钥仅用于认证，因此该密钥始终会带有 %1$s。</string>
+    <string name="keyring_generate_granular_fixed_signing">主钥仅用于认证，因此会添加 %1$s 用于签名。</string>
+    <string name="keyring_generate_granular_remove_cd">移除子钥</string>
+    <plurals name="keyring_generate_granular_dropped_named">
+        <item quantity="other">已移除，因为你选择的主钥无法容纳：%1$s。</item>
+    </plurals>
 </resources>

@@ -1987,17 +1987,11 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="keyring_generate_algorithm_group_classical">Clásico</string>
     <string name="keyring_generate_algorithm_group_pqc">Poscuántico</string>
     <string name="keyring_generate_algorithm_group_interop">Interop / compatibilidad</string>
-    <string name="keyring_generate_algorithm_group_advanced">Avanzado / compatibilidad</string>
     <string name="keyring_generate_algorithm_caption_pqc_v4">Cifrado poscuántico con el mayor alcance. Una clave v4 Ed25519 estándar que toda herramienta OpenPGP ya admite, con una subclave de cifrado poscuántico ML-KEM-768 junto a una clásica, de modo que el software antiguo puede seguir cifrándote mientras las herramientas actuales usan ML-KEM. La opción recomendada para el cifrado poscuántico que funciona con destinatarios reales. La copia de seguridad de la clave privada para esta forma aún no está disponible.</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign">Totalmente poscuántico sin recurso clásico: una identidad de firma ML-DSA más una subclave de cifrado ML-KEM en una clave v6 moderna (RFC 9980). Tanto la firma como el cifrado resisten los ataques cuánticos, y como la clave no lleva ninguna subclave clásica más débil, no hay nada a lo que degradarse. Solo el software OpenPGP actualizado puede usarla.</string>
     <string name="keyring_generate_granular_toggle">Avanzado: componer subclaves</string>
     <string name="keyring_generate_granular_include_default">Incluir la subclave de cifrado predeterminada</string>
     <string name="keyring_generate_granular_add_subkey">Añadir subclave</string>
-    <string name="keyring_generate_granular_base_label">Clave base</string>
-    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
-    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
-    <string name="keyring_generate_granular_dropped_for_v4">Una clave v4 no puede contener algunas de las subclaves que elegiste, así que se quitaron.</string>
-    <string name="keyring_generate_granular_include_default_caption">Añade una subclave de cifrado X25519 clásica junto a las que elijas.</string>
     <string name="keyring_error_email_invalid">Esa dirección de correo no parece correcta</string>
     <string name="import_button_encrypt_to_key">Cifrar a esta clave</string>
     <string name="key_detail_copy_email_cd">Copiar la dirección de correo</string>
@@ -2017,8 +2011,6 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="key_detail_subkey_last_enc_body">Esta es la única subclave de cifrado de esta clave. Quitarla o revocarla deja la clave incapaz de recibir mensajes cifrados. ¿Continuar de todos modos?</string>
     <string name="key_detail_subkey_last_enc_action">Continuar</string>
     <string name="key_detail_subkey_action_failed">No se pudo completar la acción de subclave. Inténtalo de nuevo.</string>
-    <string name="key_detail_add_subkey_group_classical">Clásico</string>
-    <string name="key_detail_add_subkey_group_pq">Poscuántico</string>
     <string name="key_detail_add_subkey_type_mlkem768">ML-KEM-768 (Cifrar)</string>
     <string name="key_detail_add_subkey_type_mlkem1024">ML-KEM-1024 (Cifrar)</string>
     <string name="key_detail_add_subkey_type_mldsa65">ML-DSA-65 (Firmar)</string>
@@ -2129,9 +2121,6 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="ssh_keypicker_empty">Ninguna de tus claves tiene una subclave de autenticación SSH, y no hay claves SSH. En PGPony, añade una subclave de autenticación a un par de claves o crea una clave en Ajustes, Claves SSH, y vuelve a intentarlo.</string>
     <string name="key_detail_action_copy_ssh_key">Copiar clave pública SSH</string>
     <string name="key_detail_ssh_key_copied">Clave pública SSH copiada</string>
-    <string name="keyring_generate_ssh_auth_toggle">Añadir subclave de autenticación SSH</string>
-    <string name="keyring_generate_ssh_auth_caption">Una subclave para iniciar sesión en servidores por SSH a través de un puente ssh-agent: RSA en una clave RSA, ECDSA en una clave ECDSA NIST, Ed25519 en cualquier otra.</string>
-    <string name="keyring_generate_ssh_auth_failed">Clave creada, pero no se pudo añadir la subclave SSH: %1$s. Puedes añadirla desde el detalle de la clave.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">SSH desde Termux</string>
     <string name="ssh_help_row_subtitle">Usa tus claves de PGPony con ssh y git en Termux</string>
@@ -3221,10 +3210,36 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="key_detail_add_subkey_group_sign">Firma</string>
     <string name="key_detail_add_subkey_group_auth">Autenticación</string>
     <string name="key_detail_add_subkey_group_encrypt">Cifrado</string>
-    <string name="key_detail_add_subkey_curve_label">Curva para ECDSA y ECDH</string>
     <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (Firmar)</string>
     <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (Autenticar)</string>
     <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (Cifrar)</string>
     <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH solo admite ECDSA en las curvas NIST. En esta curva, una subclave de autenticación sirve solo para una llave de seguridad.</string>
-    <string name="keyring_generate_granular_dropped_for_v6">Una clave v6 no puede contener algunas de las subclaves que elegiste, así que se quitaron.</string>
+    <!-- 4.8.0 RC11 (#109) -->
+    <string name="keyring_generate_auth_toggle">Subclave de autenticación</string>
+    <string name="keyring_generate_auth_caption">Añade %1$s, para iniciar sesión por SSH a través de un puente ssh-agent o desde la ranura de autenticación de una llave de seguridad.</string>
+    <string name="keyring_generate_auth_caption_choice">Añade una subclave de autenticación: en la curva %1$s para una llave de seguridad, o Ed25519 para SSH, que no tiene un tipo de clave para %1$s.</string>
+    <string name="keyring_generate_auth_same_curve">Misma curva (para una llave de seguridad)</string>
+    <string name="keyring_generate_auth_ed25519">Ed25519 (para SSH)</string>
+    <string name="keyring_generate_auth_failed">Clave creada, pero no se pudo añadir la subclave de autenticación: %1$s. Puedes añadirla desde el detalle de la clave.</string>
+    <string name="keyring_generate_granular_primary_caption">Clave principal: %1$s, OpenPGP v%2$d. La versión depende de la clave principal: %3$s crea una clave v6 y cualquier otro tipo, una clave v4.</string>
+    <string name="keyring_generate_granular_unavailable">Para componer subclaves hace falta una clave principal clásica. Para subclaves poscuánticas, elige %1$s, o bien %2$s para añadir una subclave ML-KEM-768.</string>
+    <string name="keyring_generate_granular_include_default_caption_format">Añade %1$s, la subclave de cifrado que este tipo de clave lleva de forma predeterminada.</string>
+    <string name="keyring_generate_auth_caption_choice_on">SSH no tiene un tipo de clave para %1$s. Elige para qué servirá esta subclave:</string>
+    <string name="keyring_generate_granular_card_note">Cada llave de seguridad admite curvas distintas, así que comprueba que la tuya acepta la curva %1$s antes de mover la clave a ella.</string>
+    <string name="keyring_generate_granular_certify_only">La clave principal solo certifica</string>
+    <!-- 4.8.0 RC11 (#109): the subkey picker's rows, and the picker group for RSA, ECDSA and the LibrePGP keys. -->
+    <string name="key_detail_add_subkey_use_label">Uso</string>
+    <string name="key_detail_add_subkey_curve_heading">Curva</string>
+    <string name="key_detail_add_subkey_size_label">Tamaño de clave</string>
+    <string name="key_detail_add_subkey_level_label">Nivel de seguridad</string>
+    <string name="keyring_generate_algorithm_group_rsa_ecdsa">RSA, ECDSA y LibrePGP</string>
+    <string name="keyring_generate_granular_certify_only_caption">Para una llave de seguridad: la clave principal solo certifica y no pasa a la tarjeta, y la firma, el cifrado y la autenticación quedan a cargo de subclaves.</string>
+    <string name="keyring_generate_granular_fixed_v6">Una clave principal v6 solo certifica, así que la clave siempre lleva %1$s.</string>
+    <string name="keyring_generate_granular_fixed_signing">La clave principal solo certifica, así que se añade %1$s para firmar.</string>
+    <string name="keyring_generate_granular_remove_cd">Quitar subclave</string>
+    <plurals name="keyring_generate_granular_dropped_named">
+        <item quantity="one">Se quitó porque la clave principal que elegiste no puede contenerla: %1$s.</item>
+        <item quantity="many">Se quitaron porque la clave principal que elegiste no puede contenerlas: %1$s.</item>
+        <item quantity="other">Se quitaron porque la clave principal que elegiste no puede contenerlas: %1$s.</item>
+    </plurals>
 </resources>

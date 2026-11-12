@@ -623,18 +623,12 @@
     <string name="keyring_generate_algorithm_group_classical">Класичні</string>
     <string name="keyring_generate_algorithm_group_pqc">Постквантові</string>
     <string name="keyring_generate_algorithm_group_interop">Взаємодія / сумісність</string>
-    <string name="keyring_generate_algorithm_group_advanced">Розширені / сумісність</string>
     <string name="keyring_generate_algorithm_caption_pqc_v4">Постквантове шифрування з найширшим охопленням. Стандартний ключ v4 Ed25519, який уже підтримує кожен інструмент OpenPGP, містить постквантовий підключ шифрування ML-KEM-768 поряд із класичним, тож старіші програми все одно можуть шифрувати для вас, а сучасні інструменти використовують ML-KEM. Рекомендований вибір для постквантового шифрування, що працює з реальними співрозмовниками. Резервне копіювання закритого ключа для такого типу ключа поки що недоступне.</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign">Повністю постквантовий, без класичного запасного варіанта: основний ключ підпису ML-DSA разом з підключем шифрування ML-KEM на сучасному ключі v6 (RFC 9980). І підпис, і шифрування стійкі до квантових атак, а оскільки ключ не містить слабшого класичного підключа, понизити захист немає до чого. Використовувати його можуть лише сучасні програми OpenPGP.</string>
     <string name="keyring_generate_algorithm_caption_pqc_librepgp">Лише для взаємодії з GnuPG / LibrePGP. Це формат LibrePGP, який використовує GnuPG 2.5.x: ML-KEM (який GnuPG досі називає Kyber) разом з еліптичною кривою; gpg показує такі ключі як ky768_cv25519 і ky1024_cv448. Фактично він працює лише з GnuPG і не має широкої сумісності, тому вибирайте його тільки для обміну ключами з GnuPG. Для ширшого охоплення використовуйте натомість постквантовий варіант RFC 9980. ML-KEM-1024 є варіантом підвищеної стійкості.</string>
     <string name="keyring_generate_granular_toggle">Додатково: налаштувати склад підключів</string>
     <string name="keyring_generate_granular_include_default">Додати підключ шифрування за замовчуванням</string>
     <string name="keyring_generate_granular_add_subkey">Додати підключ</string>
-    <string name="keyring_generate_granular_base_label">Основний ключ</string>
-    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
-    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
-    <string name="keyring_generate_granular_dropped_for_v4">Ключ v4 не може містити деякі з вибраних підключів, тому їх вилучено.</string>
-    <string name="keyring_generate_granular_include_default_caption">Додає класичний підключ шифрування X25519 на додачу до вибраних.</string>
     <string name="keyring_generate_expiration_label">Термін дії</string>
     <string name="keyring_generate_passphrase_label">Парольна фраза (необов’язково)</string>
     <string name="keyring_generate_passphrase_confirm_label">Підтвердьте парольну фразу</string>
@@ -929,8 +923,6 @@
     <string name="key_detail_add_subkey_type_rsa_4096_encrypt">RSA 4096 (шифрування)</string>
     <string name="key_detail_add_subkey_type_ed25519_sign">Ed25519 (підпис)</string>
     <string name="key_detail_add_subkey_type_x25519_encrypt">X25519 (шифрування)</string>
-    <string name="key_detail_add_subkey_group_classical">Класичні</string>
-    <string name="key_detail_add_subkey_group_pq">Постквантові</string>
     <string name="key_detail_add_subkey_type_mlkem768">ML-KEM-768 (шифрування)</string>
     <string name="key_detail_add_subkey_type_mlkem1024">ML-KEM-1024 (шифрування)</string>
     <string name="key_detail_add_subkey_type_mldsa65">ML-DSA-65 (підпис)</string>
@@ -2238,9 +2230,6 @@
     <string name="ssh_keypicker_empty">Жоден із ваших ключів не має підключа автентифікації SSH, і ключів SSH теж немає. У PGPony додайте підключ автентифікації до пари ключів або створіть ключ у розділі «Налаштування», «Ключі SSH», а потім спробуйте ще раз.</string>
     <string name="key_detail_action_copy_ssh_key">Копіювати відкритий ключ SSH</string>
     <string name="key_detail_ssh_key_copied">Відкритий ключ SSH скопійовано</string>
-    <string name="keyring_generate_ssh_auth_toggle">Додати підключ автентифікації SSH</string>
-    <string name="keyring_generate_ssh_auth_caption">Підключ для входу на сервери через SSH за допомогою мосту ssh-agent: RSA для ключа RSA, ECDSA для ключа ECDSA на кривій NIST, Ed25519 для будь-якого іншого ключа.</string>
-    <string name="keyring_generate_ssh_auth_failed">Ключ створено, але не вдалося додати підключ SSH: %1$s. Його можна додати в розділі «Відомості про ключ».</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">SSH із Termux</string>
     <string name="ssh_help_row_subtitle">Використовуйте ключі PGPony з ssh і git у Termux</string>
@@ -3342,10 +3331,37 @@
     <string name="key_detail_add_subkey_group_sign">Підпис</string>
     <string name="key_detail_add_subkey_group_auth">Автентифікація</string>
     <string name="key_detail_add_subkey_group_encrypt">Шифрування</string>
-    <string name="key_detail_add_subkey_curve_label">Крива для ECDSA та ECDH</string>
     <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (підпис)</string>
     <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (автентифікація)</string>
     <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (шифрування)</string>
     <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH підтримує ECDSA лише на кривих NIST. На цій кривій підключ автентифікації призначений для ключа безпеки.</string>
-    <string name="keyring_generate_granular_dropped_for_v6">Ключ v6 не може містити деякі з вибраних підключів, тому їх вилучено.</string>
+    <!-- 4.8.0 RC11 (#109) -->
+    <string name="keyring_generate_auth_toggle">Підключ автентифікації</string>
+    <string name="keyring_generate_auth_caption">Додає %1$s для входу через SSH за допомогою мосту ssh-agent або через слот автентифікації ключа безпеки.</string>
+    <string name="keyring_generate_auth_caption_choice">Додає підключ автентифікації: на кривій %1$s для ключа безпеки або Ed25519 для SSH, де немає типу ключа для %1$s.</string>
+    <string name="keyring_generate_auth_same_curve">Та сама крива (для ключа безпеки)</string>
+    <string name="keyring_generate_auth_ed25519">Ed25519 (для SSH)</string>
+    <string name="keyring_generate_auth_failed">Ключ створено, але не вдалося додати підключ автентифікації: %1$s. Його можна додати в розділі «Відомості про ключ».</string>
+    <string name="keyring_generate_granular_primary_caption">Основний ключ: %1$s, OpenPGP v%2$d. Версія залежить від основного ключа: %3$s дає ключ v6, будь-який інший тип дає ключ v4.</string>
+    <string name="keyring_generate_granular_unavailable">Налаштування складу підключів потребує класичного основного ключа. Для постквантових підключів виберіть %1$s або %2$s, щоб додати підключ ML-KEM-768.</string>
+    <string name="keyring_generate_granular_include_default_caption_format">Додає %1$s, підключ шифрування, який цей тип ключа отримує за замовчуванням.</string>
+    <string name="keyring_generate_auth_caption_choice_on">У SSH немає типу ключа для %1$s. Виберіть, для чого потрібен цей підключ:</string>
+    <string name="keyring_generate_granular_card_note">Ключі безпеки підтримують різні криві, тому перед перенесенням ключа перевірте, чи підтримує ваш ключ безпеки криву %1$s.</string>
+    <string name="keyring_generate_granular_certify_only">Основний ключ лише для сертифікації</string>
+    <!-- 4.8.0 RC11 (#109): the subkey picker's rows, and the picker group for RSA, ECDSA and the LibrePGP keys. -->
+    <string name="key_detail_add_subkey_use_label">Призначення</string>
+    <string name="key_detail_add_subkey_curve_heading">Крива</string>
+    <string name="key_detail_add_subkey_size_label">Розмір ключа</string>
+    <string name="key_detail_add_subkey_level_label">Рівень безпеки</string>
+    <string name="keyring_generate_algorithm_group_rsa_ecdsa">RSA, ECDSA і LibrePGP</string>
+    <string name="keyring_generate_granular_certify_only_caption">Для ключа безпеки: основний ключ лише сертифікує й не переноситься на картку, а підпис, шифрування та автентифікацію виконують підключі.</string>
+    <string name="keyring_generate_granular_fixed_v6">Основний ключ v6 лише сертифікує, тому ключ завжди отримує %1$s.</string>
+    <string name="keyring_generate_granular_fixed_signing">Основний ключ лише сертифікує, тому для підпису додається %1$s.</string>
+    <string name="keyring_generate_granular_remove_cd">Вилучити підключ</string>
+    <plurals name="keyring_generate_granular_dropped_named">
+        <item quantity="one">Вилучено, бо вибраний основний ключ не може його містити: %1$s.</item>
+        <item quantity="few">Вилучено, бо вибраний основний ключ не може їх містити: %1$s.</item>
+        <item quantity="many">Вилучено, бо вибраний основний ключ не може їх містити: %1$s.</item>
+        <item quantity="other">Вилучено, бо вибраний основний ключ не може їх містити: %1$s.</item>
+    </plurals>
 </resources>

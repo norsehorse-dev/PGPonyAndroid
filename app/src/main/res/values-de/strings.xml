@@ -1987,17 +1987,11 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="keyring_generate_algorithm_group_classical">Klassisch</string>
     <string name="keyring_generate_algorithm_group_pqc">Post-Quanten</string>
     <string name="keyring_generate_algorithm_group_interop">Interop / Kompatibilität</string>
-    <string name="keyring_generate_algorithm_group_advanced">Erweitert / Kompatibilität</string>
     <string name="keyring_generate_algorithm_caption_pqc_v4">Post-Quanten-Verschlüsselung mit der größten Reichweite. Ein standardmäßiger v4-Ed25519-Schlüssel, den jedes OpenPGP-Werkzeug bereits versteht, mit einem Post-Quanten-Unterschlüssel ML-KEM-768 neben einem klassischen, sodass ältere Software weiterhin an dich verschlüsseln kann, während aktuelle Werkzeuge ML-KEM verwenden. Die empfohlene Wahl für Post-Quanten-Verschlüsselung, die mit echten Korrespondenten funktioniert. Eine Sicherung des privaten Schlüssels für diese Form ist noch nicht verfügbar.</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign">Vollständig post-quanten ohne klassischen Rückfall: eine ML-DSA-Signaturidentität plus ein ML-KEM-Verschlüsselungs-Unterschlüssel auf einem modernen v6-Schlüssel (RFC 9980). Sowohl Signatur als auch Verschlüsselung widerstehen Quantenangriffen, und da der Schlüssel keinen schwächeren klassischen Unterschlüssel trägt, gibt es nichts, worauf man herabstufen könnte. Nur aktuelle OpenPGP-Software kann ihn verwenden.</string>
     <string name="keyring_generate_granular_toggle">Erweitert: Unterschlüssel zusammenstellen</string>
     <string name="keyring_generate_granular_include_default">Standard-Verschlüsselungs-Unterschlüssel einschließen</string>
     <string name="keyring_generate_granular_add_subkey">Unterschlüssel hinzufügen</string>
-    <string name="keyring_generate_granular_base_label">Basisschlüssel</string>
-    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
-    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
-    <string name="keyring_generate_granular_dropped_for_v4">Ein v4-Schlüssel kann einige der gewählten Unterschlüssel nicht aufnehmen, daher wurden sie entfernt.</string>
-    <string name="keyring_generate_granular_include_default_caption">Fügt neben den gewählten einen klassischen X25519-Verschlüsselungs-Unterschlüssel hinzu.</string>
     <string name="keyring_error_email_invalid">Diese E-Mail-Adresse sieht nicht richtig aus</string>
     <string name="import_button_encrypt_to_key">An diesen Schlüssel verschlüsseln</string>
     <string name="key_detail_copy_email_cd">E-Mail-Adresse kopieren</string>
@@ -2017,8 +2011,6 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="key_detail_subkey_last_enc_body">Dies ist der einzige Verschlüsselungs-Unterschlüssel dieses Schlüssels. Ihn zu entfernen oder zu widerrufen macht den Schlüssel unfähig, verschlüsselte Nachrichten zu empfangen. Trotzdem fortfahren?</string>
     <string name="key_detail_subkey_last_enc_action">Fortfahren</string>
     <string name="key_detail_subkey_action_failed">Die Unterschlüssel-Aktion konnte nicht abgeschlossen werden. Bitte versuche es erneut.</string>
-    <string name="key_detail_add_subkey_group_classical">Klassisch</string>
-    <string name="key_detail_add_subkey_group_pq">Post-Quanten</string>
     <string name="key_detail_add_subkey_type_mlkem768">ML-KEM-768 (Verschlüsseln)</string>
     <string name="key_detail_add_subkey_type_mlkem1024">ML-KEM-1024 (Verschlüsseln)</string>
     <string name="key_detail_add_subkey_type_mldsa65">ML-DSA-65 (Signieren)</string>
@@ -2129,9 +2121,6 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="ssh_keypicker_empty">Keiner deiner Schlüssel hat einen SSH-Authentifizierungs-Unterschlüssel, und es gibt keine SSH-Schlüssel. Füge in PGPony einem Schlüsselpaar einen Authentifizierungs-Unterschlüssel hinzu oder erstelle einen Schlüssel unter Einstellungen, SSH-Schlüssel, und versuche es dann erneut.</string>
     <string name="key_detail_action_copy_ssh_key">Öffentlichen SSH-Schlüssel kopieren</string>
     <string name="key_detail_ssh_key_copied">Öffentlicher SSH-Schlüssel kopiert</string>
-    <string name="keyring_generate_ssh_auth_toggle">SSH-Authentifizierungs-Unterschlüssel hinzufügen</string>
-    <string name="keyring_generate_ssh_auth_caption">Ein Unterschlüssel, um dich über eine ssh-agent-Brücke per SSH an Servern anzumelden: RSA bei einem RSA-Schlüssel, ECDSA bei einem NIST-ECDSA-Schlüssel, sonst Ed25519.</string>
-    <string name="keyring_generate_ssh_auth_failed">Schlüssel erstellt, aber der SSH-Unterschlüssel konnte nicht hinzugefügt werden: %1$s. Du kannst ihn in den Schlüsseldetails hinzufügen.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">SSH aus Termux</string>
     <string name="ssh_help_row_subtitle">Deine PGPony-Schlüssel mit ssh und git in Termux nutzen</string>
@@ -3202,10 +3191,35 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
     <string name="key_detail_add_subkey_group_sign">Signatur</string>
     <string name="key_detail_add_subkey_group_auth">Authentifizierung</string>
     <string name="key_detail_add_subkey_group_encrypt">Verschlüsselung</string>
-    <string name="key_detail_add_subkey_curve_label">Kurve für ECDSA und ECDH</string>
     <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (Signieren)</string>
     <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (Authentifizieren)</string>
     <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (Verschlüsseln)</string>
     <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH unterstützt ECDSA nur auf den NIST-Kurven. Auf dieser Kurve ist ein Authentifizierungs-Unterschlüssel für einen Sicherheitsschlüssel gedacht.</string>
-    <string name="keyring_generate_granular_dropped_for_v6">Ein v6-Schlüssel kann einige der gewählten Unterschlüssel nicht aufnehmen, daher wurden sie entfernt.</string>
+    <!-- 4.8.0 RC11 (#109) -->
+    <string name="keyring_generate_auth_toggle">Authentifizierungs-Unterschlüssel</string>
+    <string name="keyring_generate_auth_caption">Fügt %1$s hinzu. Damit meldest du dich per SSH über eine ssh-agent-Brücke oder über den Authentifizierungs-Slot eines Sicherheitsschlüssels an.</string>
+    <string name="keyring_generate_auth_caption_choice">Fügt einen Authentifizierungs-Unterschlüssel hinzu: auf der Kurve %1$s für einen Sicherheitsschlüssel oder Ed25519 für SSH, das keinen Schlüsseltyp für %1$s kennt.</string>
+    <string name="keyring_generate_auth_same_curve">Gleiche Kurve (für einen Sicherheitsschlüssel)</string>
+    <string name="keyring_generate_auth_ed25519">Ed25519 (für SSH)</string>
+    <string name="keyring_generate_auth_failed">Schlüssel erstellt, aber der Authentifizierungs-Unterschlüssel konnte nicht hinzugefügt werden: %1$s. Du kannst ihn in den Schlüsseldetails hinzufügen.</string>
+    <string name="keyring_generate_granular_primary_caption">Hauptschlüssel: %1$s, OpenPGP v%2$d. Die Version richtet sich nach dem Hauptschlüssel: %3$s ergibt einen v6-Schlüssel, jeder andere Typ einen v4-Schlüssel.</string>
+    <string name="keyring_generate_granular_unavailable">Das Zusammenstellen von Unterschlüsseln setzt einen klassischen Hauptschlüssel voraus. Für Post-Quanten-Unterschlüssel wähle %1$s oder, für einen ML-KEM-768-Unterschlüssel, %2$s.</string>
+    <string name="keyring_generate_granular_include_default_caption_format">Fügt %1$s hinzu, den Verschlüsselungs-Unterschlüssel, den dieser Schlüsseltyp standardmäßig erhält.</string>
+    <string name="keyring_generate_auth_caption_choice_on">SSH kennt keinen Schlüsseltyp für %1$s. Wähle, wofür dieser Unterschlüssel gedacht ist:</string>
+    <string name="keyring_generate_granular_card_note">Sicherheitsschlüssel unterstützen unterschiedliche Kurven, prüfe also, ob deiner die Kurve %1$s annimmt, bevor du den Schlüssel darauf verschiebst.</string>
+    <string name="keyring_generate_granular_certify_only">Hauptschlüssel nur zum Beglaubigen</string>
+    <!-- 4.8.0 RC11 (#109): the subkey picker's rows, and the picker group for RSA, ECDSA and the LibrePGP keys. -->
+    <string name="key_detail_add_subkey_use_label">Verwendung</string>
+    <string name="key_detail_add_subkey_curve_heading">Kurve</string>
+    <string name="key_detail_add_subkey_size_label">Schlüsselgröße</string>
+    <string name="key_detail_add_subkey_level_label">Sicherheitsstufe</string>
+    <string name="keyring_generate_algorithm_group_rsa_ecdsa">RSA, ECDSA und LibrePGP</string>
+    <string name="keyring_generate_granular_certify_only_caption">Für einen Sicherheitsschlüssel: Der Hauptschlüssel beglaubigt nur und bleibt außerhalb der Karte. Signieren, Verschlüsseln und Authentifizieren übernehmen Unterschlüssel.</string>
+    <string name="keyring_generate_granular_fixed_v6">Ein v6-Hauptschlüssel beglaubigt nur, daher erhält der Schlüssel immer %1$s.</string>
+    <string name="keyring_generate_granular_fixed_signing">Der Hauptschlüssel beglaubigt nur, daher wird zum Signieren %1$s hinzugefügt.</string>
+    <string name="keyring_generate_granular_remove_cd">Unterschlüssel entfernen</string>
+    <plurals name="keyring_generate_granular_dropped_named">
+        <item quantity="one">Entfernt, weil der gewählte Hauptschlüssel ihn nicht aufnehmen kann: %1$s.</item>
+        <item quantity="other">Entfernt, weil der gewählte Hauptschlüssel sie nicht aufnehmen kann: %1$s.</item>
+    </plurals>
 </resources>

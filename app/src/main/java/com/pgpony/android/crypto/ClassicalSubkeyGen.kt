@@ -147,6 +147,24 @@ object ClassicalSubkeyGen {
     }
 
     /**
+     * 4.8.0 RC11 (#109): the Authentication subkey Generate Key adds to a new
+     * key of [algorithm]: the primary's own algorithm and curve (RSA of the
+     * same size, ECDSA on the same curve, Ed25519 for Ed25519 and every other
+     * key), so a card provisioned from the key gets an AUT slot that matches
+     * its SIG and DEC. Brainpool and secp256k1 have no SSH key type, so for
+     * them [forSsh] picks Ed25519 instead; see [authHasSshChoice].
+     */
+    fun authTypeFor(algorithm: KeyAlgorithm, forSsh: Boolean = false): ClassicalSubkeyType {
+        if (forSsh && authHasSshChoice(algorithm)) return ClassicalSubkeyType.ED25519_AUTH
+        return ClassicalSubkeyType.ecdsa(algorithm, Capability.AUTHENTICATE) ?: sshAuthTypeFor(algorithm)
+    }
+
+    /** 4.8.0 RC11 (#109): the same-curve Authentication subkey of [algorithm] has no SSH key type. */
+    fun authHasSshChoice(algorithm: KeyAlgorithm): Boolean =
+        algorithm == KeyAlgorithm.ECDSA_BRAINPOOL_P256 || algorithm == KeyAlgorithm.ECDSA_BRAINPOOL_P384 ||
+            algorithm == KeyAlgorithm.ECDSA_BRAINPOOL_P512 || algorithm == KeyAlgorithm.ECDSA_SECP256K1
+
+    /**
      * Add [type] as a new subkey of [secretRing], bound and protected the
      * same way the primary's own subkeys are. [passphrase] must match the
      * ring's existing protection (empty string if the ring is

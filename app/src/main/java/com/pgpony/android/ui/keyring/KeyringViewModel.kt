@@ -108,22 +108,24 @@ data class KeyringUiState(
     val generateExpiration: ExpirationOption = ExpirationOption.TWO_YEARS,
     // item 7 (#55): advanced granular keygen — compose the primary's subkey set.
     val generateGranular: Boolean = false,
-    // 4.6.0 (item 16): add an [A] subkey for SSH to the new key (RSA on an
-    // RSA key, Ed25519 otherwise). Off
-    // by default so the default key shape is unchanged. Granular mode offers
-    // the same subkey in its own list, so this applies to the simple mode.
-    val generateSshAuth: Boolean = false,
+    // 4.6.0 (item 16): add an [A] subkey to the new key. Off by default so the
+    // default key shape is unchanged. Granular mode offers the same subkey in
+    // its own list, so this applies to the simple mode. 4.8.0 RC11 (#109): it is
+    // the Authentication subkey now, on the primary's own algorithm and curve
+    // (ClassicalSubkeyGen.authTypeFor), no longer SSH only.
+    val generateAuthSubkey: Boolean = false,
+    // 4.8.0 RC11 (#109): on brainpool and secp256k1, which SSH has no type for,
+    // true picks Ed25519 (for SSH) instead of the same curve (for a security key).
+    val generateAuthForSsh: Boolean = false,
     val granularIncludeDefaultEncryption: Boolean = true,
     val granularSubkeys: List<AddSubkeyChoice> = emptyList(),
-    // 4.8.0 (item 4i): the composer's base key, v6 (the shape it always made) or v4.
-    val granularBaseV6: Boolean = true,
-    // 4.8.0 (item 4i): switching to v4 removed subkeys a v4 key can't hold.
-    val granularDroppedForV4: Boolean = false,
-    // 4.8.0 RC10 (#109): switching to v6 removed subkeys a v6 key can't hold
-    // (RSA, ECDSA and ECDH), which the v6 assembly would otherwise refuse.
-    val granularDroppedForV6: Boolean = false,
-    // 4.8.0 RC10 (#109): the curve the composer's ECDSA and ECDH entries use (v4 base).
-    val granularEcdsaCurve: KeyAlgorithm = KeyAlgorithm.ECDSA_NIST_P256,
+    // 4.8.0 RC11 (#109): picking another primary removed subkeys it can't hold.
+    // The composer builds on the picked primary now; the v4/v6 base chips are gone.
+    // 4.8.0 RC11 (#109): the subkeys removed, so the note can name them.
+    val granularDroppedSubkeys: List<AddSubkeyChoice> = emptyList(),
+    // 4.8.0 RC11 (#109): "Primary certifies only" (v4 composer): the primary gets
+    // Certify alone, for a security key that holds the S, E and A subkeys.
+    val granularCertifyOnly: Boolean = false,
     // 4.8.0 (item 4j): the user set the default encryption subkey switch, so
     // the composer stops choosing its value from the subkey list.
     val granularIncludeDefaultTouched: Boolean = false,
@@ -616,15 +618,14 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
             generatePassphrase = "",
             generateConfirmPassphrase = "",
             generateExpiration = ExpirationOption.TWO_YEARS,
-            generateSshAuth = false,
+            generateAuthSubkey = false,
+            generateAuthForSsh = false,
             // 4.8.0: the composer starts fresh each time the sheet opens.
             generateGranular = false,
             granularIncludeDefaultEncryption = true,
             granularSubkeys = emptyList(),
-            granularBaseV6 = true,
-            granularDroppedForV4 = false,
-            granularDroppedForV6 = false,
-            granularEcdsaCurve = KeyAlgorithm.ECDSA_NIST_P256,
+            granularDroppedSubkeys = emptyList(),
+            granularCertifyOnly = false,
             granularIncludeDefaultTouched = false,
             errorMessage = null
         )
@@ -643,7 +644,22 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
     }
 
     fun updateGenerateAlgorithm(algo: KeyAlgorithm) {
-        _state.value = _state.value.copy(generateAlgorithm = algo)
+        // 4.8.0 RC11 (#109): the composer follows the picked primary (GenerateForm).
+        _state.value = GenerateForm.withAlgorithm(_state.value, algo)
+    }
+
+    /**
+     * 4.8.0 RC11 (#109): onboarding's first-key sheet makes a plain key. It
+     * shares this state with the Keyring's Generate sheet, so compose mode or
+     * the Authentication subkey left on there must not carry over.
+     */
+    fun useSimpleGenerate() {
+        _state.value = GenerateForm.simple(_state.value)
+    }
+
+    /** 4.8.0 RC11 (#109): "Primary certifies only" in the v4 composer. */
+    fun setGranularCertifyOnly(on: Boolean) {
+        _state.value = _state.value.copy(granularCertifyOnly = on)
     }
 
     fun updateGeneratePassphrase(pp: String) {
@@ -659,12 +675,18 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
     }
 
     // ── item 7 (#55): advanced granular keygen controls ──────────────────
-    fun setGenerateSshAuth(on: Boolean) {
-        _state.value = _state.value.copy(generateSshAuth = on)
+    fun setGenerateAuthSubkey(on: Boolean) {
+        _state.value = _state.value.copy(generateAuthSubkey = on)
+    }
+
+    /** 4.8.0 RC11 (#109): Ed25519 (for SSH) instead of the same curve (for a security key). */
+    fun setGenerateAuthForSsh(forSsh: Boolean) {
+        _state.value = _state.value.copy(generateAuthForSsh = forSsh)
     }
 
     fun toggleGenerateGranular(on: Boolean) {
-        _state.value = _state.value.copy(generateGranular = on)
+        // 4.8.0 RC11 (#109): never changes the picked primary (GenerateForm).
+        _state.value = GenerateForm.withCompose(_state.value, on)
     }
 
     fun setGranularIncludeDefaultEncryption(on: Boolean) {
@@ -679,43 +701,11 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
         setGranularSubkeys(_state.value.granularSubkeys.filterIndexed { i, _ -> i != index })
     }
 
-    /**
-     * 4.8.0 (item 4i): the base key for the composer. Switching to v4 keeps
-     * only the subkeys a v4 key can hold (no ML-DSA, no ML-KEM-1024, one
-     * ML-KEM-768) and says so when it removed any.
-     */
-    fun setGranularBase(v6: Boolean) {
-        val s = _state.value
-        if (v6 == s.granularBaseV6) return
-        if (v6) {
-            // 4.8.0 RC10 (#109): RSA, ECDSA and ECDH stay on a v4 base.
-            val keptV6 = GranularComposer.keptForV6(s.granularSubkeys)
-            _state.value = s.copy(
-                granularBaseV6 = true, granularDroppedForV4 = false,
-                granularDroppedForV6 = keptV6.size != s.granularSubkeys.size
-            )
-            setGranularSubkeys(keptV6, keepDroppedNote = true)
-            return
-        }
-        val kept = GranularComposer.keptForV4(s.granularSubkeys)
-        _state.value = s.copy(
-            granularBaseV6 = false, granularDroppedForV6 = false,
-            granularDroppedForV4 = kept.size != s.granularSubkeys.size
-        )
-        setGranularSubkeys(kept, keepDroppedNote = true)
-    }
-
-    /** 4.8.0 RC10 (#109): the curve the composer's ECDSA and ECDH entries use. */
-    fun setGranularEcdsaCurve(curve: KeyAlgorithm) {
-        if (curve in KeyAlgorithm.generatableEcdsa) _state.value = _state.value.copy(granularEcdsaCurve = curve)
-    }
-
     private fun setGranularSubkeys(list: List<AddSubkeyChoice>, keepDroppedNote: Boolean = false) {
         val s = _state.value
         _state.value = s.copy(
             granularSubkeys = list,
-            granularDroppedForV4 = keepDroppedNote && s.granularDroppedForV4,
-            granularDroppedForV6 = keepDroppedNote && s.granularDroppedForV6,
+            granularDroppedSubkeys = if (keepDroppedNote) s.granularDroppedSubkeys else emptyList(),
             granularIncludeDefaultEncryption = if (s.granularIncludeDefaultTouched) s.granularIncludeDefaultEncryption
                 else GranularComposer.defaultEncryptionSubkey(list)
         )
@@ -747,7 +737,9 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
         viewModelScope.launch {
             try {
                 val passphrase = s.generatePassphrase.ifBlank { null }
-                val generated = if (s.generateGranular) {
+                // 4.8.0 RC11 (#109): compose on the picked primary, when it can be composed.
+                val compose = GenerateForm.composes(s)
+                val generated = if (compose) {
                     repo.generateGranularKey(
                         name = s.generateName.trim(),
                         email = s.generateEmail.trim(),
@@ -757,7 +749,9 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                         },
                         passphrase = passphrase,
                         expirationSeconds = s.generateExpiration.seconds,
-                        v6 = s.granularBaseV6
+                        primary = s.generateAlgorithm,
+                        // A v6 primary already certifies only (buildV6Ed25519X25519KeyRings).
+                        certifyOnly = s.granularCertifyOnly && !s.generateAlgorithm.isV6
                     )
                 } else {
                     repo.generateKey(
@@ -772,14 +766,17 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                 // the key's own expiry. A failure here keeps the new key and
                 // says so; the subkey can still be added from Key Detail.
                 var sshAuthError: String? = null
-                if (!s.generateGranular && s.generateSshAuth) {
+                if (!compose && s.generateAuthSubkey) {
                     try {
-                        repo.addSshAuthSubkeyAtGeneration(
-                            generated.fingerprint, s.generateAlgorithm, s.generateExpiration.seconds, passphrase
+                        // 4.8.0 RC11 (#109): the primary's own algorithm and curve, or Ed25519 for SSH.
+                        repo.addAuthSubkeyAtGeneration(
+                            generated.fingerprint,
+                            com.pgpony.android.crypto.ClassicalSubkeyGen.authTypeFor(s.generateAlgorithm, s.generateAuthForSsh),
+                            s.generateExpiration.seconds, passphrase
                         )
                     } catch (e: Exception) {
                         sshAuthError = PGPonyApp.instance.getString(
-                            R.string.keyring_generate_ssh_auth_failed, ErrorText.localize(e.message) ?: ""
+                            R.string.keyring_generate_auth_failed, ErrorText.localize(e.message) ?: ""
                         )
                     }
                 }
@@ -1499,41 +1496,77 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
 /**
  * 4.8.0 (items 4i and 4j): the subkey composer's rules, kept apart from the
  * ViewModel so they can be tested on their own.
+ * 4.8.0 RC11 (#109): the composer builds on the primary picked in Generate Key.
  */
 object GranularComposer {
 
+    /** Whether the composer can build on [primary] (see AddSubkeyChoice.composerBaseFor). */
+    fun supports(primary: KeyAlgorithm): Boolean = AddSubkeyChoice.composerBaseFor(primary) != null
+
     /**
-     * The Add subkey menu for [baseV6], given the subkeys already [chosen].
-     * 4.8.0 RC10 (#109): the same list Add subkey shows in Key Details for a key
-     * of that version (AddSubkeyChoice.optionsFor, same order and labels), with
-     * ECDSA and ECDH on [curve]. The one difference: a v4 base takes a single
-     * ML-KEM-768 subkey here, because Bouncy Castle cannot carry that subkey
-     * through a later edit, so the composer grafts it last and only once.
+     * The subkeys the composer's picker offers for a key on [primary], given the
+     * subkeys already [chosen]: what Add subkey offers in Key Details for a key of
+     * that type, on every curve (SubkeyPick.options, same order and labels). Two
+     * differences: an Ed25519 v4 key takes a single ML-KEM-768 subkey here,
+     * because Bouncy Castle cannot carry that subkey through a later edit, so the
+     * composer grafts it last and only once; and a v6 key is always made with an
+     * Ed25519 signing subkey ([fixedSubkeys]), so a second one is not offered.
+     * 4.8.0 RC11 (#109): every curve at once, since the picker asks for the curve
+     * itself; this was a menu with one curve at a time.
      */
-    fun menu(
-        baseV6: Boolean,
-        chosen: List<AddSubkeyChoice>,
-        curve: KeyAlgorithm = KeyAlgorithm.ECDSA_NIST_P256
-    ): List<AddSubkeyChoice> {
-        val all = AddSubkeyChoice.optionsFor(
-            if (baseV6) AddSubkeyChoice.Base.V6 else AddSubkeyChoice.Base.V4, curve
-        )
-        if (baseV6 || chosen.none { it is AddSubkeyChoice.PqEncryption }) return all
+    fun options(primary: KeyAlgorithm, chosen: List<AddSubkeyChoice>): List<AddSubkeyChoice> {
+        val base = AddSubkeyChoice.composerBaseFor(primary) ?: return emptyList()
+        var all = SubkeyPick.options(base, primary = primary)
+        if (base == AddSubkeyChoice.Base.V6) all = all - V6_SIGNING
+        if (base != AddSubkeyChoice.Base.V4 || chosen.none { it is AddSubkeyChoice.PqEncryption }) return all
         return all.filterNot { it is AddSubkeyChoice.PqEncryption }
     }
 
-    /** 4.8.0 RC10 (#109): [chosen] with what a v6 base can't hold removed: RSA, ECDSA and ECDH. */
-    fun keptForV6(chosen: List<AddSubkeyChoice>): List<AddSubkeyChoice> =
-        chosen.filter { AddSubkeyChoice.allowedOn(AddSubkeyChoice.Base.V6, it) }
+    /**
+     * 4.8.0 RC11 (#109): the uses the composed key already covers, so the picker
+     * starts on the first it lacks: signing (the primary, or the fixed signing
+     * subkey when it certifies only), encryption when the default encryption
+     * subkey is on, and the use of every subkey [chosen].
+     */
+    fun have(primary: KeyAlgorithm, includeDefaultEncryption: Boolean, chosen: List<AddSubkeyChoice>): Set<AddSubkeyChoice.Usage> {
+        val have = mutableSetOf(AddSubkeyChoice.Usage.SIGN)
+        if (includeDefaultEncryption && AddSubkeyChoice.defaultEncryptionFor(primary) != null) have += AddSubkeyChoice.Usage.ENCRYPT
+        chosen.forEach { have += AddSubkeyChoice.usageOf(it) }
+        return have
+    }
 
-    /** [chosen] with what a v4 base can't hold removed: ML-DSA, ML-KEM-1024, a second ML-KEM-768. */
-    fun keptForV4(chosen: List<AddSubkeyChoice>): List<AddSubkeyChoice> {
+    private val V6_SIGNING = AddSubkeyChoice.Classical(
+        com.pgpony.android.crypto.ClassicalSubkeyGen.ClassicalSubkeyType.ED25519_SIGN
+    )
+
+    /**
+     * 4.8.0 RC11 (#109): subkeys the key gets without being picked, shown as
+     * fixed chips: a v6 key's Ed25519 signing subkey (its primary certifies
+     * only), and on v4 with "Primary certifies only" and no signing subkey
+     * composed, a signing subkey of the primary's type.
+     */
+    fun fixedSubkeys(primary: KeyAlgorithm, certifyOnly: Boolean, chosen: List<AddSubkeyChoice>): List<AddSubkeyChoice> =
+        when (AddSubkeyChoice.composerBaseFor(primary)) {
+            null -> emptyList()
+            AddSubkeyChoice.Base.V6 -> listOf(V6_SIGNING)
+            else -> AddSubkeyChoice.addedSigningSubkey(primary, certifyOnly, chosen)
+        }
+
+    /**
+     * [chosen] with what a key on [primary] can't hold removed: ECDSA, ECDH and
+     * RSA leave a v6 key; ML-DSA and ML-KEM-1024 leave a v4 key; ML-KEM-768
+     * leaves an RSA or ECDSA key; an Ed25519 v4 key keeps one ML-KEM-768. A
+     * primary the composer can't build on keeps the list for when a classical
+     * one is picked again.
+     */
+    fun keptFor(primary: KeyAlgorithm, chosen: List<AddSubkeyChoice>): List<AddSubkeyChoice> {
+        val base = AddSubkeyChoice.composerBaseFor(primary) ?: return chosen
         var pqKept = false
         return chosen.filter { c ->
             when {
-                // 4.8.0 RC10 (#109): the shared rule, which also keeps ECDSA and ECDH on any curve.
-                !AddSubkeyChoice.allowedOn(AddSubkeyChoice.Base.V4, c) -> false
-                c is AddSubkeyChoice.PqEncryption -> if (pqKept) false else { pqKept = true; true }
+                !AddSubkeyChoice.allowedOn(base, c) -> false
+                base == AddSubkeyChoice.Base.V4 && c is AddSubkeyChoice.PqEncryption ->
+                    if (pqKept) false else { pqKept = true; true }
                 else -> true
             }
         }
@@ -1547,4 +1580,54 @@ object GranularComposer {
      */
     fun defaultEncryptionSubkey(chosen: List<AddSubkeyChoice>): Boolean =
         !(chosen.any { it is AddSubkeyChoice.PqEncryption } && chosen.none { it is AddSubkeyChoice.Classical })
+}
+
+/**
+ * 4.8.0 RC11 (#109): how the Generate Key form changes when the primary or
+ * the compose switch changes, apart from the ViewModel so it can be tested.
+ * The tester picked NIST P-256, turned on compose, and the key became an
+ * Ed25519 v6 key: compose hid the picker and built its own base. Now nothing
+ * here changes the picked primary.
+ */
+object GenerateForm {
+
+    /** Whether Generate composes: the switch is on and the primary can be composed. */
+    fun composes(s: KeyringUiState): Boolean = s.generateGranular && GranularComposer.supports(s.generateAlgorithm)
+
+    /**
+     * Onboarding's plain key: compose and the Authentication subkey off, and the
+     * default expiry, since onboarding has no expiry picker.
+     */
+    fun simple(s: KeyringUiState): KeyringUiState = s.copy(
+        generateGranular = false, generateAuthSubkey = false, generateAuthForSsh = false,
+        generateExpiration = ExpirationOption.TWO_YEARS
+    )
+
+    /** The compose switch. It never changes the primary. */
+    fun withCompose(s: KeyringUiState, on: Boolean): KeyringUiState = s.copy(generateGranular = on)
+
+    /**
+     * A new primary. The composer keeps the subkeys it can hold (and names the
+     * ones it removed). A primary the composer can't build on
+     * turns compose off and clears it, so nothing stays hidden to come back later.
+     */
+    fun withAlgorithm(s: KeyringUiState, algorithm: KeyAlgorithm): KeyringUiState {
+        val next = s.copy(generateAlgorithm = algorithm)
+        if (!GranularComposer.supports(algorithm)) {
+            return next.copy(
+                generateGranular = false,
+                granularSubkeys = emptyList(),
+                granularDroppedSubkeys = emptyList(),
+                granularCertifyOnly = false
+            )
+        }
+        val kept = GranularComposer.keptFor(algorithm, s.granularSubkeys)
+        return next.copy(
+            granularSubkeys = kept,
+            // Each kept subkey once, so a second ML-KEM-768 counts as removed.
+            granularDroppedSubkeys = s.granularSubkeys.toMutableList().apply { kept.forEach { remove(it) } },
+            granularIncludeDefaultEncryption = if (s.granularIncludeDefaultTouched) s.granularIncludeDefaultEncryption
+                else GranularComposer.defaultEncryptionSubkey(kept)
+        )
+    }
 }

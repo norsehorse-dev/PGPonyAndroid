@@ -1983,17 +1983,11 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="keyring_generate_algorithm_group_classical">従来型</string>
     <string name="keyring_generate_algorithm_group_pqc">耐量子</string>
     <string name="keyring_generate_algorithm_group_interop">相互運用 / 互換性</string>
-    <string name="keyring_generate_algorithm_group_advanced">詳細 / 互換性</string>
     <string name="keyring_generate_algorithm_caption_pqc_v4">最も広く使える耐量子暗号化です。あらゆるOpenPGPツールがすでに扱える標準的なv4 Ed25519鍵に、従来型と並んで耐量子のML-KEM-768暗号化サブキーを持たせます。古いソフトウェアも引き続きあなたに暗号化でき、最新のツールはML-KEMを使います。実際の相手と使える耐量子暗号化として推奨される選択肢です。この形式の秘密鍵バックアップはまだ利用できません。</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign">従来型のフォールバックを持たない完全な耐量子です。最新のv6鍵（RFC 9980）上のML-DSA署名アイデンティティとML-KEM暗号化サブキー。署名も暗号化も量子攻撃に耐え、鍵はより弱い従来型サブキーを持たないため、ダウングレードする先がありません。最新のOpenPGPソフトウェアのみが使用できます。</string>
     <string name="keyring_generate_granular_toggle">詳細: サブキーを構成</string>
     <string name="keyring_generate_granular_include_default">デフォルトの暗号化サブキーを含める</string>
     <string name="keyring_generate_granular_add_subkey">サブキーを追加</string>
-    <string name="keyring_generate_granular_base_label">主鍵</string>
-    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
-    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
-    <string name="keyring_generate_granular_dropped_for_v4">v4 鍵には選択したサブキーの一部を含められないため、それらを削除しました。</string>
-    <string name="keyring_generate_granular_include_default_caption">選択したサブキーに加えて、従来型の X25519 暗号化サブキーを追加します。</string>
     <string name="keyring_error_email_invalid">そのメールアドレスは正しくないようです</string>
     <string name="import_button_encrypt_to_key">この鍵に暗号化</string>
     <string name="key_detail_copy_email_cd">メールアドレスをコピー</string>
@@ -2013,8 +2007,6 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="key_detail_subkey_last_enc_body">これはこの鍵で唯一の暗号化サブキーです。削除または失効すると、この鍵は暗号化されたメッセージを受け取れなくなります。それでも続けますか？</string>
     <string name="key_detail_subkey_last_enc_action">続行</string>
     <string name="key_detail_subkey_action_failed">サブキーの操作を完了できませんでした。もう一度お試しください。</string>
-    <string name="key_detail_add_subkey_group_classical">従来型</string>
-    <string name="key_detail_add_subkey_group_pq">耐量子</string>
     <string name="key_detail_add_subkey_type_mlkem768">ML-KEM-768（暗号化）</string>
     <string name="key_detail_add_subkey_type_mlkem1024">ML-KEM-1024（暗号化）</string>
     <string name="key_detail_add_subkey_type_mldsa65">ML-DSA-65（署名）</string>
@@ -2122,9 +2114,6 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="ssh_keypicker_empty">SSH 認証サブキーを持つ鍵がなく、SSH 鍵もありません。PGPony で鍵ペアに認証サブキーを追加するか、「設定」の「SSH 鍵」で鍵を作成してから、もう一度お試しください。</string>
     <string name="key_detail_action_copy_ssh_key">SSH 公開鍵をコピー</string>
     <string name="key_detail_ssh_key_copied">SSH 公開鍵をコピーしました</string>
-    <string name="keyring_generate_ssh_auth_toggle">SSH 認証サブキーを追加</string>
-    <string name="keyring_generate_ssh_auth_caption">ssh-agent ブリッジ経由で SSH によりサーバーにログインするためのサブキーです。RSA 鍵には RSA、NIST ECDSA 鍵には ECDSA、それ以外の鍵には Ed25519 を使います。</string>
-    <string name="keyring_generate_ssh_auth_failed">鍵は作成されましたが、SSH サブキーを追加できませんでした: %1$s。鍵の詳細から追加できます。</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">Termux からの SSH</string>
     <string name="ssh_help_row_subtitle">PGPony の鍵を Termux の ssh と git で使う</string>
@@ -3172,10 +3161,34 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <string name="key_detail_add_subkey_group_sign">署名</string>
     <string name="key_detail_add_subkey_group_auth">認証</string>
     <string name="key_detail_add_subkey_group_encrypt">暗号化</string>
-    <string name="key_detail_add_subkey_curve_label">ECDSA と ECDH の曲線</string>
     <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s（署名）</string>
     <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s（認証）</string>
     <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s（暗号化）</string>
     <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH で使える ECDSA は NIST 曲線のみです。この曲線の認証サブキーはセキュリティキー用です。</string>
-    <string name="keyring_generate_granular_dropped_for_v6">v6 鍵には選択したサブキーの一部を含められないため、それらを削除しました。</string>
+    <!-- 4.8.0 RC11 (#109) -->
+    <string name="keyring_generate_auth_toggle">認証サブキー</string>
+    <string name="keyring_generate_auth_caption">%1$s を追加します。ssh-agent ブリッジ経由の SSH ログインや、セキュリティキーの認証スロットからのログインに使います。</string>
+    <string name="keyring_generate_auth_caption_choice">認証サブキーを追加します。セキュリティキー用なら %1$s 曲線、SSH 用なら Ed25519 です（SSH には %1$s 用の鍵の種類がありません）。</string>
+    <string name="keyring_generate_auth_same_curve">同じ曲線（セキュリティキー用）</string>
+    <string name="keyring_generate_auth_ed25519">Ed25519（SSH 用）</string>
+    <string name="keyring_generate_auth_failed">鍵は作成されましたが、認証サブキーを追加できませんでした: %1$s。鍵の詳細から追加できます。</string>
+    <string name="keyring_generate_granular_primary_caption">主鍵: %1$s、OpenPGP v%2$d。バージョンは主鍵で決まります。%3$s なら v6 鍵、それ以外の種類なら v4 鍵になります。</string>
+    <string name="keyring_generate_granular_unavailable">サブキーの構成には従来型の主鍵が必要です。耐量子サブキーを使うには %1$s を選ぶか、%2$s を選んで ML-KEM-768 サブキーを追加してください。</string>
+    <string name="keyring_generate_granular_include_default_caption_format">%1$s を追加します。この鍵の種類にデフォルトで付く暗号化サブキーです。</string>
+    <string name="keyring_generate_auth_caption_choice_on">SSH には %1$s 用の鍵の種類がありません。このサブキーの用途を選んでください:</string>
+    <string name="keyring_generate_granular_card_note">対応する曲線はセキュリティキーによって異なるため、鍵を移動する前に、お使いのセキュリティキーが %1$s 曲線に対応しているか確認してください。</string>
+    <string name="keyring_generate_granular_certify_only">主鍵は鍵の認証のみ</string>
+    <!-- 4.8.0 RC11 (#109): the subkey picker's rows, and the picker group for RSA, ECDSA and the LibrePGP keys. -->
+    <string name="key_detail_add_subkey_use_label">用途</string>
+    <string name="key_detail_add_subkey_curve_heading">曲線</string>
+    <string name="key_detail_add_subkey_size_label">鍵長</string>
+    <string name="key_detail_add_subkey_level_label">セキュリティレベル</string>
+    <string name="keyring_generate_algorithm_group_rsa_ecdsa">RSA、ECDSA、LibrePGP</string>
+    <string name="keyring_generate_granular_certify_only_caption">セキュリティキー向け: 主鍵は鍵の認証だけを行ってカードには移さず、署名、暗号化、認証はサブキーが担います。</string>
+    <string name="keyring_generate_granular_fixed_v6">v6 の主鍵は鍵の認証のみを行うため、この鍵には常に %1$s が付きます。</string>
+    <string name="keyring_generate_granular_fixed_signing">主鍵は鍵の認証のみを行うため、署名用に %1$s を追加します。</string>
+    <string name="keyring_generate_granular_remove_cd">サブキーを削除</string>
+    <plurals name="keyring_generate_granular_dropped_named">
+        <item quantity="other">選択した主鍵には含められないため削除しました: %1$s。</item>
+    </plurals>
 </resources>

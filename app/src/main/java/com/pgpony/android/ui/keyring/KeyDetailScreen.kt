@@ -1160,6 +1160,8 @@ fun KeyDetailScreen(
             isCompositeSign = keyForAddSubkey.algorithm.isCompositeSign,
             // 4.8.0 RC10 (#109): an ECDSA key's subkey list starts on its own curve.
             keyAlgorithm = keyForAddSubkey.algorithm,
+            // 4.8.0 RC11 (#109): the picker starts on a use the key does not have yet.
+            usableSubkeyFlags = state.subkeys.filter { !it.isRevoked && it.issue == null }.map { it.capabilities },
             onApply = { choice, expiresAt, passphrase ->
                 viewModel.addSubkey(choice, expiresAt, passphrase)
             },

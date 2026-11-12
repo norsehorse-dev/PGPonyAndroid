@@ -621,18 +621,12 @@
     <string name="keyring_generate_algorithm_group_classical">Klasik</string>
     <string name="keyring_generate_algorithm_group_pqc">Kuantum Sonrası</string>
     <string name="keyring_generate_algorithm_group_interop">Birlikte çalışabilirlik / uyumluluk</string>
-    <string name="keyring_generate_algorithm_group_advanced">Gelişmiş / uyumluluk</string>
     <string name="keyring_generate_algorithm_caption_pqc_v4">En geniş erişime sahip kuantum sonrası şifreleme. Her OpenPGP aracının zaten desteklediği standart bir v4 Ed25519 anahtarı; klasik bir alt anahtarın yanında kuantum sonrası bir ML-KEM-768 şifreleme alt anahtarı taşır. Böylece eski yazılımlar size yine şifreleme yapabilirken güncel araçlar ML-KEM kullanır. Yazıştığınız gerçek kişilerle çalışan kuantum sonrası şifreleme için önerilen seçim. Bu anahtar yapısı için gizli anahtar yedeği henüz kullanılamıyor.</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign">Klasik alternatifi olmayan, tamamen kuantum sonrası: modern bir v6 anahtarında (RFC 9980) bir ML-DSA imzalama kimliği ile bir ML-KEM şifreleme alt anahtarı. Hem imzalama hem şifreleme kuantum saldırılarına dayanıklıdır ve anahtar daha zayıf bir klasik alt anahtar taşımadığı için düşürülebilecek bir seviye yoktur. Yalnızca güncel OpenPGP yazılımları bunu kullanabilir.</string>
     <string name="keyring_generate_algorithm_caption_pqc_librepgp">Yalnızca GnuPG / LibrePGP ile birlikte çalışabilirlik için. Bu, GnuPG 2.5.x sürümünün kullandığı LibrePGP biçimidir: ML-KEM (GnuPG hâlâ Kyber adını kullanır) ile bir eliptik eğri; gpg bunu ky768_cv25519 ve ky1024_cv448 olarak gösterir. Pratikte yalnızca GnuPG\'ye özgüdür ve geniş çapta birlikte çalışabilir değildir, bu yüzden bunu yalnızca GnuPG ile anahtar alışverişi yapmak için seçin. Daha geniş erişim için bunun yerine RFC 9980 kuantum sonrası seçeneğini kullanın. ML-KEM-1024 daha yüksek güçlü seçenektir.</string>
     <string name="keyring_generate_granular_toggle">Gelişmiş: alt anahtarları yapılandır</string>
     <string name="keyring_generate_granular_include_default">Varsayılan şifreleme alt anahtarını ekle</string>
     <string name="keyring_generate_granular_add_subkey">Alt anahtar ekle</string>
-    <string name="keyring_generate_granular_base_label">Temel anahtar</string>
-    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
-    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
-    <string name="keyring_generate_granular_dropped_for_v4">Bir v4 anahtarı seçtiğiniz alt anahtarların bazılarını içeremez, bu yüzden bunlar kaldırıldı.</string>
-    <string name="keyring_generate_granular_include_default_caption">Seçtiğiniz alt anahtarların yanına klasik bir X25519 şifreleme alt anahtarı ekler.</string>
     <string name="keyring_generate_expiration_label">Son kullanma tarihi</string>
     <string name="keyring_generate_passphrase_label">Parola ifadesi (isteğe bağlı)</string>
     <string name="keyring_generate_passphrase_confirm_label">Parola İfadesini Onayla</string>
@@ -925,8 +919,6 @@
     <string name="key_detail_add_subkey_type_rsa_4096_encrypt">RSA 4096 (Şifreleme)</string>
     <string name="key_detail_add_subkey_type_ed25519_sign">Ed25519 (İmzalama)</string>
     <string name="key_detail_add_subkey_type_x25519_encrypt">X25519 (Şifreleme)</string>
-    <string name="key_detail_add_subkey_group_classical">Klasik</string>
-    <string name="key_detail_add_subkey_group_pq">Kuantum Sonrası</string>
     <string name="key_detail_add_subkey_type_mlkem768">ML-KEM-768 (Şifreleme)</string>
     <string name="key_detail_add_subkey_type_mlkem1024">ML-KEM-1024 (Şifreleme)</string>
     <string name="key_detail_add_subkey_type_mldsa65">ML-DSA-65 (İmzalama)</string>
@@ -2220,9 +2212,6 @@
     <string name="ssh_keypicker_empty">Anahtarlarınızın hiçbirinde SSH kimlik doğrulama alt anahtarı yok ve hiç SSH anahtarı da yok. PGPony\'de bir anahtar çiftine Kimlik Doğrulama alt anahtarı ekleyin veya Ayarlar, SSH anahtarları bölümünde bir anahtar oluşturun, ardından yeniden deneyin.</string>
     <string name="key_detail_action_copy_ssh_key">SSH Açık Anahtarını Kopyala</string>
     <string name="key_detail_ssh_key_copied">SSH açık anahtarı kopyalandı</string>
-    <string name="keyring_generate_ssh_auth_toggle">SSH kimlik doğrulama alt anahtarı ekle</string>
-    <string name="keyring_generate_ssh_auth_caption">Bir ssh-agent köprüsü aracılığıyla SSH üzerinden sunuculara giriş yapmak için bir alt anahtar: RSA anahtarında RSA, NIST ECDSA anahtarında ECDSA, diğer tüm anahtarlarda Ed25519.</string>
-    <string name="keyring_generate_ssh_auth_failed">Anahtar oluşturuldu ancak SSH alt anahtarı eklenemedi: %1$s. Alt anahtarı Anahtar Ayrıntıları\'ndan ekleyebilirsiniz.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">Termux\'tan SSH</string>
     <string name="ssh_help_row_subtitle">PGPony anahtarlarınızı Termux\'ta ssh ve git ile kullanın</string>
@@ -3278,10 +3267,35 @@
     <string name="key_detail_add_subkey_group_sign">İmzalama</string>
     <string name="key_detail_add_subkey_group_auth">Kimlik doğrulama</string>
     <string name="key_detail_add_subkey_group_encrypt">Şifreleme</string>
-    <string name="key_detail_add_subkey_curve_label">ECDSA ve ECDH için eğri</string>
     <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (İmzalama)</string>
     <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (Kimlik Doğrulama)</string>
     <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (Şifreleme)</string>
     <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH, ECDSA\'yı yalnızca NIST eğrilerinde kabul eder. Bu eğride bir kimlik doğrulama alt anahtarı, güvenlik anahtarı içindir.</string>
-    <string name="keyring_generate_granular_dropped_for_v6">Bir v6 anahtarı seçtiğiniz alt anahtarların bazılarını içeremez, bu yüzden bunlar kaldırıldı.</string>
+    <!-- 4.8.0 RC11 (#109) -->
+    <string name="keyring_generate_auth_toggle">Kimlik doğrulama alt anahtarı</string>
+    <string name="keyring_generate_auth_caption">Bir ssh-agent köprüsü aracılığıyla SSH üzerinden ya da bir güvenlik anahtarının kimlik doğrulama yuvasından giriş yapmak için şu alt anahtarı ekler: %1$s.</string>
+    <string name="keyring_generate_auth_caption_choice">Bir kimlik doğrulama alt anahtarı ekler: güvenlik anahtarı için %1$s üzerinde ya da SSH için Ed25519. SSH\'de %1$s için bir anahtar türü yoktur.</string>
+    <string name="keyring_generate_auth_same_curve">Aynı eğri (güvenlik anahtarı için)</string>
+    <string name="keyring_generate_auth_ed25519">Ed25519 (SSH için)</string>
+    <string name="keyring_generate_auth_failed">Anahtar oluşturuldu ancak kimlik doğrulama alt anahtarı eklenemedi: %1$s. Alt anahtarı Anahtar Ayrıntıları\'ndan ekleyebilirsiniz.</string>
+    <string name="keyring_generate_granular_primary_caption">Birincil anahtar: %1$s, OpenPGP v%2$d. Sürüm birincil anahtara bağlıdır: %3$s bir v6 anahtarı, diğer tüm türler bir v4 anahtarı oluşturur.</string>
+    <string name="keyring_generate_granular_unavailable">Alt anahtarları yapılandırmak için klasik bir birincil anahtar gerekir. Kuantum sonrası alt anahtarlar için %1$s türünü ya da bir ML-KEM-768 alt anahtarı eklemek için %2$s türünü seçin.</string>
+    <string name="keyring_generate_granular_include_default_caption_format">Bu anahtar türünün varsayılan olarak aldığı şifreleme alt anahtarını ekler: %1$s.</string>
+    <string name="keyring_generate_auth_caption_choice_on">SSH\'de %1$s için bir anahtar türü yok. Bu alt anahtarın ne için kullanılacağını seçin:</string>
+    <string name="keyring_generate_granular_card_note">Güvenlik anahtarlarının desteklediği eğriler farklıdır, bu yüzden anahtarı taşımadan önce sizinkinin %1$s eğrisini desteklediğini kontrol edin.</string>
+    <string name="keyring_generate_granular_certify_only">Birincil anahtar yalnızca onaylar</string>
+    <!-- 4.8.0 RC11 (#109): the subkey picker's rows, and the picker group for RSA, ECDSA and the LibrePGP keys. -->
+    <string name="key_detail_add_subkey_use_label">Kullanım amacı</string>
+    <string name="key_detail_add_subkey_curve_heading">Eğri</string>
+    <string name="key_detail_add_subkey_size_label">Anahtar boyutu</string>
+    <string name="key_detail_add_subkey_level_label">Güvenlik düzeyi</string>
+    <string name="keyring_generate_algorithm_group_rsa_ecdsa">RSA, ECDSA ve LibrePGP</string>
+    <string name="keyring_generate_granular_certify_only_caption">Güvenlik anahtarı için: birincil anahtar yalnızca onaylama yapar ve karta taşınmaz; imzalama, şifreleme ve kimlik doğrulama alt anahtarlarla yapılır.</string>
+    <string name="keyring_generate_granular_fixed_v6">v6 birincil anahtar yalnızca onaylama yapar, bu yüzden anahtar her zaman şunu alır: %1$s.</string>
+    <string name="keyring_generate_granular_fixed_signing">Birincil anahtar yalnızca onaylama yapar, bu yüzden imzalamak için şu eklenir: %1$s.</string>
+    <string name="keyring_generate_granular_remove_cd">Alt anahtarı kaldır</string>
+    <plurals name="keyring_generate_granular_dropped_named">
+        <item quantity="one">Seçtiğiniz birincil anahtar bunu içeremediği için kaldırıldı: %1$s.</item>
+        <item quantity="other">Seçtiğiniz birincil anahtar bunları içeremediği için kaldırıldı: %1$s.</item>
+    </plurals>
 </resources>

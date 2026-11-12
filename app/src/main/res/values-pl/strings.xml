@@ -496,18 +496,12 @@
     <string name="keyring_generate_algorithm_group_classical">Klasyczne</string>
     <string name="keyring_generate_algorithm_group_pqc">Postkwantowe</string>
     <string name="keyring_generate_algorithm_group_interop">Zgodność</string>
-    <string name="keyring_generate_algorithm_group_advanced">Zaawansowane / zgodność</string>
     <string name="keyring_generate_algorithm_caption_pqc_v4">Szyfrowanie postkwantowe o najszerszym zasięgu. Standardowy klucz v4 Ed25519, który obsługuje już każde narzędzie OpenPGP, z postkwantowym podkluczem szyfrowania ML-KEM-768 obok klasycznego, więc starsze oprogramowanie nadal może szyfrować dla Ciebie, a aktualne narzędzia używają ML-KEM. Zalecany wybór szyfrowania postkwantowego, które działa z prawdziwymi korespondentami. Kopia zapasowa klucza prywatnego dla tego typu klucza nie jest jeszcze dostępna.</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign">W pełni postkwantowy, bez klasycznej rezerwy: tożsamość podpisująca ML-DSA i podklucz szyfrowania ML-KEM na nowoczesnym kluczu v6 (RFC 9980). Zarówno podpisywanie, jak i szyfrowanie są odporne na ataki kwantowe, a ponieważ klucz nie ma słabszego klasycznego podklucza, nie da się obniżyć poziomu zabezpieczeń. Może go używać tylko aktualne oprogramowanie OpenPGP.</string>
     <string name="keyring_generate_algorithm_caption_pqc_librepgp">Tylko do zgodności z GnuPG / LibrePGP. To format LibrePGP używany przez GnuPG 2.5.x: ML-KEM (który GnuPG nadal nazywa Kyber) w połączeniu z krzywą eliptyczną, wyświetlany przez gpg jako ky768_cv25519 i ky1024_cv448. W praktyce działa tylko z GnuPG i nie zapewnia szerokiej zgodności, więc wybierz go wyłącznie do wymiany kluczy z GnuPG. Aby uzyskać szerszy zasięg, wybierz zamiast tego opcję postkwantową RFC 9980. ML-KEM-1024 to opcja o wyższym poziomie bezpieczeństwa.</string>
     <string name="keyring_generate_granular_toggle">Zaawansowane: wybierz podklucze</string>
     <string name="keyring_generate_granular_include_default">Dołącz domyślny podklucz szyfrowania</string>
     <string name="keyring_generate_granular_add_subkey">Dodaj podklucz</string>
-    <string name="keyring_generate_granular_base_label">Klucz bazowy</string>
-    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
-    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
-    <string name="keyring_generate_granular_dropped_for_v4">Klucz v4 nie może zawierać niektórych wybranych podkluczy, więc zostały usunięte.</string>
-    <string name="keyring_generate_granular_include_default_caption">Dodaje klasyczny podklucz szyfrowania X25519 obok wybranych podkluczy.</string>
     <string name="keyring_generate_expiration_label">Data wygaśnięcia</string>
     <string name="keyring_generate_passphrase_label">Hasło (opcjonalne)</string>
     <string name="keyring_generate_passphrase_confirm_label">Potwierdź hasło</string>
@@ -786,8 +780,6 @@
     <string name="key_detail_add_subkey_type_rsa_4096_encrypt">RSA 4096 (szyfrowanie)</string>
     <string name="key_detail_add_subkey_type_ed25519_sign">Ed25519 (podpisywanie)</string>
     <string name="key_detail_add_subkey_type_x25519_encrypt">X25519 (szyfrowanie)</string>
-    <string name="key_detail_add_subkey_group_classical">Klasyczne</string>
-    <string name="key_detail_add_subkey_group_pq">Postkwantowe</string>
     <string name="key_detail_add_subkey_type_mlkem768">ML-KEM-768 (szyfrowanie)</string>
     <string name="key_detail_add_subkey_type_mlkem1024">ML-KEM-1024 (szyfrowanie)</string>
     <string name="key_detail_add_subkey_type_mldsa65">ML-DSA-65 (podpisywanie)</string>
@@ -1996,9 +1988,6 @@
     <string name="ssh_keypicker_empty">Żaden z Twoich kluczy nie ma podklucza uwierzytelniania SSH i nie masz kluczy SSH. W aplikacji PGPony dodaj podklucz uwierzytelniania do pary kluczy albo utwórz klucz w sekcji Ustawienia → Klucze SSH, a potem spróbuj ponownie.</string>
     <string name="key_detail_action_copy_ssh_key">Kopiuj klucz publiczny SSH</string>
     <string name="key_detail_ssh_key_copied">Skopiowano klucz publiczny SSH</string>
-    <string name="keyring_generate_ssh_auth_toggle">Dodaj podklucz uwierzytelniania SSH</string>
-    <string name="keyring_generate_ssh_auth_caption">Podklucz do logowania się na serwerach przez SSH za pośrednictwem mostka ssh-agent: RSA dla klucza RSA, ECDSA dla klucza ECDSA na krzywej NIST, Ed25519 dla każdego innego klucza.</string>
-    <string name="keyring_generate_ssh_auth_failed">Klucz został utworzony, ale nie udało się dodać podklucza SSH: %1$s. Możesz go dodać na ekranie „Szczegóły klucza”.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">SSH w aplikacji Termux</string>
     <string name="ssh_help_row_subtitle">Używaj kluczy z PGPony z ssh i git w aplikacji Termux</string>
@@ -3089,10 +3078,37 @@
     <string name="key_detail_add_subkey_group_sign">Podpisywanie</string>
     <string name="key_detail_add_subkey_group_auth">Uwierzytelnianie</string>
     <string name="key_detail_add_subkey_group_encrypt">Szyfrowanie</string>
-    <string name="key_detail_add_subkey_curve_label">Krzywa dla ECDSA i ECDH</string>
     <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (podpisywanie)</string>
     <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (uwierzytelnianie)</string>
     <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (szyfrowanie)</string>
     <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH obsługuje ECDSA tylko na krzywych NIST. Na tej krzywej podklucz uwierzytelniania jest przeznaczony dla klucza bezpieczeństwa.</string>
-    <string name="keyring_generate_granular_dropped_for_v6">Klucz v6 nie może zawierać niektórych wybranych podkluczy, więc zostały usunięte.</string>
+    <!-- 4.8.0 RC11 (#109) -->
+    <string name="keyring_generate_auth_toggle">Podklucz uwierzytelniania</string>
+    <string name="keyring_generate_auth_caption">Dodaje %1$s do logowania się przez SSH za pośrednictwem mostka ssh-agent lub z gniazda uwierzytelniania klucza bezpieczeństwa.</string>
+    <string name="keyring_generate_auth_caption_choice">Dodaje podklucz uwierzytelniania: na krzywej %1$s dla klucza bezpieczeństwa albo Ed25519 dla SSH, które nie ma typu klucza dla %1$s.</string>
+    <string name="keyring_generate_auth_same_curve">Ta sama krzywa (dla klucza bezpieczeństwa)</string>
+    <string name="keyring_generate_auth_ed25519">Ed25519 (dla SSH)</string>
+    <string name="keyring_generate_auth_failed">Klucz został utworzony, ale nie udało się dodać podklucza uwierzytelniania: %1$s. Możesz go dodać na ekranie „Szczegóły klucza”.</string>
+    <string name="keyring_generate_granular_primary_caption">Klucz główny: %1$s, OpenPGP v%2$d. Wersja zależy od klucza głównego: %3$s daje klucz v6, każdy inny typ daje klucz v4.</string>
+    <string name="keyring_generate_granular_unavailable">Wybieranie podkluczy wymaga klasycznego klucza głównego. Dla podkluczy postkwantowych wybierz %1$s albo %2$s, by dodać podklucz ML-KEM-768.</string>
+    <string name="keyring_generate_granular_include_default_caption_format">Dodaje %1$s, czyli podklucz szyfrowania, który ten typ klucza dostaje domyślnie.</string>
+    <string name="keyring_generate_auth_caption_choice_on">SSH nie ma typu klucza dla %1$s. Wybierz, do czego ma służyć ten podklucz:</string>
+    <string name="keyring_generate_granular_card_note">Klucze bezpieczeństwa różnią się obsługiwanymi krzywymi, więc zanim przeniesiesz klucz na swój, sprawdź, czy obsługuje krzywą %1$s.</string>
+    <string name="keyring_generate_granular_certify_only">Klucz główny tylko certyfikuje</string>
+    <!-- 4.8.0 RC11 (#109): the subkey picker's rows, and the picker group for RSA, ECDSA and the LibrePGP keys. -->
+    <string name="key_detail_add_subkey_use_label">Zastosowanie</string>
+    <string name="key_detail_add_subkey_curve_heading">Krzywa</string>
+    <string name="key_detail_add_subkey_size_label">Długość klucza</string>
+    <string name="key_detail_add_subkey_level_label">Poziom bezpieczeństwa</string>
+    <string name="keyring_generate_algorithm_group_rsa_ecdsa">RSA, ECDSA i LibrePGP</string>
+    <string name="keyring_generate_granular_certify_only_caption">Dla klucza bezpieczeństwa: klucz główny tylko certyfikuje i nie trafia na kartę, a podpisywanie, szyfrowanie i uwierzytelnianie przejmują podklucze.</string>
+    <string name="keyring_generate_granular_fixed_v6">Klucz główny v6 tylko certyfikuje, więc klucz zawsze dostaje %1$s.</string>
+    <string name="keyring_generate_granular_fixed_signing">Klucz główny tylko certyfikuje, więc do podpisywania zostanie dodany podklucz %1$s.</string>
+    <string name="keyring_generate_granular_remove_cd">Usuń podklucz</string>
+    <plurals name="keyring_generate_granular_dropped_named">
+        <item quantity="one">Usunięto, bo wybrany klucz główny nie może go zawierać: %1$s.</item>
+        <item quantity="few">Usunięto, bo wybrany klucz główny nie może ich zawierać: %1$s.</item>
+        <item quantity="many">Usunięto, bo wybrany klucz główny nie może ich zawierać: %1$s.</item>
+        <item quantity="other">Usunięto, bo wybrany klucz główny nie może ich zawierać: %1$s.</item>
+    </plurals>
 </resources>

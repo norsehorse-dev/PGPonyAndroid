@@ -478,11 +478,17 @@ class KeyRepository(
         subkeys: List<GranularSubkeySpec>,
         passphrase: String?,
         expirationSeconds: Long? = null,
-        // 4.8.0 (item 4i): false builds the key on a v4 Ed25519 base.
-        v6: Boolean = true
+        // 4.8.0 RC11 (#109): the primary picked in Generate Key. Ed25519 v6 is
+        // the v6 composer; Ed25519, RSA and ECDSA build a v4 key on that
+        // primary (4.8.0 item 4i made the v4 Ed25519 base).
+        primary: com.pgpony.android.crypto.KeyAlgorithm = com.pgpony.android.crypto.KeyAlgorithm.V6_ED25519,
+        // 4.8.0 RC11 (#109): a v4 primary with the Certify flag only.
+        certifyOnly: Boolean = false
     ): PGPKeyEntity = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val uid = PGPKeyEntity.composeUserID(name, email)
-        if (!v6) return@withContext storeGranularV4Key(uid, includeDefaultEncryptionSubkey, subkeys, passphrase, expirationSeconds)
+        if (primary != com.pgpony.android.crypto.KeyAlgorithm.V6_ED25519) {
+            return@withContext storeGranularV4Key(uid, includeDefaultEncryptionSubkey, subkeys, passphrase, expirationSeconds, primary, certifyOnly)
+        }
         val ring = crypto.assembleGranularV6Ring(
             userID = uid,
             includeDefaultEncryptionSubkey = includeDefaultEncryptionSubkey,
@@ -491,16 +497,16 @@ class KeyRepository(
             expirationSeconds = expirationSeconds
         )
         val publicRing = PGPPublicKeyRing(ring.publicKeys.asSequence().toList())
-        val primary = publicRing.publicKey
-        val fpHex = primary.fingerprint.joinToString("") { "%02X".format(it) }.uppercase()
+        val primaryKey = publicRing.publicKey
+        val fpHex = primaryKey.fingerprint.joinToString("") { "%02X".format(it) }.uppercase()
 
         store.storePublicKey(fpHex, publicRing.encoded)
         store.storePrivateKey(fpHex, ring.encoded)
         // 4.8.0: the recovery wrap every other keygen path attaches.
         attachRecovery(fpHex, passphrase)
 
-        val validSec = primary.validSeconds
-        val expiresAtMs = if (validSec > 0) primary.creationTime.time + validSec * 1000 else null
+        val validSec = primaryKey.validSeconds
+        val expiresAtMs = if (validSec > 0) primaryKey.creationTime.time + validSec * 1000 else null
         val parsed = PGPKeyEntity.parseUserID(uid)
         val entity = PGPKeyEntity(
             id = UUID.randomUUID().toString(),
@@ -514,7 +520,8 @@ class KeyRepository(
             createdAt = System.currentTimeMillis(),
             expiresAt = expiresAtMs,
             armoredPublicKey = crypto.exportArmoredPublicKey(publicRing),
-            revocationCertificate = null
+            // 4.8.0 RC11 (#109): pre-cached as plain Generate does.
+            revocationCertificate = precacheRevocation(ring, passphrase)
         )
         dao.insert(entity)
         return@withContext entity
@@ -531,14 +538,18 @@ class KeyRepository(
         includeDefaultEncryptionSubkey: Boolean,
         subkeys: List<GranularSubkeySpec>,
         passphrase: String?,
-        expirationSeconds: Long?
+        expirationSeconds: Long?,
+        primary: com.pgpony.android.crypto.KeyAlgorithm = com.pgpony.android.crypto.KeyAlgorithm.ED25519_CV25519,
+        certifyOnly: Boolean = false
     ): PGPKeyEntity {
         val key = crypto.assembleGranularV4(
             userID = uid,
             includeDefaultEncryptionSubkey = includeDefaultEncryptionSubkey,
             subkeys = subkeys,
             passphrase = passphrase,
-            expirationSeconds = expirationSeconds
+            expirationSeconds = expirationSeconds,
+            primary = primary,
+            certifyOnly = certifyOnly
         )
         store.storePublicKey(key.fingerprintHex, key.public)
         store.storePrivateKey(key.fingerprintHex, key.secret)
@@ -557,16 +568,43 @@ class KeyRepository(
             userID = uid,
             userName = parsed.first,
             userEmail = parsed.second,
-            algorithm = if (key.hasV4Algo35) KeyAlgorithm.MLKEM768_X25519_V4 else KeyAlgorithm.ED25519_CV25519,
+            // 4.8.0 RC11 (#109): labelled by the primary it was built on.
+            algorithm = if (key.hasV4Algo35) KeyAlgorithm.MLKEM768_X25519_V4 else primary,
             isKeyPair = true,
             trustLevel = TrustLevel.ULTIMATE,
             createdAt = System.currentTimeMillis(),
-            expiresAt = expirationSeconds?.let { System.currentTimeMillis() + it * 1000 },
+            // 4.8.0 RC11 (#109): read from the primary, as plain Generate does,
+            // when the key is a Bouncy Castle ring (an algo-35 key is not).
+            expiresAt = key.publicRing?.publicKey?.let { pk ->
+                val validSec = pk.validSeconds
+                if (validSec > 0) pk.creationTime.time + validSec * 1000 else null
+            } ?: expirationSeconds?.let { System.currentTimeMillis() + it * 1000 },
             armoredPublicKey = armoredPublic,
-            revocationCertificate = null
+            // 4.8.0 RC11 (#109): pre-cached as plain Generate does. An algo-35 key
+            // stays without one, like generateV4Algo35Key.
+            revocationCertificate = if (key.hasV4Algo35) null else precacheRevocation(
+                org.bouncycastle.openpgp.PGPSecretKeyRing(key.secret, org.bouncycastle.openpgp.operator.bc.BcKeyFingerprintCalculator()),
+                passphrase
+            )
         )
         dao.insert(entity)
         return entity
+    }
+
+    /**
+     * 4.8.0 RC11 (#109): the revocation certificate plain Generate pre-caches
+     * (reason "no reason"), for composed keys too. Null when it cannot be made;
+     * Revoke makes a fresh one then.
+     */
+    private fun precacheRevocation(secretRing: org.bouncycastle.openpgp.PGPSecretKeyRing, passphrase: String?): String? = try {
+        revocation.generateRevocationCertificate(
+            secretKeyRing = secretRing,
+            reason = RevocationReason.NO_REASON,
+            comment = null,
+            passphrase = passphrase
+        )
+    } catch (_: Exception) {
+        null
     }
 
     // ── Import ─────────────────────────────────────────────────────────
@@ -3354,6 +3392,19 @@ class KeyRepository(
     ) = addSubkeyEdit(fingerprint, ClassicalSubkeyGen.sshAuthTypeFor(algorithm), expirationSeconds, passphrase)
 
     /**
+     * 4.8.0 RC11 (#109): the keygen "Authentication subkey" option, with the
+     * subkey type chosen by the caller (ClassicalSubkeyGen.authTypeFor): the
+     * primary's own algorithm and curve, or Ed25519 for SSH on a curve SSH
+     * has no type for.
+     */
+    suspend fun addAuthSubkeyAtGeneration(
+        fingerprint: String,
+        type: ClassicalSubkeyGen.ClassicalSubkeyType,
+        expirationSeconds: Long?,
+        passphrase: String?
+    ) = addSubkeyEdit(fingerprint, type, expirationSeconds, passphrase)
+
+    /**
      * Add a classical subkey (RSA / Ed25519 / X25519) to an existing
      * software key pair. Mirrors setKeyExpirationSoftware's shape: load
      * both rings, hand them to the crypto layer (ClassicalSubkeyGen),
@@ -3549,6 +3600,12 @@ class KeyRepository(
             throw ClassicalSubkeyGen.SubkeyAddError(
                 "A v4 key supports the ML-KEM-768 (algorithm 35) post-quantum subkey only"
             )
+        }
+        // 4.8.0 RC11 (#109): the algorithm 35 binding is an EdDSA signature made by
+        // hand, so only an Ed25519 primary can sign it. Add subkey no longer offers
+        // it on an RSA or ECDSA key; this stops any other way in.
+        if (secRing.publicKey.algorithm != org.bouncycastle.bcpg.PublicKeyAlgorithmTags.EDDSA_LEGACY) {
+            throw ClassicalSubkeyGen.SubkeyAddError("An ML-KEM-768 subkey on a v4 key needs an Ed25519 primary")
         }
         val rings = com.pgpony.android.crypto.pqc.CompositeKeyGen.addV4Algo35SubkeyRings(
             baseSecretRing = secRing,

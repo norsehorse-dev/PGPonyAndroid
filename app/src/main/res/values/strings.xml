@@ -631,18 +631,12 @@
     <string name="keyring_generate_algorithm_group_classical">Classical</string>
     <string name="keyring_generate_algorithm_group_pqc">Post-Quantum</string>
     <string name="keyring_generate_algorithm_group_interop">Interop / compatibility</string>
-    <string name="keyring_generate_algorithm_group_advanced">Advanced / compatibility</string>
     <string name="keyring_generate_algorithm_caption_pqc_v4">Post-quantum encryption with the widest reach. A standard v4 Ed25519 key that every OpenPGP tool already handles, carrying a post-quantum ML-KEM-768 encryption subkey alongside a classical one, so older software can still encrypt to you while up-to-date tools use ML-KEM. The recommended choice for post-quantum encryption that works with real correspondents. Private-key backup for this shape is not available yet.</string>
     <string name="keyring_generate_algorithm_caption_pqc_sign">Fully post-quantum with no classical fallback: an ML-DSA signing identity plus an ML-KEM encryption subkey on a modern v6 key (RFC 9980). Both signing and encryption resist quantum attacks, and because the key carries no weaker classical subkey there is nothing to downgrade to. Only up-to-date OpenPGP software can use it.</string>
     <string name="keyring_generate_algorithm_caption_pqc_librepgp">For GnuPG / LibrePGP interop only. This is the LibrePGP format GnuPG 2.5.x uses: ML-KEM (which GnuPG still calls Kyber) plus an elliptic curve, shown by gpg as ky768_cv25519 and ky1024_cv448. It is effectively GnuPG-only and is not broadly interoperable, so choose it only to exchange keys with GnuPG. For wider reach, use the RFC 9980 post-quantum option instead. ML-KEM-1024 is the higher-strength option.</string>
     <string name="keyring_generate_granular_toggle">Advanced: compose subkeys</string>
     <string name="keyring_generate_granular_include_default">Include default encryption subkey</string>
     <string name="keyring_generate_granular_add_subkey">Add subkey</string>
-    <string name="keyring_generate_granular_base_label">Base key</string>
-    <string name="keyring_generate_granular_base_v6">OpenPGP v6</string>
-    <string name="keyring_generate_granular_base_v4">OpenPGP v4</string>
-    <string name="keyring_generate_granular_dropped_for_v4">A v4 key can\'t hold some of the subkeys you picked, so they were removed.</string>
-    <string name="keyring_generate_granular_include_default_caption">Adds a classical X25519 encryption subkey next to the ones you pick.</string>
     <string name="keyring_generate_expiration_label">Expiration</string>
     <string name="keyring_generate_passphrase_label">Passphrase (optional)</string>
     <string name="keyring_generate_passphrase_confirm_label">Confirm Passphrase</string>
@@ -943,8 +937,6 @@
     <string name="key_detail_add_subkey_type_rsa_4096_encrypt">RSA 4096 (Encrypt)</string>
     <string name="key_detail_add_subkey_type_ed25519_sign">Ed25519 (Sign)</string>
     <string name="key_detail_add_subkey_type_x25519_encrypt">X25519 (Encrypt)</string>
-    <string name="key_detail_add_subkey_group_classical">Classical</string>
-    <string name="key_detail_add_subkey_group_pq">Post-Quantum</string>
     <string name="key_detail_add_subkey_type_mlkem768">ML-KEM-768 (Encrypt)</string>
     <string name="key_detail_add_subkey_type_mlkem1024">ML-KEM-1024 (Encrypt)</string>
     <string name="key_detail_add_subkey_type_mldsa65">ML-DSA-65 (Sign)</string>
@@ -2239,9 +2231,6 @@
     <string name="ssh_keypicker_empty">None of your keys has an SSH authentication subkey, and there are no SSH keys. In PGPony, add an Authenticate subkey to a key pair, or make a key in Settings, SSH keys, then try again.</string>
     <string name="key_detail_action_copy_ssh_key">Copy SSH Public Key</string>
     <string name="key_detail_ssh_key_copied">SSH public key copied</string>
-    <string name="keyring_generate_ssh_auth_toggle">Add SSH authentication subkey</string>
-    <string name="keyring_generate_ssh_auth_caption">A subkey for signing in to servers over SSH through an ssh-agent bridge: RSA on an RSA key, ECDSA on a NIST ECDSA key, Ed25519 on any other key.</string>
-    <string name="keyring_generate_ssh_auth_failed">Key created, but the SSH subkey could not be added: %1$s. You can add it from Key Detail.</string>
     <!-- 4.6.0 (item 16): SSH from Termux via the OkcAgent fork -->
     <string name="ssh_help_title">SSH from Termux</string>
     <string name="ssh_help_row_subtitle">Use your PGPony keys with ssh and git in Termux</string>
@@ -3304,10 +3293,35 @@
     <string name="key_detail_add_subkey_group_sign">Signing</string>
     <string name="key_detail_add_subkey_group_auth">Authentication</string>
     <string name="key_detail_add_subkey_group_encrypt">Encryption</string>
-    <string name="key_detail_add_subkey_curve_label">Curve for ECDSA and ECDH</string>
     <string name="key_detail_add_subkey_type_ecdsa_sign">ECDSA %1$s (Sign)</string>
     <string name="key_detail_add_subkey_type_ecdsa_auth">ECDSA %1$s (Authenticate)</string>
     <string name="key_detail_add_subkey_type_ecdh_encrypt">ECDH %1$s (Encrypt)</string>
     <string name="key_detail_add_subkey_ecdsa_ssh_note">SSH takes ECDSA on the NIST curves only. On this curve, an Authenticate subkey is for a security key.</string>
-    <string name="keyring_generate_granular_dropped_for_v6">A v6 key can\'t hold some of the subkeys you picked, so they were removed.</string>
+    <!-- 4.8.0 RC11 (#109) -->
+    <string name="keyring_generate_auth_toggle">Authentication subkey</string>
+    <string name="keyring_generate_auth_caption">Adds %1$s, for logging in over SSH through an ssh-agent bridge or from a security key\'s authentication slot.</string>
+    <string name="keyring_generate_auth_caption_choice">Adds an authentication subkey: on %1$s for a security key, or Ed25519 for SSH, which has no key type for %1$s.</string>
+    <string name="keyring_generate_auth_same_curve">Same curve (for a security key)</string>
+    <string name="keyring_generate_auth_ed25519">Ed25519 (for SSH)</string>
+    <string name="keyring_generate_auth_failed">Key created, but the authentication subkey could not be added: %1$s. You can add it from Key Detail.</string>
+    <string name="keyring_generate_granular_primary_caption">Primary: %1$s, OpenPGP v%2$d. The version follows the primary: %3$s makes a v6 key, every other type a v4 key.</string>
+    <string name="keyring_generate_granular_unavailable">Compose subkeys builds on a classical primary. For post-quantum subkeys, pick %1$s, or %2$s to add an ML-KEM-768 subkey.</string>
+    <string name="keyring_generate_granular_include_default_caption_format">Adds %1$s, the encryption subkey this key type gets by default.</string>
+    <string name="keyring_generate_auth_caption_choice_on">SSH has no key type for %1$s. Pick what this subkey is for:</string>
+    <string name="keyring_generate_granular_card_note">Security keys differ in which curves they hold, so check that yours takes %1$s before moving the key to it.</string>
+    <string name="keyring_generate_granular_certify_only">Primary certifies only</string>
+    <!-- 4.8.0 RC11 (#109): the subkey picker's rows, and the picker group for RSA, ECDSA and the LibrePGP keys. -->
+    <string name="key_detail_add_subkey_use_label">Used for</string>
+    <string name="key_detail_add_subkey_curve_heading">Curve</string>
+    <string name="key_detail_add_subkey_size_label">Key size</string>
+    <string name="key_detail_add_subkey_level_label">Security level</string>
+    <string name="keyring_generate_algorithm_group_rsa_ecdsa">RSA, ECDSA and LibrePGP</string>
+    <string name="keyring_generate_granular_certify_only_caption">For a security key: the primary only certifies and stays off the card, and signing, encryption and authentication go to subkeys.</string>
+    <string name="keyring_generate_granular_fixed_v6">A v6 primary only certifies, so the key always gets %1$s.</string>
+    <string name="keyring_generate_granular_fixed_signing">The primary only certifies, so %1$s is added to sign.</string>
+    <string name="keyring_generate_granular_remove_cd">Remove subkey</string>
+    <plurals name="keyring_generate_granular_dropped_named">
+        <item quantity="one">Removed because the primary you picked can\'t hold it: %1$s.</item>
+        <item quantity="other">Removed because the primary you picked can\'t hold them: %1$s.</item>
+    </plurals>
 </resources>
