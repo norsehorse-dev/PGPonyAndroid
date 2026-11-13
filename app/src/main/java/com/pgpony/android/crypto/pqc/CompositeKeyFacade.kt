@@ -649,6 +649,45 @@ object CompositeKeyFacade {
         return out
     }
 
+    /**
+     * 4.8.0: the key flags on a composite primary's newest self-signature (its
+     * direct-key signature or a User ID certification it made), as the wire
+     * key-flags octet, or null when no self-signature carries any. Key Details
+     * shows these as the primary's Usage; Bouncy Castle cannot load an
+     * algo-30/31 primary, so the BC reader it uses for other keys came back
+     * empty and the row was missing on ML-DSA keys. Only signatures before the
+     * first subkey whose issuer fingerprint is the primary's own are read;
+     * a third party's certification of a User ID is skipped.
+     */
+    fun primaryKeyFlags(ring: ByteArray): Int? {
+        val pkts = walk(ring)
+        val primaryIdx = pkts.indexOfFirst { it.tag == 5 || it.tag == 6 }
+        if (primaryIdx < 0 || pkts[primaryIdx].body.firstOrNull()?.toInt() != 6) return null
+        val primaryFp = v6Fingerprint(publicKeyBody(pkts[primaryIdx].body))
+        var newestTime = -1L
+        var flags: Int? = null
+        for (j in primaryIdx + 1 until pkts.size) {
+            val pkt = pkts[j]
+            if (pkt.tag == 7 || pkt.tag == 14) break
+            if (pkt.tag != 2) continue
+            val body = pkt.body
+            if (body.size < 8 || body[0].toInt() != 6) continue
+            val type = body[1].toInt() and 0xFF
+            if (type != 0x1F && type !in 0x10..0x13) continue
+            val area = v6HashedArea(body)
+            val issuer = findSubpacket(area, 33) ?: continue
+            if (issuer.size != 33 || !issuer.copyOfRange(1, 33).contentEquals(primaryFp)) continue
+            val kf = findSubpacket(area, 27)?.takeIf { it.isNotEmpty() } ?: continue
+            val created = findSubpacket(area, 2)?.takeIf { it.size >= 4 }
+                ?.let { beInt(it, 0).toLong() and 0xFFFFFFFFL } ?: 0L
+            if (created > newestTime) {
+                newestTime = created
+                flags = kf[0].toInt() and 0xFF
+            }
+        }
+        return flags
+    }
+
     /** The hashed subpacket area of a v6 signature packet body. */
     private fun v6HashedArea(sigBody: ByteArray): ByteArray {
         val hlen = beInt(sigBody, 4)

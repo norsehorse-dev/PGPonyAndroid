@@ -1,0 +1,1 @@
+ECDSA keys on NIST, brainpool and secp256k1 curves, and a subkey composer for security keys. Trusted introducers (gpg tsign), recipient groups, faster QR key exchange, Encrypt and Sign from selected text, experimental ML-DSA-44 SSH keys, Korean and Polish. Fixes for ML-DSA signing, ADSKs and authentication-slot decryption on security keys, and duplicate keys in the keyring.

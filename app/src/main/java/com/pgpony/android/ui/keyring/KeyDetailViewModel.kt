@@ -535,7 +535,13 @@ class KeyDetailViewModel(
                 keyServerCheck = loaded?.let { com.pgpony.android.data.KeyServerCheckStore.last(it.fingerprint) },
                 primaryUsage = loaded?.let { e ->
                     withContext(Dispatchers.IO) {
-                        repo.loadPublicKeyRing(e.fingerprint)?.publicKey?.let { primaryUsageOf(it) }
+                        // 4.8.0: Bouncy Castle cannot load a composite ML-DSA
+                        // primary, so its flags are read from the packets.
+                        if (e.algorithm.isCompositeSign) {
+                            repo.compositePrimaryKeyFlags(e.fingerprint)?.let { SubkeyCapability.fromBcKeyFlags(it) }
+                        } else {
+                            repo.loadPublicKeyRing(e.fingerprint)?.publicKey?.let { primaryUsageOf(it) }
+                        }
                     }
                 },
                 certifications = loaded?.let { runCatching { repo.certificationsOf(it.fingerprint) }.getOrNull() }.orEmpty(),

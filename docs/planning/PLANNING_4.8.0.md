@@ -955,6 +955,11 @@ RC11 (added Nov 11): 4x after the RC10 comments (#109): compose subkeys on the p
 Authentication subkey on the primary's own algorithm and curve, no ML-KEM-768 on an RSA or ECDSA key, and the UX
 pass in 4x. RC11 also carries the BackupFormat.kt move above, so it is the build that move needed.
 
+Release (Nov 12): RC11 was confirmed on #109. One fix goes into the release without an RC of its own: Key Details had
+no Usage row on an ML-DSA key, because the row read the primary through Bouncy Castle, which cannot load an algo-30/31
+primary. CompositeKeyFacade.primaryKeyFlags reads the newest self-signature's key flags from the packets
+(CompositePrimaryKeyFlagsTest). Reported by email on 4.7.3.
+
 Not in an RC: the section 6 carry-overs unless one comes up on its own, and the in-app viewer for decrypted files
 (4b), which is not planned yet.
 

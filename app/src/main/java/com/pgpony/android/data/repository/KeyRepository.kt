@@ -1772,6 +1772,14 @@ class KeyRepository(
         } catch (_: Exception) { null }
     }
 
+    /** 4.8.0: a composite primary's key flags, for the Usage row in Key Details. */
+    fun compositePrimaryKeyFlags(fingerprint: String): Int? {
+        val data = store.loadPublicKey(fingerprint) ?: return null
+        return try {
+            CompositeKeyFacade.primaryKeyFlags(data)
+        } catch (_: Exception) { null }
+    }
+
     /** #55: every subkey on a composite primary, for the Key Detail list. */
     fun loadCompositeSubkeys(fingerprint: String): List<CompositeKeyFacade.SubkeyDescriptor> {
         val data = store.loadPublicKey(fingerprint) ?: return emptyList()
