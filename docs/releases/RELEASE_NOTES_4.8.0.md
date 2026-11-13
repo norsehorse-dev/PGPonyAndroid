@@ -187,3 +187,24 @@ as failed imports.
 
 The backup format is written up in docs/PGPONY_BACKUP_FORMAT.md, and the pairing skip check, the export file name
 rule and the backup format constants are in code PGPony Desktop 4.0.0 shares.
+
+## Verify this build
+
+Whole-file SHA-256 (is this download the published file):
+
+```
+a78e22a4b896bbd406b3fd2f7187e8280d28f93af54c731f08f2c124c7ed497e
+```
+
+Content hash (for rebuilders; excludes signature, see docs/REPRODUCIBLE_BUILDS_PLAYBOOK.md):
+
+```
+01058d37d0fb78a4bb7511d8276712f298a04f30b0cc1b2f7a3f1d83c7bb329e
+```
+
+The APK is signed with the NorseHorse release key
+(A0CBC8F65AACE56F1C5B767753F9798E4919DE62); the detached signature is attached to
+this release, along with the armored release key (NorseHorse-release-key.asc) and
+PGPony-4.8.0-signing-keys.txt with the OpenPGP fingerprint and the APK signing certificate's SHA-256. Check the
+fingerprint against pgpony.app, keys.openpgp.org or keys.pgpony.app rather than trusting the copy in the release
+alone.
