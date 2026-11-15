@@ -323,6 +323,15 @@ class PGPonyOpenPgpService : Service() {
             }
         }
 
+        // 4.8.1 (#121): the user's armor comment setting, read fresh for every
+        // operation. This process skips ArmorCommentStore.startCaching, so
+        // ArmorCommentHeader.current holds the seeded default until it is read
+        // from disk. #57 refreshed it before encrypting only, so a signature
+        // (clear-signed or detached, as K-9 sends) kept the default comment
+        // with the setting off. The card activities run in this process too
+        // and use the same value.
+        refreshArmorComment()
+
         // 4) Action dispatch.
         return when (data.action) {
             OpenPgpApi.ACTION_CHECK_PERMISSION -> successResult()
@@ -593,6 +602,15 @@ class PGPonyOpenPgpService : Service() {
             .getSharedPreferences("pgpony_prefs", android.content.Context.MODE_MULTI_PROCESS)
             .getBoolean("allow_expired_keys", false)
 
+    /** 4.8.1 (#121): re-read the armor comment setting from disk (see the dispatch). */
+    private fun refreshArmorComment() {
+        runBlocking {
+            runCatching {
+                com.pgpony.android.data.ArmorCommentStore.get(applicationContext).refreshFromDisk()
+            }
+        }
+    }
+
     /** ACTION_ENCRYPT / ACTION_SIGN_AND_ENCRYPT. */
     private fun encryptOp(
         data: Intent,
@@ -609,23 +627,6 @@ class PGPonyOpenPgpService : Service() {
         }
         val armor = data.getBooleanExtra(OpenPgpApi.EXTRA_REQUEST_ASCII_ARMOR, false)
         val filename = data.getStringExtra(OpenPgpApi.EXTRA_ORIGINAL_FILENAME)
-
-        // #57: this runs in the :remote_api process, which
-        // skips ArmorCommentStore.startCaching (no long-lived DataStore
-        // collector in a second process), so ArmorCommentHeader.current was
-        // stuck on the seeded default and every armored message from the
-        // OpenPGP API carried the default comment regardless of the user's
-        // setting. Refresh it once from disk before building armored output.
-        // Read-only and only when armor is requested (the comment applies to
-        // armored output only).
-        if (armor) {
-            runBlocking {
-                runCatching {
-                    com.pgpony.android.data.ArmorCommentStore.get(applicationContext)
-                        .refreshFromDisk()
-                }
-            }
-        }
 
         // Recipients: EXTRA_KEY_IDS (already-resolved ids) and/or
         // EXTRA_USER_IDS (email addresses), deduped by fingerprint.

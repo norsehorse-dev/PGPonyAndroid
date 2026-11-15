@@ -433,7 +433,8 @@ fun KeyDetailScreen(
                             }
                             // 4.7.0 (item 51, #86): re-sign with a current hash.
                             // 4.8.0 (#71): also with the primary on the security key.
-                            if ((menuKey.isKeyPair && state.primaryStub == null && !menuKey.algorithm.isCompositeSign) ||
+                            // 4.8.1: and on ML-DSA keys.
+                            if ((menuKey.isKeyPair && state.primaryStub == null) ||
                                 state.cardPrimaryEdits
                             ) {
                                 DropdownMenuItem(

@@ -170,6 +170,12 @@ object CompositePrimaryKeyGen {
         val certHashed = ByteArrayOutputStream().apply {
             write(subpacket(SUBPKT_CREATION_TIME or 0x80, uint32(ctime)))
             write(subpacket(SUBPKT_KEY_FLAGS or 0x80, byteArrayOf((KEY_FLAG_CERTIFY or KEY_FLAG_SIGN).toByte())))
+            // 4.8.1: the certification carries the key's expiry too. Readers
+            // that take the primary's expiry from the newest self-signature of
+            // any kind (CertificateBindings does) otherwise found none here.
+            if (expirationSeconds != null && expirationSeconds > 0L) {
+                write(subpacket(SUBPKT_KEY_EXPIRE, uint32(expirationSeconds.toInt())))
+            }
             write(issuerFingerprintSubpacket(fingerprint))
         }.toByteArray()
         val certSig = compositeSignaturePacket(
@@ -307,6 +313,8 @@ object CompositePrimaryKeyGen {
         val certHashed = ByteArrayOutputStream().apply {
             write(subpacket(SUBPKT_CREATION_TIME or 0x80, uint32((creationTime.time / 1000L).toInt())))
             write(subpacket(SUBPKT_KEY_FLAGS or 0x80, byteArrayOf((KEY_FLAG_CERTIFY or KEY_FLAG_SIGN).toByte())))
+            // 4.8.1: the key's expiry, as the direct-key signature has it (see assemble).
+            info.expirationSeconds?.takeIf { it in 1..0xFFFFFFFFL }?.let { write(subpacket(SUBPKT_KEY_EXPIRE, uint32(it.toInt()))) }
             write(issuerFingerprintSubpacket(info.fingerprint))
         }.toByteArray()
         val certSig = compositeSignaturePacket(
@@ -544,6 +552,517 @@ object CompositePrimaryKeyGen {
         var q = 1 + 4 + 1
         val matLen = beInt(keyPacketBody, q); q += 4
         return keyPacketBody.copyOfRange(0, q + matLen)
+    }
+
+    // -- 4.8.1: self-signature edits on a composite primary -----------------
+    //
+    // Bouncy Castle cannot load an algo-30/31 primary, so the key edits that go
+    // through it (expiry, Refresh self-signatures, notations, the primary User
+    // ID, revoking the key or a User ID) failed on ML-DSA keys with "Secret key
+    // ring could not be loaded". These do the same edits on the raw packets with
+    // the composite signer. An edit replaces the newest self-signature of each
+    // component it touches with a new one, dated now, carrying the same hashed
+    // subpackets apart from the ones the edit changes; a revocation is added
+    // after the component's signatures. [ring] is the transferable secret key;
+    // [passphrase] unlocks a protected primary, and the returned ring keeps the
+    // original (protected) key packets, as addUserId's does.
+
+    private const val SIGTYPE_KEY_REVOCATION = 0x20
+    private const val SIGTYPE_CERT_REVOCATION = 0x30
+    private const val SUBPKT_ISSUER_KEY_ID = 16
+    private const val SUBPKT_NOTATION = 20
+    private const val SUBPKT_PRIMARY_USER_ID = 25
+
+    /** One key component (the primary, a User ID or a subkey) and its signatures. */
+    private class Component(
+        val kind: Kind,
+        /** The octets a signature over this component hashes before its trailer. */
+        val hashPrefix: ByteArray,
+        /** For a User ID, its text; for a subkey, its v6 fingerprint (lowercase hex). */
+        val label: String,
+        val keyCreatedSec: Long,
+        val sigSpans: List<PacketSpan>,
+        /** Where a new signature for this component goes (after its signatures). */
+        val endOffset: Int
+    ) {
+        enum class Kind { PRIMARY, USER_ID, SUBKEY }
+    }
+
+    private class Sig(val span: PacketSpan, val type: Int, val createdSec: Long, val hashed: ByteArray, val unhashed: ByteArray = ByteArray(0))
+
+    private fun componentsOf(ring: ByteArray, primaryPubBody: ByteArray): List<Component> {
+        val spans = packetSpans(ring)
+        val primaryFrame = keyFrame(primaryPubBody)
+        val primaryCreated = beInt(primaryPubBody, 1).toLong() and 0xFFFFFFFFL
+        val out = ArrayList<Component>()
+        var i = 0
+        while (i < spans.size) {
+            val s = spans[i]
+            val q: Quad? = when (s.tag) {
+                TAG_SECKEY, 6 -> Quad(Component.Kind.PRIMARY, primaryFrame, "", primaryCreated)
+                TAG_USERID -> Quad(
+                    Component.Kind.USER_ID,
+                    primaryFrame + byteArrayOf(0xB4.toByte()) + uint32(s.body.size) + s.body,
+                    String(s.body, Charsets.UTF_8),
+                    primaryCreated
+                )
+                TAG_SECSUBKEY, TAG_PUBSUBKEY -> {
+                    val sub = publicKeyBody(s.body)
+                    Quad(
+                        Component.Kind.SUBKEY,
+                        primaryFrame + keyFrame(sub),
+                        v6Fingerprint(sub).joinToString("") { "%02x".format(it) },
+                        beInt(sub, 1).toLong() and 0xFFFFFFFFL
+                    )
+                }
+                else -> null
+            }
+            if (q == null) { i++; continue }
+            var j = i + 1
+            val sigs = ArrayList<PacketSpan>()
+            while (j < spans.size && spans[j].tag == TAG_SIGNATURE) { sigs.add(spans[j]); j++ }
+            out.add(Component(q.kind, q.prefix, q.label, q.created, sigs, if (sigs.isEmpty()) s.end else sigs.last().end))
+            i = j
+        }
+        return out
+    }
+
+    private data class Quad(val kind: Component.Kind, val prefix: ByteArray, val label: String, val created: Long)
+
+    /**
+     * The v6 signatures in [c] that the primary made, with their type, creation
+     * time and hashed area. As CertificateBindings.issuedBy: a signature is the
+     * primary's when any issuer fingerprint or key ID in either area names it,
+     * or when it names no issuer at all.
+     */
+    private fun selfSigs(c: Component, primaryFingerprint: ByteArray): List<Sig> = c.sigSpans.mapNotNull { span ->
+        val b = span.body
+        if (b.size < 8 || b[0].toInt() != 6) return@mapNotNull null
+        val hLen = beInt(b, 4)
+        if (8 + hLen > b.size) return@mapNotNull null
+        val hashed = b.copyOfRange(8, 8 + hLen)
+        val subs = subpacketsOf(hashed)
+        val unhashed = if (8 + hLen + 4 <= b.size) {
+            val uLen = beInt(b, 8 + hLen)
+            if (uLen >= 0 && 8 + hLen + 4 + uLen <= b.size) b.copyOfRange(8 + hLen + 4, 8 + hLen + 4 + uLen) else ByteArray(0)
+        } else ByteArray(0)
+        val all = subs + subpacketsOf(unhashed)
+        val fps = all.filter { it.first == SUBPKT_ISSUER_FP && it.second.size > 1 }.map { it.second.copyOfRange(1, it.second.size) }
+        val ids = all.filter { it.first == SUBPKT_ISSUER_KEY_ID && it.second.size == 8 }.map { it.second }
+        val primaryKeyId = primaryFingerprint.copyOfRange(0, 8)
+        if ((fps.isNotEmpty() || ids.isNotEmpty()) &&
+            fps.none { it.contentEquals(primaryFingerprint) } && ids.none { it.contentEquals(primaryKeyId) }
+        ) return@mapNotNull null
+        val created = subs.firstOrNull { it.first == SUBPKT_CREATION_TIME }?.second
+            ?.takeIf { it.size >= 4 }?.let { beInt(it, 0).toLong() and 0xFFFFFFFFL } ?: 0L
+        Sig(span, b[1].toInt() and 0xFF, created, hashed, unhashed)
+    }
+
+    /** The hashed subpackets of [hashed] as (type without the critical bit, body, raw octets). */
+    private fun subpacketsOf(hashed: ByteArray): List<Triple<Int, ByteArray, ByteArray>> {
+        val out = ArrayList<Triple<Int, ByteArray, ByteArray>>()
+        var i = 0
+        while (i < hashed.size) {
+            val start = i
+            val l0 = hashed[i++].toInt() and 0xFF
+            val len = when {
+                l0 < 192 -> l0
+                l0 < 255 -> ((l0 - 192) shl 8) + (hashed[i++].toInt() and 0xFF) + 192
+                else -> beInt(hashed, i).also { i += 4 }
+            }
+            if (len < 1 || i + len > hashed.size) break
+            val type = hashed[i].toInt() and 0x7F
+            out.add(Triple(type, hashed.copyOfRange(i + 1, i + len), hashed.copyOfRange(start, i + len)))
+            i += len
+        }
+        return out
+    }
+
+    /** The newest of [sigs] whose type is in [types], or null. */
+    private fun newest(sigs: List<Sig>, types: Set<Int>): Sig? =
+        sigs.filter { it.type in types }.maxByOrNull { it.createdSec }
+
+    private val CERT_TYPES = setOf(0x10, 0x11, 0x12, 0x13)
+
+    /**
+     * New hashed subpackets for a replacement of [old]: a fresh creation time,
+     * the issuer fingerprint, then every other subpacket of [old] that [drop]
+     * doesn't name, then [add].
+     */
+    private fun rebuiltHashed(old: Sig, primaryFingerprint: ByteArray, nowSec: Long, drop: Set<Int>, add: List<ByteArray>): ByteArray =
+        ByteArrayOutputStream().apply {
+            write(subpacket(SUBPKT_CREATION_TIME or 0x80, uint32(nowSec.toInt())))
+            for ((type, _, raw) in subpacketsOf(old.hashed)) {
+                if (type == SUBPKT_CREATION_TIME || type == SUBPKT_ISSUER_FP || type == SUBPKT_ISSUER_KEY_ID) continue
+                if (type in drop) continue
+                write(raw)
+            }
+            for (a in add) write(a)
+            // A back-signature (embedded signature) kept in the unhashed area,
+            // as GnuPG does, moves into the hashed area, since the new
+            // signature has no unhashed subpackets. It authenticates itself.
+            if (subpacketsOf(old.hashed).none { it.first == SUBPKT_EMBEDDED_SIG }) {
+                for ((type, _, raw) in subpacketsOf(old.unhashed)) if (type == SUBPKT_EMBEDDED_SIG) write(raw)
+            }
+            write(issuerFingerprintSubpacket(primaryFingerprint))
+        }.toByteArray()
+
+    /** A Key Expiration Time subpacket for [expiresAtSec] on a key created at [keyCreatedSec]. */
+    private fun expirySubpacket(keyCreatedSec: Long, expiresAtSec: Long): ByteArray {
+        val secs = expiresAtSec - keyCreatedSec
+        require(secs in 1..0xFFFFFFFFL) { "The expiry must be after the key was created" }
+        return subpacket(SUBPKT_KEY_EXPIRE, uint32(secs.toInt()))
+    }
+
+    /**
+     * For a User ID certification an edit replaces: the Key Expiration Time
+     * of the primary's newest direct-key signature, so the certification
+     * (often the newest self-signature after the edit) states the same expiry.
+     * The first is what to drop, the second what to add; nothing when the
+     * primary has no direct-key signature.
+     */
+    private fun uidExpirySync(comps: List<Component>, fp: ByteArray): Pair<Set<Int>, List<ByteArray>> {
+        val primary = comps.firstOrNull { it.kind == Component.Kind.PRIMARY } ?: return emptySet<Int>() to emptyList()
+        val direct = newest(selfSigs(primary, fp), setOf(SIGTYPE_DIRECT_KEY)) ?: return emptySet<Int>() to emptyList()
+        val raw = subpacketsOf(direct.hashed).firstOrNull { it.first == SUBPKT_KEY_EXPIRE }?.third
+        return setOf(SUBPKT_KEY_EXPIRE) to listOfNotNull(raw)
+    }
+
+    private class Replacement(val remove: PacketSpan?, val insertAt: Int, val packet: ByteArray)
+
+    /** [ring] with each replacement's old signature swapped for its new one,
+     *  and each revocation (no old signature) inserted at its offset. */
+    private fun applyReplacements(ring: ByteArray, edits: List<Replacement>): ByteArray {
+        val ops = edits.map { e -> Triple(e.remove?.start ?: e.insertAt, e.remove?.end ?: e.insertAt, e.packet) }
+            .sortedWith(compareBy<Triple<Int, Int, ByteArray>>({ it.first }, { it.second }))
+        val out = ByteArrayOutputStream()
+        var pos = 0
+        for ((start, end, packet) in ops) {
+            require(start >= pos) { "overlapping key edits" }
+            out.write(ring, pos, start - pos)
+            out.write(packet)
+            pos = end
+        }
+        out.write(ring, pos, ring.size - pos)
+        return out.toByteArray()
+    }
+
+    /** What an expiry edit changes. */
+    sealed class ExpiryTarget {
+        /** The primary (its direct-key signature and every live User ID's
+         *  certification), and with [subkeys] also these subkeys (v6
+         *  fingerprints, lowercase hex). */
+        data class Primary(val subkeys: Set<String> = emptySet()) : ExpiryTarget()
+        /** One subkey's binding. */
+        data class Subkey(val fingerprintHex: String) : ExpiryTarget()
+    }
+
+    /**
+     * Set or remove the expiry of a composite primary or one of its subkeys.
+     * [expiresAtEpochSeconds] null means never. For the primary, the newest
+     * direct-key signature and each live User ID's newest certification are
+     * replaced; with subkeys listed, each one's newest binding too.
+     */
+    fun setExpiry(
+        ring: ByteArray,
+        target: ExpiryTarget,
+        expiresAtEpochSeconds: Long?,
+        passphrase: CharArray? = null,
+        random: SecureRandom = SecureRandom(),
+        now: Date = Date()
+    ): ByteArray {
+        val ctx = primaryContext(ring, passphrase)
+        val nowSec = now.time / 1000L
+        val comps = componentsOf(ring, ctx.pubBody)
+        val wantSubkeys: Set<String> = when (target) {
+            is ExpiryTarget.Primary -> target.subkeys.map { it.lowercase() }.toSet()
+            is ExpiryTarget.Subkey -> setOf(target.fingerprintHex.lowercase())
+        }
+        if (target is ExpiryTarget.Subkey && comps.none { it.kind == Component.Kind.SUBKEY && it.label == target.fingerprintHex.lowercase() }) {
+            throw IllegalArgumentException("subkey not found in this key")
+        }
+        val edits = ArrayList<Replacement>()
+        for (c in comps) {
+            val sigs = selfSigs(c, ctx.fingerprint)
+            val old: Sig = when (c.kind) {
+                Component.Kind.PRIMARY -> if (target is ExpiryTarget.Primary) newest(sigs, setOf(SIGTYPE_DIRECT_KEY)) else null
+                Component.Kind.USER_ID -> if (target is ExpiryTarget.Primary && newest(sigs, setOf(SIGTYPE_CERT_REVOCATION)) == null)
+                    newest(sigs, CERT_TYPES) else null
+                Component.Kind.SUBKEY -> if (c.label in wantSubkeys && newest(sigs, setOf(SIGTYPE_SUBKEY_REVOCATION)) == null)
+                    newest(sigs, setOf(SIGTYPE_SUBKEY_BINDING)) else null
+            } ?: continue
+            val add = expiresAtEpochSeconds?.let { listOf(expirySubpacket(c.keyCreatedSec, it)) } ?: emptyList()
+            val hashed = rebuiltHashed(old, ctx.fingerprint, nowSec, setOf(SUBPKT_KEY_EXPIRE), add)
+            val packet = compositeSignaturePacket(ctx.suite, ctx.secret, old.type, c.hashPrefix, hashed, random)
+            edits.add(Replacement(old.span, old.span.start, packet))
+        }
+        // An edit that would change nothing (a revoked subkey, or no
+        // self-signature to replace) is refused rather than reported as done.
+        require(edits.isNotEmpty()) {
+            if (target is ExpiryTarget.Subkey) "This subkey is revoked or has no binding to change"
+            else "This key has no self-signature to change"
+        }
+        return applyReplacements(ring, edits)
+    }
+
+    /**
+     * Refresh self-signatures: replace the newest self-signature of the
+     * primary, of each live User ID and of each subkey that is not revoked
+     * with a new one dated now, each keeping its own subpackets (and so its
+     * own expiry). Nothing expires or comes back to life.
+     */
+    fun refreshSelfSignatures(
+        ring: ByteArray,
+        passphrase: CharArray? = null,
+        random: SecureRandom = SecureRandom(),
+        now: Date = Date()
+    ): ByteArray {
+        val ctx = primaryContext(ring, passphrase)
+        val nowSec = now.time / 1000L
+        val edits = ArrayList<Replacement>()
+        val comps = componentsOf(ring, ctx.pubBody)
+        val (syncDrop, syncAdd) = uidExpirySync(comps, ctx.fingerprint)
+        for (c in comps) {
+            val sigs = selfSigs(c, ctx.fingerprint)
+            val old: Sig = when (c.kind) {
+                Component.Kind.PRIMARY -> newest(sigs, setOf(SIGTYPE_DIRECT_KEY))
+                Component.Kind.USER_ID -> if (newest(sigs, setOf(SIGTYPE_CERT_REVOCATION)) == null) newest(sigs, CERT_TYPES) else null
+                Component.Kind.SUBKEY -> if (newest(sigs, setOf(SIGTYPE_SUBKEY_REVOCATION)) == null) newest(sigs, setOf(SIGTYPE_SUBKEY_BINDING)) else null
+            } ?: continue
+            val uid = c.kind == Component.Kind.USER_ID
+            val hashed = rebuiltHashed(old, ctx.fingerprint, nowSec, if (uid) syncDrop else emptySet(), if (uid) syncAdd else emptyList())
+            val packet = compositeSignaturePacket(ctx.suite, ctx.secret, old.type, c.hashPrefix, hashed, random)
+            edits.add(Replacement(old.span, old.span.start, packet))
+        }
+        require(edits.isNotEmpty()) { "This key has no self-signature to refresh" }
+        return applyReplacements(ring, edits)
+    }
+
+    /**
+     * Mark [userId] as the primary User ID: its newest certification is
+     * replaced with one carrying Primary User ID, and every other live User
+     * ID whose newest certification carries that flag gets one without it.
+     */
+    fun setPrimaryUserId(
+        ring: ByteArray,
+        userId: String,
+        passphrase: CharArray? = null,
+        random: SecureRandom = SecureRandom(),
+        now: Date = Date()
+    ): ByteArray {
+        val ctx = primaryContext(ring, passphrase)
+        val nowSec = now.time / 1000L
+        val all = componentsOf(ring, ctx.pubBody)
+        val (syncDrop, syncAdd) = uidExpirySync(all, ctx.fingerprint)
+        val comps = all.filter { it.kind == Component.Kind.USER_ID }
+        require(comps.any { it.label == userId }) { "User ID not found in this key" }
+        val edits = ArrayList<Replacement>()
+        var targetDone = false
+        for (c in comps) {
+            val sigs = selfSigs(c, ctx.fingerprint)
+            if (newest(sigs, setOf(SIGTYPE_CERT_REVOCATION)) != null) continue
+            val old = newest(sigs, CERT_TYPES) ?: continue
+            val flagged = subpacketsOf(old.hashed).any { it.first == SUBPKT_PRIMARY_USER_ID && it.second.firstOrNull()?.toInt() != 0 }
+            val target = c.label == userId
+            if (!target && !flagged) continue
+            val add = (if (target) listOf(subpacket(SUBPKT_PRIMARY_USER_ID, byteArrayOf(1))) else emptyList()) + syncAdd
+            val hashed = rebuiltHashed(old, ctx.fingerprint, nowSec, setOf(SUBPKT_PRIMARY_USER_ID) + syncDrop, add)
+            val packet = compositeSignaturePacket(ctx.suite, ctx.secret, old.type, c.hashPrefix, hashed, random)
+            edits.add(Replacement(old.span, old.span.start, packet))
+            if (target) targetDone = true
+        }
+        require(targetDone) { "That User ID is revoked or has no certification to change" }
+        return applyReplacements(ring, edits)
+    }
+
+    /**
+     * Replace the notations on the primary User ID's newest certification
+     * with [notations] (name to value, human-readable), as the Bouncy Castle
+     * path does for other keys. The primary User ID is the one flagged so,
+     * else the first live one.
+     */
+    fun setNotations(
+        ring: ByteArray,
+        notations: List<Pair<String, String>>,
+        passphrase: CharArray? = null,
+        random: SecureRandom = SecureRandom(),
+        now: Date = Date()
+    ): ByteArray {
+        val ctx = primaryContext(ring, passphrase)
+        val nowSec = now.time / 1000L
+        val target = primaryUserIdComponent(ring, ctx) ?: throw IllegalArgumentException("Key has no primary User ID")
+        val (c, old) = target
+        val (syncDrop, syncAdd) = uidExpirySync(componentsOf(ring, ctx.pubBody), ctx.fingerprint)
+        val add = notations.map { (name, value) ->
+            val n = name.toByteArray(Charsets.UTF_8)
+            val v = value.toByteArray(Charsets.UTF_8)
+            subpacket(
+                SUBPKT_NOTATION,
+                byteArrayOf(0x80.toByte(), 0, 0, 0) +
+                    byteArrayOf((n.size shr 8).toByte(), n.size.toByte(), (v.size shr 8).toByte(), v.size.toByte()) + n + v
+            )
+        }
+        val hashed = rebuiltHashed(old, ctx.fingerprint, nowSec, setOf(SUBPKT_NOTATION) + syncDrop, add + syncAdd)
+        val packet = compositeSignaturePacket(ctx.suite, ctx.secret, old.type, c.hashPrefix, hashed, random)
+        return applyReplacements(ring, listOf(Replacement(old.span, old.span.start, packet)))
+    }
+
+    /** The human-readable notations on the primary User ID's newest certification. */
+    fun readNotations(ring: ByteArray): List<Pair<String, String>> {
+        val pkts = packetSpans(ring)
+        val primary = pkts.firstOrNull { it.tag == TAG_SECKEY || it.tag == 6 } ?: return emptyList()
+        if (primary.body.firstOrNull()?.toInt() != 6) return emptyList()
+        val pub = publicKeyBody(primary.body)
+        val fp = v6Fingerprint(pub)
+        val comps = componentsOf(ring, pub).filter { it.kind == Component.Kind.USER_ID }
+        val (_, sig) = pickPrimaryUserId(comps, fp) ?: return emptyList()
+        return subpacketsOf(sig.hashed).filter { it.first == SUBPKT_NOTATION }.mapNotNull { (_, b, _) ->
+            if (b.size < 8 || (b[0].toInt() and 0x80) == 0) return@mapNotNull null
+            val nl = ((b[4].toInt() and 0xFF) shl 8) or (b[5].toInt() and 0xFF)
+            val vl = ((b[6].toInt() and 0xFF) shl 8) or (b[7].toInt() and 0xFF)
+            if (8 + nl + vl > b.size) return@mapNotNull null
+            String(b, 8, nl, Charsets.UTF_8) to String(b, 8 + nl, vl, Charsets.UTF_8)
+        }
+    }
+
+    /** The primary User ID: the live one whose newest certification is
+     *  flagged primary (the newest such), else the first live one. */
+    fun primaryUserIdOf(ring: ByteArray): String? {
+        val pkts = packetSpans(ring)
+        val primary = pkts.firstOrNull { it.tag == TAG_SECKEY || it.tag == 6 } ?: return null
+        if (primary.body.firstOrNull()?.toInt() != 6) return null
+        val pub = publicKeyBody(primary.body)
+        return pickPrimaryUserId(componentsOf(ring, pub).filter { it.kind == Component.Kind.USER_ID }, v6Fingerprint(pub))?.first?.label
+    }
+
+    /** 4.8.1: one User ID of a composite key as Key Details lists it. */
+    data class UserIdState(val userId: String, val isPrimary: Boolean, val isRevoked: Boolean)
+
+    /** 4.8.1: every User ID in ring order, with which is primary and which the primary revoked. */
+    fun userIdStates(ring: ByteArray): List<UserIdState> {
+        val pkts = packetSpans(ring)
+        val primary = pkts.firstOrNull { it.tag == TAG_SECKEY || it.tag == 6 } ?: return emptyList()
+        if (primary.body.firstOrNull()?.toInt() != 6) return emptyList()
+        val pub = publicKeyBody(primary.body)
+        val fp = v6Fingerprint(pub)
+        val uids = componentsOf(ring, pub).filter { it.kind == Component.Kind.USER_ID }
+        val primaryLabel = pickPrimaryUserId(uids, fp)?.first?.label
+        return uids.map { c ->
+            UserIdState(c.label, c.label == primaryLabel, newest(selfSigs(c, fp), setOf(SIGTYPE_CERT_REVOCATION)) != null)
+        }
+    }
+
+    private fun primaryUserIdComponent(ring: ByteArray, ctx: PrimaryCtx): Pair<Component, Sig>? =
+        pickPrimaryUserId(componentsOf(ring, ctx.pubBody).filter { it.kind == Component.Kind.USER_ID }, ctx.fingerprint)
+
+    private fun pickPrimaryUserId(uids: List<Component>, fp: ByteArray): Pair<Component, Sig>? {
+        val live = uids.mapNotNull { c ->
+            val sigs = selfSigs(c, fp)
+            if (newest(sigs, setOf(SIGTYPE_CERT_REVOCATION)) != null) return@mapNotNull null
+            newest(sigs, CERT_TYPES)?.let { c to it }
+        }
+        return live.filter { (_, s) ->
+            subpacketsOf(s.hashed).any { it.first == SUBPKT_PRIMARY_USER_ID && it.second.firstOrNull()?.toInt() != 0 }
+        }.maxByOrNull { it.second.createdSec } ?: live.firstOrNull()
+    }
+
+    /**
+     * Revoke the whole key: a 0x20 key revocation over the primary with a
+     * Reason for Revocation, added after the primary's signatures. Returns the
+     * ring and the revocation signature packet on its own (the revocation
+     * certificate).
+     */
+    fun revokeKey(
+        ring: ByteArray,
+        reasonCode: Int,
+        reasonText: String = "",
+        passphrase: CharArray? = null,
+        random: SecureRandom = SecureRandom(),
+        now: Date = Date()
+    ): Pair<ByteArray, ByteArray> {
+        val ctx = primaryContext(ring, passphrase)
+        val primary = componentsOf(ring, ctx.pubBody).first { it.kind == Component.Kind.PRIMARY }
+        val packet = revocationPacket(ctx, SIGTYPE_KEY_REVOCATION, primary.hashPrefix, reasonCode, reasonText, random, now)
+        return applyReplacements(ring, listOf(Replacement(null, primary.endOffset, packet))) to packet
+    }
+
+    /** Revoke [userId]: a 0x30 certification revocation added after that User ID's signatures. */
+    fun revokeUserId(
+        ring: ByteArray,
+        userId: String,
+        reasonCode: Int,
+        reasonText: String = "",
+        passphrase: CharArray? = null,
+        random: SecureRandom = SecureRandom(),
+        now: Date = Date()
+    ): ByteArray {
+        val ctx = primaryContext(ring, passphrase)
+        val uids = componentsOf(ring, ctx.pubBody).filter { it.kind == Component.Kind.USER_ID }
+        val c = uids.firstOrNull { it.label == userId } ?: throw IllegalArgumentException("User ID not found in this key")
+        val liveOthers = uids.count { u ->
+            u.label != userId && newest(selfSigs(u, ctx.fingerprint), setOf(SIGTYPE_CERT_REVOCATION)) == null
+        }
+        require(liveOthers > 0) { "The last User ID can't be revoked" }
+        val packet = revocationPacket(ctx, SIGTYPE_CERT_REVOCATION, c.hashPrefix, reasonCode, reasonText, random, now)
+        return applyReplacements(ring, listOf(Replacement(null, c.endOffset, packet)))
+    }
+
+    private fun revocationPacket(
+        ctx: PrimaryCtx,
+        type: Int,
+        data: ByteArray,
+        reasonCode: Int,
+        reasonText: String,
+        random: SecureRandom,
+        now: Date
+    ): ByteArray {
+        val hashed = ByteArrayOutputStream().apply {
+            write(subpacket(SUBPKT_CREATION_TIME or 0x80, uint32((now.time / 1000L).toInt())))
+            write(subpacket(SUBPKT_REASON_FOR_REVOCATION, byteArrayOf(reasonCode.toByte()) + reasonText.toByteArray(Charsets.UTF_8)))
+            write(issuerFingerprintSubpacket(ctx.fingerprint))
+        }.toByteArray()
+        return compositeSignaturePacket(ctx.suite, ctx.secret, type, data, hashed, random)
+    }
+
+    /**
+     * 4.8.1: [edited] (a public ring made from the edited secret ring) with
+     * every User ID, user attribute and subkey of [stored] (the public copy
+     * held before the edit) that [edited] lacks, each with its signatures.
+     * The stored public copy can hold components the secret ring doesn't (a
+     * subkey merged in from the owner's own export, see
+     * KeyRepository.mergeImportedPublic), and an edit must not drop them.
+     * User IDs go before the first subkey, subkeys at the end. Both rings
+     * must have the same primary; otherwise [edited] is returned as it is.
+     */
+    fun withMissingComponents(edited: ByteArray, stored: ByteArray): ByteArray {
+        val e = packetSpans(edited)
+        val st = packetSpans(stored)
+        val ePrimary = e.firstOrNull()?.takeIf { it.tag == 6 || it.tag == TAG_SECKEY } ?: return edited
+        val sPrimary = st.firstOrNull()?.takeIf { it.tag == 6 || it.tag == TAG_SECKEY } ?: return edited
+        if (!publicKeyBody(ePrimary.body).contentEquals(publicKeyBody(sPrimary.body))) return edited
+        fun identity(span: PacketSpan): String? = when (span.tag) {
+            TAG_USERID, 17 -> "u" + span.body.joinToString("") { "%02x".format(it) }
+            TAG_PUBSUBKEY, TAG_SECSUBKEY -> "k" + v6Fingerprint(publicKeyBody(span.body)).joinToString("") { "%02x".format(it) }
+            else -> null
+        }
+        val have = e.mapNotNull { identity(it) }.toSet()
+        val ids = ByteArrayOutputStream()
+        val subs = ByteArrayOutputStream()
+        var i = 1
+        while (i < st.size) {
+            val span = st[i]
+            val id = identity(span)
+            var j = i + 1
+            while (j < st.size && st[j].tag == TAG_SIGNATURE) j++
+            if (id != null && id !in have && span.tag != TAG_SECSUBKEY) {
+                val target = if (span.tag == TAG_PUBSUBKEY) subs else ids
+                target.write(stored, span.start, st[j - 1].end - span.start)
+            }
+            i = j
+        }
+        if (ids.size() == 0 && subs.size() == 0) return edited
+        val firstSub = e.firstOrNull { it.tag == TAG_PUBSUBKEY || it.tag == TAG_SECSUBKEY }?.start ?: edited.size
+        return edited.copyOfRange(0, firstSub) + ids.toByteArray() + edited.copyOfRange(firstSub, edited.size) + subs.toByteArray()
     }
 
     // -- add subkey (raw composite primary) --------------------------

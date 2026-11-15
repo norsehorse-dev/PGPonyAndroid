@@ -322,8 +322,11 @@ android {
         // 4.8.0: signing with an ML-DSA signing subkey on an Ed25519 primary, messages with a short
         // first partial chunk (#110), Enter unlocks (#105), the email in export file names,
         // canonical text in inline text signatures. versionCode 480.
-        versionCode = 480
-        versionName = "4.8.0"
+        // 4.8.1: key edits on ML-DSA keys (expiry, revoke, notations, User IDs), an import that
+        // merges into the stored copy instead of replacing it, the armor comment on provider
+        // signing (#121), YubiKey ECDSA certify (#117). versionCode 481.
+        versionCode = 481
+        versionName = "4.8.1"
         // 4.8.0 RC8 (#114): see gitCommit above.
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

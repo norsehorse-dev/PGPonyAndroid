@@ -105,7 +105,10 @@ internal object SubkeyRows {
             } else null
             row.copy(
                 secretLocation = SubkeyAdmission.locationFor(row.fingerprint, isKeyPair, isCardBacked, cardFingerprints, held),
-                issue = issue
+                issue = issue,
+                // 4.8.1 (#120): the date comes from the same binding as the
+                // Expired label, so the two never disagree.
+                expiresAt = SubkeyAdmission.shownExpiry(report, row.fingerprint, row.expiresAt)
             )
         }
     }

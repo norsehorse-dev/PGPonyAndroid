@@ -476,16 +476,40 @@ class SecureKeyStore(context: Context) {
 
     // ── Public API (store/load surface unchanged) ───────────────────────
 
-    fun storePublicKey(fingerprint: String, data: ByteArray) {
+    /**
+     * [dropSubkeys] (uppercase hex fingerprints) is for Remove subkey only:
+     * every other subkey the stored copy has bound is kept (4.8.1, #119, see
+     * SubkeyKeep).
+     */
+    fun storePublicKey(fingerprint: String, data: ByteArray, dropSubkeys: Set<String> = emptySet()) {
         val fp = fingerprint.lowercase()
         // 4.6.0 (item 17.1): every public certificate that reaches storage keeps
         // only the components its primary verifiably bound (and the signatures
         // that verify). A certificate whose primary cannot be evaluated, or data
         // that is not a certificate, is stored as given.
         val clean = runCatching { com.pgpony.android.crypto.CertificateBindings.sanitized(data) }.getOrDefault(data)
-        writeBlob(fp, pubName(fp), clean)
+        val toStore = keepBoundSubkeys(fp, clean, dropSubkeys)
+        writeBlob(fp, pubName(fp), toStore)
         // 4.8.0 RC8 (#115): its certifications may have changed.
         CertifiedTrust.invalidate(fp)
+    }
+
+    /**
+     * 4.8.1 (#119): [clean] with the subkeys the stored copy of [fp] binds and
+     * [clean] lacks carried over. A write that would drop one is logged with
+     * its caller, since no write should.
+     */
+    private fun keepBoundSubkeys(fp: String, clean: ByteArray, drop: Set<String>): ByteArray {
+        val old = runCatching { readBlob(fp, pubName(fp), flagUnreadable = false) }.getOrNull() ?: return clean
+        val result = runCatching { com.pgpony.android.crypto.SubkeyKeep.keepBound(old, clean, drop) }.getOrNull() ?: return clean
+        if (result.kept.isNotEmpty()) {
+            Log.w(
+                TAG,
+                "Kept ${result.kept.size} bound subkey(s) a write of $fp would have dropped: ${result.kept}",
+                Throwable("subkey drop")
+            )
+        }
+        return result.bytes
     }
 
     fun storePrivateKey(fingerprint: String, data: ByteArray) {

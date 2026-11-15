@@ -128,6 +128,20 @@ object SubkeyAdmission {
         )
     }
 
+    /**
+     * 4.8.1 (#120): the expiry Key Details shows for the subkey [fpHex]: the
+     * one in its newest verified binding, which is what [issueOf] reads, or
+     * [fallback] when [report] cannot speak for the subkey (an unsupported
+     * primary, or no binding that verifies). The Bouncy Castle rows read the
+     * expiry from a different rule (the latest expiry in any binding, verified
+     * or not), so a subkey could be labelled expired under a date still to come.
+     */
+    fun shownExpiry(report: CertificateBindings.Report?, fpHex: String, fallback: Long?): Long? {
+        if (report == null || !report.supported) return fallback
+        val s = report.subkeyByFingerprint(fpHex)?.takeIf { it.bound } ?: return fallback
+        return s.expiresAtMs
+    }
+
     /** Every subkey of the incoming key [raw] (binary, public or secret) that
      *  an import leaves out or cannot use now, with the reason. */
     fun leftOut(raw: ByteArray, nowMs: Long = System.currentTimeMillis()): List<LeftOut> {

@@ -621,17 +621,23 @@ object CompositeKeyFacade {
             var keyFlags = 0
             var expiry: Long? = null
             var revoked = false
+            // 4.8.1: flags and expiry from the newest binding, so an edit that
+            // removes the expiry (a binding without one) reads as never.
+            var newestBindingTime = -1L
             var j = idx + 1
             while (j < pkts.size && pkts[j].tag == 2) {
                 val body = pkts[j].body
-                if (body.isNotEmpty() && body[0].toInt() == 6) {
+                if (body.size > 8 && body[0].toInt() == 6) {
                     when (body[1].toInt() and 0xFF) {
                         0x18 -> {
                             val area = v6HashedArea(body)
-                            findSubpacket(area, 27)?.let { if (it.isNotEmpty()) keyFlags = it[0].toInt() and 0xFF }
-                            findSubpacket(area, 9)?.let {
-                                val e = beInt(it, 0).toLong() and 0xFFFFFFFFL
-                                if (e > 0) expiry = e
+                            val created = findSubpacket(area, 2)?.takeIf { it.size >= 4 }
+                                ?.let { beInt(it, 0).toLong() and 0xFFFFFFFFL } ?: 0L
+                            if (created >= newestBindingTime) {
+                                newestBindingTime = created
+                                keyFlags = findSubpacket(area, 27)?.takeIf { it.isNotEmpty() }?.let { it[0].toInt() and 0xFF } ?: 0
+                                expiry = findSubpacket(area, 9)?.takeIf { it.size >= 4 }
+                                    ?.let { beInt(it, 0).toLong() and 0xFFFFFFFFL }?.takeIf { it > 0 }
                             }
                         }
                         0x28 -> revoked = true
@@ -766,8 +772,12 @@ object CompositeKeyFacade {
     }
 
     private fun directKeyExpiration(packets: List<Pkt>): Long? {
-        val direct = packets.firstOrNull { it.tag == 2 && (it.body[1].toInt() and 0xFF) == 0x1F }
-            ?: return null
+        // 4.8.1: the newest direct-key signature, now that a key edit can add one.
+        val direct = packets.filter { it.tag == 2 && it.body.size > 8 && (it.body[1].toInt() and 0xFF) == 0x1F }
+            .maxByOrNull { sig ->
+                findSubpacket(v6HashedArea(sig.body), 2)?.takeIf { it.size >= 4 }
+                    ?.let { beInt(it, 0).toLong() and 0xFFFFFFFFL } ?: 0L
+            } ?: return null
         // v6 sig body: ver,type,pubalgo,hash, 4-octet hashed len, hashed subpackets...
         val hLen = beInt(direct.body, 4)
         val hashed = direct.body.copyOfRange(8, 8 + hLen)

@@ -1153,17 +1153,20 @@ class KeyDetailViewModel(
             // #55 item 4: a composite ML-DSA key is not a BouncyCastle ring, so
             // its User IDs come from CompositeKeyFacade metadata rather than from
             // primaryPub (which is null for algo 30/31). Show every one.
+            // 4.8.1: with which one is primary and which are revoked, now that
+            // both can be changed on these keys.
             val compositeUids = withContext(Dispatchers.IO) {
-                repo.loadCompositePublicInfo(entity.fingerprint)?.userIds
+                repo.compositeUserIdStates(entity.fingerprint)
             }
-            if (!compositeUids.isNullOrEmpty()) {
-                return compositeUids.mapIndexed { index, raw ->
-                    val parsed = PGPKeyEntity.parseUserID(raw)
+            if (compositeUids.isNotEmpty()) {
+                return compositeUids.map { st ->
+                    val parsed = PGPKeyEntity.parseUserID(st.userId)
                     KeyUserIdInfo(
-                        raw = raw,
+                        raw = st.userId,
                         name = parsed.first,
                         email = parsed.second,
-                        isPrimary = index == 0
+                        isPrimary = st.isPrimary,
+                        isRevoked = st.isRevoked
                     )
                 }
             }
@@ -1234,7 +1237,9 @@ class KeyDetailViewModel(
                 createdAt = d.createdAtMillis,
                 expiresAt = d.expirationSeconds?.let { d.createdAtMillis + it * 1000L },
                 isRevoked = d.isRevoked,
-                isCardBacked = entity.isCardBacked
+                isCardBacked = entity.isCardBacked,
+                // 4.8.1: CompositePrimaryKeyGen re-binds any subkey of an ML-DSA key.
+                expiryEditable = true
             )
         }
     }
@@ -1624,7 +1629,9 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
         // chosen, so the choice the user sees is the one that is used.
         viewModelScope.launch {
             val hash = repo.defaultSelfSigHash(fp)
-            val fixed = repo.selfSigHashFixed(fp)
+            // 4.8.1: an ML-DSA key's hash is set by its algorithm, so the
+            // refresh offers no choice there either.
+            val fixed = _state.value.key?.algorithm?.isCompositeSign == true || repo.selfSigHashFixed(fp)
             _state.value = _state.value.copy(
                 showRefreshSigs = true, refreshSigsError = null, selfSigHash = hash, selfSigHashFixed = fixed
             )
@@ -1791,7 +1798,10 @@ PGPonyApp.instance.getString(R.string.kd_vm_upload_verify_skipped)
      *  when asked, the subkeys valid now). */
     fun expiryTarget(alsoCurrentSubkeys: Boolean): KeyExpirationService.Target =
         _state.value.expirySubkey?.let { sub ->
-            KeyExpirationService.Target.Subkey(java.lang.Long.parseUnsignedLong(sub.fingerprint.takeLast(16), 16))
+            // 4.8.1: the row's key ID, which is the first eight octets of a v6
+            // fingerprint and the last eight of a v4 one. The fingerprint's
+            // tail only names a v4 subkey.
+            KeyExpirationService.Target.Subkey(java.lang.Long.parseUnsignedLong(sub.keyId, 16))
         } ?: KeyExpirationService.Target.Primary(alsoCurrentSubkeys)
 
     /**

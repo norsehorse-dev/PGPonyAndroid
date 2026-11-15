@@ -157,7 +157,7 @@ object CertificationService {
     /**
      * True when [certifier]'s primary may certify on a card: it carries
      * Certify, is not revoked or weak, and is an algorithm the card signer
-     * handles (EdDSA legacy, RSA).
+     * handles (EdDSA legacy, RSA, and from 4.8.1 ECDSA).
      */
     fun canCertifyOnCard(certifier: PGPPublicKeyRing): Boolean {
         val pub = certifier.publicKey
@@ -168,11 +168,15 @@ object CertificationService {
         return SubkeyCapability.hasCapability(caps, SubkeyCapability.Certify)
     }
 
-    /** Public key algorithms CardPGPContentSigner turns into signatures. */
+    /** Public key algorithms CardPGPContentSigner turns into signatures.
+     *  4.8.1 (#117): ECDSA too. The card signer has made ECDSA signatures since
+     *  4.7.1 (#102), hashing to suit the curve, but this list was never updated,
+     *  so a YubiKey whose only key pair is ECDSA was offered no certifier. */
     private val CARD_SIGNER_ALGORITHMS = setOf(
         org.bouncycastle.bcpg.PublicKeyAlgorithmTags.EDDSA_LEGACY,
         org.bouncycastle.bcpg.PublicKeyAlgorithmTags.RSA_GENERAL,
-        org.bouncycastle.bcpg.PublicKeyAlgorithmTags.RSA_SIGN
+        org.bouncycastle.bcpg.PublicKeyAlgorithmTags.RSA_SIGN,
+        org.bouncycastle.bcpg.PublicKeyAlgorithmTags.ECDSA
     )
 
     /**
@@ -200,7 +204,8 @@ object CertificationService {
     /**
      * Certify [userIds] on [target] on the card in [session], whose signature
      * slot holds [certifier]'s primary ([cardSigFingerprint], read from the
-     * card). Same signatures as [certify], signed with SHA-256 on the card.
+     * card). Same signatures as [certify], signed on the card (SHA-256, or
+     * for ECDSA the hash that suits the curve).
      * Runs inside a card operation (NFC or USB).
      */
     fun certifyOnCard(

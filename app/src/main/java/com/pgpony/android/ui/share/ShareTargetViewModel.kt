@@ -251,15 +251,21 @@ class ShareTargetViewModel(
         val bytes = encryptedBytesForCardDecrypt(content) ?: return@withContext null
         try {
             val ids = PGPCryptoService.shared.recipientKeyIDs(bytes)
-            if (ids.isEmpty()) {
-                null
-            } else {
-                keys.filter { it.isCardBacked && it.armoredPublicKey != null }
-                    .firstOrNull { entity ->
-                        val ring = repository.loadPublicKeyRing(entity.fingerprint)
-                        ring != null && ringContainsAnyKeyId(ring, ids)
-                    }
+            // 4.8.1 (#117): the stored ring decides, not the cached armor, which
+            // a key paired from a card may not carry.
+            val cardKeys = keys.filter { it.isCardBacked && it.cardDecFingerprint != null }
+            val byId = if (ids.isEmpty()) null else cardKeys.firstOrNull { entity ->
+                val ring = repository.loadPublicKeyRing(entity.fingerprint)
+                ring != null && ringContainsAnyKeyId(ring, ids)
             }
+            // 4.8.1 (#117): when no recipient ID matched (hidden recipients, or
+            // an ID read this way can't match) and the phone's only way to
+            // decrypt is one security key, the message goes to that card rather
+            // than stopping at "No private keys available". The card answers
+            // whether it can open the message. A message with no recipients at
+            // all (signed only) is not one for the card.
+            byId ?: if (ids.isEmpty()) null else
+                cardKeys.singleOrNull()?.takeIf { keys.none { k -> k.isKeyPair && !k.isCardBacked } }
         } catch (e: Exception) {
             null
         }
