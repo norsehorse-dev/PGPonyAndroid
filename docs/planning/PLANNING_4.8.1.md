@@ -165,17 +165,20 @@ older binding left on the key) shows both at once; gpg reads the newest binding 
 Not reproduced with keys made in gpg 2.4 on P-256, P-384, P-521 and Ed25519, with expiry changed in gpg and in
 PGPony with SHA-256 and SHA-512: the two readers agree on all of them.
 
-The tester's key (Nov 13) has it: each of its six NIST subkeys has an Oct 2 binding with an expiry in 2030 or 2036
-and a Nov 13 binding (SHA-512, every subkey re-signed in the same second) that sets the expiry to 2026-10-04 20:20
-UTC. gpg lists all six as expired on that date, as the label says; the row showed 2030 or 2036 from the older
-bindings. Asked the tester whether they expired those subkeys around Oct 4, and which tool made the Nov 13
-signatures: a Refresh self-signatures with SHA-512 in 4.8.0 would look like that and carry an earlier expiry
-forward.
+The tester's key (Nov 13) has it: each of its six NIST subkeys has an Oct 2 binding with an expiry in 2030 or 2036,
+or none, and a Nov 13 binding (SHA-512, every subkey re-signed in the same second by Refresh self-signatures) that
+sets the expiry to 2026-10-04 20:20:05 UTC. gpg lists all six as expired on that date, as the label says; the row
+showed 2030 or 2036 from the older bindings.
+
+Cause of the Oct 4 date, found Nov 14: the tester's copy on GitHub, uploaded Oct 13, already carries a binding on
+every subkey made on Oct 4 between 20:16 and 20:29 UTC outside PGPony (the tester edited the key with gpg
+--edit-key). The NIST subkeys' bindings were signed at 20:16:46 and expire at 20:20:05; the others moved to noon UTC
+on Jan 31. The Nov 13 bindings carry exactly those values, so Refresh kept each subkey's newest expiry as it should,
+and PGPony isn't at fault. The display was: until 4.8.1 the row showed the Oct 2 dates.
 
 Done meanwhile: the row now shows the expiry from the same binding as the label (SubkeyAdmission.shownExpiry), so
 the two can't disagree, and the date says which binding PGPony reads. SubkeyShownExpiryTest builds subkeys bound
-twice and checks the date and label agree. If the tester's key shows a binding that should verify and doesn't,
-that is a separate fix.
+twice and checks the date and label agree. In RC1 the tester's NIST subkeys show Oct 4 2026 beside Expired.
 
 ## 7. A classical key losing its subkeys (#119)
 
