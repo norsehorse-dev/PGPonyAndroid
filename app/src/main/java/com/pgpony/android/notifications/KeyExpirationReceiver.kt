@@ -7,10 +7,10 @@
 //
 // Lifecycle:
 //   • Receiver is short-lived (onReceive runs on Main thread,
-//     ~10 seconds before the system kills it). The work here must
-//     complete synchronously without blocking — and it does: building
-//     a NotificationCompat.Builder and calling NotificationManager.notify
-//     is fast.
+//     ~10 seconds before the system kills it). Since 4.8.1 (#125) it
+//     reads the key from the database first, under goAsync on
+//     Dispatchers.IO, then builds and posts the notification, which is
+//     fast.
 //   • If the POST_NOTIFICATIONS permission is missing (API 33+) the
 //     notify call silently drops. We don't try to request the
 //     permission from here — runtime permission requests need a
@@ -33,7 +33,11 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.pgpony.android.MainActivity
+import com.pgpony.android.PGPonyApp
 import com.pgpony.android.R
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class KeyExpirationReceiver : BroadcastReceiver() {
 
@@ -46,6 +50,25 @@ class KeyExpirationReceiver : BroadcastReceiver() {
         val daysBefore = intent.getIntExtra(EXTRA_DAYS_BEFORE, -1)
         if (daysBefore < 0) return
 
+        // 4.8.1 (#125): look the key up before posting. An alarm set by an
+        // earlier release for someone else's public key, or for a key that
+        // has since been revoked, binned or given a later expiry, posts
+        // nothing. The lookup reads the database, so it runs off the main
+        // thread under goAsync.
+        val pending = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val key = runCatching { PGPonyApp.instance.keyRepository.getByFingerprint(fingerprint) }.getOrNull()
+                if (ExpiryReminderRule.stillDue(key, daysBefore, System.currentTimeMillis())) {
+                    post(context, fingerprint, displayName, daysBefore)
+                }
+            } finally {
+                pending.finish()
+            }
+        }
+    }
+
+    private fun post(context: Context, fingerprint: String, displayName: String, daysBefore: Int) {
         // Defensive — ensures channel exists even if the app process
         // died between PGPonyApp.onCreate and this alarm firing.
         KeyExpirationService.createNotificationChannel(context)

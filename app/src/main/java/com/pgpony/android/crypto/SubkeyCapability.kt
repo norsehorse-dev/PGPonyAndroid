@@ -92,8 +92,8 @@ enum class SubkeyCapability(val flag: Int, val displayName: String) {
          *
          * Heuristic table:
          *   primary RSA            -> Certify | Sign | Encrypt
-         *   primary Ed25519        -> Certify
-         *   primary v6 Ed25519/Ed448 -> Certify
+         *   primary Ed25519        -> Certify | Sign
+         *   primary v6 Ed25519/Ed448 -> Certify | Sign
          *   subkey  RSA            -> Sign | Encrypt
          *   subkey  Ed25519/Ed448  -> Sign
          *   subkey  Cv25519/X25519/X448 -> Encrypt
@@ -107,12 +107,18 @@ enum class SubkeyCapability(val flag: Int, val displayName: String) {
                     if (isPrimary) Certify.flag or Sign.flag or Encrypt.flag
                     else Sign.flag or Encrypt.flag
 
+                // 4.8.1: an EdDSA primary with no Key Flags subpacket in any
+                // self-signature signs too. RFC 9580 puts no limit on a key
+                // without one, and CertificateBindings already reads it that
+                // way; Certify alone left such a key with "No signing-capable
+                // key found" (a Proton key whose newest User ID certification
+                // carries no flags, reported by email on 4.8.0).
                 KeyAlgorithm.ED25519_CV25519 ->
-                    if (isPrimary) Certify.flag else Encrypt.flag
+                    if (isPrimary) Certify.flag or Sign.flag else Encrypt.flag
 
                 KeyAlgorithm.V6_ED25519,
                 KeyAlgorithm.V6_ED448 ->
-                    if (isPrimary) Certify.flag else Sign.flag
+                    if (isPrimary) Certify.flag or Sign.flag else Sign.flag
 
                 KeyAlgorithm.V6_X25519,
                 KeyAlgorithm.V6_X448 ->

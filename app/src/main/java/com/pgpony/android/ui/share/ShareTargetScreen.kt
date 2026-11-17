@@ -634,7 +634,11 @@ private fun ShareRootContent(
         )
     }
 
-    val noKeyPairs = state.availableKeyPairs.isEmpty()
+    // 4.8.1 RC2 (#117): a message for a key pair whose keys are only on a
+    // security key is decrypted on the card (beginDecrypt goes to the PIN),
+    // so Decrypt stays enabled; it was greyed out with "No private keys
+    // available" because a card-only key pair is not among the software ones.
+    val noKeyPairs = state.availableKeyPairs.isEmpty() && state.cardDecryptKeyFingerprint == null
     val noRecipients = state.availableRecipients.isEmpty()
 
     // 4.6.0 (item 6): one payload-aware list. Text (a shared text or a text
@@ -770,7 +774,8 @@ private fun SingleFileActionCards(
                 icon = Icons.Filled.Restore,
                 onClick = onRestore,
             )
-            ShareFileActions.Action.DECRYPT -> DecryptCard(onDecrypt, state.availableKeyPairs.isEmpty())
+            ShareFileActions.Action.DECRYPT ->
+                DecryptCard(onDecrypt, state.availableKeyPairs.isEmpty() && state.cardDecryptKeyFingerprint == null)
             ShareFileActions.Action.ENCRYPT -> EncryptCard(onEncrypt, state.availableRecipients.isEmpty())
             ShareFileActions.Action.SIGN -> SignCard(onSign, state.availableSigners.isEmpty())
         }

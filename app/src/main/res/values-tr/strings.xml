@@ -2884,6 +2884,11 @@
     <string name="provider_review_dont_use_hint">\"Kullanım dışı\" olarak işaretlenen anahtarlar sunulmaz. Bunlardan birine şifrelemek için PGPony\'de güven düzeyini değiştirin.</string>
     <string name="provider_review_no_keys">PGPony\'de seçilebilecek anahtar yok. Önce alıcının açık anahtarını PGPony\'ye içe aktarın.</string>
     <string name="provider_review_confirm">Seçilenlere şifrele</string>
+    <!-- 4.8.1: the public key picker, for an app that asks for keys without naming an address. -->
+    <string name="provider_pick_title">Açık anahtarları seçin</string>
+    <string name="provider_pick_intro">%1$s, PGPony\'den açık anahtar istiyor. Bu uygulamaya verilecek anahtarları seçin veya iptal edin.</string>
+    <string name="provider_pick_no_keys">PGPony\'de seçilebilecek açık anahtar yok. Önce PGPony\'ye bir anahtar içe aktarın.</string>
+    <string name="provider_pick_confirm">Seç</string>
     <string name="err_provider_review_key_unusable">Bu mesaj için seçilen bir anahtar kullanılamıyor: %1$s. Mesajı yeniden gönderin ve alıcıları PGPony\'de seçin.</string>
     <string name="import_method_github">GitHub</string>
     <string name="import_github_label">GitHub kullanıcısı</string>

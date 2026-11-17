@@ -2863,6 +2863,11 @@
     <string name="provider_review_dont_use_hint">‘사용 안 함’으로 표시된 키는 목록에 나오지 않습니다. 그런 키로 암호화하려면 PGPony에서 신뢰 수준을 변경하세요.</string>
     <string name="provider_review_no_keys">선택할 키가 PGPony에 없습니다. 먼저 PGPony에서 받는 사람의 공개 키를 가져오세요.</string>
     <string name="provider_review_confirm">선택한 키로 암호화</string>
+    <!-- 4.8.1: the public key picker, for an app that asks for keys without naming an address. -->
+    <string name="provider_pick_title">공개 키 선택</string>
+    <string name="provider_pick_intro">%1$s에서 PGPony에 공개 키를 요청하고 있습니다. 전달할 키를 선택하거나 취소하세요.</string>
+    <string name="provider_pick_no_keys">선택할 공개 키가 PGPony에 없습니다. 먼저 PGPony에서 공개 키를 가져오세요.</string>
+    <string name="provider_pick_confirm">선택</string>
     <string name="err_provider_review_key_unusable">이 메시지에 선택된 키를 사용할 수 없습니다: %1$s. 메시지를 다시 보내고 PGPony에서 받는 사람을 선택하세요.</string>
     <string name="import_method_github">GitHub</string>
     <string name="import_github_label">GitHub 사용자</string>

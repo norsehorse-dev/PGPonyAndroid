@@ -80,6 +80,40 @@ internal object RecipientReview {
     fun needsReview(unresolvedCount: Int, opportunistic: Boolean, hasSelection: Boolean): Boolean =
         unresolvedCount > 0 && !opportunistic && !hasSelection
 
+    /** 4.8.1: what GET_KEY_IDS answers with. */
+    enum class KeyIdsStep {
+        /** The ids the request's addresses resolved to, as they are. */
+        ANSWER,
+        /** Those ids plus the selection the client sent back (or a recalled one). */
+        ANSWER_SELECTION,
+        /** The recipient review, for addresses with no usable key. */
+        REVIEW,
+        /** The public key picker: the request named no addresses at all. */
+        PICK
+    }
+
+    /**
+     * 4.8.1: GET_KEY_IDS with no user ids (the extra absent or an empty array)
+     * asks the person to pick public keys, as OpenKeychain does, so a client
+     * that only wants "a key from the key app" gets one. Before this it got
+     * success with no ids. Opportunistic requests stay silent, and a request
+     * that names addresses takes exactly the 4.7.0 path (items 41, 56, 67).
+     */
+    fun keyIdsStep(userIdCount: Int, opportunistic: Boolean, hasSelection: Boolean, unresolvedCount: Int): KeyIdsStep =
+        when {
+            opportunistic -> KeyIdsStep.ANSWER
+            hasSelection -> KeyIdsStep.ANSWER_SELECTION
+            userIdCount == 0 -> KeyIdsStep.PICK
+            needsReview(unresolvedCount, opportunistic = false, hasSelection = false) -> KeyIdsStep.REVIEW
+            else -> KeyIdsStep.ANSWER
+        }
+
+    /**
+     * 4.8.1: picks from an earlier review are reused only for a request that
+     * names addresses. A request with none always shows the picker.
+     */
+    fun mayRecall(userIdCount: Int, opportunistic: Boolean): Boolean = userIdCount > 0 && !opportunistic
+
     /** A key the review may offer, and the only kind EXTRA_KEY_IDS_SELECTED may name. */
     fun isOfferable(key: PGPKeyEntity, allowExpired: Boolean): Boolean =
         !key.isRevoked &&

@@ -450,6 +450,11 @@ data class DecryptUiState(
     val selectedFileUri: android.net.Uri? = null,
     val decryptedFileBytes: ByteArray? = null,
     val decryptedFile: java.io.File? = null,
+    /** 4.8.1 (#123): a decrypted file that is a MIME message with no
+     *  attachments, its body decoded as the paste path shows it. The file
+     *  sheet previews and copies this; Save and Share keep the file as it
+     *  decrypted. */
+    val decryptedFileText: String? = null,
     /** 4.0.4 — streamed progress; see EncryptUiState. */
     val processedBytes: Long = 0L,
     val totalBytes: Long = 0L,
@@ -4632,6 +4637,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             cardMessageKeyName = null,
             decryptedFilename = null,
             decryptedFileBytes = null,
+            decryptedFileText = null,
             decryptedFile = null,
             mimeFileAttachments = emptyList(),
             showFileDecryptResultSheet = false,
@@ -4662,6 +4668,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             selectedFileBytes = bytes,
             selectedFileUri = null,
             decryptedFileBytes = null,
+            decryptedFileText = null,
             decryptedFile = null,
             errorMessage = null
         )
@@ -4691,6 +4698,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             selectedFileBytes = null,
             selectedFileUri = uri,
             decryptedFileBytes = null,
+            decryptedFileText = null,
             decryptedFile = null,
             errorMessage = null
         )
@@ -5011,12 +5019,17 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             val cardFileMime = if (cardBundle == null) {
                 withContext(Dispatchers.Default) { mimeRouteWithAttachments(bytes) }
             } else null
+            // 4.8.1 (#123): the same for a card decrypt kept in memory.
+            val cardFileBodyOnly = if (cardBundle == null && cardFileMime == null) {
+                withContext(Dispatchers.Default) { mimeBodyOnly(bytes) }
+            } else null
             val extractedBundle = cardBundle?.bundle
             _decryptState.value = _decryptState.value.copy(
                 isProcessing = false,
                 processedBytes = 0L,
                 totalBytes = 0L,
                 decryptedFileBytes = if (cardBundle == null) bytes else null,
+                decryptedFileText = cardFileBodyOnly,
                 decryptedFile = cardBundle?.file,
                 decryptedOutputFilename = outName,
                 mimeBody = extractedBundle?.body ?: cardFileMime?.body,
@@ -5060,6 +5073,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
             selectedFileBytes = null,
             selectedFileUri = null,
             decryptedFileBytes = null,
+            decryptedFileText = null,
             decryptedFile = null,
             errorMessage = null,
             // HW Phase 3 — drop any card-message detection from the cleared file.
@@ -5399,6 +5413,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     decryptedByKeyLabel = keyLabelForKeyId(result.decryptingKeyIdRaw, keyedRings),
                     decryptedByKeyLine = keyLineForKeyId(result.decryptingKeyIdRaw, keyedRings),
                     decryptedFileBytes = null,
+                    decryptedFileText = null,
                     decryptedFile = if (bundle != null) null else outFile,
                     decryptedOutputFilename = outFile.name,
                     mimeBody = bundle?.body,
@@ -5553,6 +5568,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
         _decryptState.value = _decryptState.value.copy(
             showFileDecryptResultSheet = false,
             decryptedFileBytes = null,
+            decryptedFileText = null,
             decryptedFile = null,
             mimeFileAttachments = emptyList()
         )
@@ -5646,6 +5662,12 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                 val fileMime = withContext(Dispatchers.Default) {
                     mimeRouteWithAttachments(result.data)
                 }
+                // 4.8.1 (#123): a message with no attachments shows its
+                // decoded body, as pasting it does. Only attachments were
+                // looked for here, so quoted-printable text showed raw.
+                val fileBodyOnly = if (fileMime == null) {
+                    withContext(Dispatchers.Default) { mimeBodyOnly(result.data) }
+                } else null
                 _decryptState.value = _decryptState.value.copy(
                     // 4.8.0 RC5: a decrypted file is shown as a file (the
                     // result sheet with Save and Share), not also as text in
@@ -5662,6 +5684,7 @@ class EncryptDecryptViewModel(private val repo: KeyRepository) : ViewModel() {
                     decryptedByKeyLabel = keyLabelForKeyId(result.decryptingKeyIdRaw, loaded),
                     decryptedByKeyLine = keyLineForKeyId(result.decryptingKeyIdRaw, loaded),
                     decryptedFileBytes = result.data,
+                    decryptedFileText = fileBodyOnly,
                     decryptedOutputFilename = outName,
                     // 3.1.0 Phase 4 (J1): a decrypted multipart/mixed with
                     // attachments opens the structured sheet instead of

@@ -132,13 +132,14 @@ class SubkeyCapabilityTest {
     }
 
     @Test
-    fun heuristicPrimaryEd25519IsCertifyOnly() {
-        // Ed25519 + Cv25519 keys split duties: primary certifies, the
-        // Cv25519 subkey encrypts. The heuristic should reflect that.
-        assertEquals(
-            SubkeyCapability.Certify.flag,
-            SubkeyCapability.heuristic(KeyAlgorithm.ED25519_CV25519, isPrimary = true)
-        )
+    fun heuristicPrimaryEd25519CertifiesAndSigns() {
+        // 4.8.1: an Ed25519 primary with no Key Flags subpacket signs too
+        // (RFC 9580 puts no limit on it). Certify alone left such a key with
+        // no signing key at all.
+        val expected = SubkeyCapability.Certify.flag or SubkeyCapability.Sign.flag
+        assertEquals(expected, SubkeyCapability.heuristic(KeyAlgorithm.ED25519_CV25519, isPrimary = true))
+        assertEquals(expected, SubkeyCapability.heuristic(KeyAlgorithm.V6_ED25519, isPrimary = true))
+        assertEquals(expected, SubkeyCapability.heuristic(KeyAlgorithm.V6_ED448, isPrimary = true))
     }
 
     @Test

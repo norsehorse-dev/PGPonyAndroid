@@ -2916,6 +2916,11 @@
     <string name="provider_review_dont_use_hint">Ключі з позначкою «Не використовувати» не пропонуються. Щоб шифрувати для такого ключа, змініть його рівень довіри в PGPony.</string>
     <string name="provider_review_no_keys">У PGPony немає ключів для вибору. Спершу імпортуйте відкритий ключ отримувача в PGPony.</string>
     <string name="provider_review_confirm">Зашифрувати для вибраних</string>
+    <!-- 4.8.1: the public key picker, for an app that asks for keys without naming an address. -->
+    <string name="provider_pick_title">Вибір відкритих ключів</string>
+    <string name="provider_pick_intro">%1$s запитує в PGPony відкриті ключі. Виберіть, які з них передати, або скасуйте.</string>
+    <string name="provider_pick_no_keys">У PGPony немає відкритих ключів для вибору. Спершу імпортуйте ключ у PGPony.</string>
+    <string name="provider_pick_confirm">Вибрати</string>
     <string name="err_provider_review_key_unusable">Вибраний для цього повідомлення ключ не можна використати: %1$s. Надішліть повідомлення ще раз і виберіть отримувачів у PGPony.</string>
     <string name="import_method_github">GitHub</string>
     <string name="import_github_label">Користувач GitHub</string>

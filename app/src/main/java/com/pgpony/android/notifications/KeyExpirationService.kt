@@ -125,12 +125,16 @@ object KeyExpirationService {
      * hint when applicable.
      */
     fun scheduleReminders(context: Context, keys: List<PGPKeyEntity>) {
+        // 4.8.1 (#125): cancel for every key, so the alarms an earlier
+        // release set for other people's keys go, then schedule only the
+        // user's own (ExpiryReminderRule).
         cancelAll(context, keys)
 
         val now = System.currentTimeMillis()
         val am = context.getSystemService<AlarmManager>() ?: return
 
         for (key in keys) {
+            if (!ExpiryReminderRule.remindsFor(key)) continue
             val expiresAt = key.expiresAt ?: continue
             if (expiresAt <= now) continue
 

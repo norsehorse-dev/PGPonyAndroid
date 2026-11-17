@@ -93,8 +93,12 @@ fun FileDecryptionResultScreen(state: DecryptUiState, onDismiss: () -> Unit) {
     // only the head, so a 13 MB plaintext costs a 64 KiB read and not
     // a 13 MB String (which would reintroduce the very allocation this
     // release removed).
-    val asText = remember(bytes, streamed) {
+    // 4.8.1 (#123): a MIME message with no attachments previews and copies
+    // its decoded body, the same text the paste path shows.
+    val decodedBody = state.decryptedFileText
+    val asText = remember(bytes, streamed, decodedBody) {
         when {
+            decodedBody != null -> decodedBody
             bytes != null -> runCatching { String(bytes, Charsets.UTF_8) }
                 .getOrNull()
                 ?.takeIf { it.isNotEmpty() && it.toByteArray(Charsets.UTF_8).contentEquals(bytes) }
@@ -107,6 +111,7 @@ fun FileDecryptionResultScreen(state: DecryptUiState, onDismiss: () -> Unit) {
     // Clipboard needs the whole thing in memory, so it stays off for
     // outputs that are too big to hold — the user saves or shares those.
     val clipboardText = when {
+        decodedBody != null -> decodedBody
         bytes != null -> asText
         streamed != null && ScratchFiles.isClipboardSized(streamed) ->
             runCatching { streamed.readText(Charsets.UTF_8) }.getOrNull()

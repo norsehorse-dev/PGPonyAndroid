@@ -465,30 +465,75 @@ class PGPonyOpenPgpService : Service() {
         // 4.7.0 (item 56, #25): a later request for the same addresses reuses
         // the picks from this app's last review.
         val reviewed = missing + dontUse
+        // 4.8.1: a request with no addresses never reuses a recalled pick, so
+        // it always reaches the picker.
         val selectedKeyIds: LongArray? =
             if (opportunistic) null
-            else data.getLongArrayExtra(OpenPgpApi.EXTRA_KEY_IDS_SELECTED) ?: recalledPicks(callingPackage, reviewed)
-        if (selectedKeyIds != null) {
-            // The re-run after the review: the same rules as encryptOp. Every
-            // picked id must be usable, or the answer is the same refusal.
-            val selection = runBlocking {
-                RecipientReview.resolveSelected(selectedKeyIds, repo.getAllKeys(), allowExpiredKeys())
-            }
-            if (selection.refused.isNotEmpty()) {
-                return reviewKeyUnusableResult(selection.refused.map { RecipientReview.formatKeyId(it) })
-            }
-            RecipientReviewMemory.shared.remember(callingPackage, reviewed, selectedKeyIds)
-            return successResult().putExtra(
-                OpenPgpApi.RESULT_KEY_IDS,
-                RecipientReview.mergeKeyIds(resolvedIds, selection.accepted)
+            else data.getLongArrayExtra(OpenPgpApi.EXTRA_KEY_IDS_SELECTED)
+                ?: if (RecipientReview.mayRecall(userIds.size, opportunistic)) recalledPicks(callingPackage, reviewed) else null
+        when (
+            RecipientReview.keyIdsStep(
+                userIds.size, opportunistic, selectedKeyIds != null, missing.size + dontUse.size
             )
-        }
-        if (RecipientReview.needsReview(missing.size + dontUse.size, opportunistic, hasSelection = false) &&
-            storageFailureMessage() == null
         ) {
-            return recipientReviewInteraction(data, callingPackage, missing, dontUse, included, forKeyIds = true)
+            RecipientReview.KeyIdsStep.ANSWER_SELECTION -> {
+                // The re-run after the review or the picker: the same rules
+                // as encryptOp. Every picked id must be usable, or the answer
+                // is the same refusal.
+                val picked: LongArray = selectedKeyIds
+                    ?: return successResult().putExtra(OpenPgpApi.RESULT_KEY_IDS, resolvedIds.toLongArray())
+                val selection = runBlocking {
+                    RecipientReview.resolveSelected(picked, repo.getAllKeys(), allowExpiredKeys())
+                }
+                if (selection.refused.isNotEmpty()) {
+                    return reviewKeyUnusableResult(selection.refused.map { RecipientReview.formatKeyId(it) })
+                }
+                // Nothing is remembered for a pick with no addresses
+                // (RecipientReviewMemory ignores an empty address list).
+                RecipientReviewMemory.shared.remember(callingPackage, reviewed, picked)
+                return successResult().putExtra(
+                    OpenPgpApi.RESULT_KEY_IDS,
+                    RecipientReview.mergeKeyIds(resolvedIds, selection.accepted)
+                )
+            }
+            // 4.8.1: no addresses at all, so the person picks public keys
+            // (a client's "pick from a key app" button). The re-run carries
+            // EXTRA_KEY_IDS_SELECTED and is answered above.
+            RecipientReview.KeyIdsStep.PICK -> return publicKeyPickInteraction(data, callingPackage)
+            RecipientReview.KeyIdsStep.REVIEW -> if (storageFailureMessage() == null) {
+                return recipientReviewInteraction(data, callingPackage, missing, dontUse, included, forKeyIds = true)
+            }
+            RecipientReview.KeyIdsStep.ANSWER -> Unit
         }
         return successResult().putExtra(OpenPgpApi.RESULT_KEY_IDS, resolvedIds.toLongArray())
+    }
+
+    /**
+     * 4.8.1: the public key picker for a GET_KEY_IDS with no user ids. It is
+     * the recipient review in pick mode: the same keys (RecipientReview
+     * .offeredKeys, so the re-run never refuses what it showed), nothing
+     * ticked when it opens, and the same answer (the request plus
+     * EXTRA_KEY_IDS_SELECTED, or RESULT_CANCELED).
+     */
+    private fun publicKeyPickInteraction(data: Intent, callingPackage: String): Intent {
+        val pickIntent = Intent(this, ProviderRecipientReviewActivity::class.java).apply {
+            putExtra(ProviderRecipientReviewActivity.EXTRA_API_DATA, data)
+            putExtra(ProviderRecipientReviewActivity.EXTRA_PICK_KEYS, true)
+            putExtra(ProviderRecipientReviewActivity.EXTRA_CLIENT_PACKAGE, callingPackage)
+            // Its own scheme and request code, so it never replaces the
+            // extras of a review's PendingIntent.
+            setData(android.net.Uri.parse("pgpony-api-pickkeys://$callingPackage/${data.action}"))
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            6,
+            pickIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return Intent().apply {
+            putExtra(OpenPgpApi.RESULT_CODE, OpenPgpApi.RESULT_CODE_USER_INTERACTION_REQUIRED)
+            putExtra(OpenPgpApi.RESULT_INTENT, pendingIntent)
+        }
     }
 
     /**

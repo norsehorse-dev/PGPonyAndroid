@@ -2809,6 +2809,11 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
     <string name="provider_review_dont_use_hint">Las claves marcadas como \"No usar\" no se ofrecen. Cambia el nivel de confianza en PGPony para cifrar para una de ellas.</string>
     <string name="provider_review_no_keys">No hay claves en PGPony para elegir. Importa primero la clave pública del destinatario en PGPony.</string>
     <string name="provider_review_confirm">Cifrar para las seleccionadas</string>
+    <!-- 4.8.1: the public key picker, for an app that asks for keys without naming an address. -->
+    <string name="provider_pick_title">Elegir claves públicas</string>
+    <string name="provider_pick_intro">%1$s solicita claves públicas a PGPony. Elige las que quieres entregarle, o cancela.</string>
+    <string name="provider_pick_no_keys">No hay claves públicas en PGPony para elegir. Importa primero una en PGPony.</string>
+    <string name="provider_pick_confirm">Elegir</string>
     <string name="err_provider_review_key_unusable">No se puede usar una clave elegida para este mensaje: %1$s. Vuelve a enviar el mensaje y elige los destinatarios en PGPony.</string>
     <string name="import_method_github">GitHub</string>
     <string name="import_github_label">Usuario de GitHub</string>

@@ -2868,6 +2868,11 @@
     <string name="provider_review_dont_use_hint">标记为「弃用」的密钥不会列出。要加密给这类密钥，请先在 PGPony 中更改其信任级别。</string>
     <string name="provider_review_no_keys">PGPony 中没有可供选择的密钥。请先在 PGPony 中导入收件人的公钥。</string>
     <string name="provider_review_confirm">加密给所选密钥</string>
+    <!-- 4.8.1: the public key picker, for an app that asks for keys without naming an address. -->
+    <string name="provider_pick_title">选择公钥</string>
+    <string name="provider_pick_intro">%1$s 正在向 PGPony 请求公钥。请选择要提供给它的公钥，或取消。</string>
+    <string name="provider_pick_no_keys">PGPony 中没有可供选择的公钥。请先在 PGPony 中导入一个公钥。</string>
+    <string name="provider_pick_confirm">选择</string>
     <string name="err_provider_review_key_unusable">为此消息选择的某个密钥无法使用：%1$s。请重新发送该消息，并在 PGPony 中选择收件人。</string>
     <string name="import_method_github">GitHub</string>
     <string name="import_github_label">GitHub 用户</string>

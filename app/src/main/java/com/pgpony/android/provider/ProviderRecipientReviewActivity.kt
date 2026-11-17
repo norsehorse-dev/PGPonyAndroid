@@ -16,6 +16,10 @@
 //   2. on confirm: setResult(RESULT_OK, <original api data> +
 //      EXTRA_KEY_IDS_SELECTED), and the client re-runs the same encrypt with it
 //   3. on cancel: RESULT_CANCELED, so the mail app keeps its draft
+//
+// 4.8.1: the same screen in pick mode (EXTRA_PICK_KEYS) answers a GET_KEY_IDS
+// that names no addresses, a client's "pick from a key app": the keyring's
+// public keys with nothing ticked, and the same round trip.
 
 package com.pgpony.android.provider
 
@@ -102,6 +106,12 @@ class ProviderRecipientReviewActivity : ComponentActivity() {
          *  includes each one. */
         const val EXTRA_INCLUDED_FPS = "com.pgpony.android.provider.REVIEW_INCLUDED_FPS"
         const val EXTRA_INCLUDED_FOR = "com.pgpony.android.provider.REVIEW_INCLUDED_FOR"
+
+        /** 4.8.1: Boolean, the public key picker for a GET_KEY_IDS with no user ids. */
+        const val EXTRA_PICK_KEYS = "com.pgpony.android.provider.REVIEW_PICK_KEYS"
+
+        /** 4.8.1: the calling app's package, named in the picker's intro. */
+        const val EXTRA_CLIENT_PACKAGE = "com.pgpony.android.provider.REVIEW_CLIENT_PACKAGE"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -119,12 +129,26 @@ class ProviderRecipientReviewActivity : ComponentActivity() {
             cancel()
             return
         }
-        val missing: List<String> = intent.getStringArrayExtra(EXTRA_MISSING)?.toList() ?: emptyList()
-        val dontUse: List<String> = intent.getStringArrayExtra(EXTRA_DONT_USE)?.toList() ?: emptyList()
-        val senderEmail: String? = intent.getStringExtra(EXTRA_SENDER_EMAIL)?.takeIf { it.isNotBlank() }
-        val signKeyId = intent.getLongExtra(EXTRA_SIGN_KEY_ID, 0L)
-        val previousPicks: Set<Long> = intent.getLongArrayExtra(EXTRA_PREVIOUS_PICKS)?.toSet() ?: emptySet()
-        val includedFor: Map<String, String> = RecipientReview.includedMap(
+        // 4.8.1: in pick mode nothing is ticked when the screen opens (no
+        // sender, signing key or earlier picks) and there are no addresses.
+        val pickKeys = intent.getBooleanExtra(EXTRA_PICK_KEYS, false)
+        val clientLabel: String = intent.getStringExtra(EXTRA_CLIENT_PACKAGE)?.let { pkg ->
+            try {
+                packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+            } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+                pkg
+            }
+        } ?: ""
+        val missing: List<String> =
+            if (pickKeys) emptyList() else intent.getStringArrayExtra(EXTRA_MISSING)?.toList() ?: emptyList()
+        val dontUse: List<String> =
+            if (pickKeys) emptyList() else intent.getStringArrayExtra(EXTRA_DONT_USE)?.toList() ?: emptyList()
+        val senderEmail: String? =
+            if (pickKeys) null else intent.getStringExtra(EXTRA_SENDER_EMAIL)?.takeIf { it.isNotBlank() }
+        val signKeyId = if (pickKeys) 0L else intent.getLongExtra(EXTRA_SIGN_KEY_ID, 0L)
+        val previousPicks: Set<Long> =
+            if (pickKeys) emptySet() else intent.getLongArrayExtra(EXTRA_PREVIOUS_PICKS)?.toSet() ?: emptySet()
+        val includedFor: Map<String, String> = if (pickKeys) emptyMap() else RecipientReview.includedMap(
             intent.getStringArrayExtra(EXTRA_INCLUDED_FPS),
             intent.getStringArrayExtra(EXTRA_INCLUDED_FOR)
         )
@@ -163,7 +187,9 @@ class ProviderRecipientReviewActivity : ComponentActivity() {
 
                 AlertDialog(
                     onDismissRequest = { cancel() },
-                    title = { Text(stringResource(R.string.provider_review_title)) },
+                    title = {
+                        Text(stringResource(if (pickKeys) R.string.provider_pick_title else R.string.provider_review_title))
+                    },
                     text = {
                         Column(
                             modifier = Modifier
@@ -171,7 +197,8 @@ class ProviderRecipientReviewActivity : ComponentActivity() {
                                 .verticalScroll(rememberScrollState())
                         ) {
                             Text(
-                                stringResource(R.string.provider_review_intro),
+                                if (pickKeys) stringResource(R.string.provider_pick_intro, clientLabel)
+                                else stringResource(R.string.provider_review_intro),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(bottom = 8.dp)
@@ -222,7 +249,9 @@ class ProviderRecipientReviewActivity : ComponentActivity() {
                             if (current != null) {
                                 val shown = current.keys.filter { RecipientReview.matchesQuery(it, query) }
                                 when {
-                                    current.keys.isEmpty() -> EmptyText(stringResource(R.string.provider_review_no_keys))
+                                    current.keys.isEmpty() -> EmptyText(
+                                        stringResource(if (pickKeys) R.string.provider_pick_no_keys else R.string.provider_review_no_keys)
+                                    )
                                     shown.isEmpty() -> EmptyText(stringResource(R.string.decrypt_picker_none))
                                     else -> shown.forEach { key ->
                                         ReviewKeyRow(
@@ -243,7 +272,7 @@ class ProviderRecipientReviewActivity : ComponentActivity() {
                             onClick = { confirm(apiData, current?.keys ?: emptyList(), answer) },
                             enabled = answer.isNotEmpty()
                         ) {
-                            Text(stringResource(R.string.provider_review_confirm))
+                            Text(stringResource(if (pickKeys) R.string.provider_pick_confirm else R.string.provider_review_confirm))
                         }
                     },
                     dismissButton = {

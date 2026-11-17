@@ -2809,6 +2809,11 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
     <string name="provider_review_dont_use_hint">Les clés marquées « Ne pas utiliser » ne sont pas proposées. Modifiez le niveau de confiance dans PGPony pour chiffrer pour l\'une d\'elles.</string>
     <string name="provider_review_no_keys">Aucune clé à choisir dans PGPony. Importez d\'abord la clé publique du destinataire dans PGPony.</string>
     <string name="provider_review_confirm">Chiffrer pour la sélection</string>
+    <!-- 4.8.1: the public key picker, for an app that asks for keys without naming an address. -->
+    <string name="provider_pick_title">Choisir des clés publiques</string>
+    <string name="provider_pick_intro">%1$s demande des clés publiques à PGPony. Choisissez celles à lui transmettre, ou annulez.</string>
+    <string name="provider_pick_no_keys">Aucune clé publique à choisir dans PGPony. Importez-en d\'abord une dans PGPony.</string>
+    <string name="provider_pick_confirm">Choisir</string>
     <string name="err_provider_review_key_unusable">Une clé choisie pour ce message est inutilisable : %1$s. Envoyez à nouveau le message et choisissez les destinataires dans PGPony.</string>
     <string name="import_method_github">GitHub</string>
     <string name="import_github_label">Utilisateur GitHub</string>

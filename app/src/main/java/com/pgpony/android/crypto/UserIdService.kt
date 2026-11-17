@@ -474,10 +474,19 @@ class UserIdService private constructor() {
         return latestSelfCert(primary, primaryUid)
     }
 
+    /**
+     * The newest self-certification (0x10 to 0x13) on [userId]. 4.8.1: it
+     * read only positive (0x13) certifications, so on a key whose User ID is
+     * certified with 0x10 (OpenPGP.js and Proton keys) it found none, and a
+     * reissued certification carried nothing over: no Key Flags, preferences,
+     * features or expiry. The key then had no Key Flags at all and PGPony
+     * found no key to sign with (reported by email on 4.8.0).
+     */
     private fun latestSelfCert(primary: PGPPublicKey, userId: String): PGPSignature? {
         var latest: PGPSignature? = null
         primary.getSignaturesForID(userId)?.forEach { sig ->
-            if (sig.keyID == primary.keyID && sig.signatureType == PGPSignature.POSITIVE_CERTIFICATION) {
+            if (sig.keyID == primary.keyID &&
+                sig.signatureType in PGPSignature.DEFAULT_CERTIFICATION..PGPSignature.POSITIVE_CERTIFICATION) {
                 if (latest == null || sig.creationTime.after(latest!!.creationTime)) latest = sig
             }
         }
