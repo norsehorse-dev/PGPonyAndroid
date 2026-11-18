@@ -76,3 +76,24 @@ first.
 ## Languages
 
 The key picker's four new strings are in all 11 languages.
+
+## Verify this build
+
+Whole-file SHA-256 (is this download the published file):
+
+```
+94e63dde00c3e91f40bba57959402627e436d6f075d9acd573153a15b49dbd70
+```
+
+Content hash (for rebuilders; excludes signature, see docs/REPRODUCIBLE_BUILDS_PLAYBOOK.md):
+
+```
+705bb688ee4ac5cdb66663d00a12330afeb225ec13d26052d5a6c0aecf9df62e
+```
+
+The APK is signed with the NorseHorse release key
+(A0CBC8F65AACE56F1C5B767753F9798E4919DE62); the detached signature is attached to
+this release, along with the armored release key (NorseHorse-release-key.asc) and
+PGPony-4.8.1-signing-keys.txt with the OpenPGP fingerprint and the APK signing certificate's SHA-256. Check the
+fingerprint against pgpony.app, keys.openpgp.org or keys.pgpony.app rather than trusting the copy in the release
+alone.
