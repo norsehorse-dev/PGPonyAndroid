@@ -1,0 +1,1 @@
+Key edits on ML-DSA keys, signing with keys made by Proton, imports that keep every subkey, and a public key picker for apps like CarrierPony. Fixes for YubiKey certify, Quick Action and pass entries on security keys, the Comment header when signing from mail apps, PGP/MIME messages decrypted from a file, and expiry reminders for other people's keys.\n

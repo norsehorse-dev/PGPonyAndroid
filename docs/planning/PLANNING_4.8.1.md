@@ -8,7 +8,7 @@ Same RC process as 4.8.0: one RC at a time as a GitHub pre-release with a signed
 reproducibility gate, and the reporter checks it on their own key before the release.
 
 Items 1 to 7 went out in RC1 (Nov 15); item 7's cause isn't found yet, and RC1 carries a guard for it. Items 8 to
-12 go out in RC2.
+12 went out in RC2 (Nov 17). Item 13 went straight into the release.
 
 ## 1. Expiry on ML-DSA keys
 
@@ -264,6 +264,15 @@ scheduled reminders for every key with an expiry date. Reminders are now for key
 are not revoked or binned (ExpiryReminderRule). Scheduling cancels the alarms of every key first, so the ones set
 for public keys go, and the receiver looks the key up when an alarm fires and posts nothing for a key that isn't
 the user's, is gone, or whose expiry has moved. ExpiryReminderRuleTest covers both.
+
+## 13. Pass entries on a card with an offline primary (#128)
+
+Reported Nov 18 against main: a pass entry encrypted to a card whose primary is offline (three NIST P-256 subkeys
+on the card) failed with "pair this card's public key first", while the same message and PIN decrypted in the
+Decrypt tab. PassEntryScreen.runCardDecrypt looked the card's signature-slot fingerprint up with loadPublicKeyRing,
+which is keyed by the primary; on that layout the slot holds a subkey. It now uses
+loadPublicKeyRingByCardFingerprint, as CardDecryptScreen and the provider do. That helper tries the primary first,
+so a card that worked before takes the same path. It went into the release without an RC of its own.
 
 ## Not in 4.8.1
 

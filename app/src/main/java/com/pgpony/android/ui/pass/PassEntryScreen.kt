@@ -138,7 +138,10 @@ fun PassEntryScreen(
             val ard = session.getApplicationRelatedData()
             val primaryFp = ard.sigFingerprint ?: ard.decFingerprint
                 ?: throw OpenPgpCardException.Malformed(cardNoKeys)
-            val pubRing = repo.loadPublicKeyRing(primaryFp)
+            // 4.8.1 (#128): the card's slot fingerprint is a subkey when the
+            // primary is kept offline, so look it up the way the Decrypt tab
+            // does. The helper tries the primary first, as before.
+            val pubRing = repo.loadPublicKeyRingByCardFingerprint(primaryFp)
                 ?: throw OpenPgpCardException.Malformed(cardPairFirst)
             CardDecryptService.shared.decryptBytes(session, pubRing, pin.toByteArray(Charsets.UTF_8), b)
         }) { result ->
