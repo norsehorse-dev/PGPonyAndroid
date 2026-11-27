@@ -41,3 +41,24 @@ ML-DSA keys still can't be certified.
 ## Languages
 
 The two new confirmation dialogs are in all 11 languages.
+
+## Verify this build
+
+Whole-file SHA-256 (is this download the published file):
+
+```
+a1bba2d65f51e41a11b79f1f48e4bdb84e5678fbf5ce70f82ea26980115a502e
+```
+
+Content hash (for rebuilders; excludes signature, see docs/REPRODUCIBLE_BUILDS_PLAYBOOK.md):
+
+```
+4c56a2fafdadb5f2193b3c0bf459002df8f6e711571846954c9cdc194d942510
+```
+
+The APK is signed with the NorseHorse release key
+(A0CBC8F65AACE56F1C5B767753F9798E4919DE62); the detached signature is attached to
+this release, along with the armored release key (NorseHorse-release-key.asc) and
+PGPony-4.8.2-signing-keys.txt with the OpenPGP fingerprint and the APK signing certificate's SHA-256. Check the
+fingerprint against pgpony.app, keys.openpgp.org or keys.pgpony.app rather than trusting the copy in the release
+alone.
