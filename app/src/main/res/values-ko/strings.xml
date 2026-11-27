@@ -3268,4 +3268,10 @@
     <plurals name="keyring_generate_granular_dropped_named">
         <item quantity="other">선택한 기본 키에 담을 수 없어 제거했습니다: %1$s.</item>
     </plurals>
+    <!-- 4.8.2 (item 1): X25519 key agreement through the provider (StegPony). -->
+    <string name="provider_x25519_title">키 합의를 허용할까요?</string>
+    <string name="provider_x25519_body">%1$s 앱이 암호화 키를 X25519 키 합의에 쓰려고 합니다. 이 작업을 %1$s에서 방금 직접 시작한 경우에만 허용하세요.</string>
+    <string name="provider_x25519_key">키: %1$s\n%2$s</string>
+    <string name="provider_x25519_count">키 합의 횟수: %1$d</string>
+    <string name="provider_x25519_card_body">%1$s 앱이 하드웨어 키에 있는 암호화 키를 X25519 키 합의에 쓰려고 합니다. 이 작업을 %1$s에서 방금 직접 시작한 경우에만 허용하세요. 카드 PIN을 입력한 뒤 키를 폰 뒷면에 대세요.</string>
 </resources>

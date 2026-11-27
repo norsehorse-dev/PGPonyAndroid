@@ -3116,4 +3116,10 @@
         <item quantity="many">Usunięto, bo wybrany klucz główny nie może ich zawierać: %1$s.</item>
         <item quantity="other">Usunięto, bo wybrany klucz główny nie może ich zawierać: %1$s.</item>
     </plurals>
+    <!-- 4.8.2 (item 1): X25519 key agreement through the provider (StegPony). -->
+    <string name="provider_x25519_title">Zezwolić na uzgodnienie klucza?</string>
+    <string name="provider_x25519_body">Aplikacja %1$s chce użyć Twojego klucza do szyfrowania w celu uzgodnienia klucza X25519. Zezwól tylko wtedy, gdy ta operacja została przed chwilą rozpoczęta przez Ciebie w aplikacji %1$s.</string>
+    <string name="provider_x25519_key">Klucz: %1$s\n%2$s</string>
+    <string name="provider_x25519_count">Liczba uzgodnień: %1$d</string>
+    <string name="provider_x25519_card_body">Aplikacja %1$s chce użyć klucza do szyfrowania zapisanego na Twoim kluczu sprzętowym w celu uzgodnienia klucza X25519. Zezwól tylko wtedy, gdy ta operacja została przed chwilą rozpoczęta przez Ciebie w aplikacji %1$s. Wpisz PIN karty, a potem przyłóż klucz do tylnej części telefonu.</string>
 </resources>

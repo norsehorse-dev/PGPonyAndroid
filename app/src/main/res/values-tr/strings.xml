@@ -3303,4 +3303,10 @@
         <item quantity="one">Seçtiğiniz birincil anahtar bunu içeremediği için kaldırıldı: %1$s.</item>
         <item quantity="other">Seçtiğiniz birincil anahtar bunları içeremediği için kaldırıldı: %1$s.</item>
     </plurals>
+    <!-- 4.8.2 (item 1): X25519 key agreement through the provider (StegPony). -->
+    <string name="provider_x25519_title">Anahtar anlaşmasına izin verilsin mi?</string>
+    <string name="provider_x25519_body">%1$s uygulaması, X25519 anahtar anlaşması için şifreleme anahtarınızı kullanmak istiyor. Yalnızca bu işlemi az önce %1$s uygulamasında başlattıysanız izin verin.</string>
+    <string name="provider_x25519_key">Anahtar: %1$s\n%2$s</string>
+    <string name="provider_x25519_count">Anlaşma sayısı: %1$d</string>
+    <string name="provider_x25519_card_body">%1$s uygulaması, X25519 anahtar anlaşması için donanım anahtarınızdaki şifreleme anahtarını kullanmak istiyor. Yalnızca bu işlemi az önce %1$s uygulamasında başlattıysanız izin verin. Kart PIN\'ini girin, ardından anahtarı telefonunuzun arkasına yaklaştırın.</string>
 </resources>

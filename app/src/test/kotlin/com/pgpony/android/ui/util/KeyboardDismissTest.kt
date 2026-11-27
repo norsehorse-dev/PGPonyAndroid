@@ -1,5 +1,6 @@
 // KeyboardDismissTest.kt
 // PGPony Android, 4.7.2: a tap closes the keyboard only outside every marked text field.
+// 4.8.2 (#130): and a long press is not a tap, so selecting text keeps its selection.
 
 package com.pgpony.android.ui.util
 
@@ -29,5 +30,23 @@ class KeyboardDismissTest {
     @Test
     fun noFieldsMeansEveryTapCloses() {
         assertFalse(insideAny(Offset(500f, 250f), emptyList()))
+    }
+
+    @Test
+    fun aQuickTapIsATap() {
+        assertTrue(isDismissTap(moved = false, multiTouch = false, heldMs = 90, longPressTimeoutMs = 400))
+    }
+
+    @Test
+    fun aLongPressIsNotATap() {
+        // #130: long-press a word in the decrypted text, then lift: the selection stays.
+        assertFalse(isDismissTap(moved = false, multiTouch = false, heldMs = 400, longPressTimeoutMs = 400))
+        assertFalse(isDismissTap(moved = false, multiTouch = false, heldMs = 1200, longPressTimeoutMs = 400))
+    }
+
+    @Test
+    fun aDragOrTwoFingersIsNotATap() {
+        assertFalse(isDismissTap(moved = true, multiTouch = false, heldMs = 90, longPressTimeoutMs = 400))
+        assertFalse(isDismissTap(moved = false, multiTouch = true, heldMs = 90, longPressTimeoutMs = 400))
     }
 }

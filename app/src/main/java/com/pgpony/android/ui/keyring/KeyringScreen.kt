@@ -1037,6 +1037,20 @@ private fun GenerateKeySheet(state: KeyringUiState, viewModel: KeyringViewModel)
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
+            // 4.8.2 (item 4): a LibrePGP key without its classical Cv25519
+            // subkey, like GnuPG's own Kyber keys. On by default, as before.
+            if (!composing && GenerateForm.offersLibrePgpSwitch(state.generateAlgorithm)) {
+                ComposerSwitch(
+                    checked = state.granularIncludeDefaultEncryption,
+                    onChange = { viewModel.setGranularIncludeDefaultEncryption(it) },
+                    title = stringResource(R.string.keyring_generate_granular_include_default),
+                    caption = AddSubkeyChoice.defaultEncryptionFor(KeyAlgorithm.ED25519_CV25519)?.let {
+                        stringResource(R.string.keyring_generate_granular_include_default_caption_format, addSubkeyChoiceLabel(it))
+                    }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             // item 7 (#55): advanced granular composer.
             // 4.8.0 RC11 (#109): on the picked primary; a post-quantum primary
             // can't be composed, so the switch is off and says why.

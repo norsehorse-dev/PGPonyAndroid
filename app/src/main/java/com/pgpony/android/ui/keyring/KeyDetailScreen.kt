@@ -444,7 +444,8 @@ fun KeyDetailScreen(
                                 )
                             }
                             // 4.7.0 (item 31, #79): certify someone else's key.
-                            if (!menuKey.isKeyPair && state.canCertify) {
+                            // 4.8.2 (item 5, #126): or another key of your own.
+                            if (state.canCertify) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.key_detail_action_certify)) },
                                     leadingIcon = { Icon(Icons.Filled.Verified, null) },
@@ -1327,7 +1328,10 @@ fun KeyDetailScreen(
                     // already shows the key as Verified; tapping it would lock in a
                     // manual level that outlives withdrawing the certification.
                     val certifiedNow = state.key?.let { com.pgpony.android.data.CertifiedTrust.verificationFor(it) } != null
-                    if (state.key?.trustLevel != com.pgpony.android.data.TrustLevel.VERIFIED && !certifiedNow) {
+                    // 4.8.2 (item 5, #126): never for your own key, which is already Ultimate.
+                    if (state.key?.isOwnKey != true &&
+                        state.key?.trustLevel != com.pgpony.android.data.TrustLevel.VERIFIED && !certifiedNow
+                    ) {
                         TextButton(onClick = { viewModel.markVerifiedAfterCertify() }) {
                             Text(stringResource(R.string.certify_done_mark_verified))
                         }

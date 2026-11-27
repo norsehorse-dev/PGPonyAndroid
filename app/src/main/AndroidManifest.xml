@@ -550,6 +550,15 @@
             android:excludeFromRecents="true"
             android:launchMode="singleTop" />
 
+        <!-- 4.8.2 (item 1): the confirmation for X25519_AGREE with a key on the phone. -->
+        <activity
+            android:name=".provider.ProviderX25519Activity"
+            android:process=":remote_api"
+            android:exported="false"
+            android:theme="@style/Theme.PGPony"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop" />
+
         <service
             android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
             android:enabled="false"

@@ -358,7 +358,8 @@ class PGPCryptoService private constructor() {
         email: String,
         algorithm: KeyAlgorithm,
         passphrase: String?,
-        expirationSeconds: Long? = null
+        expirationSeconds: Long? = null,
+        includeDefaultEncryptionSubkey: Boolean = true
     ): GeneratedKeyResult {
         val userID = com.pgpony.android.data.PGPKeyEntity.composeUserID(name, email)
         val creationDate = Date()
@@ -409,8 +410,11 @@ class PGPCryptoService private constructor() {
             KeyAlgorithm.MLKEM768_X25519_LIBREPGP -> {
                 // LibrePGP composite (v5): CompositeKeyGen protects the subkey
                 // (AES-256-CFB, S2K usage 254) when a passphrase is supplied.
-                val baseSec = buildEd25519KeyRingGenerator(userID, passphrase, creationDate, expirationSeconds)
-                    .generateSecretKeyRing()
+                val baseSec = librePgpBase(
+                    buildEd25519KeyRingGenerator(userID, passphrase, creationDate, expirationSeconds)
+                        .generateSecretKeyRing(),
+                    includeDefaultEncryptionSubkey
+                )
                 val ring = com.pgpony.android.crypto.pqc.CompositeKeyGen.addCompositeSubkey(
                     baseSec, com.pgpony.android.crypto.pqc.CompositeKeyGen.Scheme.LIBREPGP_V5,
                     passphrase, creationTime = creationDate
@@ -429,8 +433,11 @@ class PGPCryptoService private constructor() {
             }
             KeyAlgorithm.MLKEM768_BP256_LIBREPGP -> {
                 // 4.6.0 (item 13): LibrePGP ML-KEM-768 + brainpoolP256r1.
-                val baseSec = buildEd25519KeyRingGenerator(userID, passphrase, creationDate, expirationSeconds)
-                    .generateSecretKeyRing()
+                val baseSec = librePgpBase(
+                    buildEd25519KeyRingGenerator(userID, passphrase, creationDate, expirationSeconds)
+                        .generateSecretKeyRing(),
+                    includeDefaultEncryptionSubkey
+                )
                 val ring = com.pgpony.android.crypto.pqc.CompositeKeyGen.addCompositeSubkey(
                     baseSec, com.pgpony.android.crypto.pqc.CompositeSuite.LIBREPGP_768_BP256,
                     passphrase, creationTime = creationDate
@@ -440,8 +447,11 @@ class PGPCryptoService private constructor() {
             KeyAlgorithm.MLKEM1024_X448_LIBREPGP -> {
                 // LibrePGP composite (v5), Kyber-1024 + X448, driven by the
                 // LIBREPGP_1024 suite (v4 EdDSA primary + v5 composite subkey).
-                val baseSec = buildEd25519KeyRingGenerator(userID, passphrase, creationDate, expirationSeconds)
-                    .generateSecretKeyRing()
+                val baseSec = librePgpBase(
+                    buildEd25519KeyRingGenerator(userID, passphrase, creationDate, expirationSeconds)
+                        .generateSecretKeyRing(),
+                    includeDefaultEncryptionSubkey
+                )
                 val ring = com.pgpony.android.crypto.pqc.CompositeKeyGen.addCompositeSubkey(
                     baseSec, com.pgpony.android.crypto.pqc.CompositeSuite.LIBREPGP_1024,
                     passphrase, creationTime = creationDate
@@ -734,6 +744,21 @@ class PGPCryptoService private constructor() {
      * the callback's hashed-subpackets function runs AFTER the default 5-year
      * set, so setKeyExpirationTime / removePacketsOfType here is authoritative.
      */
+    /**
+     * 4.8.2 (item 4): the base a LibrePGP ML-KEM key is grafted onto, with or
+     * without its classical Cv25519 encryption subkey. GnuPG's own
+     * ky768_cv25519 keys have only the Kyber subkey, which already carries
+     * X25519; with the classical one present, GnuPG and Kleopatra may encrypt
+     * to it instead.
+     */
+    internal fun librePgpBase(ring: PGPSecretKeyRing, includeDefaultEncryptionSubkey: Boolean): PGPSecretKeyRing {
+        if (includeDefaultEncryptionSubkey) return ring
+        val defaultEnc = ring.secretKeys.asSequence().firstOrNull {
+            !it.publicKey.isMasterKey && it.publicKey.isEncryptionKey
+        } ?: return ring
+        return ClassicalSubkeyGen.removeSubkey(ring, defaultEnc.keyID)
+    }
+
     /**
      * item 14 (#56): a v4 Ed25519 + Cv25519 base secret ring for the interop
      * keygen, with a Features subpacket advertising SEIPDv1 (MDC) and SEIPDv2

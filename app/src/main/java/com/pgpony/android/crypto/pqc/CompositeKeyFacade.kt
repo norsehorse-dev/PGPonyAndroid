@@ -376,6 +376,9 @@ object CompositeKeyFacade {
      */
     fun reprotect(ring: ByteArray, oldPassphrase: CharArray?, newPassphrase: CharArray?): ByteArray {
         val out = ByteArrayOutputStream()
+        // 4.8.2 (item 2): set once the composite primary has opened with
+        // [oldPassphrase], which proves the passphrase right.
+        var primaryOpened = false
         for (pkt in walk(ring)) {
             if (pkt.tag == 5) {
                 val pubBody = publicKeyBody(pkt.body)
@@ -385,6 +388,7 @@ object CompositeKeyFacade {
                     out.write(packet(5, pubBody + reprotectRegion(
                         pkt.body, pubBody, suite.compositeSecretLen, oldPassphrase, newPassphrase
                     )))
+                    primaryOpened = CompositeSecretProtection.isProtected(pkt.body)
                     continue
                 }
             }
@@ -405,9 +409,19 @@ object CompositeKeyFacade {
                     else -> null
                 }
                 if (len != null) {
-                    out.write(packet(7, pubBody + reprotectRegion(
-                        pkt.body, pubBody, len, oldPassphrase, newPassphrase
-                    )))
+                    // 4.8.2 (item 2): before the fix in CompositeSecretProtection.protect,
+                    // an Ed25519 subkey was stored with the throwaway primary's
+                    // secret in place of its own, so it never opens again. Once the
+                    // passphrase has opened the primary, such a subkey is kept as it
+                    // is, so the key can still be edited and the broken subkey
+                    // removed. A wrong passphrase still fails on the primary first.
+                    val region = try {
+                        reprotectRegion(pkt.body, pubBody, len, oldPassphrase, newPassphrase)
+                    } catch (e: Exception) {
+                        if (!primaryOpened || !CompositeSecretProtection.isProtected(pkt.body)) throw e
+                        null
+                    }
+                    out.write(packet(7, if (region != null) pubBody + region else pkt.body))
                     continue
                 }
             }

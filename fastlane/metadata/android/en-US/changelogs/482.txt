@@ -1,0 +1,1 @@
+X25519 key agreement through the OpenPGP provider, so StegPony can reveal with a key in PGPony, on the phone or a security key, with a confirmation every time. Fixes Ed25519 subkeys on protected ML-DSA keys and text selection in decrypted text. LibrePGP keys can leave out the classical X25519 subkey, and you can certify one of your own keys with another.

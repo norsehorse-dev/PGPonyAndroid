@@ -50,6 +50,13 @@ object ProviderCardOpStore {
         val enableCompression: Boolean = false,
         /** 4.6.0 (item 16): the SSH API hash code for an SSH sign op, else -1. */
         val sshHash: Int = -1,
+        /** 4.8.2 (item 1): the app that asked, named in the confirmation. */
+        val clientPackage: String? = null,
+        /** 4.8.2 (item 1): the subkey an X25519_AGREE op uses; [input] holds
+         *  its points and [cardEntityFingerprint] the key's row, card or not. */
+        val x25519SubkeyFingerprint: String? = null,
+        /** 4.8.2 (item 1): EXTRA_PASSPHRASE from the client, as decrypt takes it. */
+        val clientPassphrase: String? = null,
         val createdAt: Long = SystemClock.elapsedRealtime()
     )
 
@@ -63,6 +70,11 @@ object ProviderCardOpStore {
         class Detached(val signature: ByteArray, val micalg: String) : CompletedOp()
         /** 4.6.0 (item 16): an SSH signature blob from the authentication slot. */
         class SshSignature(val blob: ByteArray) : CompletedOp()
+        /** 4.8.2 (item 1): X25519_AGREE's shared secrets, 32 bytes per point. */
+        class Agreed(val secrets: ByteArray) : CompletedOp()
+        /** 4.8.2 (item 1): X25519_AGREE was allowed but could not finish; the
+         *  client's re-call gets this error. */
+        class AgreeFailed(val reason: String, val message: String) : CompletedOp()
         class Decrypted(
             val data: ByteArray,
             val filename: String?,
@@ -137,8 +149,10 @@ object ProviderCardOpStore {
         completed.remove(opKey)?.value?.let { deleteFileResult(it) }
     }
 
+    /** 4.8.2 (item 1): also wipes shared secrets nobody collected. */
     private fun deleteFileResult(op: CompletedOp) {
         if (op is CompletedOp.StreamFile) runCatching { op.file.delete() }
+        if (op is CompletedOp.Agreed) op.secrets.fill(0)
     }
 
     private fun sweep() {

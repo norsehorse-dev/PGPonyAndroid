@@ -759,7 +759,10 @@ class KeyringViewModel(private val repo: KeyRepository) : ViewModel() {
                         email = s.generateEmail.trim(),
                         algorithm = s.generateAlgorithm,
                         passphrase = passphrase,
-                        expirationSeconds = s.generateExpiration.seconds
+                        expirationSeconds = s.generateExpiration.seconds,
+                        // 4.8.2 (item 4): the LibrePGP options' switch; every other key keeps its default subkey.
+                        includeDefaultEncryptionSubkey = !GenerateForm.offersLibrePgpSwitch(s.generateAlgorithm) ||
+                            s.granularIncludeDefaultEncryption
                     )
                 }
                 // 4.6.0 (item 16): the SSH authentication subkey, bound with
@@ -1602,6 +1605,16 @@ object GenerateForm {
         generateGranular = false, generateAuthSubkey = false, generateAuthForSsh = false,
         generateExpiration = ExpirationOption.TWO_YEARS
     )
+
+    /**
+     * 4.8.2 (item 4): the LibrePGP ML-KEM options get the "Include default
+     * encryption subkey" switch outside the composer: their classical Cv25519
+     * subkey can be left out, as GnuPG's own Kyber keys have none.
+     */
+    fun offersLibrePgpSwitch(algorithm: KeyAlgorithm): Boolean =
+        algorithm == KeyAlgorithm.MLKEM768_X25519_LIBREPGP ||
+            algorithm == KeyAlgorithm.MLKEM768_BP256_LIBREPGP ||
+            algorithm == KeyAlgorithm.MLKEM1024_X448_LIBREPGP
 
     /** The compose switch. It never changes the primary. */
     fun withCompose(s: KeyringUiState, on: Boolean): KeyringUiState = s.copy(generateGranular = on)

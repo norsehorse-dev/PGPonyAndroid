@@ -246,7 +246,8 @@ class KeyRepository(
         email: String,
         algorithm: KeyAlgorithm,
         passphrase: String?,
-        expirationSeconds: Long? = null
+        expirationSeconds: Long? = null,
+        includeDefaultEncryptionSubkey: Boolean = true
     ): PGPKeyEntity = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         // 4.4.0 RC3 (#30/#31): a composite ML-DSA + EdDSA signing key cannot be
         // held by BouncyCastle, so it takes the raw-bytes composite path.
@@ -259,7 +260,7 @@ class KeyRepository(
         if (algorithm == KeyAlgorithm.MLKEM768_X25519_V4) {
             return@withContext generateV4Algo35Key(name, email, passphrase, expirationSeconds)
         }
-        val result = crypto.generateKeyPair(name, email, algorithm, passphrase, expirationSeconds)
+        val result = crypto.generateKeyPair(name, email, algorithm, passphrase, expirationSeconds, includeDefaultEncryptionSubkey)
 
         // Store key material in encrypted storage
         store.storePublicKey(result.fingerprint, result.publicKeyData)
@@ -2196,11 +2197,12 @@ class KeyRepository(
         val isMine: Boolean get() = issuer?.isOwnKey == true
     }
 
-    /** True when [entity] is a public key this device can certify: not your
-     *  own, not a card record, and a certificate Bouncy Castle reads. */
+    /** True when [entity] is a key this device can certify: a certificate
+     *  Bouncy Castle reads. 4.8.2 (item 5, #126): your own key pairs and
+     *  card-backed keys too, so one of your keys can certify another;
+     *  certifierChoices leaves the target itself out. ML-DSA keys stay out. */
     fun canBeCertified(entity: PGPKeyEntity): Boolean =
-        !entity.isKeyPair && !entity.isCardBacked && !entity.algorithm.isCompositeSign &&
-            loadPublicKeyRing(entity.fingerprint) != null
+        !entity.algorithm.isCompositeSign && loadPublicKeyRing(entity.fingerprint) != null
 
     /** Your key pairs that can certify [targetFingerprint] now: software,
      *  classical, unrevoked, unexpired, not marked Don't use, with the
@@ -2293,6 +2295,17 @@ class KeyRepository(
         made.signature.verifyCertification(made.userId, target)
     }.getOrDefault(false)
 
+    /** 4.8.2 (item 5): [primary] (with its new certifications) as the secret
+     *  ring's primary public key. Secret material is untouched. */
+    private fun keepInSecretRing(fingerprint: String, primary: org.bouncycastle.openpgp.PGPPublicKey) {
+        val secret = loadSecretKeyRing(fingerprint) ?: return
+        val updated = org.bouncycastle.openpgp.PGPSecretKeyRing.insertSecretKey(
+            secret,
+            org.bouncycastle.openpgp.PGPSecretKey.replacePublicKey(secret.secretKey, primary)
+        )
+        storeEditedPrivateKey(fingerprint, updated.encoded)
+    }
+
     /** An exportable certification goes into the certificate, a local one into its blob. */
     private suspend fun keepCertifications(
         target: PGPKeyEntity,
@@ -2307,6 +2320,10 @@ class KeyRepository(
         if (exportable) {
             val updated = svc.withSignatures(ring, made)
             store.storePublicKey(targetFingerprint, updated.encoded)
+            // 4.8.2 (item 5, #126): a key pair's edits rebuild its public copy
+            // from the secret ring, so the certification goes into the secret
+            // ring's primary too, or the next edit would drop it.
+            if (target.isKeyPair) keepInSecretRing(targetFingerprint, updated.publicKey)
             dao.update(target.copy(armoredPublicKey = armoredAsStored(targetFingerprint, crypto.exportArmoredPublicKey(updated))))
         } else {
             val mine = certifierPrimary.fingerprint

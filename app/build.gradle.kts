@@ -325,8 +325,11 @@ android {
         // 4.8.1: key edits on ML-DSA keys (expiry, revoke, notations, User IDs), an import that
         // merges into the stored copy instead of replacing it, the armor comment on provider
         // signing (#121), YubiKey ECDSA certify (#117). versionCode 481.
-        versionCode = 481
-        versionName = "4.8.1"
+        // 4.8.2: X25519 key agreement through the provider for StegPony, the Ed25519 subkey fix on
+        // protected ML-DSA keys, text selection in the Decrypt output (#130), a LibrePGP key without
+        // the X25519 subkey, and certifying your own key pair (#126). versionCode 482.
+        versionCode = 482
+        versionName = "4.8.2"
         // 4.8.0 RC8 (#114): see gitCommit above.
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

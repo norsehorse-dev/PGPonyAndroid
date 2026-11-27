@@ -66,4 +66,14 @@ class GenerateFormTest {
         assertFalse(s.generateAuthForSsh)
         assertEquals(ExpirationOption.TWO_YEARS, s.generateExpiration)
     }
+
+    @Test fun `the LibrePGP options offer the default encryption subkey switch`() {
+        // 4.8.2 (item 4): the Generate Key switch outside the composer, for these three only.
+        for (a in listOf(KeyAlgorithm.MLKEM768_X25519_LIBREPGP, KeyAlgorithm.MLKEM768_BP256_LIBREPGP, KeyAlgorithm.MLKEM1024_X448_LIBREPGP)) {
+            assertTrue(a.name, GenerateForm.offersLibrePgpSwitch(a))
+        }
+        for (a in KeyAlgorithm.generatable.filter { "LIBREPGP" !in it.name }) {
+            assertFalse(a.name, GenerateForm.offersLibrePgpSwitch(a))
+        }
+    }
 }

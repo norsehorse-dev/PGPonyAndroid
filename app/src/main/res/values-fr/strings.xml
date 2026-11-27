@@ -3245,4 +3245,10 @@ Vous pouvez aussi verrouiller l\'application derrière votre empreinte digitale 
         <item quantity="many">Retirées, car la clé principale choisie ne peut pas les porter : %1$s.</item>
         <item quantity="other">Retirées, car la clé principale choisie ne peut pas les porter : %1$s.</item>
     </plurals>
+    <!-- 4.8.2 (item 1): X25519 key agreement through the provider (StegPony). -->
+    <string name="provider_x25519_title">Autoriser l\'accord de clés ?</string>
+    <string name="provider_x25519_body">%1$s souhaite utiliser votre clé de chiffrement pour un accord de clés X25519. N\'autorisez cette demande que si vous venez de la lancer dans %1$s.</string>
+    <string name="provider_x25519_key">Clé : %1$s\n%2$s</string>
+    <string name="provider_x25519_count">Accords : %1$d</string>
+    <string name="provider_x25519_card_body">%1$s souhaite utiliser la clé de chiffrement de votre clé matérielle pour un accord de clés X25519. N\'autorisez cette demande que si vous venez de la lancer dans %1$s. Saisissez le PIN de la carte, puis tenez la clé contre le dos de votre téléphone.</string>
 </resources>

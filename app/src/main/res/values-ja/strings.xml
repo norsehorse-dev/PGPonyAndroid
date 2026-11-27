@@ -3196,4 +3196,10 @@ PGPony は、古い OpenPGP 実装との相互運用性のために従来の RSA
     <plurals name="keyring_generate_granular_dropped_named">
         <item quantity="other">選択した主鍵には含められないため削除しました: %1$s。</item>
     </plurals>
+    <!-- 4.8.2 (item 1): X25519 key agreement through the provider (StegPony). -->
+    <string name="provider_x25519_title">鍵共有を許可しますか？</string>
+    <string name="provider_x25519_body">%1$s が、X25519 鍵共有のために暗号化鍵を使おうとしています。この操作を %1$s で開始したばかりの場合にのみ許可してください。</string>
+    <string name="provider_x25519_key">鍵: %1$s\n%2$s</string>
+    <string name="provider_x25519_count">鍵共有の回数: %1$d</string>
+    <string name="provider_x25519_card_body">%1$s が、X25519 鍵共有のためにハードウェアキー上の暗号化鍵を使おうとしています。この操作を %1$s で開始したばかりの場合にのみ許可してください。カードの PIN を入力し、キーをスマートフォンの背面にかざしてください。</string>
 </resources>

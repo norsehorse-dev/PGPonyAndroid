@@ -51,6 +51,7 @@ import com.pgpony.android.PGPonyApp
 import com.pgpony.android.PGPonyTheme
 import com.pgpony.android.R
 import com.pgpony.android.crypto.PGPCryptoService
+import com.pgpony.android.crypto.X25519Agreement
 import com.pgpony.android.crypto.card.CardDecryptService
 import com.pgpony.android.crypto.card.CardPinCache
 import com.pgpony.android.crypto.card.CardSigningService
@@ -200,7 +201,29 @@ class ProviderCardOpActivity : ComponentActivity() {
                     },
                     text = {
                         Column {
-                            Text(
+                            if (op.action == PGPonyActions.ACTION_X25519_AGREE) {
+                                // 4.8.2 (item 1): name the app, the key and the count, as
+                                // ProviderX25519Activity does for a key on the phone.
+                                Text(
+                                    stringResource(R.string.provider_x25519_card_body, x25519ClientLabel(op.clientPackage)),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                Text(
+                                    stringResource(
+                                        R.string.provider_x25519_key,
+                                        entity.userID,
+                                        ProviderX25519Activity.groupedFingerprint(op.x25519SubkeyFingerprint ?: "")
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                                Text(
+                                    stringResource(R.string.provider_x25519_count, op.input.size / X25519Agreement.POINT_LEN),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(bottom = 12.dp)
+                                )
+                            } else Text(
                                 stringResource(
                                     when (op.action) {
                                         OpenPgpApi.ACTION_DECRYPT_VERIFY,
@@ -538,7 +561,73 @@ class ProviderCardOpActivity : ComponentActivity() {
                 )
             }
 
+            PGPonyActions.ACTION_X25519_AGREE -> x25519OnCard(session, op, ard, pinBytes, ::ringForSlot)
+
             else -> throw OpenPgpCardException.Malformed(getString(R.string.err_unsupported_card_operation, op.action))
+        }
+    }
+
+    /**
+     * 4.8.2 (item 1): X25519_AGREE on the card. The subkey must sit in the
+     * tapped card's decryption slot, or its authentication slot on a card
+     * that can point PSO:DECIPHER there (#108); the wrong-card guard runs
+     * before the PIN. Then PW1 (0x82) and one PSO:DECIPHER per point, the
+     * raw 32-byte point in the Cipher DO. An answer that isn't a 32-byte
+     * secret, or an all-zero secret, fails the whole call, and the client's
+     * re-call gets that error. Every secret is wiped on the way out of a
+     * failure; the stored result is wiped when collected or swept.
+     */
+    private fun x25519OnCard(
+        session: OpenPgpCardSession,
+        op: ProviderCardOpStore.PendingOp,
+        ard: com.pgpony.android.crypto.card.ApplicationRelatedData,
+        pinBytes: ByteArray,
+        ringForSlot: (String?) -> org.bouncycastle.openpgp.PGPPublicKeyRing
+    ): ProviderCardOpStore.CompletedOp {
+        val sub = op.x25519SubkeyFingerprint
+            ?: throw OpenPgpCardException.Malformed(getString(R.string.provider_cardop_no_slot_key))
+        val slot = when {
+            ard.decFingerprint.equals(sub, ignoreCase = true) -> com.pgpony.android.crypto.card.CardSlot.DECRYPTION
+            ard.authFingerprint.equals(sub, ignoreCase = true) && ard.mseSupported -> com.pgpony.android.crypto.card.CardSlot.AUTHENTICATION
+            ard.authFingerprint.equals(sub, ignoreCase = true) ->
+                return ProviderCardOpStore.CompletedOp.AgreeFailed(
+                    X25519Agreement.Refusal.KEY_UNAVAILABLE.code,
+                    "This key sits in the card's authentication slot, and this card can't decrypt with that slot."
+                )
+            else -> throw OpenPgpCardException.Malformed(getString(R.string.provider_cardop_wrong_card))
+        }
+        ringForSlot(sub)
+        val points = try {
+            X25519Agreement.splitPoints(op.input)
+        } catch (e: X25519Agreement.RefusedException) {
+            return ProviderCardOpStore.CompletedOp.AgreeFailed(e.refusal.code, e.message ?: e.refusal.code)
+        }
+        session.verify(com.pgpony.android.crypto.card.OpenPgpCard.PW1_OTHER, pinBytes)
+        val out = ByteArray(points.size * X25519Agreement.POINT_LEN)
+        for ((n, point) in points.withIndex()) {
+            val answer = session.decipher(com.pgpony.android.crypto.card.EcdhCipherData.cipherDoForPoint(point), slot)
+            val secret = X25519Agreement.cardSecret(answer)
+            answer.fill(0)
+            if (secret == null || X25519Agreement.isAllZero(secret)) {
+                secret?.fill(0)
+                out.fill(0)
+                return ProviderCardOpStore.CompletedOp.AgreeFailed(
+                    X25519Agreement.Refusal.AGREEMENT_FAILED.code,
+                    if (secret == null) "The card's answer was not an X25519 shared secret." else "The shared secret was all zero"
+                )
+            }
+            System.arraycopy(secret, 0, out, n * X25519Agreement.POINT_LEN, X25519Agreement.POINT_LEN)
+            secret.fill(0)
+        }
+        return ProviderCardOpStore.CompletedOp.Agreed(out)
+    }
+
+    private fun x25519ClientLabel(pkg: String?): String {
+        if (pkg.isNullOrEmpty()) return ""
+        return try {
+            packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+        } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+            pkg
         }
     }
 

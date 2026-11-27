@@ -13,6 +13,10 @@
 //
 // Every text field inside such a screen must carry keepsKeyboard(); one without it would lose
 // focus on the tap that gives it focus, and the keyboard would flicker.
+//
+// 4.8.2 (item 3, #130): a press held past the long-press timeout is not a tap. Long-pressing a
+// word in the decrypted text selected it, and the lift counted as a tap (no movement, one
+// finger), so focus was cleared and the selection with it.
 
 package com.pgpony.android.ui.util
 
@@ -43,6 +47,14 @@ internal object KeyboardFields {
         fields.values.filter { it.isAttached }.map { it.boundsInWindow() }
 }
 
+/**
+ * 4.8.2 (#130): a touch closes the keyboard only when it is a tap: one finger, no movement past
+ * the touch slop, and lifted before the long-press timeout (a long press selects text). Pure,
+ * for tests.
+ */
+internal fun isDismissTap(moved: Boolean, multiTouch: Boolean, heldMs: Long, longPressTimeoutMs: Long): Boolean =
+    !moved && !multiTouch && heldMs < longPressTimeoutMs
+
 /** True when [point] falls inside any of [areas]. Pure, for tests. */
 internal fun insideAny(point: Offset, areas: List<Rect>): Boolean = areas.any { it.contains(point) }
 
@@ -64,15 +76,19 @@ fun Modifier.dismissKeyboardOnTap(): Modifier = composed {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                 val start = down.position
-                var tap = true
+                var moved = false
+                var multiTouch = false
+                var upAt = down.uptimeMillis
                 while (true) {
                     val event = awaitPointerEvent(PointerEventPass.Initial)
-                    if (event.changes.size > 1) tap = false
+                    if (event.changes.size > 1) multiTouch = true
                     val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                    if ((change.position - start).getDistance() > viewConfiguration.touchSlop) tap = false
+                    if ((change.position - start).getDistance() > viewConfiguration.touchSlop) moved = true
+                    upAt = change.uptimeMillis
                     if (!change.pressed) break
                 }
-                if (!tap) return@awaitEachGesture
+                val held = upAt - down.uptimeMillis
+                if (!isDismissTap(moved, multiTouch, held, viewConfiguration.longPressTimeoutMillis)) return@awaitEachGesture
                 val coordinates = holder[0]?.takeIf { it.isAttached } ?: return@awaitEachGesture
                 if (insideAny(coordinates.localToWindow(start), KeyboardFields.boundsInWindow())) {
                     return@awaitEachGesture

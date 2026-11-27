@@ -3329,4 +3329,10 @@
         <item quantity="one">Removed because the primary you picked can\'t hold it: %1$s.</item>
         <item quantity="other">Removed because the primary you picked can\'t hold them: %1$s.</item>
     </plurals>
+    <!-- 4.8.2 (item 1): X25519 key agreement through the provider (StegPony). -->
+    <string name="provider_x25519_title">Allow key agreement?</string>
+    <string name="provider_x25519_body">%1$s asks to use your encryption key for X25519 key agreement. Allow it only if you just started this in %1$s.</string>
+    <string name="provider_x25519_key">Key: %1$s\n%2$s</string>
+    <string name="provider_x25519_count">Agreements: %1$d</string>
+    <string name="provider_x25519_card_body">%1$s asks to use the encryption key on your hardware key for X25519 key agreement. Allow it only if you just started this in %1$s. Enter the card PIN, then hold the key against the back of your phone.</string>
 </resources>

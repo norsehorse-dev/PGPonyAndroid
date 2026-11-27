@@ -369,6 +369,11 @@ class PGPonyOpenPgpService : Service() {
             // ── Remaining Phase 2 actions — contract-visible, stubbed ──
             OpenPgpApi.ACTION_UPDATE_AUTOCRYPT_PEER -> updateAutocryptPeer(data)
 
+            // 4.8.2 (item 1): PGPony's own actions (PGPonyActions), for StegPony.
+            PGPonyActions.ACTION_GET_CAPABILITIES -> capabilitiesResult()
+            PGPonyActions.ACTION_X25519_KEYS -> x25519Keys()
+            PGPonyActions.ACTION_X25519_AGREE -> x25519Agree(data, callingPackage)
+
             OpenPgpApi.ACTION_GET_SIGN_KEY_ID_LEGACY,
             OpenPgpApi.ACTION_BACKUP ->
                 errorResult(
@@ -1986,6 +1991,174 @@ class PGPonyOpenPgpService : Service() {
             null
         )
     }
+
+    // ── 4.8.2 (item 1): X25519 key agreement for StegPony ─────────────
+
+    private fun capabilitiesResult(): Intent = successResult().apply {
+        putExtra(PGPonyActions.EXTRA_CAPABILITIES, PGPonyActions.CAPABILITIES)
+        putExtra(PGPonyActions.EXTRA_API_LEVEL, PGPonyActions.API_LEVEL)
+        putExtra(PGPonyActions.EXTRA_X25519_MAX_POINTS, com.pgpony.android.crypto.X25519Agreement.MAX_POINTS)
+    }
+
+    /** One of the user's Curve25519 encryption subkeys the X25519 actions accept. */
+    private class OwnX25519(
+        val entity: com.pgpony.android.data.PGPKeyEntity,
+        val subkey: com.pgpony.android.crypto.X25519Subkeys.Subkey,
+        val onCard: Boolean
+    )
+
+    /**
+     * The user's own keys' usable Curve25519 encryption subkeys: those whose
+     * secret is on this device (not a stub), and on a card-backed key those in
+     * its decryption or authentication slot (all of them while the slots are
+     * unknown; the card itself is checked on the tap).
+     */
+    private fun ownX25519Subkeys(): List<OwnX25519> = runBlocking {
+        val now = System.currentTimeMillis()
+        repo.getAllKeysPlain()
+            .filter { it.isOwnKey && !it.isRevoked && it.deletedAt == null }
+            .flatMap { entity ->
+                runCatching<List<OwnX25519>> {
+                    val cert = repo.sshAuthCertificate(entity.fingerprint) ?: return@runCatching emptyList()
+                    val subs = com.pgpony.android.crypto.X25519Subkeys.usable(cert, now)
+                    if (subs.isEmpty()) return@runCatching emptyList()
+                    // A key pair's own secret first (a key pair can keep some subkeys
+                    // on a card and others here), then the card's slots.
+                    val ring = if (entity.isKeyPair) X25519SecretKeys.ring(repo, entity.fingerprint) else null
+                    val slots = listOfNotNull(entity.cardDecFingerprint, entity.cardAuthFingerprint)
+                        .map { it.filterNot(Char::isWhitespace) }
+                    subs.mapNotNull { s ->
+                        when {
+                            ring != null && X25519SecretKeys.key(ring, s.fingerprintHex) != null ->
+                                OwnX25519(entity, s, onCard = false)
+                            entity.isCardBacked && (slots.isEmpty() || slots.any { it.equals(s.fingerprintHex, ignoreCase = true) }) ->
+                                OwnX25519(entity, s, onCard = true)
+                            else -> null
+                        }
+                    }
+                }.getOrDefault(emptyList())
+            }
+    }
+
+    /** ACTION_X25519_KEYS: public data only, so the allow-list is the gate. */
+    private fun x25519Keys(): Intent {
+        val keys = ownX25519Subkeys()
+        val points = java.io.ByteArrayOutputStream().apply { keys.forEach { write(it.subkey.point) } }.toByteArray()
+        return successResult().apply {
+            putExtra(PGPonyActions.EXTRA_X25519_SUBKEY_FINGERPRINTS, keys.map { it.subkey.fingerprintHex }.toTypedArray())
+            putExtra(PGPonyActions.EXTRA_X25519_PRIMARY_FINGERPRINTS, keys.map { it.entity.fingerprint.uppercase() }.toTypedArray())
+            putExtra(PGPonyActions.EXTRA_X25519_PUBLIC_POINTS, points)
+            putExtra(PGPonyActions.EXTRA_X25519_LABELS, keys.map { it.entity.userID }.toTypedArray())
+            putExtra(PGPonyActions.EXTRA_X25519_ON_CARD, keys.map { it.onCard }.toBooleanArray())
+        }
+    }
+
+    /**
+     * ACTION_X25519_AGREE: one shared secret per point, never without the
+     * user's yes for this call. The first call parks the request and returns
+     * USER_INTERACTION_REQUIRED; the activity (ProviderX25519Activity for a
+     * key on the device, ProviderCardOpActivity for a security key) names
+     * the app and the key, does the work on Allow and returns the request,
+     * and the client's identical re-call collects the result once.
+     */
+    private fun x25519Agree(data: Intent, callingPackage: String): Intent {
+        val agreement = com.pgpony.android.crypto.X25519Agreement
+        val fp = agreement.normalizeFingerprint(data.getStringExtra(PGPonyActions.EXTRA_X25519_SUBKEY_FINGERPRINT))
+            ?: return x25519Refused(
+                com.pgpony.android.crypto.X25519Agreement.Refusal.INVALID_REQUEST,
+                "EXTRA_X25519_SUBKEY_FINGERPRINT must be a 40 or 64 digit hex fingerprint"
+            )
+        val rawPoints = data.getByteArrayExtra(PGPonyActions.EXTRA_X25519_POINTS)
+        try {
+            agreement.splitPoints(rawPoints)
+        } catch (e: com.pgpony.android.crypto.X25519Agreement.RefusedException) {
+            return x25519Refused(e.refusal, e.message ?: e.refusal.code)
+        }
+        val points = rawPoints!!
+        val opKey = agreement.opKey(PGPonyActions.ACTION_X25519_AGREE, callingPackage, fp, points)
+        ProviderCardOpStore.consumeCompleted(opKey)?.let { done ->
+            return when (done) {
+                is ProviderCardOpStore.CompletedOp.Agreed -> {
+                    val secrets = done.secrets.copyOf()
+                    done.secrets.fill(0)
+                    successResult().apply { putExtra(PGPonyActions.EXTRA_X25519_SECRETS, secrets) }
+                }
+                is ProviderCardOpStore.CompletedOp.AgreeFailed -> errorResult(OpenPgpError.GENERIC_ERROR, done.message).apply {
+                    putExtra(PGPonyActions.EXTRA_ERROR_REASON, done.reason)
+                }
+                else -> x25519Refused(com.pgpony.android.crypto.X25519Agreement.Refusal.AGREEMENT_FAILED, "Unexpected result")
+            }
+        }
+
+        val own = ownX25519Subkeys().firstOrNull { it.subkey.fingerprintHex.equals(fp, ignoreCase = true) }
+        if (own == null) {
+            val why = x25519WhyNot(fp)
+            return x25519Refused(why, x25519WhyNotMessage(why))
+        }
+
+        ProviderCardOpStore.putPending(
+            ProviderCardOpStore.PendingOp(
+                opKey = opKey,
+                action = PGPonyActions.ACTION_X25519_AGREE,
+                input = points.copyOf(),
+                cardEntityFingerprint = own.entity.fingerprint,
+                armor = false,
+                filename = null,
+                recipientFingerprints = emptyList(),
+                senderAddress = null,
+                clientPackage = callingPackage,
+                x25519SubkeyFingerprint = own.subkey.fingerprintHex,
+                clientPassphrase = data.getStringExtra(OpenPgpApi.EXTRA_PASSPHRASE)
+            )
+        )
+        if (own.onCard) return cardInteractionResult(opKey, data)
+        val confirm = Intent(this, ProviderX25519Activity::class.java).apply {
+            putExtra(ProviderX25519Activity.EXTRA_OP_KEY, opKey)
+            putExtra(ProviderX25519Activity.EXTRA_API_DATA, data)
+            setData(android.net.Uri.parse("pgpony-api-x25519://$opKey"))
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            7,
+            confirm,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return Intent().apply {
+            putExtra(OpenPgpApi.RESULT_CODE, OpenPgpApi.RESULT_CODE_USER_INTERACTION_REQUIRED)
+            putExtra(OpenPgpApi.RESULT_INTENT, pendingIntent)
+        }
+    }
+
+    /** Why [fp] is not one of [ownX25519Subkeys]: another kind of key of the
+     *  user's, a Curve25519 key that is not usable now, or no key of theirs. */
+    private fun x25519WhyNot(fp: String): com.pgpony.android.crypto.X25519Agreement.Refusal = runBlocking {
+        val now = System.currentTimeMillis()
+        val lookups = repo.getAllKeysPlain().filter { it.isOwnKey && it.deletedAt == null }.mapNotNull { entity ->
+            runCatching {
+                repo.sshAuthCertificate(entity.fingerprint)?.let { com.pgpony.android.crypto.X25519Subkeys.classify(it, fp, now) }
+            }.getOrNull()
+        }
+        when {
+            lookups.any { it is com.pgpony.android.crypto.X25519Subkeys.Lookup.NotCurve25519 } ->
+                com.pgpony.android.crypto.X25519Agreement.Refusal.UNSUPPORTED_KEY
+            lookups.any { it !is com.pgpony.android.crypto.X25519Subkeys.Lookup.Absent } ->
+                com.pgpony.android.crypto.X25519Agreement.Refusal.KEY_UNAVAILABLE
+            else -> com.pgpony.android.crypto.X25519Agreement.Refusal.UNKNOWN_KEY
+        }
+    }
+
+    private fun x25519WhyNotMessage(r: com.pgpony.android.crypto.X25519Agreement.Refusal): String = when (r) {
+        com.pgpony.android.crypto.X25519Agreement.Refusal.UNSUPPORTED_KEY ->
+            "This key is not a Curve25519 encryption subkey. X25519 key agreement works only with X25519 and Curve25519 ECDH encryption subkeys."
+        com.pgpony.android.crypto.X25519Agreement.Refusal.KEY_UNAVAILABLE ->
+            "This key can't be used now: it is revoked, expired, not bound for encryption, or its secret is not on this device."
+        else -> "None of your PGPony keys has this subkey."
+    }
+
+    private fun x25519Refused(r: com.pgpony.android.crypto.X25519Agreement.Refusal, message: String): Intent =
+        errorResult(OpenPgpError.GENERIC_ERROR, message).apply {
+            putExtra(PGPonyActions.EXTRA_ERROR_REASON, r.code)
+        }
 
     // ── P2c: card-flow helpers ─────────────────────────────────────────
 

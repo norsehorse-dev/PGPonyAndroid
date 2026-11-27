@@ -100,8 +100,12 @@ object CompositeSecretProtection {
         val subSecBody = compositePublicBody + byteArrayOf(0) + secretMaterial
         val assembled = throwawayRing.encoded + packet(7, subSecBody)
         val ring = PGPSecretKeyRing(ByteArrayInputStream(assembled), JcaKeyFingerprintCalculator())
+        // 4.8.2: the subkey, never the throwaway primary. The primary is
+        // Ed25519 (27), so for an Ed25519 subkey a match on the algorithm
+        // alone picked the primary and protected its secret in place of the
+        // subkey's, losing the subkey's secret.
         val compositeSub = ring.secretKeys.asSequence()
-            .firstOrNull { it.publicKey.algorithm == compositeAlgo }
+            .firstOrNull { !it.isMasterKey && it.publicKey.algorithm == compositeAlgo }
             ?: throw ProtectedKeyException("BouncyCastle did not retain the composite subkey for protection")
 
         // BC's own AEAD + Argon2id protection (RFC 9580 usage 253), the same path

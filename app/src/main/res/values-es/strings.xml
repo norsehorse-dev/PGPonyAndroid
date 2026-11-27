@@ -3247,4 +3247,10 @@ Opcionalmente, bloquea la app con tu huella digital o cara para mayor tranquilid
         <item quantity="many">Se quitaron porque la clave principal que elegiste no puede contenerlas: %1$s.</item>
         <item quantity="other">Se quitaron porque la clave principal que elegiste no puede contenerlas: %1$s.</item>
     </plurals>
+    <!-- 4.8.2 (item 1): X25519 key agreement through the provider (StegPony). -->
+    <string name="provider_x25519_title">¿Permitir el acuerdo de claves?</string>
+    <string name="provider_x25519_body">%1$s quiere usar tu clave de cifrado para un acuerdo de claves X25519. Permítelo solo si acabas de iniciarlo en %1$s.</string>
+    <string name="provider_x25519_key">Clave: %1$s\n%2$s</string>
+    <string name="provider_x25519_count">Acuerdos: %1$d</string>
+    <string name="provider_x25519_card_body">%1$s quiere usar la clave de cifrado de tu llave de hardware para un acuerdo de claves X25519. Permítelo solo si acabas de iniciarlo en %1$s. Introduce el PIN de la tarjeta y acerca la llave a la parte trasera del teléfono.</string>
 </resources>

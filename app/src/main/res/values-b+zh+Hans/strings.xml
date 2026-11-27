@@ -3270,4 +3270,10 @@
     <plurals name="keyring_generate_granular_dropped_named">
         <item quantity="other">已移除，因为你选择的主钥无法容纳：%1$s。</item>
     </plurals>
+    <!-- 4.8.2 (item 1): X25519 key agreement through the provider (StegPony). -->
+    <string name="provider_x25519_title">允许密钥协商吗？</string>
+    <string name="provider_x25519_body">%1$s 想要使用你的加密密钥进行 X25519 密钥协商。请仅在你刚刚于 %1$s 中发起此操作时允许。</string>
+    <string name="provider_x25519_key">密钥：%1$s\n%2$s</string>
+    <string name="provider_x25519_count">协商次数：%1$d</string>
+    <string name="provider_x25519_card_body">%1$s 想要使用你硬件密钥上的加密密钥进行 X25519 密钥协商。请仅在你刚刚于 %1$s 中发起此操作时允许。输入卡 PIN，然后将密钥贴紧手机背面。</string>
 </resources>

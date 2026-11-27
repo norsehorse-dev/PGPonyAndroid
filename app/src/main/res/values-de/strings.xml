@@ -3227,4 +3227,10 @@ Optional kannst du die App hinter deinem Fingerabdruck oder Gesicht sperren, um 
         <item quantity="one">Entfernt, weil der gewählte Hauptschlüssel ihn nicht aufnehmen kann: %1$s.</item>
         <item quantity="other">Entfernt, weil der gewählte Hauptschlüssel sie nicht aufnehmen kann: %1$s.</item>
     </plurals>
+    <!-- 4.8.2 (item 1): X25519 key agreement through the provider (StegPony). -->
+    <string name="provider_x25519_title">Schlüsselvereinbarung erlauben?</string>
+    <string name="provider_x25519_body">%1$s möchte deinen Verschlüsselungsschlüssel für eine X25519-Schlüsselvereinbarung verwenden. Erlaube das nur, wenn du den Vorgang gerade selbst in %1$s gestartet hast.</string>
+    <string name="provider_x25519_key">Schlüssel: %1$s\n%2$s</string>
+    <string name="provider_x25519_count">Vereinbarungen: %1$d</string>
+    <string name="provider_x25519_card_body">%1$s möchte den Verschlüsselungsschlüssel auf deinem Hardware-Schlüssel für eine X25519-Schlüsselvereinbarung verwenden. Erlaube das nur, wenn du den Vorgang gerade selbst in %1$s gestartet hast. Gib die Karten-PIN ein und halte den Schlüssel dann an die Rückseite deines Telefons.</string>
 </resources>
